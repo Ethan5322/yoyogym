@@ -1,0 +1,33 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "buildCommand": "npm run build",
+  "outputDirectory": "dist",
+  "rewrites": [
+    { "source": "/((?!api/).*)", "destination": "/index.html" }
+  ],
+  "headers": [
+    {
+      "source": "/(.*)",
+      "headers": [
+        { "key": "X-Content-Type-Options", "value": "nosniff" },
+        { "key": "X-Frame-Options", "value": "SAMEORIGIN" },
+        { "key": "Referrer-Policy", "value": "strict-origin-when-cross-origin" },
+        { "key": "Permissions-Policy", "value": "geolocation=(), microphone=(), camera=()" },
+        { "key": "Strict-Transport-Security", "value": "max-age=31536000; includeSubDomains" }
+      ]
+    }
+  ],
+  "functions": {
+    "api/**/*.js": {
+      "maxDuration": 15
+    }
+  },
+  "crons": [
+    { "path": "/api/cron/retry-suspend", "schedule": "0 * * * *" },
+    { "path": "/api/cron/class-reminders", "schedule": "0 6 * * *" },
+    { "path": "/api/cron/billing", "schedule": "0 8 * * *" },
+    { "path": "/api/cron/expiry", "schedule": "0 9 * * *" },
+    { "path": "/api/cron/reengagement", "schedule": "0 10 * * *" },
+    { "path": "/api/cron/daily-summary", "schedule": "0 20 * * *" }
+  ]
+}

@@ -1,0 +1,33 @@
+{
+  "name": "premium-ai-gym-system",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Premium AI Gym Membership & Booking Automation System — MuleSoo Digital Solutions",
+  "scripts": {
+    "dev": "vite",
+    "dev:api": "node scripts/dev-server.js",
+    "build": "vite build",
+    "preview": "vite preview",
+    "seed:owner": "node scripts/seed-owner.js",
+    "seed:catalog": "node scripts/seed-catalog.js"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.45.4",
+    "bcryptjs": "^2.4.3",
+    "jsonwebtoken": "^9.0.2",
+    "jspdf": "^4.2.1",
+    "qrcode": "^1.5.4",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "react-router-dom": "^6.26.2"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-react": "^4.3.1",
+    "autoprefixer": "^10.4.20",
+    "dotenv": "^16.4.5",
+    "postcss": "^8.4.47",
+    "tailwindcss": "^3.4.13",
+    "vite": "^5.4.8"
+  }
+}
