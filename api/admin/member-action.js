@@ -7,7 +7,7 @@ import { getSupabase } from '../_lib/supabase.js';
 import { allowMethods, readJsonBody, ok, badRequest, serverError } from '../_lib/http.js';
 import { requireRole } from '../_lib/auth.js';
 import { generateVerificationCode } from '../_lib/identifiers.js';
-import { DURATION_MONTHS } from '../../shared/pricing.js';
+import { DURATION_MONTHS, computeMembership } from '../../shared/pricing.js';
 
 const isoDate = (d) => d.toISOString().slice(0, 10);
 function addMonths(date, n) {
@@ -21,7 +21,8 @@ export default async function handler(req, res) {
   const id = new URL(req.url, 'http://localhost').searchParams.get('id');
   if (!id) return badRequest(res, 'id is required.');
 
-  const { action } = await readJsonBody(req);
+  const body = await readJsonBody(req);
+  const { action } = body;
   const allowed = action === 'checkin' ? ['owner', 'manager', 'reception'] : ['owner', 'manager'];
   const admin = requireRole(req, res, allowed);
   if (!admin) return;
@@ -75,6 +76,40 @@ export default async function handler(req, res) {
       await supabase.from('members').update({ status: 'active', updated_at: new Date().toISOString() }).eq('id', id);
 
       return ok(res, { message: `Membership renewed${membership.visit_type === 'full' ? ` until ${newEnd}` : ''}.` });
+    }
+
+    if (action === 'change_plan') {
+      if (!body.plan_id) return badRequest(res, 'plan_id is required.');
+      const { data: plan } = await supabase
+        .from('plans')
+        .select('*')
+        .eq('id', body.plan_id)
+        .eq('is_enabled', true)
+        .maybeSingle();
+      if (!plan) return badRequest(res, 'Plan not available.');
+
+      const { data: membership } = await supabase
+        .from('memberships')
+        .select('id, contract_duration')
+        .eq('member_id', id)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (!membership) return badRequest(res, 'No membership to change.');
+
+      const m = computeMembership(plan, membership.contract_duration);
+      await supabase
+        .from('memberships')
+        .update({
+          plan_id: plan.id,
+          visit_type: m.visit_type,
+          tier: m.tier,
+          monthly_amount: m.monthly_amount,
+          sessions_total: m.sessions_total,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', membership.id);
+      return ok(res, { message: `Plan changed to ${plan.name}.` });
     }
 
     return badRequest(res, 'Unknown action.');

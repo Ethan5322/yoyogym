@@ -20,6 +20,16 @@ export default function PaymentsAdmin() {
   }
   useEffect(load, [status]);
 
+  async function refund(p) {
+    if (!confirm(`Mark ${zar(p.amount)} payment from ${p.member_name} as refunded?`)) return;
+    try {
+      await apiFetch(`/admin/payments?id=${p.id}`, { method: 'PATCH', body: { refunded_amount: p.amount } });
+      load();
+    } catch (e) {
+      setError(e.message);
+    }
+  }
+
   function exportCsv() {
     if (!data) return;
     const rows = [['Date', 'Member', 'Number', 'Category', 'Amount', 'Status', 'Method']];
@@ -64,7 +74,7 @@ export default function PaymentsAdmin() {
           <div className="mt-4 overflow-x-auto rounded-xl border border-white/5">
             <table className="w-full text-sm">
               <thead className="bg-surface text-left text-muted">
-                <tr><th className="px-3 py-2">Date</th><th className="px-3 py-2">Member</th><th className="px-3 py-2">Category</th><th className="px-3 py-2">Amount</th><th className="px-3 py-2">Status</th></tr>
+                <tr><th className="px-3 py-2">Date</th><th className="px-3 py-2">Member</th><th className="px-3 py-2">Category</th><th className="px-3 py-2">Amount</th><th className="px-3 py-2">Status</th><th className="px-3 py-2"></th></tr>
               </thead>
               <tbody>
                 {data.payments.map((p) => (
@@ -74,6 +84,11 @@ export default function PaymentsAdmin() {
                     <td className="px-3 py-2 text-muted">{p.category}</td>
                     <td className="px-3 py-2 text-body">{zar(p.amount)}</td>
                     <td className="px-3 py-2"><span className="text-accent">{p.status}</span></td>
+                    <td className="px-3 py-2 text-right">
+                      {p.status === 'received' && (
+                        <button className="text-xs text-error hover:underline" onClick={() => refund(p)}>Refund</button>
+                      )}
+                    </td>
                   </tr>
                 ))}
               </tbody>

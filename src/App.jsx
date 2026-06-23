@@ -28,7 +28,7 @@ const Catalog = lazy(() => import('./pages/admin/Catalog.jsx'));
 const Settings = lazy(() => import('./pages/admin/Settings.jsx'));
 const ManualRegister = lazy(() => import('./pages/admin/ManualRegister.jsx'));
 const QrCodes = lazy(() => import('./pages/admin/QrCodes.jsx'));
-const Placeholder = lazy(() => import('./pages/admin/Placeholder.jsx'));
+const Clients = lazy(() => import('./pages/admin/Clients.jsx'));
 
 const owner = ['owner'];
 const mgr = ['owner', 'manager'];
@@ -68,7 +68,7 @@ export default function App() {
         <Route path="/admin/catalog" element={guard(mgr, <Catalog />)} />
         <Route path="/admin/qr-codes" element={guard(mgr, <QrCodes />)} />
         <Route path="/admin/settings" element={guard(owner, <Settings />)} />
-        <Route path="/admin/clients" element={guard(trainer, <Placeholder title="My Clients" phase="a future update" />)} />
+        <Route path="/admin/clients" element={guard(trainer, <Clients />)} />
 
         <Route path="/admin/*" element={<Navigate to="/admin" replace />} />
         <Route path="*" element={<NotFound />} />

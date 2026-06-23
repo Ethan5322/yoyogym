@@ -16,6 +16,11 @@ export default function MemberDetail() {
   const [error, setError] = useState('');
   const [notes, setNotes] = useState('');
   const [savedMsg, setSavedMsg] = useState('');
+  const [plans, setPlans] = useState([]);
+
+  useEffect(() => {
+    apiFetch('/admin/plans').then((d) => setPlans(d.plans || [])).catch(() => {});
+  }, []);
 
   async function deleteMember() {
     if (!confirm('Permanently delete this member and ALL their data? This cannot be undone (POPIA erasure).')) return;
@@ -48,10 +53,10 @@ export default function MemberDetail() {
     }
   }
 
-  async function action(name) {
+  async function action(name, extra = {}) {
     setSavedMsg('');
     try {
-      const r = await apiFetch(`/admin/member-action?id=${id}`, { method: 'POST', body: { action: name } });
+      const r = await apiFetch(`/admin/member-action?id=${id}`, { method: 'POST', body: { action: name, ...extra } });
       setSavedMsg(r.message || 'Done.');
       load();
     } catch (e) {
@@ -91,6 +96,20 @@ export default function MemberDetail() {
         </div>
       </div>
       {savedMsg && <p className="mt-2 text-sm text-success">{savedMsg}</p>}
+
+      <div className="mt-3 flex items-center gap-2">
+        <span className="text-sm text-muted">Change plan:</span>
+        <select
+          className="field w-auto py-1.5 text-sm"
+          defaultValue=""
+          onChange={(e) => e.target.value && action('change_plan', { plan_id: e.target.value })}
+        >
+          <option value="">Select plan…</option>
+          {plans.map((p) => (
+            <option key={p.id} value={p.id}>{p.name}</option>
+          ))}
+        </select>
+      </div>
 
       {m.parq_flag && (
         <p className="mt-4 rounded-lg bg-error/10 px-3 py-2 text-sm text-error">

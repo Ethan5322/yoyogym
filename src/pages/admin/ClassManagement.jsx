@@ -1,4 +1,5 @@
-// Class management (spec 4.7): list, create, edit, delete classes.
+// Class management (spec 4.7): list, create, edit, delete classes, view
+// bookings, cancel an occurrence and notify, message booked members.
 import { useEffect, useState } from 'react';
 import AdminShell from '../../components/AdminShell.jsx';
 import { apiFetch } from '../../lib/api.js';
@@ -14,6 +15,7 @@ export default function ClassManagement() {
   const [classes, setClasses] = useState([]);
   const [trainers, setTrainers] = useState([]);
   const [form, setForm] = useState(null);
+  const [bookingsFor, setBookingsFor] = useState(null);
   const [error, setError] = useState('');
 
   function load() {
@@ -59,6 +61,7 @@ export default function ClassManagement() {
               </div>
             </div>
             <div className="flex gap-2">
+              <button className="btn-outline px-3 py-1 text-sm" onClick={() => setBookingsFor(c)}>Bookings</button>
               <button className="btn-outline px-3 py-1 text-sm" onClick={() => setForm({ ...blank, ...c, trainer_id: c.trainer_id || '', allowed_tiers: c.allowed_tiers || [] })}>Edit</button>
               <button className="text-sm text-error" onClick={() => remove(c.id)}>Delete</button>
             </div>
@@ -66,6 +69,8 @@ export default function ClassManagement() {
         ))}
         {!classes.length && <p className="text-muted">No classes yet.</p>}
       </div>
+
+      {bookingsFor && <BookingsModal klass={bookingsFor} onClose={() => setBookingsFor(null)} />}
 
       {form && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4" onClick={() => setForm(null)}>
@@ -109,5 +114,92 @@ export default function ClassManagement() {
         </div>
       )}
     </AdminShell>
+  );
+}
+
+function BookingsModal({ klass, onClose }) {
+  const [bookings, setBookings] = useState(null);
+  const [msg, setMsg] = useState('');
+  const [notice, setNotice] = useState('');
+
+  function load() {
+    apiFetch(`/admin/class-bookings?class_id=${klass.id}`)
+      .then((d) => setBookings(d.bookings))
+      .catch((e) => setMsg(e.message));
+  }
+  useEffect(load, [klass.id]);
+
+  // group by date
+  const byDate = {};
+  (bookings || []).forEach((b) => {
+    (byDate[b.session_date] ||= []).push(b);
+  });
+
+  async function cancelDate(date) {
+    if (!confirm(`Cancel ${klass.name} on ${date} and email booked members?`)) return;
+    try {
+      const r = await apiFetch('/admin/class-bookings', { method: 'POST', body: { class_id: klass.id, session_date: date, op: 'cancel' } });
+      setMsg(`Cancelled ${r.cancelled} booking(s), emailed ${r.emailed}.`);
+      load();
+    } catch (e) {
+      setMsg(e.message);
+    }
+  }
+  async function notifyDate(date) {
+    if (!notice.trim()) {
+      setMsg('Type a message first.');
+      return;
+    }
+    try {
+      const r = await apiFetch('/admin/class-bookings', { method: 'POST', body: { class_id: klass.id, session_date: date, op: 'notify', message: notice } });
+      setMsg(`Emailed ${r.emailed} member(s).`);
+      setNotice('');
+    } catch (e) {
+      setMsg(e.message);
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4" onClick={onClose}>
+      <div className="card w-full max-w-lg space-y-3" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center justify-between">
+          <h2 className="font-display uppercase text-body">{klass.name} — Bookings</h2>
+          <button className="text-sm text-muted" onClick={onClose}>Close</button>
+        </div>
+        {msg && <p className="rounded bg-elevated px-3 py-2 text-sm text-body">{msg}</p>}
+        {!bookings && <p className="text-muted">Loading…</p>}
+        {bookings && !bookings.length && <p className="text-muted">No upcoming bookings.</p>}
+
+        <div className="max-h-[40vh] space-y-3 overflow-y-auto">
+          {Object.entries(byDate).map(([date, list]) => (
+            <div key={date} className="rounded-lg border border-white/10 p-3">
+              <div className="mb-2 flex items-center justify-between">
+                <span className="font-display text-body">{date}</span>
+                <button className="text-xs text-error hover:underline" onClick={() => cancelDate(date)}>Cancel &amp; notify</button>
+              </div>
+              {list.map((b) => (
+                <div key={b.id} className="flex justify-between text-sm">
+                  <span className="text-body">{b.member_name}</span>
+                  <span className="text-muted">{b.status}</span>
+                </div>
+              ))}
+            </div>
+          ))}
+        </div>
+
+        {bookings && bookings.length > 0 && (
+          <div className="space-y-2 border-t border-white/10 pt-3">
+            <textarea className="field min-h-[60px]" placeholder="Message to booked members…" value={notice} onChange={(e) => setNotice(e.target.value)} />
+            <div className="flex flex-wrap gap-2">
+              {Object.keys(byDate).map((date) => (
+                <button key={date} className="btn-outline px-3 py-1 text-xs" onClick={() => notifyDate(date)}>
+                  Notify {date}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
   );
 }
