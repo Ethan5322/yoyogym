@@ -1,7 +1,6 @@
-// Minimal local API server so the /api serverless functions run during
-// development without the Vercel CLI. Vite (port 5173) proxies /api here.
-// Maps /api/<path> -> api/<path>.js and invokes its default export, adding the
-// Vercel-style res.status() helper the handlers expect.
+// Local API server matching Vercel's catch-all routing. Routes /api/<domain>/*
+// to api/<domain>/[...path].js (or the root api/[...path].js), populating
+// req.query.path so the routers work exactly as on Vercel.
 import 'dotenv/config';
 import http from 'node:http';
 import path from 'node:path';
@@ -9,33 +8,46 @@ import { existsSync } from 'node:fs';
 import { pathToFileURL } from 'node:url';
 
 const PORT = process.env.DEV_API_PORT || 3000;
+const ROUTER_FOLDERS = ['auth', 'member', 'payments', 'admin', 'cron'];
 
 const server = http.createServer(async (req, res) => {
-  // Vercel-style helper used throughout the handlers.
   res.status = (code) => {
     res.statusCode = code;
     return res;
   };
 
-  if (!req.url.startsWith('/api/')) {
+  const url = new URL(req.url, 'http://localhost');
+  if (!url.pathname.startsWith('/api/')) {
     res.status(404).end('Local API server — open the app via Vite on http://localhost:5173');
     return;
   }
 
-  const clean = req.url.split('?')[0].replace(/^\/api\//, '');
-  const file = path.resolve('api', `${clean}.js`);
+  const segs = url.pathname.replace(/^\/api\//, '').split('/').filter(Boolean);
+  let routerFile;
+  let pathParam;
+  if (ROUTER_FOLDERS.includes(segs[0])) {
+    routerFile = path.resolve('api', segs[0], '[...path].js');
+    pathParam = segs.slice(1);
+  } else {
+    routerFile = path.resolve('api', '[...path].js');
+    pathParam = segs;
+  }
 
-  if (!existsSync(file)) {
+  if (!existsSync(routerFile)) {
     res.status(404).setHeader('content-type', 'application/json');
-    res.end(JSON.stringify({ error: `No API route: ${clean}` }));
+    res.end(JSON.stringify({ error: `No router for /api/${segs.join('/')}` }));
     return;
   }
 
+  // Emulate Vercel's req.query (string params + catch-all path array).
+  req.query = Object.fromEntries(url.searchParams.entries());
+  req.query.path = pathParam;
+
   try {
-    const mod = await import(`${pathToFileURL(file).href}?t=${Date.now()}`); // bust cache for edits
+    const mod = await import(`${pathToFileURL(routerFile).href}?t=${Date.now()}`);
     await mod.default(req, res);
   } catch (err) {
-    console.error('API handler error:', clean, err);
+    console.error('API error:', segs.join('/'), err);
     if (!res.headersSent) {
       res.status(500).setHeader('content-type', 'application/json');
       res.end(JSON.stringify({ error: err.message }));
@@ -43,4 +55,4 @@ const server = http.createServer(async (req, res) => {
   }
 });
 
-server.listen(PORT, () => console.log(`Local API server running on http://localhost:${PORT}`));
+server.listen(PORT, () => console.log(`Local API server (catch-all) on http://localhost:${PORT}`));
