@@ -5,15 +5,11 @@ import verify from '../_handlers/payments/verify.js';
 import webhook from '../_handlers/payments/webhook.js';
 import purchasePack from '../_handlers/payments/purchase-pack.js';
 
-const routes = {
-  initialize,
-  verify,
-  webhook,
-  'purchase-pack': purchasePack,
-};
+const routes = { initialize, verify, webhook, 'purchase-pack': purchasePack };
 
 export default function handler(req, res) {
-  const seg = (req.query?.path || [])[0];
+  const parts = new URL(req.url, 'http://localhost').pathname.split('/').filter(Boolean);
+  const seg = parts[2];
   const fn = routes[seg];
   if (!fn) return json(res, 404, { error: `Not found: /api/payments/${seg || ''}` });
   return fn(req, res);

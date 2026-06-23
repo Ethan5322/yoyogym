@@ -19,7 +19,8 @@ const routes = {
 };
 
 export default function handler(req, res) {
-  const seg = (req.query?.path || [])[0];
+  const parts = new URL(req.url, 'http://localhost').pathname.split('/').filter(Boolean);
+  const seg = parts[2];
   const fn = routes[seg];
   if (!fn) return json(res, 404, { error: `Not found: /api/cron/${seg || ''}` });
   return fn(req, res);

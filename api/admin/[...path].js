@@ -1,5 +1,5 @@
-// Admin router — /api/admin/* . Routes by first path segment to the handler in
-// api/_handlers/admin/** (kept out of the function count via the _ prefix).
+// Admin router — /api/admin/* . Resolves the route from req.url; logic lives in
+// api/_handlers/admin/** (underscore = excluded from the function count).
 import { json } from '../_lib/http.js';
 import dashboard from '../_handlers/admin/dashboard.js';
 import verify from '../_handlers/admin/verify.js';
@@ -44,7 +44,8 @@ const routes = {
 };
 
 export default function handler(req, res) {
-  const seg = (req.query?.path || [])[0];
+  const parts = new URL(req.url, 'http://localhost').pathname.split('/').filter(Boolean);
+  const seg = parts[2];
   const fn = routes[seg];
   if (!fn) return json(res, 404, { error: `Not found: /api/admin/${seg || ''}` });
   return fn(req, res);
