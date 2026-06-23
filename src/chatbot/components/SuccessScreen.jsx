@@ -22,6 +22,8 @@ export default function SuccessScreen({ result, paid = false }) {
           verification_code: result.verification_code,
         },
       });
+      // Company QR points members to the online portal (check-in / manage).
+      data.companyUrl = data.gym?.website || `${window.location.origin}/member`;
       // Lazy-loaded so jsPDF is not in the initial bundle (keeps load fast).
       const { generateMembershipPdf } = await import('../../lib/pdf/generateMembershipPdf.js');
       await generateMembershipPdf(data);
