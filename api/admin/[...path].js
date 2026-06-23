@@ -1,25 +1,25 @@
 // Admin router — /api/admin/* . Resolves the route from req.url; logic lives in
-// api/_handlers/admin/** (underscore = excluded from the function count).
-import { json } from '../_lib/http.js';
-import dashboard from '../_handlers/admin/dashboard.js';
-import verify from '../_handlers/admin/verify.js';
-import members from '../_handlers/admin/members.js';
-import member from '../_handlers/admin/member.js';
-import memberAction from '../_handlers/admin/member-action.js';
-import today from '../_handlers/admin/today.js';
-import classes from '../_handlers/admin/classes.js';
-import classBookings from '../_handlers/admin/class-bookings.js';
-import trainers from '../_handlers/admin/trainers.js';
-import payments from '../_handlers/admin/payments.js';
-import analytics from '../_handlers/admin/analytics.js';
-import broadcast from '../_handlers/admin/broadcast.js';
-import plans from '../_handlers/admin/plans.js';
-import addons from '../_handlers/admin/addons.js';
-import settings from '../_handlers/admin/settings.js';
-import qrStats from '../_handlers/admin/qr-stats.js';
-import events from '../_handlers/admin/events.js';
-import clients from '../_handlers/admin/clients.js';
-import trainingSession from '../_handlers/admin/training-session.js';
+// /server/handlers/admin (outside /api, so not counted as functions).
+import { json } from '../../server/lib/http.js';
+import dashboard from '../../server/handlers/admin/dashboard.js';
+import verify from '../../server/handlers/admin/verify.js';
+import members from '../../server/handlers/admin/members.js';
+import member from '../../server/handlers/admin/member.js';
+import memberAction from '../../server/handlers/admin/member-action.js';
+import today from '../../server/handlers/admin/today.js';
+import classes from '../../server/handlers/admin/classes.js';
+import classBookings from '../../server/handlers/admin/class-bookings.js';
+import trainers from '../../server/handlers/admin/trainers.js';
+import payments from '../../server/handlers/admin/payments.js';
+import analytics from '../../server/handlers/admin/analytics.js';
+import broadcast from '../../server/handlers/admin/broadcast.js';
+import plans from '../../server/handlers/admin/plans.js';
+import addons from '../../server/handlers/admin/addons.js';
+import settings from '../../server/handlers/admin/settings.js';
+import qrStats from '../../server/handlers/admin/qr-stats.js';
+import events from '../../server/handlers/admin/events.js';
+import clients from '../../server/handlers/admin/clients.js';
+import trainingSession from '../../server/handlers/admin/training-session.js';
 
 const routes = {
   dashboard,

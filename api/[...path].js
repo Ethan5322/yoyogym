@@ -1,13 +1,12 @@
-// Root API router. Resolves the route from req.url (robust across Vercel +
-// local dev) so existing public URLs stay identical. Logic lives in
-// api/_handlers/** (underscore = not counted toward the function limit).
-import { json } from './_lib/http.js';
-import health from './_handlers/public/health.js';
-import catalog from './_handlers/public/catalog.js';
-import content from './_handlers/public/content.js';
-import register from './_handlers/public/register.js';
-import scan from './_handlers/public/scan.js';
-import document from './_handlers/public/document.js';
+// Root API router. Resolves the route from req.url. Logic lives in /server
+// (outside /api), so only the 6 router files count as Serverless Functions.
+import { json } from '../server/lib/http.js';
+import health from '../server/handlers/public/health.js';
+import catalog from '../server/handlers/public/catalog.js';
+import content from '../server/handlers/public/content.js';
+import register from '../server/handlers/public/register.js';
+import scan from '../server/handlers/public/scan.js';
+import document from '../server/handlers/public/document.js';
 
 const routes = { health, catalog, content, register, scan, 'members/document': document };
 

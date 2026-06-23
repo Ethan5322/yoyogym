@@ -1,12 +1,12 @@
 // Cron router — /api/cron/* (daily orchestrator + individual jobs).
-import { json } from '../_lib/http.js';
-import daily from '../_handlers/cron/daily.js';
-import billing from '../_handlers/cron/billing.js';
-import retrySuspend from '../_handlers/cron/retry-suspend.js';
-import expiry from '../_handlers/cron/expiry.js';
-import classReminders from '../_handlers/cron/class-reminders.js';
-import dailySummary from '../_handlers/cron/daily-summary.js';
-import reengagement from '../_handlers/cron/reengagement.js';
+import { json } from '../../server/lib/http.js';
+import daily from '../../server/handlers/cron/daily.js';
+import billing from '../../server/handlers/cron/billing.js';
+import retrySuspend from '../../server/handlers/cron/retry-suspend.js';
+import expiry from '../../server/handlers/cron/expiry.js';
+import classReminders from '../../server/handlers/cron/class-reminders.js';
+import dailySummary from '../../server/handlers/cron/daily-summary.js';
+import reengagement from '../../server/handlers/cron/reengagement.js';
 
 const routes = {
   daily,

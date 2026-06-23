@@ -1,9 +1,9 @@
 // Payments router — /api/payments/* (initialize, verify, webhook, purchase-pack).
-import { json } from '../_lib/http.js';
-import initialize from '../_handlers/payments/initialize.js';
-import verify from '../_handlers/payments/verify.js';
-import webhook from '../_handlers/payments/webhook.js';
-import purchasePack from '../_handlers/payments/purchase-pack.js';
+import { json } from '../../server/lib/http.js';
+import initialize from '../../server/handlers/payments/initialize.js';
+import verify from '../../server/handlers/payments/verify.js';
+import webhook from '../../server/handlers/payments/webhook.js';
+import purchasePack from '../../server/handlers/payments/purchase-pack.js';
 
 const routes = { initialize, verify, webhook, 'purchase-pack': purchasePack };
 
