@@ -58,6 +58,13 @@ export default function VerifyScreen() {
           {result.granted ? (
             <>
               <div className="font-display text-2xl uppercase text-success">✓ Access Granted</div>
+              {result.member.photo_url && (
+                <img
+                  src={result.member.photo_url}
+                  alt={result.member.full_name}
+                  className="mt-4 h-24 w-24 rounded-full border-2 border-success object-cover"
+                />
+              )}
               <div className="mt-4 grid gap-2 sm:grid-cols-2">
                 <Field label="Name" value={result.member.full_name} />
                 <Field label="Membership No." value={result.member.membership_number} />

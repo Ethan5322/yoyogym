@@ -48,6 +48,17 @@ export default function MemberDetail() {
     }
   }
 
+  async function action(name) {
+    setSavedMsg('');
+    try {
+      const r = await apiFetch(`/admin/member-action?id=${id}`, { method: 'POST', body: { action: name } });
+      setSavedMsg(r.message || 'Done.');
+      load();
+    } catch (e) {
+      setSavedMsg(e.message);
+    }
+  }
+
   if (error) return <AdminShell><p className="text-error">{error}</p></AdminShell>;
   if (!data) return <AdminShell><p className="text-muted">Loading…</p></AdminShell>;
 
@@ -62,18 +73,24 @@ export default function MemberDetail() {
           <h1 className="text-2xl font-bold uppercase text-body">{m.full_name}</h1>
           <p className="text-muted">{m.membership_number} · <span className="text-accent">{m.status}</span></p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
+          <button className="btn-primary px-3 py-2 text-sm" onClick={() => action('checkin')}>Check in</button>
+          <button className="btn-outline px-3 py-2 text-sm" onClick={() => action('renew')}>Renew</button>
+          <button className="btn-outline px-3 py-2 text-sm" onClick={() => action('regenerate_code')}>New code</button>
+          {m.phone && (
+            <a className="btn-outline px-3 py-2 text-sm" href={`https://wa.me/${m.phone.replace(/[^0-9]/g, '')}`} target="_blank" rel="noreferrer">WhatsApp</a>
+          )}
+          {m.email && (
+            <a className="btn-outline px-3 py-2 text-sm" href={`mailto:${m.email}`}>Email</a>
+          )}
           {m.status === 'suspended' ? (
-            <button className="btn-primary px-4 py-2 text-sm" onClick={() => patch({ status: 'active' })}>
-              Reactivate
-            </button>
+            <button className="btn-primary px-3 py-2 text-sm" onClick={() => patch({ status: 'active' })}>Reactivate</button>
           ) : (
-            <button className="btn-outline px-4 py-2 text-sm" onClick={() => patch({ status: 'suspended' })}>
-              Suspend
-            </button>
+            <button className="btn-outline px-3 py-2 text-sm" onClick={() => patch({ status: 'suspended' })}>Suspend</button>
           )}
         </div>
       </div>
+      {savedMsg && <p className="mt-2 text-sm text-success">{savedMsg}</p>}
 
       {m.parq_flag && (
         <p className="mt-4 rounded-lg bg-error/10 px-3 py-2 text-sm text-error">
