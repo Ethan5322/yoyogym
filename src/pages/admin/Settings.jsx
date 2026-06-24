@@ -50,10 +50,84 @@ export default function Settings() {
         numeric
         onSave={(v) => save('contract_discounts', v, 'payment')} />
 
+      <ComplianceSection initial={s.compliance} saved={savedKey === 'compliance'} onSave={(v) => save('compliance', v, 'access')} />
+
       <TextSection title="Indemnity Waiver" k="indemnity_text" value={s.indemnity_text?.text || ''} saved={savedKey === 'indemnity_text'} onSave={(text) => save('indemnity_text', { text }, 'terms')} />
       <TextSection title="Membership Contract" k="contract_text" value={s.contract_text?.text || ''} saved={savedKey === 'contract_text'} onSave={(text) => save('contract_text', { text }, 'terms')} />
       <TextSection title="POPIA Privacy Policy" k="popia_text" value={s.popia_text?.text || ''} saved={savedKey === 'popia_text'} onSave={(text) => save('popia_text', { text }, 'terms')} />
     </AdminShell>
+  );
+}
+
+const TIERS = ['basic', 'standard', 'premium', 'vip'];
+const DEFAULT_COMPLIANCE = {
+  capacity: 120,
+  session_minutes: 120,
+  peak_hours: { start: 17, end: 20 },
+  plan_rules: {
+    basic: { access: 'off_peak', classes_per_month: 0 },
+    standard: { access: 'anytime', classes_per_month: 4 },
+    premium: { access: 'anytime', classes_per_month: -1 },
+    vip: { access: 'anytime', classes_per_month: -1 },
+  },
+};
+
+function ComplianceSection({ initial, onSave, saved }) {
+  const [c, setC] = useState({ ...DEFAULT_COMPLIANCE, ...(initial || {}), peak_hours: { ...DEFAULT_COMPLIANCE.peak_hours, ...(initial?.peak_hours || {}) }, plan_rules: { ...DEFAULT_COMPLIANCE.plan_rules, ...(initial?.plan_rules || {}) } });
+  useEffect(() => {
+    if (initial) setC((p) => ({ ...DEFAULT_COMPLIANCE, ...initial, peak_hours: { ...DEFAULT_COMPLIANCE.peak_hours, ...(initial.peak_hours || {}) }, plan_rules: { ...DEFAULT_COMPLIANCE.plan_rules, ...(initial.plan_rules || {}) } }));
+  }, [JSON.stringify(initial)]); // eslint-disable-line
+  const setRule = (t, k, v) => setC({ ...c, plan_rules: { ...c.plan_rules, [t]: { ...c.plan_rules[t], [k]: v } } });
+
+  return (
+    <div className="card mt-6">
+      <h2 className="mb-1 font-display uppercase text-body">Access &amp; Compliance</h2>
+      <p className="mb-3 text-xs text-muted">Powers the scan card, attendance board, plan-limit enforcement and adherence scoring.</p>
+      <div className="grid gap-3 sm:grid-cols-3">
+        <Field label="Gym capacity"><input className="field" type="number" value={c.capacity} onChange={(e) => setC({ ...c, capacity: Number(e.target.value) })} /></Field>
+        <Field label="Session length (min)"><input className="field" type="number" value={c.session_minutes} onChange={(e) => setC({ ...c, session_minutes: Number(e.target.value) })} /></Field>
+        <Field label="Peak hours (24h)">
+          <div className="flex gap-2">
+            <input className="field" type="number" value={c.peak_hours.start} onChange={(e) => setC({ ...c, peak_hours: { ...c.peak_hours, start: Number(e.target.value) } })} />
+            <input className="field" type="number" value={c.peak_hours.end} onChange={(e) => setC({ ...c, peak_hours: { ...c.peak_hours, end: Number(e.target.value) } })} />
+          </div>
+        </Field>
+      </div>
+
+      <div className="mt-4 overflow-x-auto">
+        <table className="w-full text-sm">
+          <thead className="text-left text-muted"><tr><th className="py-1">Tier</th><th>Access</th><th>Classes / month (-1 = unlimited)</th></tr></thead>
+          <tbody>
+            {TIERS.map((t) => (
+              <tr key={t} className="border-t border-white/5">
+                <td className="py-1.5 uppercase text-body">{t}</td>
+                <td>
+                  <select className="field w-32 py-1" value={c.plan_rules[t]?.access || 'anytime'} onChange={(e) => setRule(t, 'access', e.target.value)}>
+                    <option value="anytime">Anytime</option>
+                    <option value="off_peak">Off-peak only</option>
+                  </select>
+                </td>
+                <td><input className="field w-24 py-1" type="number" value={c.plan_rules[t]?.classes_per_month ?? 0} onChange={(e) => setRule(t, 'classes_per_month', Number(e.target.value))} /></td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      <div className="mt-3 flex items-center gap-3">
+        <button className="btn-primary px-4 py-2 text-sm" onClick={() => onSave(c)}>Save</button>
+        {saved && <span className="text-sm text-success">Saved ✓</span>}
+      </div>
+    </div>
+  );
+}
+
+function Field({ label, children }) {
+  return (
+    <div>
+      <label className="mb-1 block text-xs text-muted">{label}</label>
+      {children}
+    </div>
   );
 }
 

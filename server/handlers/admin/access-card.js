@@ -4,16 +4,7 @@
 import { getSupabase } from '../../lib/supabase.js';
 import { allowMethods, ok, badRequest, serverError } from '../../lib/http.js';
 import { requireRole } from '../../lib/auth.js';
-
-// preferred_time -> scheduled slot (refined further by the compliance engine, §C)
-const SLOTS = {
-  early_morning: { start: 5, end: 8, label: '05:00 – 08:00' },
-  morning: { start: 8, end: 12, label: '08:00 – 12:00' },
-  afternoon: { start: 12, end: 17, label: '12:00 – 17:00' },
-  evening: { start: 17, end: 21, label: '17:00 – 21:00' },
-  flexible: null,
-};
-const SESSION_MINUTES = 120; // default allowed session length (configurable later)
+import { loadCompliance, evaluateAccess, expectedVisits, adherence } from '../../lib/compliance.js';
 
 const startOfDay = () => {
   const d = new Date();
@@ -52,7 +43,10 @@ async function memberCard(supabase, id, res) {
   if (error) return serverError(res, error.message);
   if (!m) return badRequest(res, 'Member not found.');
 
-  const [{ data: membership }, { data: pending }, { data: todayCheckins }, { count: monthVisits }] =
+  const config = await loadCompliance(supabase);
+  const since30 = new Date(Date.now() - 30 * 86400000);
+
+  const [{ data: membership }, { data: pending }, { data: todayCheckins }, { count: monthVisits }, { count: visits30 }] =
     await Promise.all([
       supabase
         .from('memberships')
@@ -73,6 +67,11 @@ async function memberCard(supabase, id, res) {
         .select('id', { count: 'exact', head: true })
         .eq('member_id', id)
         .gte('checked_in_at', startOfMonth().toISOString()),
+      supabase
+        .from('checkins')
+        .select('id', { count: 'exact', head: true })
+        .eq('member_id', id)
+        .gte('checked_in_at', since30.toISOString()),
     ]);
 
   const outstanding = (pending || []).reduce((s, p) => s + Number(p.amount || 0), 0);
@@ -85,19 +84,21 @@ async function memberCard(supabase, id, res) {
   let overtimeMin = 0;
   if (openCheckin) {
     timeInsideMin = Math.floor((Date.now() - new Date(openCheckin.checked_in_at)) / 60000);
-    const rem = SESSION_MINUTES - timeInsideMin;
+    const rem = config.session_minutes - timeInsideMin;
     timeRemainingMin = Math.max(0, rem);
     overtimeMin = rem < 0 ? -rem : 0;
   }
 
-  // schedule compliance (basic; §C refines with per-day schedules + plan limits)
-  const slot = SLOTS[m.preferred_time];
-  const hour = new Date().getHours();
-  let banner = 'on_schedule';
-  if (m.status === 'suspended') banner = 'violation';
-  else if (m.status === 'lapsed') banner = 'violation';
-  else if (slot && (hour < slot.start || hour >= slot.end)) banner = 'extra';
-  else banner = 'on_schedule';
+  // compliance engine
+  const access = evaluateAccess({
+    member: m,
+    tier: membership?.tier,
+    preferredTime: m.preferred_time,
+    openInsideMinutes: openCheckin ? timeInsideMin : null,
+    config,
+  });
+  const expected = expectedVisits(config, m.training_frequency, 30);
+  const score = adherence(config, visits30 || 0, expected);
 
   // contract
   const today = startOfDay();
@@ -143,7 +144,13 @@ async function memberCard(supabase, id, res) {
       overtime_min: overtimeMin,
     },
     month: { visits: monthVisits || 0 },
-    schedule: { slot_label: slot?.label || 'Flexible', banner, session_minutes: SESSION_MINUTES },
+    schedule: {
+      slot_label: access.slot_label,
+      banner: access.banner,
+      reasons: access.reasons,
+      session_minutes: config.session_minutes,
+    },
+    adherence: score,
   });
 }
 

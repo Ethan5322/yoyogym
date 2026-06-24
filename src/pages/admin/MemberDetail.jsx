@@ -7,6 +7,12 @@ import { useAuth } from '../../lib/auth.jsx';
 
 const zar = (n) => 'R' + Number(n || 0).toLocaleString('en-ZA', { minimumFractionDigits: 2 });
 const fmt = (d) => (d ? new Date(d).toLocaleDateString('en-ZA', { day: 'numeric', month: 'short', year: 'numeric' }) : '—');
+const ADH = {
+  excellent: 'bg-success/20 text-success',
+  good: 'bg-blue-500/20 text-blue-400',
+  needs: 'bg-yellow-500/20 text-yellow-400',
+  at_risk: 'bg-error/20 text-error',
+};
 
 export default function MemberDetail() {
   const { id } = useParams();
@@ -77,6 +83,11 @@ export default function MemberDetail() {
         <div>
           <h1 className="text-2xl font-bold uppercase text-body">{m.full_name}</h1>
           <p className="text-muted">{m.membership_number} · <span className="text-accent">{m.status}</span></p>
+          {data.adherence && (
+            <span className={`mt-1 inline-block rounded-md px-2 py-0.5 text-xs font-bold ${ADH[data.adherence.band]}`}>
+              Adherence {data.adherence.score}% · {data.adherence.label}
+            </span>
+          )}
         </div>
         <div className="flex flex-wrap gap-2">
           <button className="btn-primary px-3 py-2 text-sm" onClick={() => action('checkin')}>Check in</button>

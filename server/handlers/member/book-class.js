@@ -5,6 +5,7 @@
 import { getSupabase } from '../../lib/supabase.js';
 import { allowMethods, readJsonBody, ok, badRequest, serverError } from '../../lib/http.js';
 import { authenticateMember } from '../../lib/memberauth.js';
+import { loadCompliance, rulesFor } from '../../lib/compliance.js';
 
 export default async function handler(req, res) {
   if (!allowMethods(req, res, ['POST'])) return;
@@ -34,17 +35,42 @@ export default async function handler(req, res) {
       .maybeSingle();
     if (!klass || !klass.is_active) return badRequest(res, 'Class not available.');
 
+    // Current tier (for eligibility + monthly class limit).
+    const { data: membership } = await supabase
+      .from('memberships')
+      .select('tier')
+      .eq('member_id', auth.sub)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
     // Tier eligibility.
     if (klass.allowed_tiers?.length) {
-      const { data: membership } = await supabase
-        .from('memberships')
-        .select('tier')
-        .eq('member_id', auth.sub)
-        .order('created_at', { ascending: false })
-        .limit(1)
-        .maybeSingle();
       if (!membership?.tier || !klass.allowed_tiers.includes(membership.tier)) {
         return badRequest(res, 'Your membership tier cannot book this class.');
+      }
+    }
+
+    // Monthly class limit (compliance engine §C1). -1 = unlimited, 0 = none.
+    const config = await loadCompliance(supabase);
+    const limit = rulesFor(config, membership?.tier).classes_per_month;
+    if (limit != null && limit >= 0) {
+      const monthStart = new Date();
+      monthStart.setDate(1);
+      monthStart.setHours(0, 0, 0, 0);
+      const { count } = await supabase
+        .from('class_bookings')
+        .select('id', { count: 'exact', head: true })
+        .eq('member_id', auth.sub)
+        .in('status', ['booked', 'attended'])
+        .gte('booked_at', monthStart.toISOString());
+      if ((count || 0) >= limit) {
+        return badRequest(
+          res,
+          limit === 0
+            ? 'Your plan does not include group classes. Upgrade to book classes.'
+            : `You've reached your plan's limit of ${limit} classes this month.`
+        );
       }
     }
 

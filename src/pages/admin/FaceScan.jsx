@@ -19,6 +19,7 @@ export default function FaceScan() {
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
   const [actionMsg, setActionMsg] = useState('');
+  const [flagged, setFlagged] = useState(null);
 
   // load cached descriptors once
   useEffect(() => {
@@ -120,6 +121,8 @@ export default function FaceScan() {
     try {
       const r = await apiFetch('/admin/access-action', { method: 'POST', body: { type: 'member', id: card.member.id, action } });
       setActionMsg(r.message);
+      if (action === 'checkin') setFlagged(r.compliance && r.compliance !== 'ok' ? r.compliance : null);
+      if (action === 'approve_visit' || action === 'deny_visit') setFlagged(null);
       // refresh card to update timer / inside state
       const data = await apiFetch(`/admin/access-card?type=member&id=${card.member.id}`);
       setCard(data);
@@ -134,6 +137,7 @@ export default function FaceScan() {
     stopCamera();
     setCard(null);
     setActionMsg('');
+    setFlagged(null);
     setPhase('idle');
   }
 
@@ -168,7 +172,7 @@ export default function FaceScan() {
         )}
 
         {phase === 'result' && card?.type === 'member' && (
-          <MemberAccessCard data={card} onAction={memberAction} onClose={reset} busy={busy} actionMsg={actionMsg} />
+          <MemberAccessCard data={card} onAction={memberAction} onClose={reset} busy={busy} actionMsg={actionMsg} flagged={flagged} />
         )}
         {phase === 'result' && card?.type === 'trainer' && <TrainerCard data={card} onClose={reset} />}
         {phase === 'nomatch' && <Unidentified onClose={reset} />}

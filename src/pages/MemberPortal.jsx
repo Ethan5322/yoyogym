@@ -138,6 +138,12 @@ function useEndpoint(path) {
 }
 
 const fmt = (d) => (d ? new Date(d).toLocaleDateString('en-ZA', { day: 'numeric', month: 'short', year: 'numeric' }) : '—');
+const ADH = {
+  excellent: 'bg-success/20 text-success',
+  good: 'bg-blue-500/20 text-blue-400',
+  needs: 'bg-yellow-500/20 text-yellow-400',
+  at_risk: 'bg-error/20 text-error',
+};
 
 // ---------------------------------------------------------------- status
 function StatusTab() {
@@ -153,6 +159,19 @@ function StatusTab() {
         <div className="font-display text-xl text-body">{m?.plan_name || '—'}</div>
         <div className={`mt-1 text-sm uppercase ${badge}`}>{data.member?.status}</div>
       </div>
+
+      {data.adherence && (
+        <div className="card">
+          <div className="flex items-center justify-between">
+            <div>
+              <div className="text-sm text-muted">Schedule Adherence (30 days)</div>
+              <div className="font-display text-3xl text-body">{data.adherence.score}%</div>
+              <div className="text-xs text-muted">{data.adherence.visits_30d} of ~{data.adherence.expected_30d} expected visits</div>
+            </div>
+            <span className={`rounded-lg px-3 py-1.5 text-sm font-bold ${ADH[data.adherence.band]}`}>{data.adherence.label}</span>
+          </div>
+        </div>
+      )}
       <div className="card space-y-2 text-sm">
         <Row label="Member No." value={data.member?.membership_number} />
         <Row label="Valid until" value={m?.end_date ? fmt(m.end_date) : 'Ongoing'} />

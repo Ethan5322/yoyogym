@@ -11,25 +11,26 @@ import { allowMethods, ok, serverError } from '../../lib/http.js';
 import { authorizeCron } from '../../lib/cron.js';
 import { notifyOwner } from '../../lib/notify/index.js';
 import { ownerTemplates } from '../../lib/notify/templates.js';
+import { loadCompliance } from '../../lib/compliance.js';
 
-const SESSION_MINUTES = 120;
 const OVERTIME_ALERT = 30; // alert once member is 30 min over
 
 export async function run(supabase) {
   const dayStart = new Date();
   dayStart.setHours(0, 0, 0, 0);
 
-  const [{ data: open }, { data: capSetting }] = await Promise.all([
+  const [{ data: open }, config] = await Promise.all([
     supabase
       .from('checkins')
       .select('checked_in_at, members(full_name)')
       .is('checked_out_at', null)
       .gte('checked_in_at', dayStart.toISOString()),
-    supabase.from('settings').select('value').eq('key', 'capacity').maybeSingle(),
+    loadCompliance(supabase),
   ]);
 
+  const SESSION_MINUTES = config.session_minutes;
   const inside = (open || []).length;
-  const capacity = Number(capSetting?.value?.value || capSetting?.value || 120) || 120;
+  const capacity = config.capacity;
   const pct = Math.round((inside / capacity) * 100);
 
   let alerts = 0;

@@ -25,6 +25,12 @@ const BANNER = {
   violation: { label: 'SCHEDULE VIOLATION', cls: 'bg-error text-white' },
   not_scheduled: { label: 'NOT SCHEDULED TODAY', cls: 'bg-gray-600 text-white' },
 };
+const ADHERENCE = {
+  excellent: 'bg-success/20 text-success',
+  good: 'bg-blue-500/20 text-blue-400',
+  needs: 'bg-yellow-500/20 text-yellow-400',
+  at_risk: 'bg-error/20 text-error',
+};
 const dur = (m) => (m == null ? '—' : `${Math.floor(m / 60)}h ${m % 60}m`);
 
 function Badge({ map, key: k }) {
@@ -32,11 +38,12 @@ function Badge({ map, key: k }) {
   return <span className={`rounded-md px-2.5 py-1 text-xs font-bold tracking-wide ${v.cls}`}>{v.label}</span>;
 }
 
-export function MemberAccessCard({ data, onAction, onClose, busy, actionMsg }) {
+export function MemberAccessCard({ data, onAction, onClose, busy, actionMsg, flagged }) {
   const m = data.member;
   const ms = data.membership || {};
   const t = data.today || {};
   const banner = BANNER[data.schedule?.banner] || BANNER.on_schedule;
+  const adh = data.adherence;
 
   return (
     <div className="animate-slide-up mx-auto max-w-md overflow-hidden rounded-3xl border border-white/10 bg-surface shadow-2xl">
@@ -55,6 +62,11 @@ export function MemberAccessCard({ data, onAction, onClose, busy, actionMsg }) {
           <div className="mt-1.5 flex flex-wrap gap-2">
             <Badge map={TIER} key={ms.tier} />
             <Badge map={STATUS} key={m.status} />
+            {adh && (
+              <span className={`rounded-md px-2.5 py-1 text-xs font-bold tracking-wide ${ADHERENCE[adh.band]}`}>
+                {adh.score}% · {adh.label}
+              </span>
+            )}
           </div>
         </div>
       </div>
@@ -95,6 +107,17 @@ export function MemberAccessCard({ data, onAction, onClose, busy, actionMsg }) {
       </div>
 
       {actionMsg && <p className="px-5 pb-2 text-center text-sm text-success">{actionMsg}</p>}
+
+      {/* extra-visit / violation approval (after a flagged check-in) */}
+      {flagged && flagged !== 'ok' && (
+        <div className="mx-5 mb-2 rounded-xl bg-orange-500/10 p-3 text-center">
+          <p className="text-sm text-orange-300">This check-in was flagged: <b>{flagged}</b>. Approve or deny?</p>
+          <div className="mt-2 grid grid-cols-2 gap-2">
+            <button className="btn-primary" disabled={busy} onClick={() => onAction('approve_visit')}>Approve</button>
+            <button className="btn-outline" disabled={busy} onClick={() => onAction('deny_visit')}>Deny</button>
+          </div>
+        </div>
+      )}
 
       {/* quick actions */}
       <div className="grid grid-cols-2 gap-2 border-t border-white/10 p-4">

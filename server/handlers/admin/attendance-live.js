@@ -4,15 +4,8 @@
 import { getSupabase } from '../../lib/supabase.js';
 import { allowMethods, ok, serverError } from '../../lib/http.js';
 import { requireRole } from '../../lib/auth.js';
+import { loadCompliance, SLOTS } from '../../lib/compliance.js';
 
-const SLOTS = {
-  early_morning: { start: 5, end: 8, label: '05:00 – 08:00' },
-  morning: { start: 8, end: 12, label: '08:00 – 12:00' },
-  afternoon: { start: 12, end: 17, label: '12:00 – 17:00' },
-  evening: { start: 17, end: 21, label: '17:00 – 21:00' },
-  flexible: null,
-};
-const SESSION_MINUTES = 120;
 const HIGH_FREQ = new Set(['daily', '5_6']); // likely to be expected every day
 
 export default async function handler(req, res) {
@@ -24,15 +17,16 @@ export default async function handler(req, res) {
     const dayStart = new Date();
     dayStart.setHours(0, 0, 0, 0);
 
-    const [{ data: members }, { data: checkins }, { data: memberships }, { data: capSetting }] =
+    const [{ data: members }, { data: checkins }, { data: memberships }, config] =
       await Promise.all([
         supabase.from('members').select('id, full_name, photo_url, preferred_time, training_frequency, status').eq('status', 'active'),
         supabase.from('checkins').select('member_id, checked_in_at, checked_out_at').gte('checked_in_at', dayStart.toISOString()),
         supabase.from('memberships').select('member_id, tier, state').eq('state', 'active'),
-        supabase.from('settings').select('value').eq('key', 'capacity').maybeSingle(),
+        loadCompliance(supabase),
       ]);
 
-    const capacity = Number(capSetting?.value?.value || capSetting?.value || 120) || 120;
+    const capacity = config.capacity;
+    const SESSION_MINUTES = config.session_minutes;
     const tierOf = {};
     for (const m of memberships || []) tierOf[m.member_id] = m.tier;
 

@@ -127,4 +127,7 @@ export const ownerTemplates = {
 
   capacity_urgent: ({ inside, capacity, pct }) =>
     `🚨 CAPACITY ${pct}% (URGENT): ${inside}/${capacity} members inside — near full.`,
+
+  extra_visit: ({ member, reason }) =>
+    `🟠 EXTRA VISIT: ${member} checked in (${reason}). Review & approve/deny in the app.`,
 };
