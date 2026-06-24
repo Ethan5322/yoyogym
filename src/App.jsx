@@ -30,6 +30,7 @@ const ManualRegister = lazy(() => import('./pages/admin/ManualRegister.jsx'));
 const QrCodes = lazy(() => import('./pages/admin/QrCodes.jsx'));
 const Clients = lazy(() => import('./pages/admin/Clients.jsx'));
 const FaceScan = lazy(() => import('./pages/admin/FaceScan.jsx'));
+const Attendance = lazy(() => import('./pages/admin/Attendance.jsx'));
 
 const owner = ['owner'];
 const mgr = ['owner', 'manager'];
@@ -57,6 +58,7 @@ export default function App() {
         <Route path="/admin" element={guard(mgr, <Dashboard />)} />
         <Route path="/admin/verify" element={guard(recep, <VerifyScreen />)} />
         <Route path="/admin/scan" element={guard(recep, <FaceScan />)} />
+        <Route path="/admin/attendance" element={guard(recep, <Attendance />)} />
         <Route path="/admin/members" element={guard(mgr, <MembersList />)} />
         <Route path="/admin/members/:id" element={guard(mgr, <MemberDetail />)} />
         <Route path="/admin/today" element={guard(recep, <TodayOverview />)} />

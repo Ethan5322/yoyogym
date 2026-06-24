@@ -23,6 +23,8 @@ import trainingSession from '../../server/handlers/admin/training-session.js';
 import faceDescriptors from '../../server/handlers/admin/face-descriptors.js';
 import accessCard from '../../server/handlers/admin/access-card.js';
 import accessAction from '../../server/handlers/admin/access-action.js';
+import attendanceLive from '../../server/handlers/admin/attendance-live.js';
+import attendanceReport from '../../server/handlers/admin/attendance-report.js';
 
 const routes = {
   dashboard,
@@ -47,6 +49,8 @@ const routes = {
   'face-descriptors': faceDescriptors,
   'access-card': accessCard,
   'access-action': accessAction,
+  'attendance-live': attendanceLive,
+  'attendance-report': attendanceReport,
 };
 
 export default function handler(req, res) {

@@ -10,6 +10,7 @@ const NAV = [
   { to: '/admin/verify', label: 'Verify', roles: ['owner', 'manager', 'reception'] },
   { to: '/admin/members', label: 'Members', roles: ['owner', 'manager'] },
   { to: '/admin/today', label: 'Today', roles: ['owner', 'manager', 'reception'] },
+  { to: '/admin/attendance', label: 'Attendance', roles: ['owner', 'manager', 'reception'] },
   { to: '/admin/classes', label: 'Classes', roles: ['owner', 'manager'] },
   { to: '/admin/trainers', label: 'Trainers', roles: ['owner', 'manager'] },
   { to: '/admin/calendar', label: 'Calendar', roles: ['owner', 'manager'] },

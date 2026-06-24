@@ -7,6 +7,7 @@ import expiry from '../../server/handlers/cron/expiry.js';
 import classReminders from '../../server/handlers/cron/class-reminders.js';
 import dailySummary from '../../server/handlers/cron/daily-summary.js';
 import reengagement from '../../server/handlers/cron/reengagement.js';
+import attendanceAlerts from '../../server/handlers/cron/attendance-alerts.js';
 
 const routes = {
   daily,
@@ -16,6 +17,7 @@ const routes = {
   'class-reminders': classReminders,
   'daily-summary': dailySummary,
   reengagement,
+  'attendance-alerts': attendanceAlerts,
 };
 
 export default function handler(req, res) {

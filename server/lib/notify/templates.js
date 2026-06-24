@@ -118,4 +118,13 @@ export const ownerTemplates = {
 
   daily_summary: ({ checkins, revenue, newMembers, classesHeld }) =>
     `📊 DAILY SUMMARY — Check-ins: ${checkins} · Revenue: ${zar(revenue)} · New members: ${newMembers} · Classes: ${classesHeld}.`,
+
+  overtime: ({ member, minutesOver }) =>
+    `⏱ OVERTIME: ${member} is ${minutesOver} min over their allowed session time.`,
+
+  capacity_high: ({ inside, capacity, pct }) =>
+    `📈 CAPACITY ${pct}%: ${inside}/${capacity} members currently inside.`,
+
+  capacity_urgent: ({ inside, capacity, pct }) =>
+    `🚨 CAPACITY ${pct}% (URGENT): ${inside}/${capacity} members inside — near full.`,
 };
