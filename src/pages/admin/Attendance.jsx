@@ -73,6 +73,27 @@ function LiveBoard() {
     return () => clearInterval(timer.current);
   }, []);
 
+  function printSheet() {
+    if (!data) return;
+    const today = new Date().toLocaleDateString('en-ZA', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+    const rowsHtml = data.board
+      .map((r) => `<tr>
+        <td>${r.name}</td><td>${(r.tier || '').toUpperCase()}</td><td>${r.slot_label}</td>
+        <td>${time(r.checked_in_at) || '—'}</td><td>${r.checked_out_at ? time(r.checked_out_at) : r.inside ? 'Inside' : '—'}</td>
+        <td>${dur(r.minutes)}</td><td>${STATUS[r.status]?.label || ''}</td></tr>`)
+      .join('');
+    const w = window.open('', '_blank');
+    w.document.write(`<html><head><title>Attendance ${today}</title>
+      <style>body{font-family:Arial,sans-serif;padding:24px}h1{margin:0}h2{color:#666;font-weight:normal;margin:2px 0 16px}
+      table{width:100%;border-collapse:collapse;font-size:13px}th,td{border:1px solid #ccc;padding:6px;text-align:left}
+      th{background:#f2f2f2}</style></head><body>
+      <h1>YOYO GYM — Daily Attendance</h1><h2>${today} · ${data.checked_in_today} checked in · ${data.inside_count} inside</h2>
+      <table><thead><tr><th>Member</th><th>Tier</th><th>Slot</th><th>In</th><th>Out</th><th>Hours</th><th>Status</th></tr></thead>
+      <tbody>${rowsHtml}</tbody></table></body></html>`);
+    w.document.close();
+    w.print();
+  }
+
   if (error) return <p className="mt-4 text-error">{error}</p>;
   if (!data) return <SkeletonBoard />;
 
@@ -109,6 +130,7 @@ function LiveBoard() {
           </button>
         ))}
         <input className="field ml-auto w-48" placeholder="Search name…" value={q} onChange={(e) => setQ(e.target.value)} />
+        <button className="btn-outline px-3 py-1 text-xs" onClick={printSheet}>🖨 Print sheet</button>
       </div>
       {updated && <p className="mt-1 text-right text-xs text-muted">Updated {updated.toLocaleTimeString('en-ZA')} · auto-refresh 30s</p>}
 

@@ -52,6 +52,11 @@ export default {
           '0%,100%': { opacity: '0.5' },
           '50%': { opacity: '0.9' },
         },
+        'flash-in': {
+          '0%': { opacity: '0', transform: 'scale(0.5)' },
+          '35%': { opacity: '1', transform: 'scale(1)' },
+          '100%': { opacity: '0', transform: 'scale(1.15)' },
+        },
       },
       animation: {
         'fade-up': 'fade-up 200ms ease-out',
@@ -60,6 +65,7 @@ export default {
         'scan-sweep': 'scan-sweep 1.8s ease-in-out infinite alternate',
         'ping-soft': 'ping-soft 1.4s ease-out infinite',
         skeleton: 'skeleton 1.4s ease-in-out infinite',
+        flash: 'flash-in 800ms ease-out forwards',
       },
     },
   },

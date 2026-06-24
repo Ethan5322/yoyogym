@@ -5,6 +5,7 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import { apiFetch } from '../../lib/api.js';
+import { beep, soundEnabled, setSoundEnabled } from '../../lib/sound.js';
 import { MemberAccessCard, TrainerCard, Unidentified } from './scan/AccessCards.jsx';
 
 export default function FaceScan() {
@@ -20,6 +21,14 @@ export default function FaceScan() {
   const [busy, setBusy] = useState(false);
   const [actionMsg, setActionMsg] = useState('');
   const [flagged, setFlagged] = useState(null);
+  const [flash, setFlash] = useState(null); // 'success' | 'fail'
+  const [sound, setSound] = useState(soundEnabled());
+
+  function flashFx(kind) {
+    setFlash(kind);
+    beep(kind);
+    setTimeout(() => setFlash(null), 800);
+  }
 
   // load cached descriptors once
   useEffect(() => {
@@ -99,12 +108,14 @@ export default function FaceScan() {
           try {
             const data = await apiFetch(`/admin/access-card?type=${best.type}&id=${best.id}`);
             setCard(data);
+            flashFx('success');
             setPhase('result');
           } catch (e) {
             setError(e.message);
             setPhase('error');
           }
         } else {
+          flashFx('fail');
           setPhase('nomatch');
         }
         return;
@@ -143,10 +154,28 @@ export default function FaceScan() {
 
   return (
     <div className="fixed inset-0 z-40 flex flex-col bg-black">
+      {/* success / fail flash */}
+      {flash && (
+        <div className={`pointer-events-none fixed inset-0 z-50 flex items-center justify-center ${flash === 'success' ? 'bg-success/20' : 'bg-error/20'}`}>
+          <div className={`animate-flash text-[9rem] ${flash === 'success' ? 'text-success' : 'text-error'}`}>
+            {flash === 'success' ? '✓' : '✕'}
+          </div>
+        </div>
+      )}
+
       {/* header */}
       <div className="flex items-center justify-between px-4 py-3 text-body">
         <span className="font-display text-lg uppercase tracking-wider text-accent">Yoyo GYM · Access</span>
-        <Link to="/admin" className="text-sm text-muted hover:text-body">Exit</Link>
+        <div className="flex items-center gap-3">
+          <button
+            onClick={() => { const n = !sound; setSound(n); setSoundEnabled(n); }}
+            className="text-sm text-muted hover:text-body"
+            title="Toggle sound"
+          >
+            {sound ? '🔊' : '🔇'}
+          </button>
+          <Link to="/admin" className="text-sm text-muted hover:text-body">Exit</Link>
+        </div>
       </div>
 
       <div className="flex flex-1 flex-col items-center justify-center px-4 pb-8">
