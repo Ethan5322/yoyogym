@@ -19,6 +19,17 @@ export async function getFaceApi() {
   return _faceapi;
 }
 
+/** Fast bounding-box-only detection for live positioning guidance. */
+export async function detectBox(el) {
+  const faceapi = await getFaceApi();
+  const det = await faceapi.detectSingleFace(
+    el,
+    new faceapi.TinyFaceDetectorOptions({ inputSize: 224, scoreThreshold: 0.4 })
+  );
+  if (!det) return null;
+  return { x: det.box.x, y: det.box.y, width: det.box.width, height: det.box.height, score: det.score };
+}
+
 /** Detect a single face in a video/image element and return its 128-d descriptor. */
 export async function describeFace(el) {
   const faceapi = await getFaceApi();
