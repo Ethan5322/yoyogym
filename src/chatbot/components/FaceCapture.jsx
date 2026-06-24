@@ -4,13 +4,13 @@
 // Used in registration, admin face enrolment, and admin face login.
 import { useEffect, useRef, useState } from 'react';
 
-const STEP = 25; // progress added per good frame (~4 frames ≈ 1s to 100%)
+const SAMPLES = 5; // face templates captured & averaged for accuracy
 
 export default function FaceCapture({ onSubmit }) {
   const videoRef = useRef(null);
   const streamRef = useRef(null);
   const loopRef = useRef(false);
-  const progressRef = useRef(0);
+  const samplesRef = useRef([]);
 
   const [phase, setPhase] = useState('loading'); // loading | scanning | capturing | error
   const [guide, setGuide] = useState('Starting camera…');
@@ -24,7 +24,7 @@ export default function FaceCapture({ onSubmit }) {
     setPhase('loading');
     setError('');
     setProgress(0);
-    progressRef.current = 0;
+    samplesRef.current = [];
     (async () => {
       try {
         if (!navigator.mediaDevices?.getUserMedia) throw Object.assign(new Error('x'), { name: 'InsecureContext' });
@@ -71,21 +71,22 @@ export default function FaceCapture({ onSubmit }) {
   }
 
   async function runGuideLoop() {
-    const { detectBox } = await import('../../lib/face/faceapi.js');
+    const { detectFull } = await import('../../lib/face/faceapi.js');
     while (loopRef.current) {
       const v = videoRef.current;
       let g = 'Position your face in the circle';
       let ok = false;
+      let det = null;
       if (v && v.videoWidth) {
         const fw = v.videoWidth;
         const fh = v.videoHeight;
-        let box = null;
         try {
-          box = await detectBox(v);
+          det = await detectFull(v);
         } catch {
           /* keep going */
         }
-        if (box) {
+        if (det) {
+          const { box } = det;
           const cx = fw - (box.x + box.width / 2); // mirrored preview
           const cy = box.y + box.height / 2;
           const dx = cx - fw / 2;
@@ -93,7 +94,8 @@ export default function FaceCapture({ onSubmit }) {
           const size = box.width / fw;
           const tolX = fw * 0.15;
           const tolY = fh * 0.15;
-          if (size < 0.3) g = 'Come a little closer';
+          if (det.score < 0.6) g = 'Hold steady — improve lighting';
+          else if (size < 0.3) g = 'Come a little closer';
           else if (size > 0.62) g = 'Move back slightly';
           else if (dx < -tolX) g = 'Move right →';
           else if (dx > tolX) g = '← Move left';
@@ -101,52 +103,45 @@ export default function FaceCapture({ onSubmit }) {
           else if (dy > tolY) g = 'Lift up a little';
           else {
             ok = true;
-            g = 'Perfect — hold still';
+            g = `Hold still — capturing ${samplesRef.current.length}/${SAMPLES}`;
           }
         }
       }
+
+      // Collect a quality sample only when well-positioned.
+      if (ok && det?.descriptor) {
+        samplesRef.current.push(det.descriptor);
+      } else if (!ok) {
+        samplesRef.current = [];
+      }
+      const pct = Math.min(100, Math.round((samplesRef.current.length / SAMPLES) * 100));
       setGuide(g);
       setGood(ok);
+      setProgress(pct);
 
-      if (ok) {
-        progressRef.current = Math.min(100, progressRef.current + STEP);
-      } else {
-        progressRef.current = 0;
-      }
-      setProgress(progressRef.current);
-
-      if (progressRef.current >= 100) {
+      if (samplesRef.current.length >= SAMPLES) {
         loopRef.current = false;
-        await capture();
+        await finalize();
         return;
       }
-      await new Promise((r) => setTimeout(r, 220));
+      await new Promise((r) => setTimeout(r, 200));
     }
   }
 
-  async function capture() {
+  async function finalize() {
     setPhase('capturing');
-    setGuide('Capturing…');
+    setGuide('Saving your face…');
     try {
-      const { describeFace } = await import('../../lib/face/faceapi.js');
+      const { averageDescriptors } = await import('../../lib/face/faceapi.js');
+      const descriptor = averageDescriptors(samplesRef.current); // robust averaged template
       const v = videoRef.current;
-      const descriptor = await describeFace(v);
-      if (!descriptor) {
-        // lost the face at the last moment — resume guiding
-        progressRef.current = 0;
-        setProgress(0);
-        setPhase('scanning');
-        loopRef.current = true;
-        runGuideLoop();
-        return;
-      }
       const canvas = document.createElement('canvas');
       const size = 320;
       canvas.width = size;
       canvas.height = size;
       const s = Math.min(v.videoWidth, v.videoHeight);
       canvas.getContext('2d').drawImage(v, (v.videoWidth - s) / 2, (v.videoHeight - s) / 2, s, s, 0, 0, size, size);
-      const image = canvas.toDataURL('image/jpeg', 0.8);
+      const image = canvas.toDataURL('image/jpeg', 0.85);
       stop();
       onSubmit({ descriptor, image });
     } catch {

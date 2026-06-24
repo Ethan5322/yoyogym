@@ -159,7 +159,7 @@ export default function FaceScan() {
   }
 
   async function runLoop() {
-    const { describeFace, faceDistance, MATCH_THRESHOLD } = await import('../../lib/face/faceapi.js');
+    const { describeFace, bestMatch } = await import('../../lib/face/faceapi.js');
     while (loopRef.current) {
       let descriptor = null;
       try {
@@ -171,19 +171,10 @@ export default function FaceScan() {
 
       if (descriptor) {
         setDetected(true);
-        // find best match
-        let best = null;
-        let bestDist = Infinity;
-        for (const p of peopleRef.current) {
-          const dist = faceDistance(descriptor, p.descriptor);
-          if (dist < bestDist) {
-            bestDist = dist;
-            best = p;
-          }
-        }
+        const { person: best, confident } = bestMatch(descriptor, peopleRef.current);
         loopRef.current = false;
         stopCamera();
-        if (best && bestDist < MATCH_THRESHOLD) {
+        if (best && confident) {
           setPhase('matching');
           try {
             const data = await apiFetch(`/admin/access-card?type=${best.type}&id=${best.id}`);

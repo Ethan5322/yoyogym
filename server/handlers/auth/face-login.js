@@ -38,15 +38,21 @@ export default async function handler(req, res) {
 
     let best = null;
     let bestDist = Infinity;
+    let second = Infinity;
     for (const a of admins || []) {
       const d = distance(descriptor, a.face_descriptor);
       if (d < bestDist) {
+        second = bestDist;
         bestDist = d;
         best = a;
+      } else if (d < second) {
+        second = d;
       }
     }
 
-    if (!best || bestDist >= THRESHOLD) {
+    // Require a confident match: under threshold AND clearly better than the
+    // runner-up (margin) so a look-alike can never unlock the admin panel.
+    if (!best || bestDist >= THRESHOLD || second - bestDist < 0.05) {
       return unauthorized(res, 'Face not recognised. Use your password instead.');
     }
 
