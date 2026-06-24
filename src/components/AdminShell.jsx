@@ -6,6 +6,7 @@ import { useAuth } from '../lib/auth.jsx';
 
 const NAV = [
   { to: '/admin', label: 'Dashboard', roles: ['owner', 'manager'], exact: true },
+  { to: '/admin/scan', label: '🛡️ Scan', roles: ['owner', 'manager', 'reception'] },
   { to: '/admin/verify', label: 'Verify', roles: ['owner', 'manager', 'reception'] },
   { to: '/admin/members', label: 'Members', roles: ['owner', 'manager'] },
   { to: '/admin/today', label: 'Today', roles: ['owner', 'manager', 'reception'] },

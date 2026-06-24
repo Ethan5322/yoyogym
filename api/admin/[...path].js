@@ -20,6 +20,9 @@ import qrStats from '../../server/handlers/admin/qr-stats.js';
 import events from '../../server/handlers/admin/events.js';
 import clients from '../../server/handlers/admin/clients.js';
 import trainingSession from '../../server/handlers/admin/training-session.js';
+import faceDescriptors from '../../server/handlers/admin/face-descriptors.js';
+import accessCard from '../../server/handlers/admin/access-card.js';
+import accessAction from '../../server/handlers/admin/access-action.js';
 
 const routes = {
   dashboard,
@@ -41,6 +44,9 @@ const routes = {
   events,
   clients,
   'training-session': trainingSession,
+  'face-descriptors': faceDescriptors,
+  'access-card': accessCard,
+  'access-action': accessAction,
 };
 
 export default function handler(req, res) {
