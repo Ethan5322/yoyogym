@@ -31,6 +31,8 @@ const QrCodes = lazy(() => import('./pages/admin/QrCodes.jsx'));
 const Clients = lazy(() => import('./pages/admin/Clients.jsx'));
 const FaceScan = lazy(() => import('./pages/admin/FaceScan.jsx'));
 const Attendance = lazy(() => import('./pages/admin/Attendance.jsx'));
+const Visitors = lazy(() => import('./pages/admin/Visitors.jsx'));
+const Incidents = lazy(() => import('./pages/admin/Incidents.jsx'));
 
 const owner = ['owner'];
 const mgr = ['owner', 'manager'];
@@ -59,6 +61,8 @@ export default function App() {
         <Route path="/admin/verify" element={guard(recep, <VerifyScreen />)} />
         <Route path="/admin/scan" element={guard(recep, <FaceScan />)} />
         <Route path="/admin/attendance" element={guard(recep, <Attendance />)} />
+        <Route path="/admin/visitors" element={guard(recep, <Visitors />)} />
+        <Route path="/admin/incidents" element={guard(recep, <Incidents />)} />
         <Route path="/admin/members" element={guard(mgr, <MembersList />)} />
         <Route path="/admin/members/:id" element={guard(mgr, <MemberDetail />)} />
         <Route path="/admin/today" element={guard(recep, <TodayOverview />)} />

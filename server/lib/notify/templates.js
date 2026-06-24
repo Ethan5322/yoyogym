@@ -130,4 +130,7 @@ export const ownerTemplates = {
 
   extra_visit: ({ member, reason }) =>
     `🟠 EXTRA VISIT: ${member} checked in (${reason}). Review & approve/deny in the app.`,
+
+  incident: ({ person, note }) =>
+    `🚨 INCIDENT logged for ${person}: ${note}`,
 };

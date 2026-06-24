@@ -25,6 +25,8 @@ import accessCard from '../../server/handlers/admin/access-card.js';
 import accessAction from '../../server/handlers/admin/access-action.js';
 import attendanceLive from '../../server/handlers/admin/attendance-live.js';
 import attendanceReport from '../../server/handlers/admin/attendance-report.js';
+import visitor from '../../server/handlers/admin/visitor.js';
+import incident from '../../server/handlers/admin/incident.js';
 
 const routes = {
   dashboard,
@@ -51,6 +53,8 @@ const routes = {
   'access-action': accessAction,
   'attendance-live': attendanceLive,
   'attendance-report': attendanceReport,
+  visitor,
+  incident,
 };
 
 export default function handler(req, res) {

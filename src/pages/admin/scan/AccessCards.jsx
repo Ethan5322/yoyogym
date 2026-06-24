@@ -181,8 +181,8 @@ export function Unidentified({ onClose }) {
       <div className="mt-5 grid grid-cols-2 gap-2">
         <a className="btn-outline text-center" href="/admin/members">Search Member</a>
         <a className="btn-primary text-center" href="/admin/register-member">Register New</a>
-        <a className="btn-outline text-center" href="/admin/register-member">Visitor Pass</a>
-        <button className="btn-outline" onClick={onClose}>Report Incident</button>
+        <a className="btn-outline text-center" href="/admin/visitors">Visitor Pass</a>
+        <a className="btn-outline text-center" href="/admin/incidents">Report Incident</a>
       </div>
       <button onClick={onClose} className="mt-4 text-sm text-muted hover:text-body">Scan again</button>
     </div>
