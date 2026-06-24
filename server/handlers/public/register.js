@@ -255,11 +255,15 @@ export default async function handler(req, res) {
         id: member.id,
         full_name: a.full_name.trim(),
         email: a.email,
+        phone: a.phone,
         membership_number: membershipNumber,
         verification_code: verificationCode,
       },
       planName: membership.plan_name,
+      tier: membership.tier,
+      contractLabel: membership.contract_label,
       amount: dueToday,
+      recurring: membership.recurring_amount,
       parqFlag: anyYes,
     });
 

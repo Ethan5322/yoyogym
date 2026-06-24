@@ -36,7 +36,7 @@ export async function activatePayment(supabase, payment, paystackData) {
     // Receipt to member + payment alert to owner (best-effort).
     const { data: member } = await supabase
       .from('members')
-      .select('id, full_name, email')
+      .select('id, full_name, email, membership_number')
       .eq('id', payment.member_id)
       .maybeSingle();
     if (member) {
@@ -44,6 +44,7 @@ export async function activatePayment(supabase, payment, paystackData) {
         member,
         amount: Number(payment.amount),
         description: payment.description,
+        membershipNumber: member.membership_number,
       });
     }
   }

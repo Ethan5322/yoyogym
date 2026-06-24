@@ -17,35 +17,64 @@ function shell(gymName, bodyHtml) {
 }
 
 const codeBox = (label, value) =>
-  `<div style="margin:16px 0;text-align:center">
+  `<div style="margin:14px 0;text-align:center">
      <div style="color:#9A9590;font-size:11px;text-transform:uppercase;letter-spacing:1px">${label}</div>
      <div style="color:#E63946;font-size:28px;font-weight:bold;letter-spacing:4px;font-family:monospace">${value}</div>
    </div>`;
 
+// Tidy two-column detail rows for emails.
+const rows = (pairs) =>
+  `<table style="width:100%;border-collapse:collapse;margin:8px 0">${pairs
+    .filter(([, v]) => v != null && v !== '')
+    .map(
+      ([k, v]) =>
+        `<tr><td style="padding:6px 0;color:#9A9590;font-size:13px">${k}</td>
+             <td style="padding:6px 0;text-align:right;color:#F5F0E8;font-size:13px;font-weight:600">${v}</td></tr>`
+    )
+    .join('')}</table>`;
+
 export const memberTemplates = {
-  // Sent immediately after registration.
-  welcome: ({ gymName, member }) => ({
-    subject: `Welcome to ${gymName}! Your membership details`,
+  // Sent immediately after registration — warm, complete welcome.
+  welcome: ({ gymName, member, planName, tier, contractLabel, amount, recurring }) => ({
+    subject: `Welcome to ${gymName}, ${member.full_name?.split(' ')[0]}! 🎉`,
     html: shell(
       gymName,
-      `<p>Hi ${member.full_name?.split(' ')[0]},</p>
-       <p>Welcome to <b>${gymName}</b> — we’re thrilled to have you! 💪 Here are your details:</p>
+      `<p style="font-size:16px">Hi ${member.full_name?.split(' ')[0]},</p>
+       <p>Welcome to the <b>${gymName}</b> family — and congratulations on taking this step for your health and fitness! 💪
+          We’re thrilled to have you. Your membership is set up and your details are below.</p>
+       ${rows([
+         ['Full name', member.full_name],
+         ['Membership plan', [planName, tier ? `(${tier.toUpperCase()})` : ''].filter(Boolean).join(' ')],
+         contractLabel ? ['Contract', contractLabel] : [null, null],
+         amount ? ['Paid / due today', zar(amount)] : [null, null],
+         recurring ? ['Monthly thereafter', zar(recurring)] : [null, null],
+       ])}
        ${codeBox('Membership Number', member.membership_number)}
        ${codeBox('Verification Code', member.verification_code)}
-       <p style="color:#9A9590;font-size:13px">Show your verification code at reception for first-time access.
-       You can download your membership card from the confirmation screen.</p>`
+       <p style="color:#9A9590;font-size:13px"><b>What’s next:</b><br>
+          1. Show your verification code at reception for your first visit.<br>
+          2. Download your membership card &amp; ID from your member portal.<br>
+          3. Book your first class or session online any time.</p>
+       <p>See you at the gym — let’s get to work! 🏋️<br><b>The ${gymName} Team</b></p>`
     ),
   }),
 
-  // Sent after a successful payment.
-  payment_receipt: ({ gymName, member, amount, description }) => ({
-    subject: `${gymName} — Payment received`,
+  // Sent after a successful payment — proper receipt.
+  payment_receipt: ({ gymName, member, amount, description, membershipNumber }) => ({
+    subject: `${gymName} — Payment receipt (${zar(amount)})`,
     html: shell(
       gymName,
       `<p>Hi ${member.full_name?.split(' ')[0]},</p>
-       <p>We’ve received your payment. Thank you!</p>
-       <p style="font-size:18px"><b>${zar(amount)}</b> — ${description || 'Membership payment'}</p>
-       <p style="color:#9A9590;font-size:13px">Your membership is now active. See you at the gym!</p>`
+       <p>Thank you — we’ve successfully received your payment. This email is your receipt.</p>
+       ${rows([
+         ['Description', description || 'Membership payment'],
+         ['Amount', zar(amount)],
+         ['Date', new Date().toLocaleString('en-ZA')],
+         membershipNumber ? ['Membership no.', membershipNumber] : [null, null],
+         ['Status', 'PAID ✓'],
+       ])}
+       <p style="color:#9A9590;font-size:13px">Your membership is active. We appreciate your business — see you at the gym!</p>
+       <p><b>The ${gymName} Team</b></p>`
     ),
   }),
 
@@ -145,15 +174,47 @@ export const memberTemplates = {
 };
 
 export const ownerTemplates = {
-  new_member: ({ member, planName, amount }) =>
-    `🆕 NEW MEMBER: ${member.full_name} joined on ${planName || 'a plan'}` +
-    `${amount ? ` · due ${zar(amount)}` : ''} (No. ${member.membership_number}).`,
+  new_member: ({ member, planName, tier, contractLabel, amount, recurring, parqFlag }) =>
+    [
+      `🆕 NEW MEMBER REGISTERED`,
+      ``,
+      `Name: ${member.full_name}`,
+      `Membership No: ${member.membership_number}`,
+      `Plan: ${[planName, tier ? `(${tier.toUpperCase()})` : ''].filter(Boolean).join(' ') || '—'}`,
+      contractLabel ? `Contract: ${contractLabel}` : null,
+      member.phone ? `Phone: ${member.phone}` : null,
+      member.email ? `Email: ${member.email}` : null,
+      amount ? `Due today: ${zar(amount)}` : null,
+      recurring ? `Monthly: ${zar(recurring)}` : null,
+      parqFlag ? `⚠ PAR-Q: medical clearance required` : null,
+      `Registered: ${new Date().toLocaleString('en-ZA')}`,
+    ]
+      .filter((l) => l !== null)
+      .join('\n'),
 
   parq_flag: ({ member }) =>
-    `🩺 MEDICAL FLAG: ${member.full_name} (${member.membership_number}) answered YES on PAR-Q — medical clearance review needed.`,
+    [
+      `🩺 MEDICAL CLEARANCE REQUIRED`,
+      ``,
+      `${member.full_name} (${member.membership_number}) answered YES on the PAR-Q health screening.`,
+      member.phone ? `Phone: ${member.phone}` : null,
+      `Please review and request a doctor's clearance before their first session.`,
+    ]
+      .filter((l) => l !== null)
+      .join('\n'),
 
-  payment_received: ({ member, amount, description }) =>
-    `💰 PAYMENT: ${member.full_name} paid ${zar(amount)} (${description || 'membership'}).`,
+  payment_received: ({ member, amount, description, membershipNumber }) =>
+    [
+      `💰 PAYMENT RECEIVED`,
+      ``,
+      `Member: ${member.full_name}`,
+      membershipNumber ? `Membership No: ${membershipNumber}` : null,
+      `Amount: ${zar(amount)}`,
+      `For: ${description || 'Membership payment'}`,
+      `Date: ${new Date().toLocaleString('en-ZA')}`,
+    ]
+      .filter((l) => l !== null)
+      .join('\n'),
 
   payment_failed: ({ member, amount }) =>
     `⚠️ PAYMENT FAILED: ${member.full_name} — ${zar(amount)}. A retry has been scheduled.`,

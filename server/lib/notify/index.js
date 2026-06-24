@@ -71,6 +71,17 @@ async function emailMember(supabase, cfg, { member, templateKey, vars }) {
   });
 }
 
+// Branded HTML wrapper for owner email alerts (plain text -> tidy email).
+function ownerEmailHtml(gymName, text) {
+  const body = text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/\n/g, '<br>');
+  return `<!doctype html><html><body style="margin:0;background:#080808;font-family:Arial,Helvetica,sans-serif;color:#F0EDE8">
+    <div style="max-width:560px;margin:0 auto;padding:24px">
+      <h1 style="color:#E63946;letter-spacing:1px;text-transform:uppercase;font-size:20px;margin:0 0 12px">${gymName} — Owner Alert</h1>
+      <div style="background:#111;border:1px solid #222;border-left:3px solid #E63946;border-radius:6px;padding:18px;line-height:1.7;font-size:14px">${body}</div>
+      <p style="color:#8A8580;font-size:11px;margin-top:14px">Automated notification from your ${gymName} management system.</p>
+    </div></body></html>`;
+}
+
 // ---- owner multi-channel alert ----
 async function alertOwner(supabase, cfg, { templateKey, text, memberId }) {
   const targets = [
@@ -84,7 +95,13 @@ async function alertOwner(supabase, cfg, { templateKey, text, memberId }) {
       ? {
           channel: 'email',
           run: () =>
-            sendEmail({ to: cfg.owner.email, toName: 'Owner', subject: `${cfg.gymName} alert`, html: `<p>${text}</p>`, sender: cfg.sender }),
+            sendEmail({
+              to: cfg.owner.email,
+              toName: 'Owner',
+              subject: `${cfg.gymName} — ${text.split('\n')[0].replace(/^[^A-Za-z]+/, '').trim() || 'Notification'}`,
+              html: ownerEmailHtml(cfg.gymName, text),
+              sender: cfg.sender,
+            }),
           recipient: cfg.owner.email,
         }
       : null,
@@ -109,16 +126,17 @@ async function alertOwner(supabase, cfg, { templateKey, text, memberId }) {
 // ======================= HIGH-LEVEL TRIGGERS =======================
 
 /** New registration: member welcome + owner alert(s). */
-export async function onNewMember(supabase, { member, planName, amount, parqFlag }) {
+export async function onNewMember(supabase, { member, planName, tier, contractLabel, amount, recurring, parqFlag }) {
   try {
     const cfg = await loadConfig(supabase);
+    const vars = { gymName: cfg.gymName, planName, tier, contractLabel, amount, recurring };
     if (enabled(cfg.toggles, 'welcome_email')) {
-      await emailMember(supabase, cfg, { member, templateKey: 'welcome', vars: {} });
+      await emailMember(supabase, cfg, { member, templateKey: 'welcome', vars });
     }
     if (enabled(cfg.toggles, 'owner_new_member')) {
       await alertOwner(supabase, cfg, {
         templateKey: 'new_member',
-        text: ownerTemplates.new_member({ member, planName, amount }),
+        text: ownerTemplates.new_member({ member, planName, tier, contractLabel, amount, recurring, parqFlag }),
         memberId: member.id,
       });
     }
@@ -155,20 +173,20 @@ export async function notifyOwner(supabase, templateKey, text, memberId = null) 
 }
 
 /** Successful payment: member receipt + owner alert. */
-export async function onPaymentReceived(supabase, { member, amount, description }) {
+export async function onPaymentReceived(supabase, { member, amount, description, membershipNumber }) {
   try {
     const cfg = await loadConfig(supabase);
     if (enabled(cfg.toggles, 'payment_receipt')) {
       await emailMember(supabase, cfg, {
         member,
         templateKey: 'payment_receipt',
-        vars: { amount, description },
+        vars: { amount, description, membershipNumber },
       });
     }
     if (enabled(cfg.toggles, 'owner_payment')) {
       await alertOwner(supabase, cfg, {
         templateKey: 'payment_received',
-        text: ownerTemplates.payment_received({ member, amount, description }),
+        text: ownerTemplates.payment_received({ member, amount, description, membershipNumber }),
         memberId: member.id,
       });
     }
