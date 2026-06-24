@@ -84,12 +84,11 @@ export async function generateMembershipPdf(data) {
   // signature accent stripe
   fColor(accent);
   doc.rect(cardX + 20, cardY + 30, cardW - 40, 3, 'F');
-  // diamond corner accents (gold)
-  tColor(gold);
-  doc.setFont('helvetica', 'normal');
-  doc.setFontSize(9);
-  doc.text('◆', cardX + 13, cardY + cardH - 12);
-  doc.text('◆', cardX + cardW - 20, cardY + cardH - 12);
+  // diamond corner accents (drawn gold squares — no special font glyphs)
+  fColor(gold);
+  const dsz = 5;
+  doc.rect(cardX + 16, cardY + cardH - 20, dsz, dsz, 'F');
+  doc.rect(cardX + cardW - 16 - dsz, cardY + cardH - 20, dsz, dsz, 'F');
 
   tColor(muted);
   doc.setFont('helvetica', 'bold');

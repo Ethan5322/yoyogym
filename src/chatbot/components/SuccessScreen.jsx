@@ -14,7 +14,7 @@ export default function SuccessScreen({ result, paid = false }) {
     setPdfBusy(true);
     setPdfErr('');
     try {
-      const data = await apiFetch('/members/document', {
+      const data = await apiFetch('/document', {
         method: 'POST',
         auth: false,
         body: {
