@@ -181,6 +181,15 @@ export const FLOW = [
     prompt: (a) => `And ${a.emergency_name ? a.emergency_name.split(/\s+/)[0] + '’s' : 'their'} phone number?`,
     validate: (v) => validatePhone(v),
   },
+  {
+    id: 'face_capture',
+    section: 2,
+    type: 'face',
+    field: 'face',
+    prompt: (a) =>
+      `Almost done with your profile${firstName(a)}! Let’s capture your face for fast, secure gym access — ` +
+      `look at the camera and tap Capture. (You can skip and enrol at reception.)`,
+  },
 
   // ---- SECTION 3 — PAR-Q HEALTH SCREENING ----------------------------------
   // Mandatory in the SA fitness industry. 7 YES/NO questions, exact wording

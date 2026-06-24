@@ -24,6 +24,8 @@ export function formatAnswer(step, value) {
       return value.length ? value.map((a) => a.name).join(', ') : 'No add-ons';
     case 'agreement':
       return `Accepted & signed — ${value.signature}`;
+    case 'face':
+      return value?.descriptor ? '📸 Face captured ✓' : 'Skipped';
     case 'date':
       try {
         return new Date(value).toLocaleDateString('en-ZA', {

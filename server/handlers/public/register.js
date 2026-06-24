@@ -120,37 +120,45 @@ export default async function handler(req, res) {
     const age = ageFrom(a.date_of_birth);
 
     // ---- insert member ----
+    const memberRow = {
+      membership_number: membershipNumber,
+      verification_code: verificationCode,
+      full_name: a.full_name.trim(),
+      date_of_birth: a.date_of_birth,
+      gender: a.gender || null,
+      id_number: a.id_type === 'sa_id' ? a.id_number || null : null,
+      passport_number: a.id_type === 'passport' ? a.passport_number || null : null,
+      phone: a.phone,
+      email: a.email,
+      address_street: a.address_street || null,
+      address_suburb: a.address_suburb || null,
+      address_city: a.address_city || null,
+      address_postal_code: a.address_postal_code || null,
+      emergency_name: a.emergency_name || null,
+      emergency_phone: a.emergency_phone || null,
+      guardian_consent: age < 18,
+      fitness_goals: a.fitness_goals || [],
+      experience_level: a.experience_level || null,
+      training_frequency: a.training_frequency || null,
+      preferred_time: a.preferred_time || null,
+      injuries_notes: a.injuries_notes || null,
+      has_medical_aid: !!a.has_medical_aid,
+      medical_aid_provider: a.has_medical_aid ? a.medical_aid_provider || null : null,
+      status: 'new',
+      parq_flag: anyYes,
+      manually_registered: !!a.manual,
+      popia_consent_at: new Date().toISOString(),
+    };
+    // Phase 88 — face biometric. Added only when captured, so registration
+    // still works if the biometric columns haven't been added yet.
+    if (a.face?.descriptor) {
+      memberRow.face_descriptor = a.face.descriptor;
+      memberRow.biometric_enrolled = true;
+      memberRow.photo_url = a.face.image || null;
+    }
     const { data: member, error: memberErr } = await supabase
       .from('members')
-      .insert({
-        membership_number: membershipNumber,
-        verification_code: verificationCode,
-        full_name: a.full_name.trim(),
-        date_of_birth: a.date_of_birth,
-        gender: a.gender || null,
-        id_number: a.id_type === 'sa_id' ? a.id_number || null : null,
-        passport_number: a.id_type === 'passport' ? a.passport_number || null : null,
-        phone: a.phone,
-        email: a.email,
-        address_street: a.address_street || null,
-        address_suburb: a.address_suburb || null,
-        address_city: a.address_city || null,
-        address_postal_code: a.address_postal_code || null,
-        emergency_name: a.emergency_name || null,
-        emergency_phone: a.emergency_phone || null,
-        guardian_consent: age < 18,
-        fitness_goals: a.fitness_goals || [],
-        experience_level: a.experience_level || null,
-        training_frequency: a.training_frequency || null,
-        preferred_time: a.preferred_time || null,
-        injuries_notes: a.injuries_notes || null,
-        has_medical_aid: !!a.has_medical_aid,
-        medical_aid_provider: a.has_medical_aid ? a.medical_aid_provider || null : null,
-        status: 'new',
-        parq_flag: anyYes,
-        manually_registered: !!a.manual,
-        popia_consent_at: new Date().toISOString(),
-      })
+      .insert(memberRow)
       .select('id')
       .single();
     if (memberErr) return serverError(res, memberErr.message);

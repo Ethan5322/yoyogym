@@ -7,6 +7,7 @@ import MembershipControl from './MembershipControl.jsx';
 import AddonsControl from './AddonsControl.jsx';
 import SummaryView from './SummaryView.jsx';
 import AgreementControl from './AgreementControl.jsx';
+import FaceCapture from './FaceCapture.jsx';
 
 export default function Controls({ step, error, defaultValue, answers, onSubmit }) {
   switch (step.type) {
@@ -24,6 +25,8 @@ export default function Controls({ step, error, defaultValue, answers, onSubmit 
       return <SummaryView answers={answers} onSubmit={onSubmit} />;
     case 'agreement':
       return <AgreementControl defaultValue={defaultValue} error={error} onSubmit={onSubmit} />;
+    case 'face':
+      return <FaceCapture onSubmit={onSubmit} />;
     case 'select':
       return <SelectControl step={step} value={defaultValue} onSubmit={onSubmit} />;
     case 'multiselect':
