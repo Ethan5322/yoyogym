@@ -5,24 +5,28 @@ export default {
   theme: {
     extend: {
       colors: {
-        // Brand accent is configurable per gym (loaded from settings at runtime
-        // via CSS variable --accent). These are the spec defaults.
+        // "Dark Power Athletic Corporate" palette. Brand accent stays runtime-
+        // configurable per gym via the --accent CSS variable.
         accent: 'var(--accent, #E63946)',
         'accent-soft': 'var(--accent-soft, rgba(230,57,70,0.15))',
-        bg: '#0A0A0A',
-        surface: '#141414',
-        elevated: '#1C1C1C',
+        gold: '#C8922A',
+        bg: '#080808', // obsidian
+        surface: '#111111', // deep charcoal
+        elevated: '#1A1A1A', // lighter charcoal
         bubble: '#1A1A1A',
-        body: '#F5F0E8',
-        muted: '#9A9590',
-        success: '#2ECC71',
-        error: '#E74C3C',
+        body: '#F0EDE8', // warm white
+        muted: '#8A8580', // soft gray
+        success: '#00C851',
+        warning: '#FF8C00',
+        error: '#E63946',
       },
       fontFamily: {
-        // Headers: athletic/powerful. Body: clean/readable. Loaded via index.html.
-        display: ['Oswald', 'Bebas Neue', 'sans-serif'],
-        body: ['Inter', 'DM Sans', 'system-ui', 'sans-serif'],
-        mono: ['ui-monospace', 'SFMono-Regular', 'Menlo', 'monospace'],
+        // Hero/commanding = Bebas Neue · Section = Oswald · Body = Inter ·
+        // Data/codes = DM Mono. Loaded via index.html.
+        display: ['"Bebas Neue"', 'Oswald', 'sans-serif'],
+        heading: ['Oswald', 'sans-serif'],
+        body: ['Inter', 'system-ui', 'sans-serif'],
+        mono: ['"DM Mono"', 'ui-monospace', 'SFMono-Regular', 'monospace'],
       },
       lineHeight: {
         relaxed: '1.75',

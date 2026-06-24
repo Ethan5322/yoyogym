@@ -36,7 +36,8 @@ export async function generateMembershipPdf(data) {
 
   const ink = [33, 33, 33];
   const muted = [120, 120, 120];
-  const dark = [12, 12, 12];
+  const dark = [8, 8, 8]; // obsidian
+  const gold = [200, 146, 42];
   const line = [220, 220, 220];
 
   const tColor = (c) => doc.setTextColor(c[0], c[1], c[2]);
@@ -67,14 +68,27 @@ export async function generateMembershipPdf(data) {
   const cardW = CW;
   const cardH = cardW / 1.586;
   const cardY = 120;
-  doc.setFillColor(24, 24, 24);
-  doc.roundedRect(cardX, cardY, cardW, cardH, 16, 16, 'F');
+  doc.setFillColor(20, 20, 20);
+  doc.roundedRect(cardX, cardY, cardW, cardH, 10, 10, 'F');
+  // bold red diagonal racing wedge in the top-right corner (safe triangle fill)
+  fColor(accent);
+  doc.triangle(cardX + cardW, cardY, cardX + cardW, cardY + 64, cardX + cardW - 90, cardY, 'F');
+  // outer red border + inset gold "Member of Excellence" frame
   doc.setDrawColor(accent[0], accent[1], accent[2]);
   doc.setLineWidth(1.5);
-  doc.roundedRect(cardX, cardY, cardW, cardH, 16, 16, 'S');
-  // holographic accent stripe
+  doc.roundedRect(cardX, cardY, cardW, cardH, 10, 10, 'S');
+  doc.setDrawColor(gold[0], gold[1], gold[2]);
+  doc.setLineWidth(0.6);
+  doc.rect(cardX + 8, cardY + 8, cardW - 16, cardH - 16, 'S');
+  // signature accent stripe
   fColor(accent);
-  doc.rect(cardX + 20, cardY + 30, cardW - 40, 4, 'F');
+  doc.rect(cardX + 20, cardY + 30, cardW - 40, 3, 'F');
+  // diamond corner accents (gold)
+  tColor(gold);
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(9);
+  doc.text('◆', cardX + 13, cardY + cardH - 12);
+  doc.text('◆', cardX + cardW - 20, cardY + cardH - 12);
 
   tColor(muted);
   doc.setFont('helvetica', 'bold');

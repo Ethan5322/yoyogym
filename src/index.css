@@ -6,6 +6,7 @@
   /* Accent is overridden at runtime from gym settings (Phase 7). */
   --accent: #e63946;
   --accent-soft: rgba(230, 57, 70, 0.15);
+  --gold: #c8922a;
 }
 
 html,
@@ -16,34 +17,68 @@ body,
 
 body {
   @apply bg-bg text-body font-body antialiased;
-  line-height: 1.75;
+  line-height: 1.7;
+  /* Subtle carbon-fibre / technical texture at ~4% opacity (atmospheric depth) */
+  background-image:
+    repeating-linear-gradient(45deg, rgba(255, 255, 255, 0.018) 0 1px, transparent 1px 7px),
+    repeating-linear-gradient(-45deg, rgba(255, 255, 255, 0.018) 0 1px, transparent 1px 7px);
+  background-attachment: fixed;
 }
 
-/* Athletic display headings */
+/* Commanding athletic headings (Bebas Neue) */
 h1,
 h2,
 h3 {
-  @apply font-display tracking-wide;
+  @apply font-display;
+  letter-spacing: 0.12em;
+  line-height: 1.05;
 }
 
-/* Reusable component classes (dark premium athletic, spec Part 7) */
+/* "Dark Power Athletic Corporate" component system — sharp, purposeful. */
 @layer components {
   .btn-primary {
-    @apply inline-flex items-center justify-center rounded-lg bg-accent px-6 py-3
-      font-display text-lg font-semibold uppercase tracking-wider text-black
-      transition active:scale-[0.98] disabled:opacity-50;
+    @apply inline-flex items-center justify-center rounded-[4px] bg-accent px-6 py-3
+      font-heading text-base font-semibold uppercase tracking-[0.14em] text-white
+      transition-transform duration-75 hover:brightness-110 active:scale-[0.96]
+      disabled:opacity-50;
   }
   .btn-outline {
-    @apply inline-flex items-center justify-center rounded-lg border border-accent
-      px-6 py-3 font-display text-lg font-semibold uppercase tracking-wider
-      text-accent transition hover:bg-accent-soft active:scale-[0.98]
+    @apply inline-flex items-center justify-center rounded-[4px] border border-accent
+      px-6 py-3 font-heading text-base font-semibold uppercase tracking-[0.14em]
+      text-accent transition-transform duration-75 hover:bg-accent-soft active:scale-[0.96]
       disabled:opacity-50;
   }
   .field {
-    @apply w-full rounded-lg border border-white/10 bg-elevated px-4 py-3 text-body
+    @apply w-full rounded-[4px] border border-white/10 bg-elevated px-4 py-3 text-body
       placeholder-muted outline-none transition focus:border-accent;
   }
+  /* Surface card with a thin signature red top stripe (racing accent). */
   .card {
-    @apply rounded-2xl border border-white/5 bg-surface p-6;
+    @apply relative rounded-[6px] border border-white/[0.06] bg-surface p-6;
+  }
+  .card::before {
+    content: '';
+    @apply pointer-events-none absolute inset-x-0 top-0 h-[2px] rounded-t-[6px];
+    background: linear-gradient(90deg, var(--accent) 0%, transparent 55%);
+    opacity: 0.55;
+  }
+}
+
+/* Athletic utilities */
+@layer utilities {
+  .font-data {
+    @apply font-mono;
+    letter-spacing: 0.05em;
+  }
+  /* 15° racing stripe accent for hero containers */
+  .racing-stripe {
+    background-image: repeating-linear-gradient(
+      105deg,
+      var(--accent-soft) 0 14px,
+      transparent 14px 40px
+    );
+  }
+  .gold-frame {
+    box-shadow: inset 0 0 0 1px rgba(200, 146, 42, 0.45);
   }
 }
