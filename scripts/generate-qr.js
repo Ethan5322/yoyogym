@@ -9,7 +9,8 @@ const GYM = 'YOYO GYM';
 const ACCENT = [230, 57, 70];
 
 const codes = [
-  { key: 'company', label: 'Scan to Join or Check In', url: SITE, file: 'yoyo-gym-qr' },
+  { key: 'company', label: 'Company QR — Join or Log In', url: `${SITE}?src=qr`, file: 'yoyo-gym-company-qr' },
+  { key: 'admin', label: 'Admin QR — Staff Access', url: `${SITE}admin/login`, file: 'yoyo-gym-admin-qr' },
   { key: 'newmember', label: 'New Member — Register', url: `${SITE}register?src=qr`, file: 'yoyo-gym-newmember-qr' },
   { key: 'existing', label: 'Members — Check In & Book', url: `${SITE}member?src=qr`, file: 'yoyo-gym-existingmember-qr' },
 ];
@@ -68,4 +69,4 @@ codes.forEach((c, i) => {
 
 const pdf = doc.output('arraybuffer');
 writeFileSync('qr/yoyo-gym-qr.pdf', Buffer.from(pdf));
-console.log('✔ qr/yoyo-gym-qr.pdf (3 pages: company + new member + existing member)');
+console.log('✔ qr/yoyo-gym-qr.pdf (' + codes.length + ' pages)');

@@ -9,11 +9,17 @@ export default function FaceCapture({ onSubmit }) {
   const streamRef = useRef(null);
   const [phase, setPhase] = useState('loading'); // loading | ready | capturing | error
   const [error, setError] = useState('');
+  const [attempt, setAttempt] = useState(0);
 
   useEffect(() => {
     let active = true;
+    setPhase('loading');
+    setError('');
     (async () => {
       try {
+        if (!navigator.mediaDevices?.getUserMedia) {
+          throw Object.assign(new Error('insecure'), { name: 'InsecureContext' });
+        }
         // warm up models (lazy import) in parallel with camera
         const { getFaceApi } = await import('../../lib/face/faceapi.js');
         const camP = navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user', width: 480, height: 480 } });
@@ -30,7 +36,16 @@ export default function FaceCapture({ onSubmit }) {
         }
         setPhase('ready');
       } catch (err) {
-        setError(err?.name === 'NotAllowedError' ? 'Camera permission denied.' : 'Camera not available.');
+        const name = err?.name;
+        setError(
+          name === 'NotAllowedError'
+            ? 'Camera blocked. Tap the 🔒 padlock in your browser bar → allow Camera, then tap Try again.'
+            : name === 'NotFoundError'
+            ? 'No camera found on this device.'
+            : name === 'InsecureContext' || !window.isSecureContext
+            ? 'Camera needs a secure (https) connection.'
+            : 'Camera not available right now.'
+        );
         setPhase('error');
       }
     })();
@@ -39,7 +54,7 @@ export default function FaceCapture({ onSubmit }) {
       stop();
     };
     // eslint-disable-next-line
-  }, []);
+  }, [attempt]);
 
   function stop() {
     if (streamRef.current) {
@@ -96,7 +111,10 @@ export default function FaceCapture({ onSubmit }) {
       {error && <p className="rounded-lg bg-error/10 px-3 py-2 text-sm text-error">{error}</p>}
 
       {phase === 'error' ? (
-        <button className="btn-outline w-full" onClick={skip}>Skip — I’ll enrol at reception</button>
+        <div className="flex gap-3">
+          <button className="btn-primary flex-1" onClick={() => setAttempt((a) => a + 1)}>Try again</button>
+          <button className="btn-outline" onClick={skip}>Skip</button>
+        </div>
       ) : (
         <div className="flex gap-3">
           <button className="btn-primary flex-1" disabled={phase !== 'ready'} onClick={capture}>

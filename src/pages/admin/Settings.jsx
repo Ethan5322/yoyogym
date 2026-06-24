@@ -33,19 +33,25 @@ export default function Settings() {
   return (
     <AdminShell>
       <h1 className="text-2xl font-bold uppercase text-body">Settings</h1>
+      <p className="mt-1 text-muted">
+        Configure your gym below. Everything is pre-filled with professional defaults — review each section,
+        edit anything you like, and click <b>Save</b> on that section. Changes apply across the member app, emails, and PDFs.
+      </p>
 
       <Section title="Gym Profile" saved={savedKey === 'gym_profile'}
-        initial={s.gym_profile || {}}
-        fields={[['name', 'Gym name'], ['accent_color', 'Accent colour (e.g. #E63946)'], ['phone', 'Phone'], ['email', 'Email'], ['address', 'Address']]}
+        note="Your brand identity. The name and accent colour appear on the splash screen, membership card, emails and PDFs."
+        initial={{ ...DEFAULTS.gym_profile, ...(s.gym_profile || {}) }}
+        fields={[['name', 'Gym name'], ['tagline', 'Tagline (shown on the splash screen)'], ['accent_color', 'Brand accent colour (hex, e.g. #E63946)'], ['phone', 'Contact phone'], ['email', 'Contact email'], ['website', 'Website (optional)'], ['address', 'Physical address'], ['operating_hours', 'Operating hours'], ['welcome_message', 'Welcome message (splash screen)']]}
         onSave={(v) => save('gym_profile', v, 'gym_profile')} />
 
       <Section title="Owner Notifications" saved={savedKey === 'notifications'}
         initial={s.notifications || {}}
         fields={[['owner_email', 'Owner email'], ['owner_whatsapp_phone', 'WhatsApp phone (+27…)'], ['owner_whatsapp_apikey', 'CallMeBot WhatsApp API key'], ['owner_telegram_user', 'Telegram username (@…)']]}
-        note="CallMeBot needs a one-time activation per number/username. WhatsApp: message the CallMeBot number to get your API key. Telegram: start the CallMeBot and send /start."
+        note="Where instant alerts (new members, payments, capacity, incidents) are sent. CallMeBot needs a one-time activation per number/username — WhatsApp: message the CallMeBot number to get your API key; Telegram: start the CallMeBot and send /start."
         onSave={(v) => save('notifications', v, 'notifications')} />
 
       <Section title="Contract Discounts (%)" saved={savedKey === 'contract_discounts'}
+        note="Percentage discount applied to the monthly fee for longer commitments. Longer contracts reward loyalty and reduce churn."
         initial={s.contract_discounts || { month_to_month: 0, '3_month': 0, '6_month': 5, '12_month': 10 }}
         fields={[['month_to_month', 'Month-to-month'], ['3_month', '3 month'], ['6_month', '6 month'], ['12_month', '12 month']]}
         numeric
@@ -55,12 +61,51 @@ export default function Settings() {
 
       <AdminFaceEnroll />
 
-      <TextSection title="Indemnity Waiver" k="indemnity_text" value={s.indemnity_text?.text || ''} saved={savedKey === 'indemnity_text'} onSave={(text) => save('indemnity_text', { text }, 'terms')} />
-      <TextSection title="Membership Contract" k="contract_text" value={s.contract_text?.text || ''} saved={savedKey === 'contract_text'} onSave={(text) => save('contract_text', { text }, 'terms')} />
-      <TextSection title="POPIA Privacy Policy" k="popia_text" value={s.popia_text?.text || ''} saved={savedKey === 'popia_text'} onSave={(text) => save('popia_text', { text }, 'terms')} />
+      <TextSection title="Gym Rules & Code of Conduct" k="gym_rules" value={s.gym_rules?.text} defaultText={DEFAULTS.gym_rules} note="Shown to members during registration and printed on their confirmation." saved={savedKey === 'gym_rules'} onSave={(text) => save('gym_rules', { text }, 'rules')} />
+      <TextSection title="Indemnity Waiver" k="indemnity_text" value={s.indemnity_text?.text} defaultText={DEFAULTS.indemnity_text} note="Legal waiver the member must accept before joining (CPA-aligned)." saved={savedKey === 'indemnity_text'} onSave={(text) => save('indemnity_text', { text }, 'terms')} />
+      <TextSection title="Membership Contract" k="contract_text" value={s.contract_text?.text} defaultText={DEFAULTS.contract_text} note="Your membership terms: billing, cancellation (20 business days, CPA), conduct." saved={savedKey === 'contract_text'} onSave={(text) => save('contract_text', { text }, 'terms')} />
+      <TextSection title="POPIA Privacy Policy" k="popia_text" value={s.popia_text?.text} defaultText={DEFAULTS.popia_text} note="How you process members' personal information (POPIA compliant)." saved={savedKey === 'popia_text'} onSave={(text) => save('popia_text', { text }, 'terms')} />
     </AdminShell>
   );
 }
+
+const DEFAULTS = {
+  gym_profile: {
+    name: 'Yoyo GYM',
+    tagline: 'Train harder. Live stronger.',
+    accent_color: '#E63946',
+    operating_hours: 'Mon–Fri 05:00–21:00 · Sat–Sun 07:00–18:00',
+    welcome_message: 'Welcome to Yoyo GYM — your journey to a stronger, healthier you starts here. Scan, register, and let’s get moving.',
+    website: '',
+  },
+  gym_rules: `1. Always carry and present your membership for access.
+2. Wipe down equipment after every use and re-rack your weights.
+3. Appropriate gym attire and closed training shoes are required.
+4. Respect staff, trainers and fellow members at all times.
+5. Personal belongings are the member's responsibility — use the lockers provided.
+6. No outside trainers may operate on the gym floor without authorisation.
+7. Report any faulty equipment or injuries to reception immediately.
+8. The gym reserves the right to suspend membership for serious misconduct.`,
+  indemnity_text:
+    'I acknowledge that physical exercise carries inherent risks including injury or illness. ' +
+    'I confirm that I am physically capable of participating in a gym environment. I indemnify Yoyo GYM and ' +
+    'its staff against any injury, illness, loss, or damage arising from my use of the facilities, to the extent ' +
+    'permitted by South African law.',
+  contract_text:
+    'MEMBERSHIP CONTRACT & TERMS\n\n' +
+    '1. Billing: Monthly fees are collected by debit order / card on the agreed billing date.\n' +
+    '2. Cancellation: 20 business days written notice is required (Consumer Protection Act compliant).\n' +
+    '3. Early cancellation of a fixed-term contract may attract a reasonable cancellation fee.\n' +
+    '4. Members agree to follow the gym rules and code of conduct at all times.\n' +
+    '5. Guests are subject to the gym guest policy and applicable fees.\n' +
+    '6. In a medical emergency, the gym may obtain emergency assistance on the member’s behalf.\n' +
+    '7. Personal information is processed in line with POPIA (see privacy policy).',
+  popia_text:
+    'PRIVACY POLICY (POPIA)\n\n' +
+    'Yoyo GYM processes your personal information solely to administer your membership, payments, health & safety ' +
+    'screening, and communications. Your data is stored securely and is never sold. You may request access to, ' +
+    'correction of, or deletion of your personal information at any time. (Protection of Personal Information Act, 2013.)',
+};
 
 const TIERS = ['basic', 'standard', 'premium', 'vip'];
 const DEFAULT_COMPLIANCE = {
@@ -191,16 +236,20 @@ function Section({ title, fields, initial, numeric, note, onSave, saved }) {
   );
 }
 
-function TextSection({ title, value, onSave, saved }) {
-  const [t, setT] = useState(value);
-  useEffect(() => setT(value), [value]);
+function TextSection({ title, value, defaultText = '', note, onSave, saved }) {
+  // Pre-fill the professional default when nothing is saved yet, so the admin
+  // can review/edit and save rather than start from a blank box.
+  const [t, setT] = useState(value ?? defaultText);
+  useEffect(() => setT(value ?? defaultText), [value, defaultText]);
   return (
     <div className="card mt-6">
-      <h2 className="mb-3 font-display uppercase text-body">{title}</h2>
-      <textarea className="field min-h-[120px]" value={t} onChange={(e) => setT(e.target.value)} />
+      <h2 className="mb-1 font-display uppercase text-body">{title}</h2>
+      {note && <p className="mb-3 text-xs text-muted">{note}</p>}
+      <textarea className="field min-h-[140px]" value={t} onChange={(e) => setT(e.target.value)} />
       <div className="mt-3 flex items-center gap-3">
         <button className="btn-primary px-4 py-2 text-sm" onClick={() => onSave(t)}>Save</button>
         {saved && <span className="text-sm text-success">Saved ✓</span>}
+        <button className="text-xs text-muted hover:text-body" onClick={() => setT(defaultText)}>Reset to default</button>
       </div>
     </div>
   );
