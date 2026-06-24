@@ -5,6 +5,7 @@ import { Link } from 'react-router-dom';
 import { memberFetch, getMemberToken, setMemberToken, clearMemberToken } from '../lib/memberApi.js';
 import { logQrScan } from '../lib/scan.js';
 import PersonalQr from '../components/PersonalQr.jsx';
+import IdCardButton from '../components/IdCardButton.jsx';
 
 export default function MemberPortal() {
   const [token, setTok] = useState(getMemberToken());
@@ -188,6 +189,25 @@ function StatusTab() {
         <p className="rounded-lg bg-error/10 px-3 py-2 text-xs text-error">
           ⚠ Medical clearance required — please bring a doctor’s note.
         </p>
+      )}
+
+      {data.member?.membership_number && (
+        <div className="card text-center">
+          {data.member.photo_url && (
+            <img src={data.member.photo_url} alt="" className="mx-auto mb-3 h-28 w-[84px] rounded object-cover gold-frame" />
+          )}
+          <p className="font-display text-lg uppercase text-body">Membership ID Card</p>
+          <p className="mb-3 text-xs text-muted">Your photo, details &amp; QR — use it as your gym ID.</p>
+          <IdCardButton
+            member={{
+              full_name: data.member.full_name,
+              membership_number: data.member.membership_number,
+              tier: m?.tier,
+              valid_until: m?.end_date,
+              photo_url: data.member.photo_url,
+            }}
+          />
+        </div>
       )}
 
       {data.member?.membership_number && (

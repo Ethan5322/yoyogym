@@ -135,13 +135,22 @@ export default function FaceCapture({ onSubmit }) {
       const { averageDescriptors } = await import('../../lib/face/faceapi.js');
       const descriptor = averageDescriptors(samplesRef.current); // robust averaged template
       const v = videoRef.current;
+      // Clear passport-style 3:4 portrait for the membership ID card.
+      const ow = 600;
+      const oh = 800;
       const canvas = document.createElement('canvas');
-      const size = 320;
-      canvas.width = size;
-      canvas.height = size;
-      const s = Math.min(v.videoWidth, v.videoHeight);
-      canvas.getContext('2d').drawImage(v, (v.videoWidth - s) / 2, (v.videoHeight - s) / 2, s, s, 0, 0, size, size);
-      const image = canvas.toDataURL('image/jpeg', 0.85);
+      canvas.width = ow;
+      canvas.height = oh;
+      let sw = v.videoWidth;
+      let sh = (sw * 4) / 3;
+      if (sh > v.videoHeight) {
+        sh = v.videoHeight;
+        sw = (sh * 3) / 4;
+      }
+      const sx = (v.videoWidth - sw) / 2;
+      const sy = (v.videoHeight - sh) / 2;
+      canvas.getContext('2d').drawImage(v, sx, sy, sw, sh, 0, 0, ow, oh);
+      const image = canvas.toDataURL('image/jpeg', 0.9);
       stop();
       onSubmit({ descriptor, image });
     } catch {

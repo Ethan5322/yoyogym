@@ -17,7 +17,7 @@ export default async function handler(req, res) {
       await Promise.all([
         supabase
           .from('members')
-          .select('full_name, membership_number, verification_code, status, parq_flag, training_frequency')
+          .select('full_name, membership_number, verification_code, status, parq_flag, training_frequency, photo_url')
           .eq('id', auth.sub)
           .maybeSingle(),
         supabase

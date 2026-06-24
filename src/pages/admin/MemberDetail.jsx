@@ -5,6 +5,7 @@ import AdminShell from '../../components/AdminShell.jsx';
 import { apiFetch } from '../../lib/api.js';
 import { useAuth } from '../../lib/auth.jsx';
 import PersonalQr from '../../components/PersonalQr.jsx';
+import IdCardButton from '../../components/IdCardButton.jsx';
 
 const zar = (n) => 'R' + Number(n || 0).toLocaleString('en-ZA', { minimumFractionDigits: 2 });
 const fmt = (d) => (d ? new Date(d).toLocaleDateString('en-ZA', { day: 'numeric', month: 'short', year: 'numeric' }) : '—');
@@ -184,7 +185,12 @@ export default function MemberDetail() {
         </div>
       </Section>
 
-      <Section title="Personal QR (Type B)">
+      <Section title="Membership ID Card & QR">
+        <div className="mb-4 max-w-xs">
+          <IdCardButton
+            member={{ full_name: m.full_name, membership_number: m.membership_number, tier: current?.tier, valid_until: current?.end_date, photo_url: m.photo_url }}
+          />
+        </div>
         <PersonalQr url={`${window.location.origin}/p/m/${m.membership_number}`} name={m.full_name} />
       </Section>
 
