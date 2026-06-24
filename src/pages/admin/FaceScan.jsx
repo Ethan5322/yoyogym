@@ -62,11 +62,16 @@ export default function FaceScan() {
     setPhase('scanning');
 
     // 1) Camera first — its own error handling (separate from face models).
+    // QR scanning needs a sharper, higher-res frame; face needs less.
+    const constraints =
+      mode === 'qr'
+        ? { video: { facingMode: 'environment', width: { ideal: 1280 }, height: { ideal: 720 } } }
+        : { video: { facingMode: 'environment', width: { ideal: 640 }, height: { ideal: 640 } } };
     let stream;
     try {
       if (!navigator.mediaDevices?.getUserMedia) throw new Error('insecure');
       try {
-        stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment', width: 640, height: 640 } });
+        stream = await navigator.mediaDevices.getUserMedia(constraints);
       } catch {
         stream = await navigator.mediaDevices.getUserMedia({ video: true }); // fallback (e.g. laptop front cam)
       }
@@ -109,14 +114,20 @@ export default function FaceScan() {
     const jsQR = (await import('jsqr')).default;
     const canvas = document.createElement('canvas');
     const ctx = canvas.getContext('2d', { willReadFrequently: true });
+    const MAXW = 720; // downscale processing for speed while keeping QR detail
     while (loopRef.current) {
       const v = videoRef.current;
-      if (v && v.videoWidth) {
-        canvas.width = v.videoWidth;
-        canvas.height = v.videoHeight;
-        ctx.drawImage(v, 0, 0, canvas.width, canvas.height);
-        const img = ctx.getImageData(0, 0, canvas.width, canvas.height);
-        const code = jsQR(img.data, img.width, img.height);
+      if (v && v.readyState >= 2 && v.videoWidth) {
+        const scale = Math.min(1, MAXW / v.videoWidth);
+        const w = Math.round(v.videoWidth * scale);
+        const h = Math.round(v.videoHeight * scale);
+        if (canvas.width !== w) {
+          canvas.width = w;
+          canvas.height = h;
+        }
+        ctx.drawImage(v, 0, 0, w, h);
+        const img = ctx.getImageData(0, 0, w, h);
+        const code = jsQR(img.data, w, h, { inversionAttempts: 'dontInvert' });
         if (code && code.data) {
           loopRef.current = false;
           stopCamera();
@@ -124,7 +135,8 @@ export default function FaceScan() {
           return;
         }
       }
-      await new Promise((r) => setTimeout(r, 250));
+      // tight loop, paced to the display (fast reads without pegging the CPU)
+      await new Promise((r) => requestAnimationFrame(() => r()));
     }
   }
 
