@@ -3,6 +3,7 @@
 // member's passport photo, details, and personal QR — downloadable as a PNG
 // the member can keep on their phone or print as a gym ID.
 import QRCode from 'qrcode';
+import { downloadCanvas } from './download.js';
 
 const TIER_COLOR = {
   basic: '#8A8580',
@@ -172,8 +173,5 @@ export async function downloadIdCard({
     ctx.fillText('SCAN TO VERIFY', qx + 18, qy + qz + 28);
   }
 
-  const a = document.createElement('a');
-  a.href = canvas.toDataURL('image/png');
-  a.download = `yoyo-id-${(membershipNumber || name || 'member').replace(/\s+/g, '-')}.png`;
-  a.click();
+  await downloadCanvas(canvas, `yoyo-id-${(membershipNumber || name || 'member').replace(/\s+/g, '-')}.png`);
 }

@@ -2,6 +2,7 @@
 // with download + print. Used in the member portal and admin records.
 import { useEffect, useRef } from 'react';
 import QRCode from 'qrcode';
+import { downloadCanvas } from '../lib/download.js';
 
 export default function PersonalQr({ url, name = 'profile', label }) {
   const canvasRef = useRef(null);
@@ -11,10 +12,7 @@ export default function PersonalQr({ url, name = 'profile', label }) {
   }, [url]);
 
   function download() {
-    const a = document.createElement('a');
-    a.href = canvasRef.current.toDataURL('image/png');
-    a.download = `yoyo-qr-${name.replace(/\s+/g, '-').toLowerCase()}.png`;
-    a.click();
+    downloadCanvas(canvasRef.current, `yoyo-qr-${name.replace(/\s+/g, '-').toLowerCase()}.png`);
   }
   function print() {
     const dataUrl = canvasRef.current.toDataURL('image/png');

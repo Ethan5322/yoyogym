@@ -13,6 +13,7 @@ import {
   PARQ_QUESTIONS,
 } from './labels.js';
 import { gymTerms } from './terms.js';
+import { downloadBlob } from '../download.js';
 
 function hexToRgb(hex) {
   const m = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex || '');
@@ -354,5 +355,10 @@ export async function generateMembershipPdf(data) {
     doc.text(`Page ${i} of ${pages}`, W - M, H - 24, { align: 'right' });
   }
 
-  doc.save(`${member.membership_number}.pdf`);
+  // Robust download (works where doc.save() is silently blocked).
+  try {
+    downloadBlob(doc.output('blob'), `${member.membership_number}.pdf`);
+  } catch {
+    doc.save(`${member.membership_number}.pdf`);
+  }
 }

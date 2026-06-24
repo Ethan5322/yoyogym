@@ -42,11 +42,9 @@ function QrCard({ title, subtitle, url }) {
     QRCode.toCanvas(canvasRef.current, url, { width: 320, margin: 2, errorCorrectionLevel: 'H' }, () => setReady(true));
   }, [url]);
 
-  function download() {
-    const a = document.createElement('a');
-    a.href = canvasRef.current.toDataURL('image/png');
-    a.download = `qr-${title.toLowerCase().replace(/\s+/g, '-')}.png`;
-    a.click();
+  async function download() {
+    const { downloadCanvas } = await import('../../lib/download.js');
+    await downloadCanvas(canvasRef.current, `qr-${title.toLowerCase().replace(/\s+/g, '-')}.png`);
   }
   function print() {
     const dataUrl = canvasRef.current.toDataURL('image/png');

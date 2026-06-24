@@ -37,11 +37,9 @@ export default function PaymentsAdmin() {
       rows.push([p.created_at, p.member_name, p.membership_number, p.category, p.amount, p.status, p.method]);
     }
     const csv = rows.map((r) => r.map((c) => `"${String(c ?? '')}"`).join(',')).join('\n');
-    const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv' }));
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = 'payments.csv';
-    a.click();
+    import('../../lib/download.js').then(({ downloadBlob }) =>
+      downloadBlob(new Blob([csv], { type: 'text/csv' }), 'payments.csv')
+    );
   }
 
   return (
