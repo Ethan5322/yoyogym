@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import { memberFetch, getMemberToken, setMemberToken, clearMemberToken } from '../lib/memberApi.js';
 import { logQrScan } from '../lib/scan.js';
+import PersonalQr from '../components/PersonalQr.jsx';
 
 export default function MemberPortal() {
   const [token, setTok] = useState(getMemberToken());
@@ -188,6 +189,17 @@ function StatusTab() {
           ⚠ Medical clearance required — please bring a doctor’s note.
         </p>
       )}
+
+      {data.member?.membership_number && (
+        <div className="card">
+          <PersonalQr
+            url={`${window.location.origin}/p/m/${data.member.membership_number}`}
+            name={data.member.full_name || data.member.membership_number}
+            label="My Member QR — show this to verify your membership"
+          />
+        </div>
+      )}
+
       <DeletionRequest />
     </div>
   );

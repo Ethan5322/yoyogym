@@ -4,6 +4,7 @@ import { useParams, Link, useNavigate } from 'react-router-dom';
 import AdminShell from '../../components/AdminShell.jsx';
 import { apiFetch } from '../../lib/api.js';
 import { useAuth } from '../../lib/auth.jsx';
+import PersonalQr from '../../components/PersonalQr.jsx';
 
 const zar = (n) => 'R' + Number(n || 0).toLocaleString('en-ZA', { minimumFractionDigits: 2 });
 const fmt = (d) => (d ? new Date(d).toLocaleDateString('en-ZA', { day: 'numeric', month: 'short', year: 'numeric' }) : '—');
@@ -181,6 +182,10 @@ export default function MemberDetail() {
           </button>
           {savedMsg && <span className="text-sm text-muted">{savedMsg}</span>}
         </div>
+      </Section>
+
+      <Section title="Personal QR (Type B)">
+        <PersonalQr url={`${window.location.origin}/p/m/${m.membership_number}`} name={m.full_name} />
       </Section>
 
       {m.data_deletion_requested && (

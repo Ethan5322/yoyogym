@@ -7,8 +7,9 @@ import content from '../server/handlers/public/content.js';
 import register from '../server/handlers/public/register.js';
 import scan from '../server/handlers/public/scan.js';
 import document from '../server/handlers/public/document.js';
+import publicProfile from '../server/handlers/public/public-profile.js';
 
-const routes = { health, catalog, content, register, scan, 'members/document': document };
+const routes = { health, catalog, content, register, scan, 'members/document': document, 'public-profile': publicProfile };
 
 export default function handler(req, res) {
   const parts = new URL(req.url, 'http://localhost').pathname.split('/').filter(Boolean);

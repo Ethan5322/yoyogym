@@ -10,8 +10,10 @@ import { apiFetch } from '../../lib/api.js';
 const origin = typeof window !== 'undefined' ? window.location.origin : '';
 
 const CODES = [
+  { key: 'company', title: 'Company QR (Type A)', subtitle: 'Register or log in', url: `${origin}/?src=qr` },
   { key: 'new', title: 'New Member', subtitle: 'Join / Register', url: `${origin}/register?src=qr` },
   { key: 'existing', title: 'Existing Member', subtitle: 'Check-in / Book', url: `${origin}/member?src=qr` },
+  { key: 'admin', title: 'Admin QR (Type C)', subtitle: 'Secure admin gate', url: `${origin}/admin/login` },
 ];
 
 export default function QrCodes() {
@@ -19,6 +21,7 @@ export default function QrCodes() {
     <AdminShell>
       <h1 className="text-2xl font-bold uppercase text-body">QR Codes</h1>
       <p className="mt-1 text-muted">Print these and place them at your entrance, reception, and on flyers.</p>
+      <p className="mt-1 text-xs text-muted">Type B (personal QR) is per-person — members get theirs in the member portal; staff find member/trainer QRs on each record.</p>
 
       <div className="mt-6 grid gap-6 sm:grid-cols-2">
         {CODES.map((c) => (

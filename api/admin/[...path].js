@@ -27,6 +27,8 @@ import attendanceLive from '../../server/handlers/admin/attendance-live.js';
 import attendanceReport from '../../server/handlers/admin/attendance-report.js';
 import visitor from '../../server/handlers/admin/visitor.js';
 import incident from '../../server/handlers/admin/incident.js';
+import resolveMember from '../../server/handlers/admin/resolve-member.js';
+import enrollFace from '../../server/handlers/admin/enroll-face.js';
 
 const routes = {
   dashboard,
@@ -55,6 +57,8 @@ const routes = {
   'attendance-report': attendanceReport,
   visitor,
   incident,
+  'resolve-member': resolveMember,
+  'enroll-face': enrollFace,
 };
 
 export default function handler(req, res) {

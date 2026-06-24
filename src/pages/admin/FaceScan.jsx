@@ -23,6 +23,7 @@ export default function FaceScan() {
   const [flagged, setFlagged] = useState(null);
   const [flash, setFlash] = useState(null); // 'success' | 'fail'
   const [sound, setSound] = useState(soundEnabled());
+  const [mode, setMode] = useState('face'); // 'face' | 'qr'
 
   function flashFx(kind) {
     setFlash(kind);
@@ -71,12 +72,66 @@ export default function FaceScan() {
         await videoRef.current.play().catch(() => {});
       }
       loopRef.current = true;
-      runLoop();
+      if (mode === 'qr') runQrLoop();
+      else runLoop();
     } catch {
       setError('Camera not available or permission denied.');
       setPhase('error');
     }
-  }, []);
+  }, [mode]);
+
+  async function runQrLoop() {
+    const jsQR = (await import('jsqr')).default;
+    const canvas = document.createElement('canvas');
+    const ctx = canvas.getContext('2d', { willReadFrequently: true });
+    while (loopRef.current) {
+      const v = videoRef.current;
+      if (v && v.videoWidth) {
+        canvas.width = v.videoWidth;
+        canvas.height = v.videoHeight;
+        ctx.drawImage(v, 0, 0, canvas.width, canvas.height);
+        const img = ctx.getImageData(0, 0, canvas.width, canvas.height);
+        const code = jsQR(img.data, img.width, img.height);
+        if (code && code.data) {
+          loopRef.current = false;
+          stopCamera();
+          await handleQr(code.data);
+          return;
+        }
+      }
+      await new Promise((r) => setTimeout(r, 250));
+    }
+  }
+
+  async function handleQr(text) {
+    setPhase('matching');
+    setDetected(true);
+    try {
+      let type, id;
+      if (text.includes('/p/t/')) {
+        type = 'trainer';
+        id = text.split('/p/t/')[1].split(/[?#/]/)[0];
+      } else if (text.includes('/p/m/')) {
+        const num = text.split('/p/m/')[1].split(/[?#/]/)[0];
+        const r = await apiFetch(`/admin/resolve-member?membership_number=${encodeURIComponent(num)}`);
+        if (!r.found) throw new Error('not found');
+        type = 'member';
+        id = r.id;
+      } else {
+        const r = await apiFetch(`/admin/resolve-member?membership_number=${encodeURIComponent(text.trim())}`);
+        if (!r.found) throw new Error('not found');
+        type = 'member';
+        id = r.id;
+      }
+      const data = await apiFetch(`/admin/access-card?type=${type}&id=${id}`);
+      setCard(data);
+      flashFx('success');
+      setPhase('result');
+    } catch {
+      flashFx('fail');
+      setPhase('nomatch');
+    }
+  }
 
   async function runLoop() {
     const { describeFace, faceDistance, MATCH_THRESHOLD } = await import('../../lib/face/faceapi.js');
@@ -192,12 +247,25 @@ export default function FaceScan() {
             <div className="mb-6 text-6xl">🛡️</div>
             <h1 className="font-display text-3xl uppercase text-body">Biometric Access</h1>
             <p className="mt-2 text-muted">{peopleRef.current.length} enrolled profiles loaded</p>
-            <button className="btn-primary mt-8 px-10 py-4 text-xl" onClick={startScan}>Scan Member</button>
+            <div className="mt-6 inline-flex rounded-lg bg-elevated p-1">
+              {['face', 'qr'].map((mo) => (
+                <button
+                  key={mo}
+                  onClick={() => setMode(mo)}
+                  className={`rounded-md px-5 py-2 font-display uppercase ${mode === mo ? 'bg-accent text-black' : 'text-muted'}`}
+                >
+                  {mo === 'face' ? 'Face' : 'QR'}
+                </button>
+              ))}
+            </div>
+            <button className="btn-primary mt-6 block w-full px-10 py-4 text-xl" onClick={startScan}>
+              {mode === 'qr' ? 'Scan QR Code' : 'Scan Face'}
+            </button>
           </div>
         )}
 
         {(phase === 'scanning' || phase === 'detected' || phase === 'matching') && (
-          <ScanFrame video={videoRef} detected={detected} matching={phase === 'matching'} />
+          <ScanFrame video={videoRef} detected={detected} matching={phase === 'matching'} mode={mode} />
         )}
 
         {phase === 'result' && card?.type === 'member' && (
@@ -210,7 +278,8 @@ export default function FaceScan() {
   );
 }
 
-function ScanFrame({ video, detected, matching }) {
+function ScanFrame({ video, detected, matching, mode = 'face' }) {
+  const qr = mode === 'qr';
   return (
     <div className="w-full max-w-sm text-center">
       <div className="relative mx-auto aspect-square w-full overflow-hidden rounded-3xl bg-elevated">
@@ -232,9 +301,9 @@ function ScanFrame({ video, detected, matching }) {
         )}
       </div>
       <p className={`mt-5 font-display text-lg uppercase tracking-wider ${detected ? 'text-success' : 'text-body'}`}>
-        {matching ? 'Matching…' : detected ? 'Face detected — hold still' : 'Scanning — position face in frame'}
+        {matching ? 'Matching…' : qr ? 'Scanning — position QR code in frame' : detected ? 'Face detected — hold still' : 'Scanning — position face in frame'}
       </p>
-      <p className="mt-1 text-xs text-muted">Auto-captures when your face is clear and centered</p>
+      <p className="mt-1 text-xs text-muted">{qr ? 'Auto-reads the member’s QR code' : 'Auto-captures when your face is clear and centered'}</p>
     </div>
   );
 }

@@ -2,8 +2,9 @@
 import { json } from '../../server/lib/http.js';
 import login from '../../server/handlers/auth/login.js';
 import me from '../../server/handlers/auth/me.js';
+import faceLogin from '../../server/handlers/auth/face-login.js';
 
-const routes = { login, me };
+const routes = { login, me, 'face-login': faceLogin };
 
 export default function handler(req, res) {
   const parts = new URL(req.url, 'http://localhost').pathname.split('/').filter(Boolean);

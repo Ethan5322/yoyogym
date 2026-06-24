@@ -2,12 +2,14 @@
 import { useEffect, useState } from 'react';
 import AdminShell from '../../components/AdminShell.jsx';
 import { apiFetch } from '../../lib/api.js';
+import PersonalQr from '../../components/PersonalQr.jsx';
 
 const blank = { full_name: '', phone: '', email: '', specialization: '', certifications: '', bio: '', is_active: true };
 
 export default function TrainerManagement() {
   const [trainers, setTrainers] = useState([]);
   const [form, setForm] = useState(null);
+  const [qrFor, setQrFor] = useState(null);
   const [error, setError] = useState('');
 
   function load() {
@@ -48,6 +50,7 @@ export default function TrainerManagement() {
               <div className="text-xs text-muted">{[t.specialization, t.phone, t.email].filter(Boolean).join(' · ')}</div>
             </div>
             <div className="flex gap-2">
+              <button className="btn-outline px-3 py-1 text-sm" onClick={() => setQrFor(t)}>QR</button>
               <button className="btn-outline px-3 py-1 text-sm" onClick={() => setForm({ ...blank, ...t })}>Edit</button>
               <button className="text-sm text-error" onClick={() => remove(t.id)}>Remove</button>
             </div>
@@ -55,6 +58,16 @@ export default function TrainerManagement() {
         ))}
         {!trainers.length && <p className="text-muted">No trainers yet.</p>}
       </div>
+
+      {qrFor && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4" onClick={() => setQrFor(null)}>
+          <div className="card w-full max-w-xs" onClick={(e) => e.stopPropagation()}>
+            <h2 className="mb-3 font-display uppercase text-body">{qrFor.full_name} — QR</h2>
+            <PersonalQr url={`${window.location.origin}/p/t/${qrFor.id}`} name={qrFor.full_name} />
+            <button className="btn-outline mt-3 w-full" onClick={() => setQrFor(null)}>Close</button>
+          </div>
+        </div>
+      )}
 
       {form && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4" onClick={() => setForm(null)}>

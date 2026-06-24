@@ -4,6 +4,7 @@
 import { useEffect, useState } from 'react';
 import AdminShell from '../../components/AdminShell.jsx';
 import { apiFetch } from '../../lib/api.js';
+import FaceCapture from '../../chatbot/components/FaceCapture.jsx';
 
 export default function Settings() {
   const [s, setS] = useState(null);
@@ -51,6 +52,8 @@ export default function Settings() {
         onSave={(v) => save('contract_discounts', v, 'payment')} />
 
       <ComplianceSection initial={s.compliance} saved={savedKey === 'compliance'} onSave={(v) => save('compliance', v, 'access')} />
+
+      <AdminFaceEnroll />
 
       <TextSection title="Indemnity Waiver" k="indemnity_text" value={s.indemnity_text?.text || ''} saved={savedKey === 'indemnity_text'} onSave={(text) => save('indemnity_text', { text }, 'terms')} />
       <TextSection title="Membership Contract" k="contract_text" value={s.contract_text?.text || ''} saved={savedKey === 'contract_text'} onSave={(text) => save('contract_text', { text }, 'terms')} />
@@ -118,6 +121,36 @@ function ComplianceSection({ initial, onSave, saved }) {
         <button className="btn-primary px-4 py-2 text-sm" onClick={() => onSave(c)}>Save</button>
         {saved && <span className="text-sm text-success">Saved ✓</span>}
       </div>
+    </div>
+  );
+}
+
+function AdminFaceEnroll() {
+  const [open, setOpen] = useState(false);
+  const [msg, setMsg] = useState('');
+  async function onCapture(result) {
+    if (!result?.descriptor) { setOpen(false); return; }
+    try {
+      await apiFetch('/admin/enroll-face', { method: 'POST', body: { descriptor: result.descriptor } });
+      setMsg('Face enrolled — you can now log in with your face.');
+    } catch (e) {
+      setMsg(e.message);
+    } finally {
+      setOpen(false);
+    }
+  }
+  return (
+    <div className="card mt-6">
+      <h2 className="mb-1 font-display uppercase text-body">Admin Face Login (QR Type C)</h2>
+      <p className="mb-3 text-xs text-muted">Enrol your face so you can unlock the admin panel by face scan at the gate.</p>
+      {msg && <p className="mb-3 text-sm text-success">{msg}</p>}
+      {open ? (
+        <div className="max-w-xs">
+          <FaceCapture onSubmit={onCapture} />
+        </div>
+      ) : (
+        <button className="btn-primary px-4 py-2 text-sm" onClick={() => { setMsg(''); setOpen(true); }}>Enrol my face</button>
+      )}
     </div>
   );
 }

@@ -51,6 +51,13 @@ export function AuthProvider({ children }) {
     return user;
   }, []);
 
+  // Apply an externally-obtained session (e.g. face login).
+  const applySession = useCallback((token, user) => {
+    setToken(token);
+    setUser(user);
+    return user;
+  }, []);
+
   const logout = useCallback(() => {
     clearToken();
     setUser(null);
@@ -64,7 +71,7 @@ export function AuthProvider({ children }) {
   );
 
   return (
-    <AuthContext.Provider value={{ user, loading, login, logout, hasRole, homeFor }}>
+    <AuthContext.Provider value={{ user, loading, login, applySession, logout, hasRole, homeFor }}>
       {children}
     </AuthContext.Provider>
   );
