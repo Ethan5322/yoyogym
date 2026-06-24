@@ -60,22 +60,47 @@ export default function FaceScan() {
     setActionMsg('');
     setDetected(false);
     setPhase('scanning');
+
+    // 1) Camera first — its own error handling (separate from face models).
+    let stream;
+    try {
+      if (!navigator.mediaDevices?.getUserMedia) throw new Error('insecure');
+      try {
+        stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment', width: 640, height: 640 } });
+      } catch {
+        stream = await navigator.mediaDevices.getUserMedia({ video: true }); // fallback (e.g. laptop front cam)
+      }
+    } catch (err) {
+      setError(
+        err?.name === 'NotAllowedError'
+          ? 'Camera blocked. Tap the 🔒 padlock in the address bar → allow Camera, then Try again.'
+          : !window.isSecureContext
+          ? 'Camera needs a secure (https) connection — open the site via its https address.'
+          : 'No camera available on this device.'
+      );
+      setPhase('error');
+      return;
+    }
+
+    streamRef.current = stream;
+    if (videoRef.current) {
+      videoRef.current.srcObject = stream;
+      await videoRef.current.play().catch(() => {});
+    }
+
+    // 2) Run the right loop. QR mode does NOT need the face models.
+    loopRef.current = true;
+    if (mode === 'qr') {
+      runQrLoop();
+      return;
+    }
     try {
       const { getFaceApi } = await import('../../lib/face/faceapi.js');
-      const camP = navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment', width: 640, height: 640 } })
-        .catch(() => navigator.mediaDevices.getUserMedia({ video: true }));
-      await getFaceApi();
-      const stream = await camP;
-      streamRef.current = stream;
-      if (videoRef.current) {
-        videoRef.current.srcObject = stream;
-        await videoRef.current.play().catch(() => {});
-      }
-      loopRef.current = true;
-      if (mode === 'qr') runQrLoop();
-      else runLoop();
+      await getFaceApi(); // load models (CDN) — only for face mode
+      runLoop();
     } catch {
-      setError('Camera not available or permission denied.');
+      stopCamera();
+      setError('Could not load the face-recognition models (check your connection). QR mode still works.');
       setPhase('error');
     }
   }, [mode]);
