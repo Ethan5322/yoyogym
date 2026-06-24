@@ -39,6 +39,9 @@ export default function Dashboard() {
             {d.expiring_soon > 0 && (
               <Banner tone="warn">{d.expiring_soon} membership(s) expiring within 7 days.</Banner>
             )}
+            {d.classes_full > 0 && (
+              <Banner tone="warn">{d.classes_full} class(es) today at 90%+ capacity.</Banner>
+            )}
           </div>
 
           <div className="mt-6 grid grid-cols-2 gap-4 lg:grid-cols-4">
@@ -73,11 +76,27 @@ export default function Dashboard() {
             </div>
 
             <div className="card">
-              <h2 className="mb-3 font-display uppercase text-body">Quick Actions</h2>
-              <div className="grid grid-cols-2 gap-3">
-                <Link to="/admin/verify" className="btn-primary">Verify Member</Link>
-                <Link to="/admin/members" className="btn-outline">Members</Link>
-              </div>
+              <h2 className="mb-3 font-display uppercase text-body">Recent Activity</h2>
+              {d.activity?.length ? (
+                d.activity.map((e, i) => (
+                  <div key={i} className="flex justify-between border-b border-white/5 py-2 text-sm">
+                    <span className="text-body">{e.text}</span>
+                    <span className="text-muted">{new Date(e.at).toLocaleTimeString('en-ZA', { hour: '2-digit', minute: '2-digit' })}</span>
+                  </div>
+                ))
+              ) : (
+                <p className="text-sm text-muted">No recent activity.</p>
+              )}
+            </div>
+          </div>
+
+          <div className="card mt-4">
+            <h2 className="mb-3 font-display uppercase text-body">Quick Actions</h2>
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+              <Link to="/admin/scan" className="btn-primary">Scan</Link>
+              <Link to="/admin/verify" className="btn-outline">Verify</Link>
+              <Link to="/admin/attendance" className="btn-outline">Attendance</Link>
+              <Link to="/admin/members" className="btn-outline">Members</Link>
             </div>
           </div>
         </>

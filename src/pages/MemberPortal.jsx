@@ -291,6 +291,24 @@ function ClassesTab() {
     }
   }
 
+  async function cancel(o) {
+    const key = `${o.class_id}|${o.session_date}`;
+    setBusyKey(key);
+    setNote('');
+    try {
+      const r = await memberFetch('/member/cancel-booking', {
+        method: 'POST',
+        body: { class_id: o.class_id, session_date: o.session_date },
+      });
+      setNote(r.message);
+      reload();
+    } catch (e) {
+      setNote(e.message);
+    } finally {
+      setBusyKey(null);
+    }
+  }
+
   if (loading) return <p className="text-muted">Loading classes…</p>;
   if (error) return <p className="text-error">{error}</p>;
   if (!data.schedule.length) return <p className="text-muted">No classes scheduled this week.</p>;
@@ -313,7 +331,9 @@ function ClassesTab() {
               </div>
             </div>
             {o.already_booked ? (
-              <span className="text-sm text-success">Booked ✓</span>
+              <button className="btn-outline px-3 py-2 text-xs" disabled={busyKey === key} onClick={() => cancel(o)}>
+                {busyKey === key ? '…' : 'Cancel'}
+              </button>
             ) : !o.allowed ? (
               <span className="text-xs text-muted">Tier locked</span>
             ) : (

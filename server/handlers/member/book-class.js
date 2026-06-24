@@ -6,6 +6,7 @@ import { getSupabase } from '../../lib/supabase.js';
 import { allowMethods, readJsonBody, ok, badRequest, serverError } from '../../lib/http.js';
 import { authenticateMember } from '../../lib/memberauth.js';
 import { loadCompliance, rulesFor } from '../../lib/compliance.js';
+import { notifyMemberEmail } from '../../lib/notify/index.js';
 
 export default async function handler(req, res) {
   if (!allowMethods(req, res, ['POST'])) return;
@@ -122,6 +123,17 @@ export default async function handler(req, res) {
       { onConflict: 'class_id,member_id,session_date' }
     );
     if (error) return serverError(res, error.message);
+
+    // Confirmation email (spec 2.6 #4) — only for confirmed bookings.
+    if (status === 'booked') {
+      const { data: mem } = await supabase.from('members').select('full_name, email').eq('id', auth.sub).maybeSingle();
+      if (mem?.email) {
+        await notifyMemberEmail(supabase, { id: auth.sub, full_name: mem.full_name, email: mem.email }, 'booking_confirmation', {
+          className: klass.name,
+          when: session_date,
+        });
+      }
+    }
 
     return ok(res, {
       status,

@@ -91,6 +91,57 @@ export const memberTemplates = {
        <p style="color:#9A9590;font-size:13px">Please contact reception to settle your balance and reactivate.</p>`
     ),
   }),
+
+  // Class booking confirmation (spec 2.6 #4).
+  booking_confirmation: ({ gymName, member, className, when }) => ({
+    subject: `${gymName} — Class booked: ${className}`,
+    html: shell(
+      gymName,
+      `<p>Hi ${member.full_name?.split(' ')[0]},</p>
+       <p>You’re confirmed for <b>${className}</b>${when ? ` on ${when}` : ''}. We’ll send a reminder before it starts. 💪</p>`
+    ),
+  }),
+
+  // Class cancelled by the member (spec 2.6 #8).
+  booking_cancelled: ({ gymName, member, className, when, late }) => ({
+    subject: `${gymName} — Booking cancelled: ${className}`,
+    html: shell(
+      gymName,
+      `<p>Hi ${member.full_name?.split(' ')[0]},</p>
+       <p>Your booking for <b>${className}</b>${when ? ` on ${when}` : ''} has been cancelled.</p>
+       ${late ? '<p style="color:#FF8C00;font-size:13px">Note: this was a late cancellation (under 2 hours\' notice).</p>' : ''}`
+    ),
+  }),
+
+  // A waitlisted member promoted into the class.
+  waitlist_promoted: ({ gymName, member, className, when }) => ({
+    subject: `${gymName} — A spot opened: ${className}`,
+    html: shell(
+      gymName,
+      `<p>Hi ${member.full_name?.split(' ')[0]},</p>
+       <p>Good news — a spot opened in <b>${className}</b>${when ? ` on ${when}` : ''} and you’re now booked in. See you there!</p>`
+    ),
+  }),
+
+  // Session pack running low (spec 2.6 #7).
+  session_low: ({ gymName, member, remaining }) => ({
+    subject: `${gymName} — ${remaining} session${remaining === 1 ? '' : 's'} left`,
+    html: shell(
+      gymName,
+      `<p>Hi ${member.full_name?.split(' ')[0]},</p>
+       <p>You have <b>${remaining}</b> session${remaining === 1 ? '' : 's'} remaining on your pack. Top up to keep training without interruption.</p>`
+    ),
+  }),
+
+  // Upcoming monthly billing reminder (spec 3.1).
+  billing_reminder: ({ gymName, member, amount, date }) => ({
+    subject: `${gymName} — Payment due ${date}`,
+    html: shell(
+      gymName,
+      `<p>Hi ${member.full_name?.split(' ')[0]},</p>
+       <p>This is a friendly reminder that your membership payment of <b>R${Number(amount || 0).toLocaleString('en-ZA', { minimumFractionDigits: 2 })}</b> is scheduled for <b>${date}</b>.</p>`
+    ),
+  }),
 };
 
 export const ownerTemplates = {

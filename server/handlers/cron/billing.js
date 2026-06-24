@@ -4,14 +4,39 @@ import { getSupabase } from '../../lib/supabase.js';
 import { allowMethods, ok, serverError } from '../../lib/http.js';
 import { authorizeCron } from '../../lib/cron.js';
 import { paystackConfigured, chargeAuthorization, newReference } from '../../lib/paystack.js';
-import { onPaymentReceived, notifyOwner } from '../../lib/notify/index.js';
+import { onPaymentReceived, notifyOwner, notifyMemberEmail } from '../../lib/notify/index.js';
 import { ownerTemplates } from '../../lib/notify/templates.js';
 
 const isoDate = (d) => d.toISOString().slice(0, 10);
+const fmtDate = (s) => new Date(s).toLocaleDateString('en-ZA', { day: 'numeric', month: 'short', year: 'numeric' });
 function addMonths(date, n) {
   const d = new Date(date);
   d.setMonth(d.getMonth() + n);
   return d;
+}
+
+/** Email members whose monthly payment is due in 3 days (spec 3.1). */
+export async function runReminders(supabase) {
+  const in3 = isoDate(new Date(Date.now() + 3 * 86400000));
+  const { data: due, error } = await supabase
+    .from('memberships')
+    .select('member_id, monthly_amount, next_billing_date, members(full_name, email, status)')
+    .eq('state', 'active')
+    .eq('visit_type', 'full')
+    .eq('next_billing_date', in3);
+  if (error) throw new Error(error.message);
+
+  let sent = 0;
+  for (const m of due || []) {
+    const member = m.members;
+    if (!member?.email || member.status === 'suspended') continue;
+    await notifyMemberEmail(supabase, { id: m.member_id, full_name: member.full_name, email: member.email }, 'billing_reminder', {
+      amount: m.monthly_amount,
+      date: fmtDate(m.next_billing_date),
+    });
+    sent++;
+  }
+  return { reminded: sent };
 }
 
 export async function run(supabase) {

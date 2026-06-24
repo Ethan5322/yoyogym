@@ -5,6 +5,7 @@ import status from '../../server/handlers/member/status.js';
 import checkin from '../../server/handlers/member/checkin.js';
 import classes from '../../server/handlers/member/classes.js';
 import bookClass from '../../server/handlers/member/book-class.js';
+import cancelBooking from '../../server/handlers/member/cancel-booking.js';
 import history from '../../server/handlers/member/history.js';
 import requestDeletion from '../../server/handlers/member/request-deletion.js';
 
@@ -14,6 +15,7 @@ const routes = {
   checkin,
   classes,
   'book-class': bookClass,
+  'cancel-booking': cancelBooking,
   history,
   'request-deletion': requestDeletion,
 };

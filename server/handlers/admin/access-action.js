@@ -7,8 +7,9 @@ import { getSupabase } from '../../lib/supabase.js';
 import { allowMethods, readJsonBody, ok, badRequest, serverError } from '../../lib/http.js';
 import { requireRole } from '../../lib/auth.js';
 import { loadCompliance, evaluateAccess } from '../../lib/compliance.js';
-import { notifyOwner } from '../../lib/notify/index.js';
+import { notifyOwner, notifyMemberEmail } from '../../lib/notify/index.js';
 import { ownerTemplates } from '../../lib/notify/templates.js';
+import { consumeSession } from '../../lib/sessions.js';
 
 const startOfDay = () => {
   const d = new Date();
@@ -66,9 +67,19 @@ export default async function handler(req, res) {
         );
       }
 
+      // Session-pack consumption + low reminder (spec 3.1 / 2.6 #7).
+      const pack = await consumeSession(supabase, id);
+      if (pack.consumed && (pack.low || pack.depleted)) {
+        const { data: mem } = await supabase.from('members').select('full_name, email').eq('id', id).maybeSingle();
+        if (mem?.email) {
+          await notifyMemberEmail(supabase, { id, full_name: mem.full_name, email: mem.email }, 'session_low', { remaining: pack.remaining });
+        }
+      }
+
       return ok(res, {
         message: compliance === 'ok' ? 'Checked in — timer started. 💪' : `Checked in — flagged (${compliance}).`,
         compliance,
+        sessions_remaining: pack.consumed ? pack.remaining : undefined,
         banner: access.banner,
         reasons: access.reasons,
       });

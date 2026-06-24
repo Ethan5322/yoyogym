@@ -4,6 +4,8 @@
 import { getSupabase } from '../../lib/supabase.js';
 import { allowMethods, ok, badRequest, serverError } from '../../lib/http.js';
 import { authenticateMember } from '../../lib/memberauth.js';
+import { consumeSession } from '../../lib/sessions.js';
+import { notifyMemberEmail } from '../../lib/notify/index.js';
 
 export default async function handler(req, res) {
   if (!allowMethods(req, res, ['POST'])) return;
@@ -40,7 +42,20 @@ export default async function handler(req, res) {
       .insert({ member_id: auth.sub, method: 'self' });
     if (error) return serverError(res, error.message);
 
-    return ok(res, { checked_in: true, message: 'Checked in — enjoy your workout! 💪' });
+    // Session-pack consumption + low-balance reminder (spec 3.1 / 2.6 #7).
+    const pack = await consumeSession(supabase, auth.sub);
+    if (pack.consumed && (pack.low || pack.depleted)) {
+      const { data: mem } = await supabase.from('members').select('full_name, email').eq('id', auth.sub).maybeSingle();
+      if (mem?.email) {
+        await notifyMemberEmail(supabase, { id: auth.sub, full_name: mem.full_name, email: mem.email }, 'session_low', { remaining: pack.remaining });
+      }
+    }
+
+    return ok(res, {
+      checked_in: true,
+      sessions_remaining: pack.consumed ? pack.remaining : undefined,
+      message: 'Checked in — enjoy your workout! 💪',
+    });
   } catch (err) {
     console.error('checkin error:', err.message);
     return serverError(res, 'Check-in failed');
