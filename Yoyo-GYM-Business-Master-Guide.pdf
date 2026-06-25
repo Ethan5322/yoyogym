@@ -1,0 +1,1151 @@
+%PDF-1.3
+%ºß¬à
+3 0 obj
+<</Type /Page
+/Parent 1 0 R
+/Resources 2 0 R
+/MediaBox [0 0 595.2799999999999727 841.8899999999999864]
+/Contents 4 0 R
+>>
+endobj
+4 0 obj
+<<
+/Length 1163
+>>
+stream
+0.5670000000000001 w
+0 G
+0.09 g
+0. 841.8899999999999864 595.2755905511811534 -841.8897637795276978 re
+f
+0.9 0.22 0.27 rg
+0. 569.7640157480313974 595.2755905511811534 -5.6692913385826778 re
+f
+BT
+/F10 13 Tf
+14.9499999999999993 TL
+0.902 0.224 0.275 rg
+51.0236220472441033 643.4648031496062686 Td
+(MULESOO DIGITAL SOLUTIONS) Tj
+ET
+BT
+/F2 34 Tf
+39.0999999999999943 TL
+0.961 0.941 0.91 rg
+51.0236220472441033 501.7325196850393354 Td
+(Business) Tj
+ET
+BT
+/F2 34 Tf
+39.0999999999999943 TL
+0.961 0.941 0.91 rg
+51.0236220472441033 459.2128346456692611 Td
+(Master Guide) Tj
+ET
+BT
+/F1 13 Tf
+14.9499999999999993 TL
+0.706 g
+51.0236220472441033 416.69314960629913 Td
+(Selling & Delivering the AI Gym System) Tj
+ET
+BT
+/F1 13 Tf
+14.9499999999999993 TL
+0.706 g
+51.0236220472441033 394.0159842519684616 Td
+(to Multiple Gyms) Tj
+ET
+BT
+/F1 10 Tf
+11.5 TL
+0.471 g
+51.0236220472441033 133.2285826771652637 Td
+(Premium AI Gym Membership & Booking Automation) Tj
+ET
+BT
+/F1 10 Tf
+11.5 TL
+0.471 g
+51.0236220472441033 116.220708661417234 Td
+(South Africa Market  •  CPA / POPIA aware) Tj
+ET
+BT
+/F1 10 Tf
+11.5 TL
+0.471 g
+51.0236220472441033 99.2128346456692043 Td
+(Generated 25 June 2026) Tj
+ET
+endstream
+endobj
+5 0 obj
+<</Type /Page
+/Parent 1 0 R
+/Resources 2 0 R
+/MediaBox [0 0 595.2799999999999727 841.8899999999999864]
+/Contents 6 0 R
+>>
+endobj
+6 0 obj
+<<
+/Length 7865
+>>
+stream
+0.5670000000000001 w
+0 G
+BT
+/F2 16 Tf
+18.3999999999999986 TL
+0.086 g
+51.0236220472441033 785.1970866141732586 Td
+(1. How You Sell This — The Model) Tj
+ET
+0.9 0.22 0.27 rg
+51.0236220472441033 776.69314960629913 73.7007874015748143 -3.6850393700787407 re
+f
+BT
+/F1 10.5 Tf
+12.0749999999999993 TL
+0.086 g
+51.0236220472441033 756.8506299212598378 Td
+(Your system is single-tenant: one Supabase database + one Vercel deployment per gym. You are not) Tj
+ET
+BT
+/F1 10.5 Tf
+12.0749999999999993 TL
+0.086 g
+51.0236220472441033 741.5435433070865656 Td
+(building one website that many gyms log into — you stamp out a private, isolated copy for each gym from) Tj
+ET
+BT
+/F1 10.5 Tf
+12.0749999999999993 TL
+0.086 g
+51.0236220472441033 726.2364566929134071 Td
+(one master codebase. Each gym's data never mixes with another's.) Tj
+ET
+BT
+/F1 10.5 Tf
+12.0749999999999993 TL
+0.086 g
+51.0236220472441033 710.9293700787401349 Td
+(This is the ideal model for selling, because you already have the tools to spin up a new gym fast:) Tj
+ET
+BT
+/F1 10.5 Tf
+12.0749999999999993 TL
+0.086 g
+51.0236220472441033 695.6222834645668627 Td
+(db/schema.sql, the seed scripts \(seed:owner, seed:catalog\), and an admin Settings panel for branding and) Tj
+ET
+BT
+/F1 10.5 Tf
+12.0749999999999993 TL
+0.086 g
+51.0236220472441033 680.3151968503937042 Td
+(pricing — no code editing per gym.) Tj
+ET
+0.96 g
+51.0236220472441033 665.0081102362205456 493.2283464566929752 -51.0236220472441033 re
+f
+0.9 0.22 0.27 rg
+51.0236220472441033 665.0081102362205456 4.2519685039370083 -51.0236220472441033 re
+f
+BT
+/F2 10 Tf
+11.5 TL
+0.902 0.224 0.275 rg
+65.1968503937007995 648.0002362204724022 Td
+(Core principle) Tj
+ET
+BT
+/F1 10 Tf
+11.5 TL
+0.086 g
+65.1968503937007995 633.8270078740157487 Td
+(Build once. Deploy many. Maintain centrally. One bug fix or new feature pushed to GitHub redeploys) Tj
+ET
+BT
+/F1 10 Tf
+11.5 TL
+0.086 g
+65.1968503937007995 619.6537795275589815 Td
+(every gym automatically.) Tj
+ET
+BT
+/F2 16 Tf
+18.3999999999999986 TL
+0.086 g
+51.0236220472441033 596.9766141732283131 Td
+(2. Pricing Strategy) Tj
+ET
+0.9 0.22 0.27 rg
+51.0236220472441033 588.4726771653542983 73.7007874015748143 -3.6850393700787407 re
+f
+BT
+/F2 12 Tf
+13.7999999999999989 TL
+0.902 0.224 0.275 rg
+51.0236220472441033 562.9608661417322537 Td
+(Choose a recurring model) Tj
+ET
+0.99 0.98 0.98 rg
+51.0236220472441033 558.7088976377953031 493.2283464566929752 -48.1889763779527627 re
+f
+BT
+/F2 9.5 Tf
+10.9249999999999989 TL
+0.086 g
+56.6929133858267775 545.952992125984224 Td
+(Monthly subscription \(recommended\)) Tj
+ET
+BT
+/F1 9.5 Tf
+10.9249999999999989 TL
+0.235 g
+221.102362204724443 545.952992125984224 Td
+(You keep ownership of the code, host an instance per gym, and) Tj
+ET
+BT
+/F1 9.5 Tf
+10.9249999999999989 TL
+0.235 g
+221.102362204724443 531.7797637795274568 Td
+(charge R750–R2,500/month each. You push updates to all gyms) Tj
+ET
+BT
+/F1 9.5 Tf
+10.9249999999999989 TL
+0.235 g
+221.102362204724443 517.6065354330708033 Td
+(centrally.) Tj
+ET
+0.99 0.98 0.98 rg
+51.0236220472441033 510.5199212598425333 493.2283464566929752 -34.0157480314960665 re
+f
+BT
+/F2 9.5 Tf
+10.9249999999999989 TL
+0.086 g
+56.6929133858267775 497.7640157480314542 Td
+(One-time license) Tj
+ET
+BT
+/F1 9.5 Tf
+10.9249999999999989 TL
+0.235 g
+221.102362204724443 497.7640157480314542 Td
+(Sell a copy for a setup fee \(R15k–R40k\); they own it; you bill support) Tj
+ET
+BT
+/F1 9.5 Tf
+10.9249999999999989 TL
+0.235 g
+221.102362204724443 483.5907874015748007 Td
+(separately. Quick cash, but no recurring income and less control.) Tj
+ET
+BT
+/F1 10.5 Tf
+12.0749999999999993 TL
+0.086 g
+51.0236220472441033 455.2443307086614368 Td
+(Go with subscription. The ROI story sells itself: the system replaces a R8,000–R15,000/month) Tj
+ET
+BT
+/F1 10.5 Tf
+12.0749999999999993 TL
+0.086 g
+51.0236220472441033 439.9372440944881646 Td
+(receptionist, so R1,500/month is an easy yes for a gym owner. Twenty gyms at R1,500 is R30,000/month) Tj
+ET
+BT
+/F1 10.5 Tf
+12.0749999999999993 TL
+0.086 g
+51.0236220472441033 424.6301574803149492 Td
+(recurring from a single codebase.) Tj
+ET
+0.96 g
+51.0236220472441033 409.323070866141677 493.2283464566929752 -51.0236220472441033 re
+f
+0.9 0.22 0.27 rg
+51.0236220472441033 409.323070866141677 4.2519685039370083 -51.0236220472441033 re
+f
+BT
+/F2 10 Tf
+11.5 TL
+0.902 0.224 0.275 rg
+65.1968503937007995 392.3151968503936473 Td
+(Suggested package) Tj
+ET
+BT
+/F1 10 Tf
+11.5 TL
+0.086 g
+65.1968503937007995 378.1419685039369369 Td
+(Once-off onboarding/setup fee \(e.g. R3,500\) + monthly subscription \(e.g. R1,500\) that bundles hosting,) Tj
+ET
+BT
+/F1 10 Tf
+11.5 TL
+0.086 g
+65.1968503937007995 363.9687401574802834 Td
+(updates and support.) Tj
+ET
+BT
+/F2 16 Tf
+18.3999999999999986 TL
+0.086 g
+51.0236220472441033 341.2915748031495582 Td
+(3. Money & Data Ownership \(Critical for SA\)) Tj
+ET
+0.9 0.22 0.27 rg
+51.0236220472441033 332.7876377952755433 73.7007874015748143 -3.6850393700787407 re
+f
+BT
+/F1 10.5 Tf
+12.0749999999999993 TL
+0.086 g
+51.0236220472441033 312.9451181102361943 Td
+(For each gym, set these up under the GYM'S OWN accounts, not yours:) Tj
+ET
+BT
+/F2 10.5 Tf
+12.0749999999999993 TL
+0.902 0.224 0.275 rg
+53.8582677165354369 297.6380314960629221 Td
+(•) Tj
+ET
+BT
+/F1 10.5 Tf
+12.0749999999999993 TL
+0.086 g
+68.031496062992133 297.6380314960629221 Td
+(Paystack — the gym's own account. Member payments must flow to them. You only paste their API) Tj
+ET
+BT
+/F1 10.5 Tf
+12.0749999999999993 TL
+0.086 g
+68.031496062992133 282.3309448818896499 Td
+(keys into their instance, so you never handle their members' money or carry financial liability.) Tj
+ET
+BT
+/F2 10.5 Tf
+12.0749999999999993 TL
+0.902 0.224 0.275 rg
+53.8582677165354369 267.0238582677163777 Td
+(•) Tj
+ET
+BT
+/F1 10.5 Tf
+12.0749999999999993 TL
+0.086 g
+68.031496062992133 267.0238582677163777 Td
+(Supabase — ideally the gym's own project for clean data isolation and POPIA. You can manage it on) Tj
+ET
+BT
+/F1 10.5 Tf
+12.0749999999999993 TL
+0.086 g
+68.031496062992133 251.7167716535432191 Td
+(their behalf.) Tj
+ET
+BT
+/F2 10.5 Tf
+12.0749999999999993 TL
+0.902 0.224 0.275 rg
+53.8582677165354369 236.4096850393699469 Td
+(•) Tj
+ET
+BT
+/F1 10.5 Tf
+12.0749999999999993 TL
+0.086 g
+68.031496062992133 236.4096850393699469 Td
+(POPIA — the gym is the "responsible party" for member data; you are the operator/processor. Include) Tj
+ET
+BT
+/F1 10.5 Tf
+12.0749999999999993 TL
+0.086 g
+68.031496062992133 221.1025984251966747 Td
+(a one-page data-processing clause in your contract.) Tj
+ET
+BT
+/F1 10.5 Tf
+12.0749999999999993 TL
+0.086 g
+51.0236220472441033 205.7955118110234025 Td
+(What you keep and control: the GitHub codebase, the deployment process, and \(once added\) a single) Tj
+ET
+BT
+/F1 10.5 Tf
+12.0749999999999993 TL
+0.086 g
+51.0236220472441033 190.488425196850244 Td
+(Anthropic AI key.) Tj
+ET
+BT
+/F2 16 Tf
+18.3999999999999986 TL
+0.086 g
+51.0236220472441033 169.5120472440942194 Td
+(4. Hosting & Costs) Tj
+ET
+0.9 0.22 0.27 rg
+51.0236220472441033 161.0081102362202614 73.7007874015748143 -3.6850393700787407 re
+f
+BT
+/F1 10.5 Tf
+12.0749999999999993 TL
+0.086 g
+51.0236220472441033 141.1655905511809124 Td
+(Bundle Supabase + Vercel + \(later\) Anthropic into your monthly fee. Both Supabase and Vercel have free) Tj
+ET
+BT
+/F1 10.5 Tf
+12.0749999999999993 TL
+0.086 g
+51.0236220472441033 125.8585039370076402 Td
+(tiers that cover a small gym; upgrade only busy gyms and pass that cost through. The gym sees one) Tj
+ET
+BT
+/F1 10.5 Tf
+12.0749999999999993 TL
+0.086 g
+51.0236220472441033 110.551417322834368 Td
+(simple monthly fee — "everything included".) Tj
+ET
+0.88 G
+0.5669291338582678 w
+51.0236220472441033 39.6852755905510719 m
+544.2519685039370643 39.6852755905510719 l
+S
+BT
+/F1 8 Tf
+9.1999999999999993 TL
+0.471 g
+51.0236220472441033 25.5120472440943331 Td
+(Yoyo GYM — Business Master Guide  •  MuleSoo Digital Solutions) Tj
+ET
+BT
+/F1 8 Tf
+9.1999999999999993 TL
+0.471 g
+503.6119685039370211 25.5120472440943331 Td
+(Page 1 of 3) Tj
+ET
+endstream
+endobj
+7 0 obj
+<</Type /Page
+/Parent 1 0 R
+/Resources 2 0 R
+/MediaBox [0 0 595.2799999999999727 841.8899999999999864]
+/Contents 8 0 R
+>>
+endobj
+8 0 obj
+<<
+/Length 10152
+>>
+stream
+0.5670000000000001 w
+0 G
+BT
+/F2 16 Tf
+18.3999999999999986 TL
+0.086 g
+51.0236220472441033 785.1970866141732586 Td
+(5. Per-Buyer Delivery Runbook \(~1–2 hrs\)) Tj
+ET
+0.9 0.22 0.27 rg
+51.0236220472441033 776.69314960629913 73.7007874015748143 -3.6850393700787407 re
+f
+BT
+/F1 10.5 Tf
+12.0749999999999993 TL
+0.086 g
+51.0236220472441033 756.8506299212598378 Td
+(Run this every time you land a buyer. Most of it already exists in your DELIVERY.md.) Tj
+ET
+BT
+/F2 10.5 Tf
+12.0749999999999993 TL
+0.902 0.224 0.275 rg
+53.8582677165354369 741.5435433070865656 Td
+(1.) Tj
+ET
+BT
+/F1 10.5 Tf
+12.0749999999999993 TL
+0.086 g
+73.7007874015748143 741.5435433070865656 Td
+(Collect from the gym: logo, brand colour, address/contact, operating hours, their plans & prices, their) Tj
+ET
+BT
+/F1 10.5 Tf
+12.0749999999999993 TL
+0.086 g
+73.7007874015748143 726.2364566929134071 Td
+(Paystack keys, Brevo sender email, owner WhatsApp number.) Tj
+ET
+BT
+/F2 10.5 Tf
+12.0749999999999993 TL
+0.902 0.224 0.275 rg
+53.8582677165354369 710.9293700787401349 Td
+(2.) Tj
+ET
+BT
+/F1 10.5 Tf
+12.0749999999999993 TL
+0.086 g
+73.7007874015748143 710.9293700787401349 Td
+( D a t a b a s e :   c r e a t e   a   n e w   S u p a b a s e   p r o j e c t  !’   r u n   d b / s c h e m a . s q l   i n   t h e   S Q L   E d i t o r  !’   r u n   " n p m   r u n) Tj
+ET
+BT
+/F1 10.5 Tf
+12.0749999999999993 TL
+0.086 g
+73.7007874015748143 695.6222834645668627 Td
+(seed:owner" and "npm run seed:catalog".) Tj
+ET
+BT
+/F2 10.5 Tf
+12.0749999999999993 TL
+0.902 0.224 0.275 rg
+53.8582677165354369 680.3151968503937042 Td
+(3.) Tj
+ET
+BT
+/F1 10.5 Tf
+12.0749999999999993 TL
+0.086 g
+73.7007874015748143 680.3151968503937042 Td
+( D e p l o y :   V e r c e l  !’   N e w   P r o j e c t  !’   i m p o r t   y o u r   G i t H u b   r e p o  !’   s e t   e n v i r o n m e n t   v a r i a b l e s   \( f r o m) Tj
+ET
+BT
+/F1 10.5 Tf
+12.0749999999999993 TL
+0.086 g
+73.7007874015748143 665.0081102362204319 Td
+( . e n v . e x a m p l e \)  !’   D e p l o y .   O n e   r e p o ,   m a n y   V e r c e l   p r o j e c t s .) Tj
+ET
+BT
+/F2 10.5 Tf
+12.0749999999999993 TL
+0.902 0.224 0.275 rg
+53.8582677165354369 649.7010236220471597 Td
+(4.) Tj
+ET
+BT
+/F1 10.5 Tf
+12.0749999999999993 TL
+0.086 g
+73.7007874015748143 649.7010236220471597 Td
+(Domain: give them a subdomain \(theirgym.yourbrand.co.za\) or connect their own domain.) Tj
+ET
+BT
+/F2 10.5 Tf
+12.0749999999999993 TL
+0.902 0.224 0.275 rg
+53.8582677165354369 634.3939370078740012 Td
+(5.) Tj
+ET
+BT
+/F1 10.5 Tf
+12.0749999999999993 TL
+0.086 g
+73.7007874015748143 634.3939370078740012 Td
+( C o n f i g u r e   i n - a p p :   l o g   i n t o   / a d m i n  !’   S e t t i n g s  !’   g y m   p r o f i l e ,   b r a n d i n g ,   p l a n s ,   n o t i f i c a t i o n   n u m b e r s .   N o) Tj
+ET
+BT
+/F1 10.5 Tf
+12.0749999999999993 TL
+0.086 g
+73.7007874015748143 619.086850393700729 Td
+(code needed.) Tj
+ET
+BT
+/F2 10.5 Tf
+12.0749999999999993 TL
+0.902 0.224 0.275 rg
+53.8582677165354369 603.7797637795274568 Td
+(6.) Tj
+ET
+BT
+/F1 10.5 Tf
+12.0749999999999993 TL
+0.086 g
+73.7007874015748143 603.7797637795274568 Td
+( Q R   c o d e s :   A d m i n  !’   Q R   C o d e s  !’   d o w n l o a d   a n d   p r i n t   t h e i r   t w o   c o d e s   \( n e w   m e m b e r   +   e x i s t i n g) Tj
+ET
+BT
+/F1 10.5 Tf
+12.0749999999999993 TL
+0.086 g
+73.7007874015748143 588.4726771653542983 Td
+(member\).) Tj
+ET
+BT
+/F2 10.5 Tf
+12.0749999999999993 TL
+0.902 0.224 0.275 rg
+53.8582677165354369 573.1655905511809124 Td
+(7.) Tj
+ET
+BT
+/F1 10.5 Tf
+12.0749999999999993 TL
+0.086 g
+73.7007874015748143 573.1655905511809124 Td
+(Handover: give the owner their /admin login, a 30-minute training call, and a 1-page how-to sheet.) Tj
+ET
+BT
+/F2 10.5 Tf
+12.0749999999999993 TL
+0.902 0.224 0.275 rg
+53.8582677165354369 557.8585039370077538 Td
+(8.) Tj
+ET
+BT
+/F1 10.5 Tf
+12.0749999999999993 TL
+0.086 g
+73.7007874015748143 557.8585039370077538 Td
+( V e r i f y :   o p e n   h t t p s : / / t h e i r d o m a i n / a p i / h e a l t h  !’   { " s t a t u s " : " o k " }   a n d   r u n   t h e   t e s t   c h e c k l i s t   i n   D E L I V E R Y . m d .) Tj
+ET
+BT
+/F2 16 Tf
+18.3999999999999986 TL
+0.086 g
+51.0236220472441033 536.882125984251843 Td
+(6. Set Up Before Your First Sale) Tj
+ET
+0.9 0.22 0.27 rg
+51.0236220472441033 528.3781889763778281 73.7007874015748143 -3.6850393700787407 re
+f
+BT
+/F2 10.5 Tf
+12.0749999999999993 TL
+0.902 0.224 0.275 rg
+53.8582677165354369 508.5356692913384222 Td
+(•) Tj
+ET
+BT
+/F1 10.5 Tf
+12.0749999999999993 TL
+0.086 g
+68.031496062992133 508.5356692913384222 Td
+(A simple contract/SLA: what's included, monthly fee, uptime expectation, support hours, POPIA data) Tj
+ET
+BT
+/F1 10.5 Tf
+12.0749999999999993 TL
+0.086 g
+68.031496062992133 493.2285826771652069 Td
+(clause, cancellation terms.) Tj
+ET
+BT
+/F2 10.5 Tf
+12.0749999999999993 TL
+0.902 0.224 0.275 rg
+53.8582677165354369 477.9214960629919915 Td
+(•) Tj
+ET
+BT
+/F1 10.5 Tf
+12.0749999999999993 TL
+0.086 g
+68.031496062992133 477.9214960629919915 Td
+(An onboarding intake form \(a Google Form is fine\) that collects everything in step 1 above.) Tj
+ET
+BT
+/F2 10.5 Tf
+12.0749999999999993 TL
+0.902 0.224 0.275 rg
+53.8582677165354369 462.6144094488187193 Td
+(•) Tj
+ET
+BT
+/F1 10.5 Tf
+12.0749999999999993 TL
+0.086 g
+68.031496062992133 462.6144094488187193 Td
+(A support channel \(WhatsApp/email\) with clear response-time expectations.) Tj
+ET
+BT
+/F2 10.5 Tf
+12.0749999999999993 TL
+0.902 0.224 0.275 rg
+53.8582677165354369 447.3073228346455039 Td
+(•) Tj
+ET
+BT
+/F1 10.5 Tf
+12.0749999999999993 TL
+0.086 g
+68.031496062992133 447.3073228346455039 Td
+(Migrations discipline: when you change the database, add numbered migration files in db/ so you can) Tj
+ET
+BT
+/F1 10.5 Tf
+12.0749999999999993 TL
+0.086 g
+68.031496062992133 432.0002362204722317 Td
+(safely update every existing gym.) Tj
+ET
+0.96 g
+51.0236220472441033 416.6931496062989595 493.2283464566929752 -65.1968503937007995 re
+f
+0.9 0.22 0.27 rg
+51.0236220472441033 416.6931496062989595 4.2519685039370083 -65.1968503937007995 re
+f
+BT
+/F2 10 Tf
+11.5 TL
+0.902 0.224 0.275 rg
+65.1968503937007995 399.6852755905509866 Td
+(Marketing honesty) Tj
+ET
+BT
+/F1 10 Tf
+11.5 TL
+0.086 g
+65.1968503937007995 385.5120472440942763 Td
+(Until you add the Anthropic key, market it as a "smart guided registration & booking system", not an "AI) Tj
+ET
+BT
+/F1 10 Tf
+11.5 TL
+0.086 g
+65.1968503937007995 371.3388188976375659 Td
+(chatbot" — the conversation is currently rule-based. Add the key, upgrade everyone, then sell the AI) Tj
+ET
+BT
+/F1 10 Tf
+11.5 TL
+0.086 g
+65.1968503937007995 357.1655905511808555 Td
+(angle.) Tj
+ET
+BT
+/F2 16 Tf
+18.3999999999999986 TL
+0.086 g
+51.0236220472441033 334.4884251968501871 Td
+(7. One Codebase, Many Gyms) Tj
+ET
+0.9 0.22 0.27 rg
+51.0236220472441033 325.9844881889761155 73.7007874015748143 -3.6850393700787407 re
+f
+BT
+/F1 10.5 Tf
+12.0749999999999993 TL
+0.086 g
+51.0236220472441033 306.1419685039368233 Td
+( F i x   a   b u g   o r   a d d   a   f e a t u r e   o n c e  !’   p u s h   t o   G i t H u b   m a i n  !’   e v e r y   g y m ' s   V e r c e l   r e d e p l o y s   a u t o m a t i c a l l y .   T h a t) Tj
+ET
+BT
+/F1 10.5 Tf
+12.0749999999999993 TL
+0.086 g
+51.0236220472441033 290.834881889763551 Td
+(is the entire advantage of the single-tenant-from-one-repo model: build once, deploy many, maintain) Tj
+ET
+BT
+/F1 10.5 Tf
+12.0749999999999993 TL
+0.086 g
+51.0236220472441033 275.5277952755902788 Td
+(centrally.) Tj
+ET
+BT
+/F2 16 Tf
+18.3999999999999986 TL
+0.086 g
+51.0236220472441033 254.551417322834368 Td
+(8. Quick Launch Checklist) Tj
+ET
+0.9 0.22 0.27 rg
+51.0236220472441033 246.0474803149603247 73.7007874015748143 -3.6850393700787407 re
+f
+0.9 0.22 0.27 RG
+1.1338582677165356 w
+51.0236220472441033 236.1262204724406502 11.3385826771653555 -11.3385826771653555 re
+S
+BT
+/F1 10.5 Tf
+12.0749999999999993 TL
+0.086 g
+70.8661417322834666 226.2049606299209472 Td
+(Decide pricing \(recurring subscription recommended\)) Tj
+ET
+0.9 0.22 0.27 RG
+1.1338582677165356 w
+51.0236220472441033 216.2837007874012727 11.3385826771653555 -11.3385826771653555 re
+S
+BT
+/F1 10.5 Tf
+12.0749999999999993 TL
+0.086 g
+70.8661417322834666 206.362440944881655 Td
+(Prepare contract/SLA + POPIA data clause) Tj
+ET
+0.9 0.22 0.27 RG
+1.1338582677165356 w
+51.0236220472441033 196.4411811023618952 11.3385826771653555 -11.3385826771653555 re
+S
+BT
+/F1 10.5 Tf
+12.0749999999999993 TL
+0.086 g
+70.8661417322834666 186.5199212598422491 Td
+(Create onboarding intake form) Tj
+ET
+0.9 0.22 0.27 RG
+1.1338582677165356 w
+51.0236220472441033 176.5986614173225178 11.3385826771653555 -11.3385826771653555 re
+S
+BT
+/F1 10.5 Tf
+12.0749999999999993 TL
+0.086 g
+70.8661417322834666 166.6774015748028432 Td
+(Set up your support channel) Tj
+ET
+0.9 0.22 0.27 RG
+1.1338582677165356 w
+51.0236220472441033 156.7561417322831687 11.3385826771653555 -11.3385826771653555 re
+S
+BT
+/F1 10.5 Tf
+12.0749999999999993 TL
+0.086 g
+70.8661417322834666 146.8348818897634374 Td
+(Confirm your GitHub repo is the single source of truth) Tj
+ET
+0.9 0.22 0.27 RG
+1.1338582677165356 w
+51.0236220472441033 136.9136220472437913 11.3385826771653555 -11.3385826771653555 re
+S
+BT
+/F1 10.5 Tf
+12.0749999999999993 TL
+0.086 g
+70.8661417322834666 126.9923622047241452 Td
+(Per gym: their Paystack + Supabase + Brevo accounts) Tj
+ET
+0.9 0.22 0.27 RG
+1.1338582677165356 w
+51.0236220472441033 117.0711023622044991 11.3385826771653555 -11.3385826771653555 re
+S
+BT
+/F1 10.5 Tf
+12.0749999999999993 TL
+0.086 g
+70.8661417322834666 107.149842519684853 Td
+(Per gym: deploy, configure Settings, generate QR codes) Tj
+ET
+0.9 0.22 0.27 RG
+1.1338582677165356 w
+51.0236220472441033 97.2285826771651216 11.3385826771653555 -11.3385826771653555 re
+S
+BT
+/F1 10.5 Tf
+12.0749999999999993 TL
+0.086 g
+70.8661417322834666 87.3073228346454471 Td
+(Per gym: train the owner + hand over /admin login) Tj
+ET
+0.88 G
+0.5669291338582678 w
+51.0236220472441033 39.6852755905510719 m
+544.2519685039370643 39.6852755905510719 l
+S
+BT
+/F1 8 Tf
+9.1999999999999993 TL
+0.471 g
+51.0236220472441033 25.5120472440943331 Td
+(Yoyo GYM — Business Master Guide  •  MuleSoo Digital Solutions) Tj
+ET
+BT
+/F1 8 Tf
+9.1999999999999993 TL
+0.471 g
+503.6119685039370211 25.5120472440943331 Td
+(Page 2 of 3) Tj
+ET
+endstream
+endobj
+9 0 obj
+<</Type /Page
+/Parent 1 0 R
+/Resources 2 0 R
+/MediaBox [0 0 595.2799999999999727 841.8899999999999864]
+/Contents 10 0 R
+>>
+endobj
+10 0 obj
+<<
+/Length 692
+>>
+stream
+1.1338582677165356 w
+0.9 0.22 0.27 RG
+0.9 0.22 0.27 RG
+1.1338582677165356 w
+51.0236220472441033 800.7876377952756002 11.3385826771653555 -11.3385826771653555 re
+S
+BT
+/F1 10.5 Tf
+12.0749999999999993 TL
+0.086 g
+70.8661417322834666 790.8663779527558972 Td
+(Per gym: verify /api/health and run the test checklist) Tj
+ET
+0.88 G
+0.5669291338582678 w
+51.0236220472441033 39.6852755905510719 m
+544.2519685039370643 39.6852755905510719 l
+S
+BT
+/F1 8 Tf
+9.1999999999999993 TL
+0.471 g
+51.0236220472441033 25.5120472440943331 Td
+(Yoyo GYM — Business Master Guide  •  MuleSoo Digital Solutions) Tj
+ET
+BT
+/F1 8 Tf
+9.1999999999999993 TL
+0.471 g
+503.6119685039370211 25.5120472440943331 Td
+(Page 3 of 3) Tj
+ET
+endstream
+endobj
+1 0 obj
+<</Type /Pages
+/Kids [3 0 R 5 0 R 7 0 R 9 0 R ]
+/Count 4
+>>
+endobj
+11 0 obj
+<<
+/Type /Font
+/BaseFont /Helvetica
+/Subtype /Type1
+/Encoding /WinAnsiEncoding
+/FirstChar 32
+/LastChar 255
+>>
+endobj
+12 0 obj
+<<
+/Type /Font
+/BaseFont /Helvetica-Bold
+/Subtype /Type1
+/Encoding /WinAnsiEncoding
+/FirstChar 32
+/LastChar 255
+>>
+endobj
+13 0 obj
+<<
+/Type /Font
+/BaseFont /Helvetica-Oblique
+/Subtype /Type1
+/Encoding /WinAnsiEncoding
+/FirstChar 32
+/LastChar 255
+>>
+endobj
+14 0 obj
+<<
+/Type /Font
+/BaseFont /Helvetica-BoldOblique
+/Subtype /Type1
+/Encoding /WinAnsiEncoding
+/FirstChar 32
+/LastChar 255
+>>
+endobj
+15 0 obj
+<<
+/Type /Font
+/BaseFont /Courier
+/Subtype /Type1
+/Encoding /WinAnsiEncoding
+/FirstChar 32
+/LastChar 255
+>>
+endobj
+16 0 obj
+<<
+/Type /Font
+/BaseFont /Courier-Bold
+/Subtype /Type1
+/Encoding /WinAnsiEncoding
+/FirstChar 32
+/LastChar 255
+>>
+endobj
+17 0 obj
+<<
+/Type /Font
+/BaseFont /Courier-Oblique
+/Subtype /Type1
+/Encoding /WinAnsiEncoding
+/FirstChar 32
+/LastChar 255
+>>
+endobj
+18 0 obj
+<<
+/Type /Font
+/BaseFont /Courier-BoldOblique
+/Subtype /Type1
+/Encoding /WinAnsiEncoding
+/FirstChar 32
+/LastChar 255
+>>
+endobj
+19 0 obj
+<<
+/Type /Font
+/BaseFont /Times-Roman
+/Subtype /Type1
+/Encoding /WinAnsiEncoding
+/FirstChar 32
+/LastChar 255
+>>
+endobj
+20 0 obj
+<<
+/Type /Font
+/BaseFont /Times-Bold
+/Subtype /Type1
+/Encoding /WinAnsiEncoding
+/FirstChar 32
+/LastChar 255
+>>
+endobj
+21 0 obj
+<<
+/Type /Font
+/BaseFont /Times-Italic
+/Subtype /Type1
+/Encoding /WinAnsiEncoding
+/FirstChar 32
+/LastChar 255
+>>
+endobj
+22 0 obj
+<<
+/Type /Font
+/BaseFont /Times-BoldItalic
+/Subtype /Type1
+/Encoding /WinAnsiEncoding
+/FirstChar 32
+/LastChar 255
+>>
+endobj
+23 0 obj
+<<
+/Type /Font
+/BaseFont /ZapfDingbats
+/Subtype /Type1
+/FirstChar 32
+/LastChar 255
+>>
+endobj
+24 0 obj
+<<
+/Type /Font
+/BaseFont /Symbol
+/Subtype /Type1
+/FirstChar 32
+/LastChar 255
+>>
+endobj
+2 0 obj
+<<
+/ProcSet [/PDF /Text /ImageB /ImageC /ImageI]
+/Font <<
+/F1 11 0 R
+/F2 12 0 R
+/F3 13 0 R
+/F4 14 0 R
+/F5 15 0 R
+/F6 16 0 R
+/F7 17 0 R
+/F8 18 0 R
+/F9 19 0 R
+/F10 20 0 R
+/F11 21 0 R
+/F12 22 0 R
+/F13 23 0 R
+/F14 24 0 R
+>>
+/XObject <<
+>>
+>>
+endobj
+25 0 obj
+<<
+/Producer (jsPDF 4.2.1)
+/CreationDate (D:20260625150151+02'00')
+>>
+endobj
+26 0 obj
+<<
+/Type /Catalog
+/Pages 1 0 R
+/OpenAction [3 0 R /FitH null]
+/PageLayout /OneColumn
+>>
+endobj
+xref
+0 27
+0000000000 65535 f 
+0000020645 00000 n 
+0000022485 00000 n 
+0000000015 00000 n 
+0000000152 00000 n 
+0000001367 00000 n 
+0000001504 00000 n 
+0000009421 00000 n 
+0000009558 00000 n 
+0000019763 00000 n 
+0000019901 00000 n 
+0000020720 00000 n 
+0000020846 00000 n 
+0000020977 00000 n 
+0000021111 00000 n 
+0000021249 00000 n 
+0000021373 00000 n 
+0000021502 00000 n 
+0000021634 00000 n 
+0000021770 00000 n 
+0000021898 00000 n 
+0000022025 00000 n 
+0000022154 00000 n 
+0000022287 00000 n 
+0000022389 00000 n 
+0000022738 00000 n 
+0000022824 00000 n 
+trailer
+<<
+/Size 27
+/Root 26 0 R
+/Info 25 0 R
+/ID [ <40C4318D7768E9FB01EF98C53FFC8BBB> <40C4318D7768E9FB01EF98C53FFC8BBB> ]
+>>
+startxref
+22928
+%%EOF
