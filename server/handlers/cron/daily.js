@@ -1,7 +1,9 @@
-// Consolidated DAILY cron (Hobby-plan friendly — one scheduled job).
-// Runs every automation in sequence. Each job is isolated so one failure does
-// not stop the others. The individual endpoints remain callable manually /
-// via an external scheduler if you later move to more granular timing.
+// MORNING cron orchestrator (runs 06:00 daily — see vercel.json).
+// Runs the day's maintenance automations in sequence. Each job is isolated so
+// one failure does not stop the others. Two jobs run on their own schedules and
+// are deliberately excluded here: daily-summary (20:00) and weekly-schedule
+// (Mon 07:00). All individual endpoints remain callable manually / via an
+// external scheduler if you move to more granular hourly timing on Vercel Pro.
 import { getSupabase } from '../../lib/supabase.js';
 import { allowMethods, ok } from '../../lib/http.js';
 import { authorizeCron } from '../../lib/cron.js';
@@ -10,7 +12,8 @@ import { run as billing, runReminders as billingReminders } from './billing.js';
 import { run as expiry } from './expiry.js';
 import { run as classReminders } from './class-reminders.js';
 import { run as reengagement } from './reengagement.js';
-import { run as dailySummary } from './daily-summary.js';
+// NOTE: daily_summary runs on its own 8 PM schedule (spec Part 5 #10), so it is
+// intentionally NOT included in this morning orchestrator.
 
 export default async function handler(req, res) {
   if (!allowMethods(req, res, ['GET', 'POST'])) return;
@@ -24,7 +27,6 @@ export default async function handler(req, res) {
     ['expiry', expiry],
     ['class_reminders', classReminders],
     ['reengagement', reengagement],
-    ['daily_summary', dailySummary],
   ];
 
   const results = {};

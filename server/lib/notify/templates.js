@@ -22,6 +22,14 @@ const codeBox = (label, value) =>
      <div style="color:#E63946;font-size:28px;font-weight:bold;letter-spacing:4px;font-family:monospace">${value}</div>
    </div>`;
 
+// A prominent call-to-action / highlight panel (accent-bordered).
+const panel = (html) =>
+  `<div style="margin:16px 0;background:#1A1A1A;border:1px solid #2A2A2A;border-left:3px solid #E63946;border-radius:8px;padding:14px 16px;font-size:13px;line-height:1.7;color:#F5F0E8">${html}</div>`;
+
+// A short, friendly closing sign-off used across member emails.
+const signoff = (gymName) =>
+  `<p style="margin-top:18px">See you at the gym — let’s keep the momentum going! 🏋️<br><b>The ${gymName} Team</b></p>`;
+
 // Tidy two-column detail rows for emails.
 const rows = (pairs) =>
   `<table style="width:100%;border-collapse:collapse;margin:8px 0">${pairs
@@ -80,33 +88,63 @@ export const memberTemplates = {
 
   // Membership expiring in ~7 days.
   renewal_reminder: ({ gymName, member, endDate }) => ({
-    subject: `${gymName} — Your membership is expiring soon`,
+    subject: `${gymName} — Your membership expires soon${endDate ? ` (${endDate})` : ''}`,
     html: shell(
       gymName,
-      `<p>Hi ${member.full_name?.split(' ')[0]},</p>
-       <p>Your membership expires on <b>${endDate || 'soon'}</b>. Renew now to keep your momentum going! 💪</p>
-       <p style="color:#9A9590;font-size:13px">Pop in at reception or reply to this email to renew.</p>`
+      `<p style="font-size:16px">Hi ${member.full_name?.split(' ')[0]},</p>
+       <p>You’ve been putting in the work — let’s not lose that momentum. Your <b>${gymName}</b> membership is coming to an end and now’s the perfect time to renew.</p>
+       ${rows([
+         ['Member', member.full_name],
+         member.membership_number ? ['Membership no.', member.membership_number] : [null, null],
+         ['Expires on', endDate || 'soon'],
+       ])}
+       ${panel(
+         `<b>Renew in under a minute:</b><br>
+          • Pop in at reception, or<br>
+          • Reply to this email and we’ll set it up for you.<br>
+          Renew before your expiry date to avoid any break in access.`
+       )}
+       <p style="color:#9A9590;font-size:13px">Already renewed? Thank you — please ignore this reminder.</p>
+       ${signoff(gymName)}`
     ),
   }),
 
   // Win-back for lapsed members.
   reengagement: ({ gymName, member }) => ({
-    subject: `${gymName} — We miss you!`,
+    subject: `${gymName} — We’ve saved your spot, ${member.full_name?.split(' ')[0]} 👋`,
     html: shell(
       gymName,
-      `<p>Hi ${member.full_name?.split(' ')[0]},</p>
-       <p>It’s been a while — your goals are still within reach. Come back and we’ll help you get there. 🏋️</p>
-       <p style="color:#9A9590;font-size:13px">Ask us about a returning-member special.</p>`
+      `<p style="font-size:16px">Hi ${member.full_name?.split(' ')[0]},</p>
+       <p>It’s been a little while since we saw you at <b>${gymName}</b> — and we’d love to have you back. Your goals haven’t gone anywhere, and neither have we. 💪</p>
+       ${panel(
+         `<b>Ready when you are:</b><br>
+          • Ask us about a returning-member special.<br>
+          • Not sure where to start again? We’ll set you up with a fresh plan.<br>
+          • Bring a friend — training together makes it stick.`
+       )}
+       <p style="color:#9A9590;font-size:13px">Reply to this email or visit reception and we’ll get you going.</p>
+       ${signoff(gymName)}`
     ),
   }),
 
-  // Class reminder.
+  // Class reminder (sent the morning of the class).
   class_reminder: ({ gymName, member, className, when }) => ({
-    subject: `${gymName} — Class reminder: ${className}`,
+    subject: `${gymName} — Reminder: ${className}${when ? ` ${when}` : ''}`,
     html: shell(
       gymName,
-      `<p>Hi ${member.full_name?.split(' ')[0]},</p>
-       <p>Reminder: you’re booked for <b>${className}</b>${when ? ` (${when})` : ''}. See you there!</p>`
+      `<p style="font-size:16px">Hi ${member.full_name?.split(' ')[0]},</p>
+       <p>Just a friendly reminder about your upcoming class. We’re looking forward to seeing you! 🔥</p>
+       ${rows([
+         ['Class', className || 'Your class'],
+         ['When', when || 'today'],
+       ])}
+       ${panel(
+         `<b>Quick tips:</b><br>
+          • Arrive 5–10 minutes early to warm up.<br>
+          • Bring water and a towel.<br>
+          • Can’t make it? Please cancel in your member portal so someone on the waitlist can take your spot.`
+       )}
+       ${signoff(gymName)}`
     ),
   }),
 
@@ -123,11 +161,20 @@ export const memberTemplates = {
 
   // Class booking confirmation (spec 2.6 #4).
   booking_confirmation: ({ gymName, member, className, when }) => ({
-    subject: `${gymName} — Class booked: ${className}`,
+    subject: `${gymName} — You’re booked: ${className}`,
     html: shell(
       gymName,
-      `<p>Hi ${member.full_name?.split(' ')[0]},</p>
-       <p>You’re confirmed for <b>${className}</b>${when ? ` on ${when}` : ''}. We’ll send a reminder before it starts. 💪</p>`
+      `<p style="font-size:16px">Hi ${member.full_name?.split(' ')[0]},</p>
+       <p>Your class booking is confirmed. We’ve saved your spot — see you there! 💪</p>
+       ${rows([
+         ['Class', className || 'Your class'],
+         when ? ['When', when] : [null, null],
+         ['Status', 'CONFIRMED ✓'],
+       ])}
+       ${panel(
+         `We’ll send you a reminder before it starts. If your plans change, please cancel in your member portal so a waitlisted member can take the spot.`
+       )}
+       ${signoff(gymName)}`
     ),
   }),
 
@@ -136,39 +183,96 @@ export const memberTemplates = {
     subject: `${gymName} — Booking cancelled: ${className}`,
     html: shell(
       gymName,
-      `<p>Hi ${member.full_name?.split(' ')[0]},</p>
-       <p>Your booking for <b>${className}</b>${when ? ` on ${when}` : ''} has been cancelled.</p>
-       ${late ? '<p style="color:#FF8C00;font-size:13px">Note: this was a late cancellation (under 2 hours\' notice).</p>' : ''}`
+      `<p style="font-size:16px">Hi ${member.full_name?.split(' ')[0]},</p>
+       <p>This confirms your class booking has been cancelled.</p>
+       ${rows([
+         ['Class', className || 'Your class'],
+         when ? ['When', when] : [null, null],
+         ['Status', 'CANCELLED'],
+       ])}
+       ${
+         late
+           ? panel(
+               `<span style="color:#FF8C00"><b>Please note:</b></span> this was a late cancellation (under 2 hours’ notice). Repeated late cancellations may affect your booking privileges.`
+             )
+           : '<p style="color:#9A9590;font-size:13px">Changed your mind? You can re-book any time in your member portal.</p>'
+       }
+       ${signoff(gymName)}`
     ),
   }),
 
   // A waitlisted member promoted into the class.
   waitlist_promoted: ({ gymName, member, className, when }) => ({
-    subject: `${gymName} — A spot opened: ${className}`,
+    subject: `${gymName} — A spot opened up: ${className} 🎉`,
     html: shell(
       gymName,
-      `<p>Hi ${member.full_name?.split(' ')[0]},</p>
-       <p>Good news — a spot opened in <b>${className}</b>${when ? ` on ${when}` : ''} and you’re now booked in. See you there!</p>`
+      `<p style="font-size:16px">Hi ${member.full_name?.split(' ')[0]},</p>
+       <p>Great news — a spot opened up and you’ve been moved off the waitlist into the class. You’re all set!</p>
+       ${rows([
+         ['Class', className || 'Your class'],
+         when ? ['When', when] : [null, null],
+         ['Status', 'CONFIRMED ✓'],
+       ])}
+       ${panel(`Can no longer make it? Please cancel in your member portal so the next person on the waitlist can take your place.`)}
+       ${signoff(gymName)}`
     ),
   }),
 
   // Session pack running low (spec 2.6 #7).
   session_low: ({ gymName, member, remaining }) => ({
-    subject: `${gymName} — ${remaining} session${remaining === 1 ? '' : 's'} left`,
+    subject: `${gymName} — Only ${remaining} session${remaining === 1 ? '' : 's'} left on your pack`,
     html: shell(
       gymName,
-      `<p>Hi ${member.full_name?.split(' ')[0]},</p>
-       <p>You have <b>${remaining}</b> session${remaining === 1 ? '' : 's'} remaining on your pack. Top up to keep training without interruption.</p>`
+      `<p style="font-size:16px">Hi ${member.full_name?.split(' ')[0]},</p>
+       <p>A quick heads-up so your training never has to pause.</p>
+       ${rows([
+         ['Member', member.full_name],
+         member.membership_number ? ['Membership no.', member.membership_number] : [null, null],
+         ['Sessions remaining', `${remaining}`],
+       ])}
+       ${panel(
+         `<b>Top up your pack to keep going:</b><br>
+          • Purchase another session pack at reception or in your member portal.<br>
+          • Top up before you reach zero to avoid any interruption to your access.`
+       )}
+       ${signoff(gymName)}`
     ),
   }),
 
   // Upcoming monthly billing reminder (spec 3.1).
   billing_reminder: ({ gymName, member, amount, date }) => ({
-    subject: `${gymName} — Payment due ${date}`,
+    subject: `${gymName} — Payment of ${zar(amount)} due ${date}`,
     html: shell(
       gymName,
-      `<p>Hi ${member.full_name?.split(' ')[0]},</p>
-       <p>This is a friendly reminder that your membership payment of <b>R${Number(amount || 0).toLocaleString('en-ZA', { minimumFractionDigits: 2 })}</b> is scheduled for <b>${date}</b>.</p>`
+      `<p style="font-size:16px">Hi ${member.full_name?.split(' ')[0]},</p>
+       <p>This is a friendly reminder about your upcoming membership payment. No action is needed if your payment details are up to date — we’ll collect it automatically.</p>
+       ${rows([
+         ['Member', member.full_name],
+         member.membership_number ? ['Membership no.', member.membership_number] : [null, null],
+         ['Amount due', zar(amount)],
+         ['Scheduled for', date],
+       ])}
+       ${panel(
+         `Please make sure there are sufficient funds available on your payment date. If anything has changed with your card or bank details, update them at reception to avoid a failed payment.`
+       )}
+       ${signoff(gymName)}`
+    ),
+  }),
+
+  // Weekly class schedule sent to active members every Monday (spec 3.4).
+  weekly_schedule: ({ gymName, member, weekLabel, items }) => ({
+    subject: `${gymName} — This week’s class schedule${weekLabel ? ` (${weekLabel})` : ''}`,
+    html: shell(
+      gymName,
+      `<p style="font-size:16px">Hi ${member.full_name?.split(' ')[0]},</p>
+       <p>Here’s what’s on at <b>${gymName}</b> this week. Book early — popular classes fill up fast! 🔥</p>
+       ${
+         items && items.length
+           ? rows(items.map((i) => [i.day, i.detail]))
+           : '<p style="color:#9A9590;font-size:13px">No classes are scheduled this week. Check back soon!</p>'
+       }
+       ${panel(`Reserve your spot in your member portal. We’ll send a reminder before each class you book.`)}
+       ${signoff(gymName)}`
     ),
   }),
 };

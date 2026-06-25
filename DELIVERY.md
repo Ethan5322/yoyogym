@@ -20,10 +20,22 @@ Single-tenant: one Supabase project + one Vercel deployment **per gym**.
 6. **Paystack dashboard** → Webhooks → set `https://YOUR-DOMAIN/api/payments/webhook`.
 7. **Verify**: open `https://YOUR-DOMAIN/api/health` → `{ status: "ok", schema: "gym" }`.
 
-### Cron on free tier
-`vercel.json` defines 6 cron jobs. Vercel **Hobby** restricts cron count/frequency.
-On Hobby, either upgrade to Pro, or use a free external scheduler (e.g. cron-job.org)
-to hit each `/api/cron/*` URL with header `Authorization: Bearer <CRON_SECRET>`.
+### Cron schedule
+`vercel.json` defines 3 scheduled jobs:
+- `/api/cron/daily` — **06:00 daily** orchestrator: runs retry-suspend, billing
+  reminders, billing, expiry, class-reminders, reengagement in sequence (each
+  isolated so one failure doesn't stop the rest).
+- `/api/cron/daily-summary` — **20:00 daily** owner summary (spec Part 5 #10).
+- `/api/cron/weekly-schedule` — **Mon 07:00** weekly class schedule to active members (spec 3.4).
+
+Every job is also exposed as its own endpoint and can be triggered manually /
+by an external scheduler with header `Authorization: Bearer <CRON_SECRET>`.
+
+**Hobby vs Pro:** the spec also calls for an *hourly* failed-payment check. The
+daily orchestrator covers it once per day (fine for most gyms). For true hourly
+granularity, upgrade to Vercel **Pro** and add `{ "path": "/api/cron/retry-suspend",
+"schedule": "0 * * * *" }`, or point a free external scheduler (e.g. cron-job.org)
+at that endpoint.
 
 ---
 
@@ -68,7 +80,9 @@ Existing Member → `/member`). Both carry `?src=qr` for scan analytics.
 
 ### Crons (trigger manually with `Authorization: Bearer <CRON_SECRET>`)
 - [ ] `/api/cron/billing`, `/api/cron/retry-suspend`, `/api/cron/expiry`,
-      `/api/cron/class-reminders`, `/api/cron/daily-summary`, `/api/cron/reengagement`
+      `/api/cron/class-reminders`, `/api/cron/daily-summary`, `/api/cron/reengagement`,
+      `/api/cron/weekly-schedule`
+- [ ] `/api/cron/daily` orchestrator runs all morning jobs in one call
 
 ---
 
@@ -91,8 +105,15 @@ Existing Member → `/member`). Both carry `?src=qr` for scan analytics.
 - ✅ Input validation client + server; generic auth error messages
 
 ## 6. Known follow-ups (not blocking)
-- Trainer "My Clients" view (uses `training_sessions`)
-- Calendar one-off events / blocked days (needs a small events table)
-- Weekly Monday class-schedule email
+- AI chatbot upgrade: the registration flow is currently a polished rule-based
+  conversation. Set `ANTHROPIC_API_KEY` and wire `src/chatbot/messages.js`
+  (AI-upgrade seam already in place) to enable live Claude responses.
 - Server-side PDF attachment on the welcome email (members can download from success screen)
 - Optional: embed Oswald/Bebas fonts in the PDF (currently standard PDF fonts)
+- Member WhatsApp (CallMeBot supports owner alerts only; members receive email)
+
+### Done in this pass
+- ✅ Weekly Monday class-schedule email (`/api/cron/weekly-schedule`)
+- ✅ Daily owner summary moved to its own 20:00 schedule (spec Part 5 #10)
+- ✅ All member email templates upgraded to the detailed, branded style
+- ✅ Version-controlled DB schema committed (`db/schema.sql`)
