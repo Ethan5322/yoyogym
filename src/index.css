@@ -16,13 +16,38 @@ body,
 }
 
 body {
-  @apply bg-bg text-body font-body antialiased;
+  @apply text-body font-body antialiased;
   line-height: 1.7;
-  /* Subtle carbon-fibre / technical texture at ~4% opacity (atmospheric depth) */
+  color: #f0ede8;
+  /* Premium multi-layer gym backdrop (top → bottom in the stack):
+     1) vignette frame  2) red "spotlight" glow  3) faint equipment pattern
+     4) base diagonal gradient. Fills the entire page; visible around the
+     centered chat panel on desktop. */
+  background-color: #0a0a0a;
   background-image:
-    repeating-linear-gradient(45deg, rgba(255, 255, 255, 0.018) 0 1px, transparent 1px 7px),
-    repeating-linear-gradient(-45deg, rgba(255, 255, 255, 0.018) 0 1px, transparent 1px 7px);
+    radial-gradient(ellipse at 50% 50%, transparent 40%, rgba(0, 0, 0, 0.6) 100%),
+    radial-gradient(ellipse at 50% 30%, rgba(230, 57, 70, 0.08) 0%, transparent 60%),
+    url('/gym-pattern.svg'),
+    linear-gradient(135deg, #0a0a0a 0%, #0f0a0a 40%, #120808 70%, #0a0a0a 100%);
+  background-repeat: no-repeat, no-repeat, repeat, no-repeat;
+  background-size: cover, cover, 300px 300px, cover;
   background-attachment: fixed;
+}
+
+/* ===== Thin gym-red scrollbar ===== */
+::-webkit-scrollbar {
+  width: 4px;
+  height: 4px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(230, 57, 70, 0.4);
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(230, 57, 70, 0.8);
 }
 
 /* Commanding athletic headings (Bebas Neue) */
@@ -81,4 +106,156 @@ h3 {
   .gold-frame {
     box-shadow: inset 0 0 0 1px rgba(200, 146, 42, 0.45);
   }
+}
+
+/* =====================================================================
+   PREMIUM CHATBOT VISUAL LAYER (visual only — scoped to .chat-shell so
+   the admin UI is unaffected). Structure/logic in JSX is unchanged.
+   ===================================================================== */
+
+/* Floating glass panel over the gym backdrop */
+.chat-shell {
+  width: 100%;
+  max-width: 480px;
+  height: 100dvh;
+  margin: 0 auto;
+  background: rgba(10, 10, 10, 0.85);
+  -webkit-backdrop-filter: blur(8px);
+  backdrop-filter: blur(8px);
+  border: 1px solid rgba(230, 57, 70, 0.15);
+  box-shadow:
+    0 0 40px rgba(230, 57, 70, 0.08),
+    0 20px 60px rgba(0, 0, 0, 0.5);
+}
+@media (min-width: 640px) {
+  .chat-shell {
+    height: calc(100dvh - 3rem);
+    margin: 1.5rem auto;
+    border-radius: 12px;
+    overflow: hidden;
+  }
+}
+
+/* Header bar */
+.chat-header {
+  background: rgba(8, 8, 8, 0.95);
+  -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: blur(12px);
+  border-bottom: 1px solid rgba(230, 57, 70, 0.3);
+  box-shadow: 0 1px 20px rgba(230, 57, 70, 0.15);
+}
+
+/* Footer / active-control area */
+.chat-footer {
+  background: rgba(8, 8, 8, 0.6);
+  -webkit-backdrop-filter: blur(8px);
+  backdrop-filter: blur(8px);
+  border-top: 1px solid rgba(230, 57, 70, 0.15);
+}
+
+/* Progress bar */
+.progress-track {
+  height: 3px;
+  border-radius: 2px;
+  background: rgba(255, 255, 255, 0.08);
+  overflow: hidden;
+}
+.progress-fill {
+  height: 100%;
+  border-radius: 2px;
+  background: linear-gradient(90deg, #e63946, #ff6b6b);
+  box-shadow: 0 0 8px rgba(230, 57, 70, 0.6);
+  transition: width 500ms ease;
+}
+
+/* Message bubbles */
+.bubble {
+  max-width: 85%;
+  padding: 16px 20px;
+  font-family: 'Inter', system-ui, sans-serif;
+  font-size: 15px;
+  line-height: 1.8;
+  white-space: pre-line;
+}
+.bubble-ai {
+  background: rgba(20, 20, 20, 0.9);
+  border: 1px solid rgba(230, 57, 70, 0.15);
+  border-left: 3px solid #e63946;
+  border-radius: 2px 16px 16px 16px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+  -webkit-backdrop-filter: blur(4px);
+  backdrop-filter: blur(4px);
+  color: #f0ede8;
+}
+.bubble-user {
+  background: linear-gradient(135deg, #e63946 0%, #c0243a 100%);
+  border-radius: 16px 2px 16px 16px;
+  box-shadow:
+    0 4px 20px rgba(230, 57, 70, 0.3),
+    0 0 30px rgba(230, 57, 70, 0.1);
+  color: #ffffff;
+  font-weight: 500;
+}
+
+/* Go-back link */
+.go-back {
+  color: rgba(255, 255, 255, 0.35);
+  font-family: 'Inter', system-ui, sans-serif;
+  font-size: 13px;
+  transition: color 150ms ease;
+}
+.go-back:hover {
+  color: rgba(230, 57, 70, 0.8);
+}
+
+/* Premium buttons (scoped to the chatbot only) */
+.chat-shell .btn-primary {
+  min-height: 54px;
+  border-radius: 6px;
+  background: linear-gradient(135deg, #e63946 0%, #c0243a 100%);
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 18px;
+  letter-spacing: 0.15em;
+  color: #fff;
+  box-shadow:
+    0 4px 20px rgba(230, 57, 70, 0.4),
+    0 0 40px rgba(230, 57, 70, 0.15);
+  transition: all 150ms ease;
+}
+.chat-shell .btn-primary:hover {
+  filter: brightness(1.1);
+  box-shadow:
+    0 6px 28px rgba(230, 57, 70, 0.55),
+    0 0 52px rgba(230, 57, 70, 0.2);
+}
+.chat-shell .btn-primary:active {
+  transform: scale(0.97);
+}
+.chat-shell .btn-outline {
+  min-height: 54px;
+  border-radius: 6px;
+  background: transparent;
+  border: 1px solid rgba(230, 57, 70, 0.5);
+  color: #e63946;
+  font-family: 'Oswald', sans-serif;
+  font-size: 16px;
+  letter-spacing: 0.1em;
+  transition: all 150ms ease;
+}
+.chat-shell .btn-outline:hover {
+  background: rgba(230, 57, 70, 0.1);
+}
+
+/* Inputs */
+.chat-shell .field {
+  background: rgba(15, 15, 15, 0.9);
+  border: 1px solid rgba(230, 57, 70, 0.2);
+  border-radius: 8px;
+  transition: all 200ms ease;
+}
+.chat-shell .field:focus {
+  border-color: #e63946;
+  box-shadow:
+    0 0 0 3px rgba(230, 57, 70, 0.15),
+    0 0 20px rgba(230, 57, 70, 0.1);
 }

@@ -29,9 +29,9 @@ export default function ChatWindow({ engine, completeView }) {
   }, [transcript.length, typing, current?.id, finished]);
 
   return (
-    <div className="mx-auto flex h-[100dvh] max-w-md flex-col bg-bg">
+    <div className="chat-shell flex flex-col">
       {/* Header + progress */}
-      <div className="border-b border-white/5 bg-surface">
+      <div className="chat-header">
         <div className="flex items-center justify-between px-4 pt-3">
           <span className="font-display text-lg uppercase tracking-wider text-body">
             Registration
@@ -63,7 +63,7 @@ export default function ChatWindow({ engine, completeView }) {
 
       {/* Active control */}
       {!finished && current && (
-        <div className="border-t border-white/5 bg-surface px-4 py-4">
+        <div className="chat-footer px-4 py-4">
           {!typing && (
             <Controls
               key={current.id}
@@ -77,7 +77,7 @@ export default function ChatWindow({ engine, completeView }) {
           {canGoBack && (
             <button
               onClick={goBack}
-              className="mt-3 w-full text-center text-sm text-muted hover:text-body"
+              className="go-back mt-3 w-full text-center"
             >
               ← Go back &amp; edit previous answer
             </button>

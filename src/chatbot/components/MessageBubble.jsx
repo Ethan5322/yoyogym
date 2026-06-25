@@ -6,12 +6,9 @@ export default function MessageBubble({ role = 'ai', children }) {
     <div className={`flex ${isUser ? 'justify-end' : 'justify-start'}`}>
       <div
         className={[
-          'max-w-[85%] animate-fade-up rounded-2xl px-4 py-3 leading-relaxed',
-          isUser
-            ? 'bg-accent text-black rounded-br-md'
-            : 'border border-accent/15 bg-bubble text-body rounded-bl-md',
+          'bubble animate-fade-up',
+          isUser ? 'bubble-user' : 'bubble-ai',
         ].join(' ')}
-        style={{ whiteSpace: 'pre-line' }}
       >
         {children}
       </div>

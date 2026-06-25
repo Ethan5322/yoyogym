@@ -7,16 +7,13 @@ export default function ProgressBar({ section, total }) {
   return (
     <div className="px-4 pb-3 pt-4">
       <div className="mb-1.5 flex items-center justify-between text-xs">
-        <span className="font-display uppercase tracking-wider text-accent">
+        <span className="font-mono uppercase tracking-wider text-accent">
           Step {section} of {total}
         </span>
         <span className="text-muted">{title}</span>
       </div>
-      <div className="h-1.5 w-full overflow-hidden rounded-full bg-elevated">
-        <div
-          className="h-full rounded-full bg-accent transition-all duration-500"
-          style={{ width: `${pct}%` }}
-        />
+      <div className="progress-track w-full">
+        <div className="progress-fill" style={{ width: `${pct}%` }} />
       </div>
     </div>
   );
