@@ -155,7 +155,7 @@ para('Your system has two parts: the MEMBER side (what your clients see) and the
 bullet('Open your admin website address in any browser, then add /admin/login to the end.', 1);
 bullet('Enter the username and password we gave you at handover.', 2);
 bullet('Click Sign in. You\'ll land on your Dashboard.', 3);
-callout('Keep it safe', 'Change your password after first login (Settings). Never share your owner login — create separate staff logins instead (see section 22). Your session signs out automatically after a while for security.');
+callout('Keep it safe', 'Never share your owner login. We can set up separate logins for your staff (see section 22). Your session signs out automatically after a while for security. To change or reset your password, contact support.');
 para('Tip: bookmark the /admin page on your phone and reception computer for one-tap access.');
 
 // ===================== 3 DASHBOARD =====================
@@ -200,7 +200,7 @@ callout('Camera tips', 'Good lighting and a steady, front-on face give the best 
 // ===================== 6 MEMBERS =====================
 pageBreak();
 section(6, 'Finding & managing members');
-para('Open "Members" to search your whole database by name, membership number, phone, email or ID. Filter by tier, status, contract or medical flag.');
+para('Open "Members" to search your whole database by name, membership number, phone, email or ID. Filter by status, or show only members with a medical (PAR-Q) flag.');
 h2('Inside a member\'s profile');
 bullet('Personal details, health screening (PAR-Q), goals and experience.');
 bullet('Membership history, payment history, attendance and class bookings.');
@@ -265,7 +265,7 @@ para('Open "Trainers" to manage your team.');
 bullet('Add each trainer with their contact details, specialisation and certifications.');
 bullet('Assign trainers to classes.');
 bullet('Trainers can log workout notes against their clients\' personal-training sessions.');
-callout('Trainer logins', 'You can give a trainer their own login that shows only their own clients (see section 22).');
+callout('Trainer logins', 'A trainer can be given their own login (we set this up for you) that shows only their own clients — see section 22.');
 
 // ===================== 12 PAYMENTS =====================
 pageBreak();
@@ -283,13 +283,13 @@ callout('Your money, your account', 'Member payments go directly into your own P
 // ===================== 13 ANALYTICS =====================
 pageBreak();
 section(13, 'Analytics & reports');
-para('Open "Analytics" to understand your business at a glance:');
-bullet('Check-ins by day/week/month and your busiest hours.');
-bullet('Most popular classes and member retention.');
-bullet('New sign-ups vs members who lapsed, and revenue trends.');
-bullet('Membership tier mix and medical-aid breakdown.');
-bullet('QR scans vs actual registrations (how well your QR converts).');
-callout('Use it monthly', 'A quick look each month tells you what\'s working and where to push promotions.');
+para('Open "Analytics" to understand your business at a glance. You\'ll see clear bar charts for:');
+bullet('Check-ins over the last 30 days.');
+bullet('Revenue trend over the last 6 months.');
+bullet('Membership tier distribution.');
+bullet('Medical-aid breakdown — how many members have medical aid, by provider.');
+bullet('Member status mix (active, new, expiring, lapsed, suspended).');
+callout('Use it monthly', 'A quick look each month tells you what\'s working. For QR sign-up conversion, see the QR Codes page (section 18).');
 
 // ===================== 14 CALENDAR =====================
 pageBreak();
@@ -335,9 +335,11 @@ callout('Everything is pre-filled', 'Professional, compliant defaults are alread
 // ===================== 18 QR =====================
 pageBreak();
 section(18, 'QR codes — print & display');
-para('Open "QR Codes" to download your two codes:');
+para('Open "QR Codes" to download and print your codes. Each has a Download PNG button and a Print button:');
 bullet('NEW MEMBER code — opens the sign-up flow. Put it on your door, flyers and social media.');
 bullet('EXISTING MEMBER code — opens the member portal for check-in and bookings.');
+bullet('A Company code (general landing page) and a secure Admin code are also provided.');
+para('This page also shows your scan analytics: total scans, new-member scans, and your scan-to-registration conversion rate.');
 callout('Display them well', 'Print large, clear copies at the entrance and reception. The easier they are to scan, the more sign-ups you get.');
 
 // ===================== 19 VISITORS =====================
@@ -362,7 +364,7 @@ section(21, 'What your members experience');
 para('It helps to know what your clients see, so you can guide them:');
 bullet('They scan your NEW MEMBER QR and are guided through sign-up: details, health check, plan, payment.', 1);
 bullet('They instantly receive a membership number, a verification code, a welcome email and a membership card PDF.', 2);
-bullet('They scan the EXISTING MEMBER QR (or use the member portal) to check in, book classes, view history and pay any balance.', 3);
+bullet('They scan the EXISTING MEMBER QR (or use the member portal) to check in, book or cancel classes, view their history and membership card, and see any balance owed.', 3);
 callout('Self-service = less work for you', 'Most member admin happens on their phone, freeing your staff for real service.');
 
 // ===================== 22 ROLES =====================
@@ -416,6 +418,6 @@ for (let p = 2; p <= pages; p++) {
   doc.text(`Page ${p} of ${pages}`, PW - M, PH - 9, { align: 'right' });
 }
 
-const out = 'Gym-System-Owner-Manual.pdf';
+const out = process.argv[2] || 'Gym-System-Owner-Manual.pdf';
 writeFileSync(out, Buffer.from(doc.output('arraybuffer')));
 console.log('✔ Wrote ' + out + ' (' + pages + ' pages)');
