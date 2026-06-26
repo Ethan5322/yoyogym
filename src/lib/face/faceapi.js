@@ -31,11 +31,12 @@ export async function detectBox(el) {
 }
 
 /** Detect a single face and return BOTH its box (for guidance) and 128-d
- *  descriptor (for the template) in one pass. */
+ *  descriptor (for the template) in one pass. Tuned for the live enrolment
+ *  guide loop (responsive). */
 export async function detectFull(el) {
   const faceapi = await getFaceApi();
   const det = await faceapi
-    .detectSingleFace(el, new faceapi.TinyFaceDetectorOptions({ inputSize: 320, scoreThreshold: 0.4 }))
+    .detectSingleFace(el, new faceapi.TinyFaceDetectorOptions({ inputSize: 320, scoreThreshold: 0.35 }))
     .withFaceLandmarks()
     .withFaceDescriptor();
   if (!det) return null;
@@ -45,6 +46,19 @@ export async function detectFull(el) {
     score: det.detection.score,
     descriptor: Array.from(det.descriptor),
   };
+}
+
+/** High-recall detection for ACCESS scanning — larger input + lower threshold
+ *  so harder faces (poor light, just-washed/shiny skin, slight angle) are still
+ *  found. Returns { score, descriptor } or null. */
+export async function detectMatch(el) {
+  const faceapi = await getFaceApi();
+  const det = await faceapi
+    .detectSingleFace(el, new faceapi.TinyFaceDetectorOptions({ inputSize: 416, scoreThreshold: 0.3 }))
+    .withFaceLandmarks()
+    .withFaceDescriptor();
+  if (!det) return null;
+  return { score: det.detection.score, descriptor: Array.from(det.descriptor) };
 }
 
 /** Detect a single face in a video/image element and return its 128-d descriptor. */

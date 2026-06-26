@@ -171,23 +171,39 @@ export default function FaceScan() {
   }
 
   async function runLoop() {
-    const { describeFace, bestMatch } = await import('../../lib/face/faceapi.js');
+    const { detectMatch, averageDescriptors, bestMatch } = await import('../../lib/face/faceapi.js');
+    const samples = [];
+    const start = Date.now();
     while (loopRef.current) {
-      let descriptor = null;
+      let det = null;
       try {
-        descriptor = await describeFace(videoRef.current);
+        det = await detectMatch(videoRef.current);
       } catch {
         /* keep scanning */
       }
       if (!loopRef.current) return;
 
-      if (descriptor) {
+      if (det?.descriptor) {
         setDetected(true);
-        const { person: best, confident } = bestMatch(descriptor, peopleRef.current);
+        samples.push(det.descriptor);
+      } else {
+        setDetected(false);
+      }
+
+      // Decide when we have enough evidence to match reliably:
+      //  - 5 good frames, OR
+      //  - at least 2 frames after ~1.8s (don't keep a person waiting).
+      const elapsed = Date.now() - start;
+      const enough = samples.length >= 5 || (samples.length >= 2 && elapsed > 1800);
+
+      if (enough) {
         loopRef.current = false;
         stopCamera();
+        setPhase('matching');
+        // Average the frames into one stable probe → robust to a single bad frame.
+        const probe = averageDescriptors(samples);
+        const { person: best, confident } = bestMatch(probe, peopleRef.current);
         if (best && confident) {
-          setPhase('matching');
           try {
             const data = await apiFetch(`/admin/access-card?type=${best.type}&id=${best.id}`);
             setCard(data);
@@ -203,8 +219,38 @@ export default function FaceScan() {
         }
         return;
       }
-      setDetected(false);
-      await new Promise((r) => setTimeout(r, 400));
+
+      // No face found at all after ~9s → stop and offer the code fallback.
+      if (samples.length === 0 && elapsed > 9000) {
+        loopRef.current = false;
+        stopCamera();
+        flashFx('fail');
+        setPhase('nomatch');
+        return;
+      }
+      await new Promise((r) => setTimeout(r, 180));
+    }
+  }
+
+  // Instant fallback: identify by typed verification code or membership number.
+  async function identifyByCode(text) {
+    const q = (text || '').trim();
+    if (!q) return;
+    setBusy(true);
+    setPhase('matching');
+    setDetected(true);
+    try {
+      const r = await apiFetch(`/admin/resolve-member?q=${encodeURIComponent(q)}`);
+      if (!r.found) throw new Error('not found');
+      const data = await apiFetch(`/admin/access-card?type=${r.type || 'member'}&id=${r.id}`);
+      setCard(data);
+      flashFx('success');
+      setPhase('result');
+    } catch {
+      flashFx('fail');
+      setPhase('nomatch');
+    } finally {
+      setBusy(false);
     }
   }
 
@@ -300,7 +346,7 @@ export default function FaceScan() {
           <MemberAccessCard data={card} onAction={memberAction} onClose={reset} busy={busy} actionMsg={actionMsg} flagged={flagged} />
         )}
         {phase === 'result' && card?.type === 'trainer' && <TrainerCard data={card} onClose={reset} />}
-        {phase === 'nomatch' && <Unidentified onClose={reset} />}
+        {phase === 'nomatch' && <Unidentified onClose={reset} onIdentify={identifyByCode} busy={busy} />}
       </div>
     </div>
   );

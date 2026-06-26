@@ -172,12 +172,30 @@ export function TrainerCard({ data, onClose }) {
   );
 }
 
-export function Unidentified({ onClose }) {
+export function Unidentified({ onClose, onIdentify, busy }) {
+  const [code, setCode] = useState('');
   return (
     <div className="animate-slide-up mx-auto max-w-md rounded-3xl border border-error/40 bg-error/10 p-6 text-center">
       <div className="text-5xl">⚠️</div>
-      <h2 className="mt-3 font-display text-2xl uppercase text-error">Unidentified Person</h2>
-      <p className="mt-1 text-sm text-muted">This person is not registered in the system.</p>
+      <h2 className="mt-3 font-display text-2xl uppercase text-error">Not Recognised</h2>
+      <p className="mt-1 text-sm text-muted">Couldn’t match a face. Identify instantly by verification code or membership number.</p>
+
+      {onIdentify && (
+        <form
+          className="mt-4 flex gap-2"
+          onSubmit={(e) => { e.preventDefault(); onIdentify(code); }}
+        >
+          <input
+            className="field flex-1 text-center uppercase tracking-widest"
+            placeholder="Code or GYM-2026-…"
+            value={code}
+            onChange={(e) => setCode(e.target.value)}
+            autoFocus
+          />
+          <button className="btn-primary px-5" disabled={busy || !code.trim()}>{busy ? '…' : 'Find'}</button>
+        </form>
+      )}
+
       <div className="mt-5 grid grid-cols-2 gap-2">
         <a className="btn-outline text-center" href="/admin/members">Search Member</a>
         <a className="btn-primary text-center" href="/admin/register-member">Register New</a>
