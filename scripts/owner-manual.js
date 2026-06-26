@@ -283,12 +283,12 @@ callout('Your money, your account', 'Member payments go directly into your own P
 // ===================== 13 ANALYTICS =====================
 pageBreak();
 section(13, 'Analytics & reports');
-para('Open "Analytics" to understand your business at a glance. You\'ll see clear bar charts for:');
-bullet('Check-ins over the last 30 days.');
+para('Open "Analytics" for headline numbers (active members, new in 30 days, lapsed, churn rate) plus clear bar charts for:');
+bullet('Check-ins over the last 30 days, and your busiest hours of the day.');
+bullet('Most popular classes (by bookings, last 30 days).');
 bullet('Revenue trend over the last 6 months.');
-bullet('Membership tier distribution.');
+bullet('Membership tier distribution and member status mix.');
 bullet('Medical-aid breakdown — how many members have medical aid, by provider.');
-bullet('Member status mix (active, new, expiring, lapsed, suspended).');
 callout('Use it monthly', 'A quick look each month tells you what\'s working. For QR sign-up conversion, see the QR Codes page (section 18).');
 
 // ===================== 14 CALENDAR =====================
@@ -378,7 +378,8 @@ twoCol([
   ['Reception', 'Verify, scan, today, register walk-ins, visitors, incidents.'],
   ['Trainer', 'Sees only their own clients.'],
 ], 40);
-callout('Best practice', 'Never share the owner login. Separate logins mean clearer accountability and safer access. Ask us to add staff accounts, or we\'ll show you how.');
+callout('Self-service', 'As the owner, create and manage staff logins yourself in Staff & Roles (set role, enable/disable, reset passwords). Never share the owner login — separate accounts mean clearer accountability.');
+para('Tip: the Audit Log (owner/manager) records important staff actions — status changes, deletions, refunds, settings and staff edits — so you always know who did what.');
 
 // ===================== 23 ALERTS =====================
 pageBreak();
