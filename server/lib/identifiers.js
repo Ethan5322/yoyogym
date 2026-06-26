@@ -39,3 +39,28 @@ export async function generateVerificationCode(supabase) {
   }
   throw new Error('Could not generate a unique verification code');
 }
+
+/** Generic uniqueness helper for any table/column. */
+async function generateUnique(supabase, table, column, make) {
+  for (let attempt = 0; attempt < 8; attempt++) {
+    const candidate = make();
+    const { data } = await supabase.from(table).select('id').eq(column, candidate).maybeSingle();
+    if (!data) return candidate;
+  }
+  throw new Error(`Could not generate a unique ${column}`);
+}
+
+const year = () => new Date().getFullYear();
+
+/** STF-YYYY-XXXXXX staff number (unique in admin_users). */
+export const generateStaffNumber = (s) =>
+  generateUnique(s, 'admin_users', 'staff_number', () => `STF-${year()}-${randomCode(6)}`);
+/** TRN-YYYY-XXXXXX trainer number (unique in trainers). */
+export const generateTrainerNumber = (s) =>
+  generateUnique(s, 'trainers', 'trainer_number', () => `TRN-${year()}-${randomCode(6)}`);
+/** 8-char verification code unique within admin_users. */
+export const generateStaffCode = (s) =>
+  generateUnique(s, 'admin_users', 'verification_code', () => randomCode(8));
+/** 8-char verification code unique within trainers. */
+export const generateTrainerCode = (s) =>
+  generateUnique(s, 'trainers', 'verification_code', () => randomCode(8));

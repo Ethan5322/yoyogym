@@ -4,12 +4,17 @@ import { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
 
 export default function PublicProfile() {
-  const { type, key } = useParams(); // type: 'm' | 't'
+  const { type, key } = useParams(); // type: 'm' | 't' | 's'
   const [data, setData] = useState(null);
   const [error, setError] = useState('');
 
   useEffect(() => {
-    const qs = type === 't' ? `type=trainer&id=${encodeURIComponent(key)}` : `type=member&key=${encodeURIComponent(key)}`;
+    const qs =
+      type === 't'
+        ? `type=trainer&id=${encodeURIComponent(key)}`
+        : type === 's'
+        ? `type=staff&id=${encodeURIComponent(key)}`
+        : `type=member&key=${encodeURIComponent(key)}`;
     fetch(`/api/public-profile?${qs}`)
       .then((r) => r.json())
       .then(setData)

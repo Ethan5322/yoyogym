@@ -263,6 +263,7 @@ pageBreak();
 section(11, 'Trainers');
 para('Open "Trainers" to manage your team.');
 bullet('Add each trainer with their contact details, specialisation and certifications.');
+bullet('Capture the trainer\'s face and photo — they instantly get a Trainer ID card (PNG) + PDF with a trainer number, verification code and a scan-to-verify QR.');
 bullet('Assign trainers to classes.');
 bullet('Trainers can log workout notes against their clients\' personal-training sessions.');
 callout('Trainer logins', 'A trainer can be given their own login (we set this up for you) that shows only their own clients — see section 22.');
@@ -378,7 +379,7 @@ twoCol([
   ['Reception', 'Verify, scan, today, register walk-ins, visitors, incidents.'],
   ['Trainer', 'Sees only their own clients.'],
 ], 40);
-callout('Self-service', 'As the owner, create and manage staff logins yourself in Staff & Roles (set role, enable/disable, reset passwords). Never share the owner login — separate accounts mean clearer accountability.');
+callout('Self-service', 'As the owner, register staff yourself in Staff & Roles: enter their details, capture a face scan + photo, and they instantly get a login, a Staff ID card + PDF (with staff number, verification code and verify QR), and face access — just like members. You can also change roles, enable/disable, and reset passwords.');
 para('Tip: the Audit Log (owner/manager) records important staff actions — status changes, deletions, refunds, settings and staff edits — so you always know who did what.');
 
 // ===================== 23 ALERTS =====================

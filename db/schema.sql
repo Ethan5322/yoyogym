@@ -44,6 +44,12 @@ create table if not exists gym.admin_users (
   trainer_id        uuid,                      -- links a 'trainer' login to gym.trainers
   is_active         boolean not null default true,
   face_descriptor   jsonb,                     -- admin face-login (Phase 88)
+  -- Staff credential (ID card + verify QR), set when an owner registers staff:
+  staff_number      text unique,               -- STF-YYYY-XXXXXX
+  verification_code text,                       -- 8-char access/verify code
+  job_title         text,                       -- e.g. Manager, Receptionist
+  phone             text,
+  photo_url         text,                       -- passport photo for the ID card
   failed_logins     integer not null default 0,
   locked_until      timestamptz,
   last_login_at     timestamptz,
@@ -63,6 +69,9 @@ create table if not exists gym.trainers (
   certifications    text,
   bio               text,
   face_descriptor   jsonb,
+  photo_url         text,                        -- passport photo for the ID card
+  trainer_number    text unique,                 -- TRN-YYYY-XXXXXX
+  verification_code text,                         -- 8-char verify code
   is_active         boolean not null default true,
   created_at        timestamptz not null default now(),
   updated_at        timestamptz not null default now()

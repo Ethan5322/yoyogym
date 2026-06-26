@@ -7,6 +7,7 @@ import { getSupabase } from '../../lib/supabase.js';
 import { allowMethods, readJsonBody, ok, badRequest, serverError } from '../../lib/http.js';
 import { requireRole, hashPassword, ROLES } from '../../lib/auth.js';
 import { recordAudit } from '../../lib/audit.js';
+import { generateStaffNumber, generateStaffCode } from '../../lib/identifiers.js';
 
 export default async function handler(req, res) {
   if (!allowMethods(req, res, ['GET', 'POST', 'PATCH', 'DELETE'])) return;
@@ -18,12 +19,29 @@ export default async function handler(req, res) {
 
   try {
     if (req.method === 'GET') {
+      // select('*') is resilient to columns that may not be migrated yet; we
+      // strip sensitive fields (password hash, face descriptor) before sending.
       const { data, error } = await supabase
         .from('admin_users')
-        .select('id, username, full_name, email, role, is_active, last_login_at, trainer_id')
+        .select('*')
         .order('created_at', { ascending: true });
       if (error) return serverError(res, error.message);
-      return ok(res, { staff: data || [] });
+      const staff = (data || []).map((s) => ({
+        id: s.id,
+        username: s.username,
+        full_name: s.full_name,
+        email: s.email,
+        role: s.role,
+        is_active: s.is_active,
+        last_login_at: s.last_login_at,
+        trainer_id: s.trainer_id,
+        staff_number: s.staff_number || null,
+        verification_code: s.verification_code || null,
+        job_title: s.job_title || null,
+        phone: s.phone || null,
+        photo_url: s.photo_url || null,
+      }));
+      return ok(res, { staff });
     }
 
     if (req.method === 'POST') {
@@ -32,22 +50,48 @@ export default async function handler(req, res) {
       if (!ROLES.includes(b.role)) return badRequest(res, 'Invalid role.');
       if (String(b.password).length < 8) return badRequest(res, 'Password must be at least 8 characters.');
       const password_hash = await hashPassword(b.password);
-      const { data, error } = await supabase
-        .from('admin_users')
-        .insert({
-          username: b.username.trim(),
-          full_name: b.full_name || null,
-          email: b.email || null,
-          role: b.role,
-          trainer_id: b.trainer_id || null,
-          password_hash,
-          is_active: true,
-        })
-        .select('id')
-        .single();
+
+      // Issue a staff number + verification code (needs the migrated columns).
+      let staff_number = null;
+      let verification_code = null;
+      try {
+        staff_number = await generateStaffNumber(supabase);
+        verification_code = await generateStaffCode(supabase);
+      } catch {
+        /* columns not migrated yet — account is still created below */
+      }
+
+      const base = {
+        username: b.username.trim(),
+        full_name: b.full_name || null,
+        email: b.email || null,
+        role: b.role,
+        trainer_id: b.trainer_id || null,
+        password_hash,
+        is_active: true,
+        face_descriptor: b.face_descriptor || null,
+      };
+      const full = {
+        ...base,
+        staff_number,
+        verification_code,
+        job_title: b.job_title || null,
+        phone: b.phone || null,
+        photo_url: b.photo_url || null,
+      };
+
+      // Try the full credential insert; fall back to a basic account if the
+      // credential columns aren't migrated on this gym's database yet.
+      let { data, error } = await supabase.from('admin_users').insert(full).select('id').single();
+      if (error && !/duplicate|unique/i.test(error.message)) {
+        ({ data, error } = await supabase.from('admin_users').insert(base).select('id').single());
+        staff_number = null;
+        verification_code = null;
+      }
       if (error) return serverError(res, /duplicate|unique/i.test(error.message) ? 'That username already exists.' : error.message);
+
       await recordAudit(supabase, admin, { action: 'staff.create', entity: 'admin_user', entity_id: data.id, detail: `${b.username} (${b.role})` });
-      return ok(res, { id: data.id });
+      return ok(res, { id: data.id, staff_number, verification_code });
     }
 
     if (req.method === 'PATCH') {

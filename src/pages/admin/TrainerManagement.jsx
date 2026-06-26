@@ -3,13 +3,17 @@ import { useEffect, useState } from 'react';
 import AdminShell from '../../components/AdminShell.jsx';
 import { apiFetch } from '../../lib/api.js';
 import PersonalQr from '../../components/PersonalQr.jsx';
+import FaceCapture from '../../chatbot/components/FaceCapture.jsx';
+import CredentialActions from '../../components/CredentialActions.jsx';
 
-const blank = { full_name: '', phone: '', email: '', specialization: '', certifications: '', bio: '', is_active: true };
+const blank = { full_name: '', phone: '', email: '', specialization: '', certifications: '', bio: '', is_active: true, photo_url: '', face_descriptor: null };
 
 export default function TrainerManagement() {
   const [trainers, setTrainers] = useState([]);
   const [form, setForm] = useState(null);
   const [qrFor, setQrFor] = useState(null);
+  const [faceOpen, setFaceOpen] = useState(false);
+  const [created, setCreated] = useState(null);
   const [error, setError] = useState('');
 
   function load() {
@@ -18,10 +22,22 @@ export default function TrainerManagement() {
   useEffect(load, []);
 
   async function save() {
-    setError('');
+    setError(''); setCreated(null);
     try {
-      if (form.id) await apiFetch(`/admin/trainers?id=${form.id}`, { method: 'PATCH', body: form });
-      else await apiFetch('/admin/trainers', { method: 'POST', body: form });
+      if (form.id) {
+        await apiFetch(`/admin/trainers?id=${form.id}`, { method: 'PATCH', body: form });
+      } else {
+        const r = await apiFetch('/admin/trainers', { method: 'POST', body: form });
+        setCreated({
+          kind: 'trainer',
+          id: r.id,
+          name: form.full_name,
+          number: r.trainer_number,
+          verification_code: r.verification_code,
+          badge: form.specialization || 'TRAINER',
+          photo_url: form.photo_url,
+        });
+      }
       setForm(null);
       load();
     } catch (e) {
@@ -42,14 +58,28 @@ export default function TrainerManagement() {
       </div>
       {error && <p className="mt-4 text-error">{error}</p>}
 
+      {created && (
+        <div className="card mt-4 border border-accent/30">
+          <h2 className="mb-1 font-display uppercase text-body">{created.name} — credential ready</h2>
+          <p className="mb-2 text-xs text-muted">
+            Trainer No: <span className="text-accent">{created.number || '—'}</span> · Verification: <span className="text-accent">{created.verification_code || '—'}</span>
+          </p>
+          <CredentialActions person={created} />
+        </div>
+      )}
+
       <div className="mt-4 space-y-2">
         {trainers.map((t) => (
-          <div key={t.id} className="card flex items-center justify-between">
-            <div>
-              <div className="font-display uppercase text-body">{t.full_name}{!t.is_active && ' · inactive'}</div>
-              <div className="text-xs text-muted">{[t.specialization, t.phone, t.email].filter(Boolean).join(' · ')}</div>
+          <div key={t.id} className="card flex flex-wrap items-center justify-between gap-3">
+            <div className="flex items-center gap-3">
+              {t.photo_url && <img src={t.photo_url} alt="" className="h-12 w-9 rounded object-cover gold-frame" />}
+              <div>
+                <div className="font-display uppercase text-body">{t.full_name}{!t.is_active && ' · inactive'}</div>
+                <div className="text-xs text-muted">{[t.specialization, t.phone, t.email].filter(Boolean).join(' · ')}</div>
+              </div>
             </div>
-            <div className="flex gap-2">
+            <div className="flex flex-wrap items-center gap-2">
+              <CredentialActions person={{ kind: 'trainer', id: t.id, name: t.full_name, number: t.trainer_number, verification_code: t.verification_code, badge: t.specialization || 'TRAINER', photo_url: t.photo_url }} />
               <button className="btn-outline px-3 py-1 text-sm" onClick={() => setQrFor(t)}>QR</button>
               <button className="btn-outline px-3 py-1 text-sm" onClick={() => setForm({ ...blank, ...t })}>Edit</button>
               <button className="text-sm text-error" onClick={() => remove(t.id)}>Remove</button>
@@ -81,10 +111,31 @@ export default function TrainerManagement() {
             <label className="flex items-center gap-2 text-sm text-muted">
               <input type="checkbox" checked={form.is_active} onChange={(e) => setForm({ ...form, is_active: e.target.checked })} /> Active
             </label>
+
+            <div className="flex items-center gap-3">
+              {form.photo_url ? (
+                <img src={form.photo_url} alt="" className="h-16 w-12 rounded object-cover gold-frame" />
+              ) : (
+                <div className="flex h-16 w-12 items-center justify-center rounded bg-elevated text-[10px] text-muted">No photo</div>
+              )}
+              <button className="btn-outline px-3 py-2 text-sm" onClick={() => setFaceOpen(true)}>
+                {form.face_descriptor ? '✓ Retake face & photo' : '📷 Capture face & photo'}
+              </button>
+            </div>
+
             <div className="flex gap-3">
               <button className="btn-primary flex-1" onClick={save}>Save</button>
               <button className="btn-outline" onClick={() => setForm(null)}>Cancel</button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {faceOpen && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/80 p-4" onClick={() => setFaceOpen(false)}>
+          <div className="card w-full max-w-sm" onClick={(e) => e.stopPropagation()}>
+            <h2 className="mb-3 font-display uppercase text-body">Capture trainer face & photo</h2>
+            <FaceCapture onSubmit={(res) => { if (res?.descriptor) setForm((f) => ({ ...f, face_descriptor: res.descriptor, photo_url: res.image })); setFaceOpen(false); }} />
           </div>
         </div>
       )}

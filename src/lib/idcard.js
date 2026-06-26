@@ -48,6 +48,13 @@ export async function downloadIdCard({
   validUntil = '',
   photoUrl = '',
   qrUrl = '',
+  // Generalised labels so the same premium card works for staff & trainers.
+  roleLabel = 'MEMBER', // shown above the name
+  subtitle = 'OFFICIAL MEMBERSHIP ID', // shown under the gym name
+  idLabel = 'MEMBERSHIP NO.', // label above the number
+  badgeText = '', // e.g. job title / specialization (overrides tier badge)
+  badgeColor = '', // hex for the badge fill
+  validLabel = 'VALID UNTIL',
 }) {
   try {
     await (document.fonts?.ready || Promise.resolve());
@@ -110,7 +117,7 @@ export async function downloadIdCard({
   ctx.fillText(gymName.toUpperCase(), 56, 92);
   ctx.fillStyle = '#8A8580';
   ctx.font = '600 16px Oswald, sans-serif';
-  ctx.fillText('OFFICIAL MEMBERSHIP ID', 58, 116);
+  ctx.fillText(subtitle.toUpperCase(), 58, 116);
 
   // photo (passport 3:4) with gold frame
   const px = 56;
@@ -129,23 +136,24 @@ export async function downloadIdCard({
   const dx = px + pw + 44;
   ctx.fillStyle = '#8A8580';
   ctx.font = '600 16px Oswald, sans-serif';
-  ctx.fillText('MEMBER', dx, py + 8);
+  ctx.fillText(roleLabel.toUpperCase(), dx, py + 8);
   ctx.fillStyle = '#F0EDE8';
   ctx.font = '600 46px "Bebas Neue", Oswald, sans-serif';
   ctx.fillText(name.toUpperCase(), dx, py + 56);
 
   ctx.fillStyle = '#8A8580';
   ctx.font = '600 14px Oswald, sans-serif';
-  ctx.fillText('MEMBERSHIP NO.', dx, py + 96);
+  ctx.fillText(idLabel.toUpperCase(), dx, py + 96);
   ctx.fillStyle = accent;
   ctx.font = '500 30px "DM Mono", monospace';
   ctx.fillText(membershipNumber, dx, py + 128);
 
-  if (tier) {
-    const label = tier.toUpperCase();
+  // Badge: explicit text (job title / specialization) overrides the tier badge.
+  const label = (badgeText || tier || '').toUpperCase();
+  if (label) {
     ctx.font = '700 18px Oswald, sans-serif';
     const tw = ctx.measureText(label).width + 28;
-    ctx.fillStyle = TIER_COLOR[tier] || gold;
+    ctx.fillStyle = badgeColor || TIER_COLOR[tier] || gold;
     ctx.fillRect(dx, py + 150, tw, 34);
     ctx.fillStyle = '#0A0A0A';
     ctx.fillText(label, dx + 14, py + 174);
@@ -153,7 +161,7 @@ export async function downloadIdCard({
 
   ctx.fillStyle = '#8A8580';
   ctx.font = '600 14px Oswald, sans-serif';
-  ctx.fillText('VALID UNTIL', dx, py + 224);
+  ctx.fillText(validLabel.toUpperCase(), dx, py + 224);
   ctx.fillStyle = '#F0EDE8';
   ctx.font = '500 22px "DM Mono", monospace';
   ctx.fillText(validUntil || 'ONGOING', dx, py + 252);

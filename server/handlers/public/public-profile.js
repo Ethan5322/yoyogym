@@ -14,6 +14,26 @@ export default async function handler(req, res) {
   const supabase = getSupabase();
 
   try {
+    if (type === 'staff') {
+      const id = url.searchParams.get('id') || url.searchParams.get('key');
+      if (!id) return badRequest(res, 'id is required.');
+      const { data: s } = await supabase
+        .from('admin_users')
+        .select('full_name, photo_url, job_title, role, is_active')
+        .eq('id', id)
+        .maybeSingle();
+      if (!s) return ok(res, { found: false });
+      return ok(res, {
+        found: true,
+        name: s.full_name,
+        photo_url: s.photo_url || null,
+        role: 'Staff',
+        subrole: s.job_title || (s.role ? s.role[0].toUpperCase() + s.role.slice(1) : null),
+        valid: !!s.is_active,
+        status_label: s.is_active ? 'Active Staff Member' : 'Inactive',
+      });
+    }
+
     if (type === 'trainer') {
       const id = url.searchParams.get('id') || url.searchParams.get('key');
       if (!id) return badRequest(res, 'id is required.');
