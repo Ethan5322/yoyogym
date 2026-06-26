@@ -5,6 +5,7 @@
 import { useEffect, useState } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../lib/auth.jsx';
+import { useBranding } from '../lib/branding.js';
 
 // Grouped navigation reads as an organised product, not a random row of buttons.
 const GROUPS = [
@@ -53,12 +54,18 @@ const GROUPS = [
   },
   {
     title: 'System',
-    items: [{ to: '/admin/settings', label: 'Settings', icon: '⚙', roles: ['owner'] }],
+    items: [
+      { to: '/admin/audit', label: 'Audit Log', icon: '❏', roles: ['owner', 'manager'] },
+      { to: '/admin/staff', label: 'Staff & Roles', icon: '☷', roles: ['owner'] },
+      { to: '/admin/settings', label: 'Settings', icon: '⚙', roles: ['owner'] },
+    ],
   },
 ];
 
 export default function AdminShell({ children }) {
   const { user, logout } = useAuth();
+  const branding = useBranding();
+  const gymName = branding.name || 'Yoyo GYM';
   const navigate = useNavigate();
   const { pathname } = useLocation();
   const [open, setOpen] = useState(false);
@@ -84,7 +91,7 @@ export default function AdminShell({ children }) {
         <button aria-label="Menu" className="admin-burger" onClick={() => setOpen(true)}>
           <span /><span /><span />
         </button>
-        <span className="font-display text-lg font-bold uppercase tracking-wider text-accent">Yoyo GYM</span>
+        <span className="font-display text-lg font-bold uppercase tracking-wider text-accent">{gymName}</span>
         <span className="text-xs uppercase tracking-wide text-muted">{user?.role}</span>
       </header>
 
@@ -94,7 +101,7 @@ export default function AdminShell({ children }) {
       {/* ===== Sidebar (fixed on desktop, drawer on mobile) ===== */}
       <aside className={`admin-sidebar ${open ? 'is-open' : ''}`}>
         <div className="admin-brand">
-          <span className="font-display text-xl font-bold uppercase tracking-wider text-accent">Yoyo GYM</span>
+          <span className="font-display text-xl font-bold uppercase tracking-wider text-accent">{gymName}</span>
           <span className="text-[10px] uppercase tracking-[0.25em] text-muted">Management</span>
         </div>
 

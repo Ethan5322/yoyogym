@@ -30,6 +30,8 @@ import visitor from '../../server/handlers/admin/visitor.js';
 import incident from '../../server/handlers/admin/incident.js';
 import resolveMember from '../../server/handlers/admin/resolve-member.js';
 import enrollFace from '../../server/handlers/admin/enroll-face.js';
+import staff from '../../server/handlers/admin/staff.js';
+import audit from '../../server/handlers/admin/audit.js';
 
 const routes = {
   dashboard,
@@ -60,6 +62,8 @@ const routes = {
   incident,
   'resolve-member': resolveMember,
   'enroll-face': enrollFace,
+  staff,
+  audit,
 };
 
 export default async function handler(req, res) {

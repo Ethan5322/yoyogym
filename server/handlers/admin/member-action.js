@@ -8,6 +8,7 @@ import { allowMethods, readJsonBody, ok, badRequest, serverError } from '../../l
 import { requireRole } from '../../lib/auth.js';
 import { generateVerificationCode } from '../../lib/identifiers.js';
 import { DURATION_MONTHS, computeMembership } from '../../../shared/pricing.js';
+import { recordAudit } from '../../lib/audit.js';
 
 const isoDate = (d) => d.toISOString().slice(0, 10);
 function addMonths(date, n) {
@@ -45,6 +46,7 @@ export default async function handler(req, res) {
         .update({ verification_code: code, updated_at: new Date().toISOString() })
         .eq('id', id);
       if (error) return serverError(res, error.message);
+      await recordAudit(supabase, admin, { action: 'member.regenerate_code', entity: 'member', entity_id: id });
       return ok(res, { message: 'New verification code generated.', verification_code: code });
     }
 
@@ -75,6 +77,7 @@ export default async function handler(req, res) {
         .eq('id', membership.id);
       await supabase.from('members').update({ status: 'active', updated_at: new Date().toISOString() }).eq('id', id);
 
+      await recordAudit(supabase, admin, { action: 'member.renew', entity: 'member', entity_id: id, detail: membership.visit_type === 'full' ? `until ${newEnd}` : null });
       return ok(res, { message: `Membership renewed${membership.visit_type === 'full' ? ` until ${newEnd}` : ''}.` });
     }
 
@@ -109,6 +112,7 @@ export default async function handler(req, res) {
           updated_at: new Date().toISOString(),
         })
         .eq('id', membership.id);
+      await recordAudit(supabase, admin, { action: 'member.change_plan', entity: 'member', entity_id: id, detail: `→ ${plan.name}` });
       return ok(res, { message: `Plan changed to ${plan.name}.` });
     }
 

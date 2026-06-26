@@ -5,10 +5,12 @@
 import { getSupabase } from '../../lib/supabase.js';
 import { allowMethods, readJsonBody, ok, badRequest, serverError } from '../../lib/http.js';
 import { requireRole } from '../../lib/auth.js';
+import { recordAudit } from '../../lib/audit.js';
 
 export default async function handler(req, res) {
   if (!allowMethods(req, res, ['GET', 'POST', 'PATCH'])) return;
-  if (!requireRole(req, res, ['owner', 'manager'])) return;
+  const admin = requireRole(req, res, ['owner', 'manager']);
+  if (!admin) return;
 
   const supabase = getSupabase();
   const url = new URL(req.url, 'http://localhost');
@@ -28,6 +30,7 @@ export default async function handler(req, res) {
         paid_at: new Date().toISOString(),
       });
       if (error) return serverError(res, error.message);
+      await recordAudit(supabase, admin, { action: 'payment.manual', entity: 'payment', entity_id: b.member_id, detail: `${b.category} R${b.amount} (${b.method || 'cash'})` });
       return ok(res, { recorded: true });
     }
 
@@ -40,6 +43,7 @@ export default async function handler(req, res) {
         .update({ status: 'refunded', refunded_amount: b.refunded_amount || 0, updated_at: new Date().toISOString() })
         .eq('id', id);
       if (error) return serverError(res, error.message);
+      await recordAudit(supabase, admin, { action: 'payment.refund', entity: 'payment', entity_id: id, detail: `R${b.refunded_amount || 0}` });
       return ok(res, { refunded: true });
     }
 

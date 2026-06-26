@@ -41,10 +41,19 @@ export default async function handler(req, res) {
     if (error) return serverError(res, error.message);
 
     const map = Object.fromEntries((data || []).map((r) => [r.key, r.value]));
-    const gymName = map.gym_profile?.name || DEFAULTS.gym_name;
+    const profile = map.gym_profile || {};
+    const gymName = profile.name || DEFAULTS.gym_name;
 
     return ok(res, {
       gym_name: gymName,
+      // Branding (consumed by the splash screen + runtime theme — no per-gym code).
+      branding: {
+        name: gymName,
+        tagline: profile.tagline || 'Train harder. Live stronger.',
+        accent_color: profile.accent_color || null,
+        logo_url: profile.logo_url || null,
+        welcome_message: profile.welcome_message || null,
+      },
       indemnity_text: (map.indemnity_text?.text || DEFAULTS.indemnity_text).replaceAll(
         '[GYM NAME]',
         gymName

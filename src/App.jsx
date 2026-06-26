@@ -1,9 +1,10 @@
 // Application routing (spec Part 8). Public splash loads eagerly; everything
 // else is lazy-loaded so the QR-scan landing is fast on mobile (spec 6.4).
 import { Routes, Route, Navigate } from 'react-router-dom';
-import { Suspense, lazy } from 'react';
+import { Suspense, lazy, useEffect } from 'react';
 import ProtectedRoute from './components/ProtectedRoute.jsx';
 import Splash from './pages/Splash.jsx';
+import { loadBranding } from './lib/branding.js';
 
 // Public (member-facing)
 const Register = lazy(() => import('./pages/Register.jsx'));
@@ -34,6 +35,8 @@ const FaceScan = lazy(() => import('./pages/admin/FaceScan.jsx'));
 const Attendance = lazy(() => import('./pages/admin/Attendance.jsx'));
 const Visitors = lazy(() => import('./pages/admin/Visitors.jsx'));
 const Incidents = lazy(() => import('./pages/admin/Incidents.jsx'));
+const Staff = lazy(() => import('./pages/admin/Staff.jsx'));
+const AuditLog = lazy(() => import('./pages/admin/AuditLog.jsx'));
 
 const owner = ['owner'];
 const mgr = ['owner', 'manager'];
@@ -47,6 +50,11 @@ function Fallback() {
 const guard = (roles, el) => <ProtectedRoute roles={roles}>{el}</ProtectedRoute>;
 
 export default function App() {
+  // Apply each gym's accent colour + title at runtime (no per-gym code).
+  useEffect(() => {
+    loadBranding();
+  }, []);
+
   return (
     <Suspense fallback={<Fallback />}>
       <Routes>
@@ -78,6 +86,8 @@ export default function App() {
         <Route path="/admin/catalog" element={guard(mgr, <Catalog />)} />
         <Route path="/admin/qr-codes" element={guard(mgr, <QrCodes />)} />
         <Route path="/admin/settings" element={guard(owner, <Settings />)} />
+        <Route path="/admin/staff" element={guard(owner, <Staff />)} />
+        <Route path="/admin/audit" element={guard(mgr, <AuditLog />)} />
         <Route path="/admin/clients" element={guard(trainer, <Clients />)} />
 
         <Route path="/admin/*" element={<Navigate to="/admin" replace />} />

@@ -5,6 +5,7 @@
 import { getSupabase } from '../../lib/supabase.js';
 import { allowMethods, readJsonBody, ok, badRequest, serverError } from '../../lib/http.js';
 import { requireRole } from '../../lib/auth.js';
+import { recordAudit } from '../../lib/audit.js';
 
 export default async function handler(req, res) {
   if (!allowMethods(req, res, ['GET', 'PUT'])) return;
@@ -22,6 +23,7 @@ export default async function handler(req, res) {
         { onConflict: 'key' }
       );
       if (error) return serverError(res, error.message);
+      await recordAudit(supabase, admin, { action: 'settings.save', entity: 'settings', entity_id: key });
       return ok(res, { saved: true });
     }
 

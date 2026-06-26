@@ -5,12 +5,14 @@ import { getSupabase } from '../../lib/supabase.js';
 import { allowMethods, readJsonBody, ok, badRequest, serverError } from '../../lib/http.js';
 import { requireRole } from '../../lib/auth.js';
 import { loadCompliance, expectedVisits, adherence } from '../../lib/compliance.js';
+import { recordAudit } from '../../lib/audit.js';
 
 export default async function handler(req, res) {
   if (!allowMethods(req, res, ['GET', 'PATCH', 'DELETE'])) return;
   // Deletion is irreversible (POPIA right to erasure) -> owner only.
   const roles = req.method === 'DELETE' ? ['owner'] : ['owner', 'manager'];
-  if (!requireRole(req, res, roles)) return;
+  const admin = requireRole(req, res, roles);
+  if (!admin) return;
 
   const url = new URL(req.url, 'http://localhost');
   const id = url.searchParams.get('id');
@@ -23,6 +25,7 @@ export default async function handler(req, res) {
       // POPIA erasure: cascading FKs remove memberships, parq, checkins, etc.
       const { error } = await supabase.from('members').delete().eq('id', id);
       if (error) return serverError(res, error.message);
+      await recordAudit(supabase, admin, { action: 'member.delete', entity: 'member', entity_id: id });
       return ok(res, { deleted: true });
     }
 
@@ -33,6 +36,9 @@ export default async function handler(req, res) {
       if (typeof body.staff_notes === 'string') patch.staff_notes = body.staff_notes;
       const { error } = await supabase.from('members').update(patch).eq('id', id);
       if (error) return serverError(res, error.message);
+      if (body.status) {
+        await recordAudit(supabase, admin, { action: 'member.status', entity: 'member', entity_id: id, detail: `status → ${body.status}` });
+      }
       return ok(res, { updated: true });
     }
 

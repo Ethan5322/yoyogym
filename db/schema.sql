@@ -367,6 +367,7 @@ create table if not exists gym.settings (
   key         text primary key,
   category    text,
   value       jsonb not null default '{}'::jsonb,
+  updated_by  uuid references gym.admin_users(id) on delete set null,
   updated_at  timestamptz not null default now()
 );
 
@@ -429,6 +430,21 @@ create table if not exists gym.incidents (
 );
 create index if not exists incidents_created_idx on gym.incidents(created_at);
 
+-- -----------------------------------------------------------------------------
+-- audit_log — record of important staff actions (accountability / compliance)
+-- -----------------------------------------------------------------------------
+create table if not exists gym.audit_log (
+  id          uuid primary key default gen_random_uuid(),
+  admin_id    uuid references gym.admin_users(id) on delete set null,
+  admin_name  text,
+  action      text not null,                 -- e.g. member.status, payment.refund
+  entity      text,                          -- member | payment | settings | admin_user
+  entity_id   text,
+  detail      text,
+  created_at  timestamptz not null default now()
+);
+create index if not exists audit_created_idx on gym.audit_log(created_at);
+
 -- =============================================================================
 -- ROW LEVEL SECURITY — enable on every table (default-deny; service role bypasses)
 -- =============================================================================
@@ -439,7 +455,7 @@ begin
     'admin_users','trainers','plans','addon_services','members','memberships',
     'parq_responses','member_addons','payments','checkins','classes',
     'class_bookings','training_sessions','notifications_log','settings',
-    'qr_scan_analytics','events','visitors','incidents'
+    'qr_scan_analytics','events','visitors','incidents','audit_log'
   ]
   loop
     execute format('alter table gym.%I enable row level security;', t);
