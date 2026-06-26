@@ -171,7 +171,8 @@ bullet('Failed payments needing attention.');
 bullet('Members flagged for medical clearance (PAR-Q).');
 bullet('Memberships expiring in 7 days.');
 bullet('Classes nearly full, and new sign-ups since you last logged in.');
-callout('Use the left menu', 'Every section in this manual is a link in the menu on the left (Verify, Members, Classes, Payments, etc.).');
+callout('Your daily 2-minute routine', '1) Open the Dashboard and clear any alert banners (failed payments, expiring memberships, PAR-Q flags). 2) Glance at today\'s classes and check-ins. 3) Use the Scan or Verify screen through the day as members arrive. That\'s it — the system handles billing, reminders and receipts automatically.');
+callout('Use the left menu', 'Every section in this manual is a link in the menu on the left (Verify, Members, Classes, Payments, etc.). On a phone, tap the ☰ menu icon.');
 
 // ===================== 4 VERIFY =====================
 pageBreak();
@@ -189,13 +190,16 @@ callout('Why it\'s safe', 'Denied scans never reveal personal information — pr
 // ===================== 5 SCAN =====================
 pageBreak();
 section(5, 'Face & QR scan access');
-para('If you use the camera-based access, open "Scan". Members can be recognised by face or by scanning their personal QR code.');
-bullet('Point the camera at the member\'s face or their QR code.', 1);
-bullet('The screen shows access granted/denied and starts their visit timer.', 2);
-bullet('On check-out, it logs how long they stayed.', 3);
-h2('Enrolling faces');
-para('Members capture their face once during registration, or you can capture it at reception. For your own admin face-login, use Settings → Admin Face Login.');
-callout('Camera tips', 'Good lighting and a steady, front-on face give the best recognition. The camera needs permission "Allow" the first time on each device.');
+para('Open "Scan" for fast, hands-free entry. There are THREE ways to identify a person, so you are never stuck at the door:');
+bullet('FACE — point the camera at the member; the system takes several quick readings, averages them, and matches. This multi-reading approach is reliable even with changeable conditions (a just-washed/shiny face, dim light, or a slight angle).', 1);
+bullet('QR — switch to QR mode and scan the member\'s or trainer\'s personal QR code.', 2);
+bullet('CODE — if a face is not recognised, a box appears: simply type the person\'s verification code or membership number and it identifies them instantly (works for members and trainers).', 3);
+para('On a match the screen shows access granted/denied and starts the visit timer; on check-out it logs how long they stayed. Denied scans never reveal personal details (POPIA).');
+h2('Enrolling faces (do this once per person)');
+bullet('Members capture their face during registration, or you can capture it at reception.');
+bullet('Staff and trainers capture their face when you register them (Staff & Roles / Trainers).');
+bullet('For your own admin face-login, use Settings → Admin Face Login.');
+callout('Best recognition', 'Capture in good, even lighting with a steady, front-on face. After any system update, ask people to re-capture once for the strongest match. The camera asks for permission the first time on each device — tap Allow.');
 
 // ===================== 6 MEMBERS =====================
 pageBreak();

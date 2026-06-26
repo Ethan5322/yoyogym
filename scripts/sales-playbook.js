@@ -154,7 +154,11 @@ bullet('Show your demo gym\'s QR code → scan it → walk through the member re
 bullet('Show the membership card / ID PDF the member receives instantly.');
 bullet('Log into the admin dashboard → show check-in verification, the member list, and the revenue/analytics view.');
 bullet('Show a class booking and an automatic email/notification.');
-callout('Always have a demo ready', 'Keep one fully-configured demo gym instance live at all times. Practise the 2-minute walkthrough until it\'s smooth.');
+h2('Closing "wow" moments (show these)');
+bullet('Face access: scan a face → instant access card. Then show the fallbacks — QR code, or just type a verification code. "Your team is never stuck at the door."');
+bullet('Staff & trainer ID cards: register a staff member with a face photo and a branded ID card + PDF generates on the spot — looks like a real corporate gym.');
+bullet('Instant branding: change the gym name, logo and colour in Settings and the whole app re-themes — "this becomes YOUR gym, not generic software."');
+callout('Always have a demo ready', 'Keep one fully-configured demo gym instance live at all times. Practise the 2-minute walkthrough — QR scan, face access, ID card, branding — until it\'s smooth.');
 
 // ---------------- 7 WHAT YOU DELIVER ----------------
 h1('7. What You Deliver to the Client');
@@ -163,8 +167,9 @@ bullet('Their own private, branded system — live at their web address (a subdo
 bullet('Owner admin login to the dashboard.');
 bullet('Their branding, membership plans and prices, add-ons, and gym rules configured in the system.');
 bullet('Payments connected to the gym\'s own Paystack account; email/WhatsApp notifications connected.');
-bullet('Two print-ready QR codes (new member + existing member).');
-bullet('A training session (≈30 min) plus a 1-page how-to sheet.');
+bullet('Print-ready QR codes (new member + existing member) for the door and reception.');
+bullet('Staff and trainer accounts set up with face access + ID cards, if the gym wants them at handover.');
+bullet('A training session (≈30 min) plus the white-label Owner\'s Manual PDF.');
 bullet('Ongoing hosting, updates, and support (your monthly subscription).');
 
 // ---------------- 8 WHAT THE OWNER RECEIVES ----------------

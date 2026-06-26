@@ -133,6 +133,16 @@ para('Your system is single-tenant: one Supabase database + one Vercel deploymen
 para('This is the ideal model for selling, because you already have the tools to spin up a new gym fast: db/schema.sql, the seed scripts (seed:owner, seed:catalog), and an admin Settings panel for branding and pricing — no code editing per gym.');
 callout('Core principle', 'Build once. Deploy many. Maintain centrally. One bug fix or new feature pushed to GitHub redeploys every gym automatically.');
 
+h2('What you are actually selling (the feature set)');
+para('Knowing the full feature list helps you price and pitch with confidence:');
+bullet('QR + guided registration: personal details, PAR-Q health screening, plan choice, indemnity, Paystack payment, instant membership number + ID card PDF.');
+bullet('Member portal: check-in, class booking + waitlists, history, membership card/QR, and online payment of any outstanding balance.');
+bullet('Biometric access: face scan (multi-reading, reliable) + QR + typed-code identification at the door, with visit timers and attendance.');
+bullet('Staff & trainers: register with a face scan + photo; each gets a login, ID card + PDF, and a verify QR.');
+bullet('Admin dashboard: verification, members, payments (auto-billing + cash/EFT + CSV), classes, trainers, calendar, analytics (busiest hours, churn), bulk email.');
+bullet('Corporate-grade: role-based staff logins, audit log, dynamic per-gym branding (name/logo/colour from Settings), automated reminders & owner alerts.');
+bullet('Compliant & safe: POPIA data handling, CPA-aligned contracts, isolated per-gym database, automated backups via GitHub + your hosting.');
+
 // ---------------- 2. PRICING ----------------
 h1('2. Pricing Strategy');
 h2('Choose a recurring model');

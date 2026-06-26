@@ -116,8 +116,8 @@ const toc = [
   ['7.', 'STEP 1 — Collect the gym\'s information'],
   ['8.', 'STEP 2 — Create the gym\'s database (Supabase)'],
   ['9.', 'STEP 3 — Load the schema & starter data'],
-  ['10.', 'STEP 4 — Make a safe branch for this gym'],
-  ['11.', 'STEP 5 — Brand the splash (name, tagline, logo, colour)'],
+  ['10.', 'STEP 4 — Branch strategy (deploy from main)'],
+  ['11.', 'STEP 5 — Brand the gym (in Settings, no code)'],
   ['12.', 'STEP 6 — Create the gym\'s website (Vercel)'],
   ['13.', 'STEP 7 — Add the environment variables'],
   ['14.', 'STEP 8 — Configure everything in Admin Settings'],
@@ -246,38 +246,35 @@ stepBadge(3, 'Create the tables, then add starter plans');
 h2('3a. Create the tables');
 bullet('In Supabase, open the "SQL Editor" (left menu).', 1);
 bullet('In your project, open the file db/schema.sql and copy ALL of it.', 2);
-bullet('Paste it into the SQL Editor and click "Run". You should see success, no errors.', 3);
+bullet('Paste it into the SQL Editor and click "Run". You should see "Success. No rows returned".', 3);
 para('This builds all the tables (members, payments, classes, etc.) in one go. db/README.md explains this too.');
+callout('Keeping existing gyms up to date', 'New gyms get everything from db/schema.sql. When you ship an update that adds columns, the db/migrations/ folder has small SQL files to paste into each existing gym\'s SQL Editor — they are safe to run more than once.');
 h2('3b. Add the owner login & starter catalogue');
 para('On your computer, in the project folder, create a temporary .env file pointing at THIS gym\'s Supabase (URL + service_role key + a JWT secret), then run:');
 bullet('npm run seed:owner   — creates the gym\'s owner admin login.', 1);
 bullet('npm run seed:catalog — adds default membership plans & add-ons.', 2);
 callout('Heads up', 'The owner username/email/password come from the SEED_OWNER_* lines in your .env. Set them to the gym owner\'s details (or a temporary password they change later).');
 
-// ===================== 10. STEP 4 BRANCH (p12) =====================
+// ===================== 10. STEP 4 BRANCH STRATEGY (p12) =====================
 pageBreak();
-h1('10. STEP 4 — Make a safe branch for this gym');
-stepBadge(4, 'Copy the master so you can brand safely');
-para('This protects your original. In your project folder, open a terminal and run:');
-bullet('git checkout main         — make sure you start from the clean master.', 1);
-bullet('git pull                  — get the latest master.', 2);
-bullet('git checkout -b gym-powerfit   — create + switch to this gym\'s branch.', 3);
-para('You are now on the gym\'s branch. Anything you change here stays here and never touches "main".');
-callout('Naming tip', 'Use "gym-" plus the gym\'s name, e.g. gym-powerfit, gym-ironworks. You\'ll connect this exact branch to the gym\'s Vercel site in Step 6.');
-para('If terminals feel scary, VS Code has a "Source Control" panel with buttons for the same actions — and the Glossary explains each term.');
+h1('10. STEP 4 — Branch strategy (good news: deploy from main)');
+stepBadge(4, 'No per-gym code branch needed anymore');
+para('Branding (name, tagline, logo, colour) is now set in the admin Settings page and applied automatically — so you NO LONGER edit code or make a branch per gym. Every gym deploys straight from your one "main" branch.');
+bullet('Same code (main) → many gym websites. You change nothing in the code per gym.');
+bullet('Each gym differs only by its own database (Step 2) and its own environment variables (Step 7).');
+bullet('When you improve the system, push to main once and every gym redeploys.');
+callout('When would you ever branch?', 'Only if a single gym needs a deep custom feature beyond what Settings covers. For normal sales you never need to — keep it simple and deploy from main.');
 
 // ===================== 11. STEP 5 BRAND (p13) =====================
 pageBreak();
-h1('11. STEP 5 — Brand the splash (name, tagline, logo, colour)');
-stepBadge(5, 'The only code edit — copy/paste simple');
-para('On the gym\'s branch, open src/pages/Splash.jsx. Change just the text:');
-bullet('Replace "Your Gym Name" with the gym\'s name.');
-bullet('Replace "Train harder. Live stronger." with the gym\'s tagline.');
-bullet('For the logo: put their logo file in the /public folder (e.g. logo.png) and swap the placeholder box for an image — or simply change the letter "G" to their initial for now.');
-h2('Set the accent colour');
-para('Open src/index.css and find the line that sets --accent (around the top). Change the hex value to the gym\'s brand colour, e.g. --accent: #1E88E5; for blue.');
-callout('Save your work to the branch', 'After editing, run: git add -A then git commit -m "Brand for PowerFit" then git push -u origin gym-powerfit. This saves the branding onto the gym\'s branch only.');
-para('That\'s the entire code touch. Everything else (plans, prices, legal, contacts) is done by typing in Admin Settings in Step 8 — no code.');
+h1('11. STEP 5 — Brand the gym (in Settings, zero code)');
+stepBadge(5, 'Set name, tagline, logo & colour in the admin');
+para('You will do this in the admin (full detail in Step 8). For each gym, in Settings → Gym Profile you set:');
+bullet('Gym name and tagline — appear on the splash screen, emails and PDFs.');
+bullet('Logo image URL — shown on the splash screen.');
+bullet('Brand accent colour (a hex code like #1E88E5) — recolours buttons and highlights live.');
+callout('How it works', 'The app reads these from the database at startup and themes itself — splash, member app and admin all pick up the gym\'s name, logo and colour with no code edit and no redeploy. Truly white-label per gym.');
+para('That means delivery is now: new database + deploy from main + fill in Settings. No files to touch.');
 
 // ===================== 12. STEP 6 VERCEL (p14) =====================
 pageBreak();
@@ -285,10 +282,10 @@ h1('12. STEP 6 — Create the gym\'s website (Vercel)');
 stepBadge(6, 'Publish this gym\'s own website');
 bullet('Go to vercel.com → "Add New… → Project".', 1);
 bullet('Import your GitHub repo (the same yoyogym repo every time).', 2);
-bullet('Under "Git Branch", choose this gym\'s branch (e.g. gym-powerfit), NOT main.', 3);
+bullet('Leave the production branch as "main" — no per-gym branch needed.', 3);
 bullet('Framework preset: Vite. The build settings come from your vercel.json automatically.', 4);
 bullet('Before deploying, add the environment variables (Step 7), then click Deploy.', 5);
-callout('One repo, many websites', 'You import the SAME repo for every gym; the difference is the branch you pick and the environment variables you set. That\'s how one codebase powers many independent gym websites.');
+callout('One repo, many websites', 'You import the SAME repo (main) for every gym; the only difference is the environment variables you set. That\'s how one codebase powers many independent, separately-branded gym websites.');
 para('After deploying, give the gym a friendly address — a subdomain like powerfit.yourbrand.co.za, or connect their own domain in Vercel → Settings → Domains.');
 
 // ===================== 13. STEP 7 ENV (p15) =====================
@@ -313,13 +310,17 @@ pageBreak();
 h1('14. STEP 8 — Configure everything in Admin Settings');
 stepBadge(8, 'Type the gym\'s details — no code');
 para('Open https://THEIR-SITE/admin/login and sign in with the owner account you seeded. Go to Settings and fill in each section, clicking Save on each:');
-bullet('Gym Profile — name, tagline, accent colour, phone, email, address, hours, welcome message.');
+bullet('Gym Profile — name, tagline, accent colour (hex), LOGO image URL, phone, email, address, hours, welcome message. This is the branding from Step 5.');
 bullet('Owner Notifications — WhatsApp/Telegram/email for instant alerts.');
 bullet('Contract Discounts — discount % for longer contracts.');
 bullet('Access & Compliance — capacity, session length, peak hours, plan rules.');
+bullet('Change Password — set the owner\'s own password.');
 bullet('Gym Rules, Indemnity, Membership Contract, POPIA — review the defaults, edit, Save.');
-para('Then open the Catalog page to adjust membership plans, prices, joining fees and add-ons to match what the gym sells.');
-callout('Good news', 'The gym NAME you set here flows automatically into the registration flow, member emails and the PDF membership cards. Most of the branding is genuinely no-code.');
+para('Then open Catalog to set membership plans, prices, joining fees and add-ons to match what the gym sells.');
+h2('Register the gym\'s team');
+bullet('Staff & Roles (owner) — register each staff member with a face scan + photo; they get a login, a staff ID card + PDF, and face access.');
+bullet('Trainers — add each trainer with a face scan + photo; they get a trainer ID card + PDF and a verify QR.');
+callout('It is genuinely no-code', 'The gym name, logo and accent colour you set here theme the whole product automatically; the name also flows into the registration flow, member emails and PDF cards.');
 
 // ===================== 15. STEP 9 HANDOVER (p17) =====================
 pageBreak();
@@ -355,14 +356,12 @@ pageBreak();
 h1('17. Selling to your 2nd, 3rd, 10th gym (the loop)');
 para('Every new gym is the SAME routine. You do not start over and you do not rebuild anything:');
 bullet('Collect details (Step 1).', 1);
-bullet('New Supabase project + run schema + seed (Steps 2–3).', 2);
-bullet('New branch off main, named for the gym (Step 4).', 3);
-bullet('Edit the splash name/tagline/logo + accent on that branch (Step 5).', 4);
-bullet('New Vercel project from the same repo, pointed at the gym\'s branch (Step 6).', 5);
-bullet('Add that gym\'s environment variables (Step 7).', 6);
-bullet('Configure Settings + Catalog in the admin (Step 8).', 7);
-bullet('QR codes, handover, train, test (Steps 9–10).', 8);
-callout('It gets fast', 'By your third gym this is a ~1–2 hour checklist. Print Steps 7–16 and tick them off each time.');
+bullet('New Supabase project → run db/schema.sql → seed owner + catalogue (Steps 2–3).', 2);
+bullet('New Vercel project from the same repo, on the main branch — no code edit (Steps 4–6).', 3);
+bullet('Add that gym\'s environment variables (Step 7).', 4);
+bullet('In the admin: set Gym Profile (name, logo, colour), Catalog, and register staff/trainers with face scans (Step 8).', 5);
+bullet('QR codes, handover, train, test (Steps 9–10).', 6);
+callout('It gets fast', 'Because branding is now no-code, a new gym is roughly a 45–60 minute checklist. Print Steps 7–16 and tick them off each time.');
 
 // ===================== 18. YOUR QUESTION (p20) =====================
 pageBreak();
@@ -370,23 +369,22 @@ h1('18. Your exact question, answered plainly');
 para('You asked: "When I sell to another gym, do I need to ask Claude to change the name/logo of the original file, and create the SQL and Vercel project again? How do I do this for a different gym?"');
 h2('Do I need to ask Claude each time? — No.');
 para('Everything is a repeatable checklist you do yourself (Steps 1–10). You only need a developer/Claude for NEW features or fixes to the master — not for setting up a gym.');
-h2('Do I edit the ORIGINAL Yoyo GYM files? — No.');
-para('You never edit "main". You make a per-gym branch (Step 4) and do the tiny branding edit there, so your original stays clean and reusable forever.');
+h2('Do I edit the ORIGINAL files? — No.');
+para('You never edit the code. Branding is dynamic now, so you deploy every gym straight from "main" and set their name, logo and colour in Admin Settings.');
 h2('Do I create a new database and Vercel project each time? — Yes.');
-para('Each gym needs its own Supabase database and its own Vercel website so their data and site are separate. This is normal, expected, and takes ~30 minutes once you\'re used to it.');
+para('Each gym needs its own Supabase database and its own Vercel website so their data and site stay separate. This is normal, expected, and takes under an hour once you\'re used to it.');
 h2('How is the name/logo/colour actually changed?');
-bullet('Name, plans, prices, legal, contacts, hours → typed into Admin Settings (no code).');
-bullet('Splash name/tagline/logo + accent colour → one small edit on the gym\'s branch (Step 5).');
-callout('Want it to be 100% no-code?', 'There is an optional one-time upgrade that makes the splash, logo and accent colour load from Admin Settings too. After that, a new gym is purely: new database + new website + fill in Settings. Ask for the "dynamic branding" upgrade when you\'re ready.', 'green');
+bullet('Entirely in Admin Settings → Gym Profile: name, tagline, logo image URL, accent colour — plus plans, prices, legal, contacts. Zero code.');
+callout('It is already 100% no-code', 'The dynamic-branding upgrade is built in: the splash, member app and admin all theme themselves from Settings. A new gym is purely: new database + new website (from main) + fill in Settings.', 'green');
 
 // ===================== 19. UPDATES + TROUBLESHOOT (p21) =====================
 pageBreak();
 h1('19. Updating all gyms + troubleshooting');
 h2('Pushing an improvement to every gym');
 bullet('Make the change on "main" and push it to GitHub.', 1);
-bullet('For each gym branch: merge main into it (git checkout gym-x, then git merge main, then git push).', 2);
-bullet('Vercel redeploys that gym automatically. Repeat per gym.', 3);
-callout('Even easier later', 'Once you take the optional dynamic-branding upgrade, most gyms can run straight off "main" with no per-gym branch — then a single push updates everyone at once.');
+bullet('Every gym\'s Vercel project deploys from main, so they ALL redeploy automatically — one push updates everyone.', 2);
+bullet('If an update adds database columns, paste the matching db/migrations/ file into each gym\'s Supabase SQL Editor.', 3);
+callout('This is the payoff', 'Because branding is no-code and every gym runs from main, you maintain ONE codebase and a single push improves all your gyms at once.');
 h2('Common problems & quick fixes');
 twoCol([
   ['Site loads but data errors', 'Check SUPABASE_URL / service_role key in Vercel; redeploy.'],
