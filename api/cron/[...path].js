@@ -1,5 +1,6 @@
 // Cron router — /api/cron/* (daily orchestrator + individual jobs).
 import { json } from '../../server/lib/http.js';
+import { captureError } from '../../server/lib/observability.js';
 import daily from '../../server/handlers/cron/daily.js';
 import billing from '../../server/handlers/cron/billing.js';
 import retrySuspend from '../../server/handlers/cron/retry-suspend.js';
@@ -22,10 +23,15 @@ const routes = {
   'weekly-schedule': weeklySchedule,
 };
 
-export default function handler(req, res) {
+export default async function handler(req, res) {
   const parts = new URL(req.url, 'http://localhost').pathname.split('/').filter(Boolean);
   const seg = parts[2];
   const fn = routes[seg];
   if (!fn) return json(res, 404, { error: `Not found: /api/cron/${seg || ''}` });
-  return fn(req, res);
+  try {
+    return await fn(req, res);
+  } catch (err) {
+    captureError(`api/cron/${seg}`, err, { method: req.method });
+    if (!res.headersSent) return json(res, 500, { error: 'Cron run failed.' });
+  }
 }

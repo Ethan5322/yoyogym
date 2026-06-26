@@ -20,7 +20,7 @@ function distance(a, b) {
 
 export default async function handler(req, res) {
   if (!allowMethods(req, res, ['POST'])) return;
-  if (!rateLimit(req, res, { key: 'face-login', limit: 10, windowMs: 60_000 })) return;
+  if (!(await rateLimit(req, res, { key: 'face-login', limit: 10, windowMs: 60_000 }))) return;
 
   try {
     const { descriptor } = await readJsonBody(req);

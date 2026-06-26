@@ -1,0 +1,33 @@
+name: CI
+
+# Runs on every push and pull request: install, unit tests, production build.
+# Protects all gym deployments — a broken change fails here before it ships.
+on:
+  push:
+    branches: ['**']
+  pull_request:
+    branches: ['**']
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Use Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Unit tests
+        run: npm test
+
+      - name: Production build
+        run: npm run build
+        env:
+          # Build needs no secrets (all server secrets are runtime env on Vercel).
+          CI: 'true'

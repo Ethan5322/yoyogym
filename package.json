@@ -9,6 +9,7 @@
     "dev:api": "node scripts/dev-server.js",
     "build": "vite build",
     "preview": "vite preview",
+    "test": "node --test \"tests/**/*.test.js\"",
     "seed:owner": "node scripts/seed-owner.js",
     "seed:catalog": "node scripts/seed-catalog.js"
   },

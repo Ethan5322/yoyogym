@@ -14,7 +14,7 @@ const LOCK_MINUTES = 15;
 
 export default async function handler(req, res) {
   if (!allowMethods(req, res, ['POST'])) return;
-  if (!rateLimit(req, res, { key: 'admin-login', limit: 10, windowMs: 60_000 })) return;
+  if (!(await rateLimit(req, res, { key: 'admin-login', limit: 10, windowMs: 60_000 }))) return;
 
   try {
     const { username, password } = await readJsonBody(req);

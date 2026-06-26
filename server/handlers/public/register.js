@@ -51,7 +51,7 @@ const isoDate = (d) => new Date(d).toISOString().slice(0, 10);
 
 export default async function handler(req, res) {
   if (!allowMethods(req, res, ['POST'])) return;
-  if (!rateLimit(req, res, { key: 'register', limit: 6, windowMs: 60_000 })) return;
+  if (!(await rateLimit(req, res, { key: 'register', limit: 6, windowMs: 60_000 }))) return;
 
   let createdMemberId = null;
   const supabase = getSupabase();

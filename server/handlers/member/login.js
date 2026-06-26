@@ -8,7 +8,7 @@ import { rateLimit } from '../../lib/ratelimit.js';
 
 export default async function handler(req, res) {
   if (!allowMethods(req, res, ['POST'])) return;
-  if (!rateLimit(req, res, { key: 'member-login', limit: 10, windowMs: 60_000 })) return;
+  if (!(await rateLimit(req, res, { key: 'member-login', limit: 10, windowMs: 60_000 }))) return;
   try {
     const { membership_number, phone } = await readJsonBody(req);
     if (!membership_number || !phone) {
