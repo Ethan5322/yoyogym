@@ -155,7 +155,7 @@ para('Your system has two parts: the MEMBER side (what your clients see) and the
 bullet('Open your admin website address in any browser, then add /admin/login to the end.', 1);
 bullet('Enter the username and password we gave you at handover.', 2);
 bullet('Click Sign in. You\'ll land on your Dashboard.', 3);
-callout('Keep it safe', 'Never share your owner login. We can set up separate logins for your staff (see section 22). Your session signs out automatically after a while for security. To change or reset your password, contact support.');
+callout('Keep it safe', 'Never share your owner login. We can set up separate logins for your staff (see section 22). Your session signs out automatically after a while for security. You can change your password in Settings - Change Password (section 17); if you forget it, contact support to reset.');
 para('Tip: bookmark the /admin page on your phone and reception computer for one-tap access.');
 
 // ===================== 3 DASHBOARD =====================
@@ -200,7 +200,7 @@ callout('Camera tips', 'Good lighting and a steady, front-on face give the best 
 // ===================== 6 MEMBERS =====================
 pageBreak();
 section(6, 'Finding & managing members');
-para('Open "Members" to search your whole database by name, membership number, phone, email or ID. Filter by status, or show only members with a medical (PAR-Q) flag.');
+para('Open "Members" to search your whole database by name, membership number, phone, email or ID. Filter by status, membership tier, contract length, or show only members with a medical (PAR-Q) flag.');
 h2('Inside a member\'s profile');
 bullet('Personal details, health screening (PAR-Q), goals and experience.');
 bullet('Membership history, payment history, attendance and class bookings.');
@@ -328,6 +328,7 @@ twoCol([
   ['Contract Discounts', 'Discounts for longer commitments.'],
   ['Access & Compliance', 'Capacity, session length, peak hours, what each tier may do.'],
   ['Legal text', 'Gym rules, indemnity waiver, membership contract, POPIA policy.'],
+  ['Change Password', 'Update the password for your own admin login (minimum 8 characters).'],
   ['Admin Face Login', 'Enrol your face to unlock the admin by scan.'],
 ], 48);
 callout('Everything is pre-filled', 'Professional, compliant defaults are already there. Just review, tweak to match your gym, and Save.');
@@ -364,7 +365,7 @@ section(21, 'What your members experience');
 para('It helps to know what your clients see, so you can guide them:');
 bullet('They scan your NEW MEMBER QR and are guided through sign-up: details, health check, plan, payment.', 1);
 bullet('They instantly receive a membership number, a verification code, a welcome email and a membership card PDF.', 2);
-bullet('They scan the EXISTING MEMBER QR (or use the member portal) to check in, book or cancel classes, view their history and membership card, and see any balance owed.', 3);
+bullet('They scan the EXISTING MEMBER QR (or use the member portal) to check in, book or cancel classes, view their history and membership card, and pay any balance owed securely online.', 3);
 callout('Self-service = less work for you', 'Most member admin happens on their phone, freeing your staff for real service.');
 
 // ===================== 22 ROLES =====================
@@ -401,7 +402,7 @@ h2('FAQ');
 twoCol([
   ['A member can\'t check in', 'Search them in Members — check status (expired/suspended) and payment.'],
   ['Payment didn\'t go through', 'See Payments → failed; the system retries automatically.'],
-  ['I forgot my password', 'Contact support to reset the owner login.'],
+  ['Change my password', 'Settings - Change Password. If forgotten, contact support to reset.'],
   ['Camera won\'t scan', 'Allow camera permission and ensure good lighting.'],
   ['Need to change a price', 'Catalog → edit the plan → Save (instant).'],
 ], 50);

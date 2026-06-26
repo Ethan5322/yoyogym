@@ -44,7 +44,7 @@ create table if not exists gym.admin_users (
   trainer_id        uuid,                      -- links a 'trainer' login to gym.trainers
   is_active         boolean not null default true,
   face_descriptor   jsonb,                     -- admin face-login (Phase 88)
-  failed_attempts   integer not null default 0,
+  failed_logins     integer not null default 0,
   locked_until      timestamptz,
   last_login_at     timestamptz,
   created_at        timestamptz not null default now(),

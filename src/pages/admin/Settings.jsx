@@ -59,6 +59,8 @@ export default function Settings() {
 
       <ComplianceSection initial={s.compliance} saved={savedKey === 'compliance'} onSave={(v) => save('compliance', v, 'access')} />
 
+      <PasswordSection />
+
       <AdminFaceEnroll />
 
       <TextSection title="Gym Rules & Code of Conduct" k="gym_rules" value={s.gym_rules?.text} defaultText={DEFAULTS.gym_rules} note="Shown to members during registration and printed on their confirmation." saved={savedKey === 'gym_rules'} onSave={(text) => save('gym_rules', { text }, 'rules')} />
@@ -165,6 +167,54 @@ function ComplianceSection({ initial, onSave, saved }) {
       <div className="mt-3 flex items-center gap-3">
         <button className="btn-primary px-4 py-2 text-sm" onClick={() => onSave(c)}>Save</button>
         {saved && <span className="text-sm text-success">Saved ✓</span>}
+      </div>
+    </div>
+  );
+}
+
+function PasswordSection() {
+  const [cur, setCur] = useState('');
+  const [next, setNext] = useState('');
+  const [confirm, setConfirm] = useState('');
+  const [msg, setMsg] = useState('');
+  const [err, setErr] = useState('');
+  const [busy, setBusy] = useState(false);
+
+  async function submit() {
+    setMsg('');
+    setErr('');
+    if (next.length < 8) return setErr('New password must be at least 8 characters.');
+    if (next !== confirm) return setErr('New passwords do not match.');
+    setBusy(true);
+    try {
+      const r = await apiFetch('/auth/change-password', {
+        method: 'POST',
+        body: { current_password: cur, new_password: next },
+      });
+      setMsg(r.message || 'Password updated.');
+      setCur(''); setNext(''); setConfirm('');
+    } catch (e) {
+      setErr(e.message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="card mt-6">
+      <h2 className="mb-1 font-display uppercase text-body">Change Password</h2>
+      <p className="mb-3 text-xs text-muted">Update the password for your own admin login. Minimum 8 characters.</p>
+      <div className="grid gap-3 sm:grid-cols-3">
+        <Field label="Current password"><input className="field" type="password" autoComplete="current-password" value={cur} onChange={(e) => setCur(e.target.value)} /></Field>
+        <Field label="New password"><input className="field" type="password" autoComplete="new-password" value={next} onChange={(e) => setNext(e.target.value)} /></Field>
+        <Field label="Confirm new password"><input className="field" type="password" autoComplete="new-password" value={confirm} onChange={(e) => setConfirm(e.target.value)} /></Field>
+      </div>
+      <div className="mt-3 flex items-center gap-3">
+        <button className="btn-primary px-4 py-2 text-sm" onClick={submit} disabled={busy || !cur || !next}>
+          {busy ? 'Updating…' : 'Update Password'}
+        </button>
+        {msg && <span className="text-sm text-success">{msg}</span>}
+        {err && <span className="text-sm text-error">{err}</span>}
       </div>
     </div>
   );

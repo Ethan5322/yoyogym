@@ -8,6 +8,7 @@ import bookClass from '../../server/handlers/member/book-class.js';
 import cancelBooking from '../../server/handlers/member/cancel-booking.js';
 import history from '../../server/handlers/member/history.js';
 import requestDeletion from '../../server/handlers/member/request-deletion.js';
+import pay from '../../server/handlers/member/pay.js';
 
 const routes = {
   login,
@@ -18,6 +19,7 @@ const routes = {
   'cancel-booking': cancelBooking,
   history,
   'request-deletion': requestDeletion,
+  pay,
 };
 
 export default function handler(req, res) {

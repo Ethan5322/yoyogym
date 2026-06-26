@@ -5,10 +5,14 @@ import AdminShell from '../../components/AdminShell.jsx';
 import { apiFetch } from '../../lib/api.js';
 
 const STATUSES = ['', 'new', 'active', 'expiring', 'lapsed', 'suspended'];
+const TIERS = [['', 'All tiers'], ['basic', 'Basic'], ['standard', 'Standard'], ['premium', 'Premium'], ['vip', 'VIP']];
+const CONTRACTS = [['', 'All contracts'], ['month_to_month', 'Month-to-month'], ['3_month', '3 month'], ['6_month', '6 month'], ['12_month', '12 month']];
 
 export default function MembersList() {
   const [q, setQ] = useState('');
   const [status, setStatus] = useState('');
+  const [tier, setTier] = useState('');
+  const [contract, setContract] = useState('');
   const [parq, setParq] = useState(false);
   const [page, setPage] = useState(1);
   const [data, setData] = useState(null);
@@ -18,6 +22,8 @@ export default function MembersList() {
     const params = new URLSearchParams({ page: String(page) });
     if (q) params.set('q', q);
     if (status) params.set('status', status);
+    if (tier) params.set('tier', tier);
+    if (contract) params.set('contract', contract);
     if (parq) params.set('parq', '1');
     setError('');
     const t = setTimeout(() => {
@@ -26,15 +32,15 @@ export default function MembersList() {
         .catch((e) => setError(e.message));
     }, 250); // debounce search
     return () => clearTimeout(t);
-  }, [q, status, parq, page]);
+  }, [q, status, tier, contract, parq, page]);
 
   return (
     <AdminShell>
       <h1 className="text-2xl font-bold uppercase text-body">Members</h1>
 
-      <div className="mt-4 flex flex-wrap gap-3">
+      <div className="admin-toolbar mt-5">
         <input
-          className="field flex-1"
+          className="field admin-toolbar__grow"
           placeholder="Search name, number, phone, email, ID…"
           value={q}
           onChange={(e) => {
@@ -43,7 +49,7 @@ export default function MembersList() {
           }}
         />
         <select
-          className="field w-40"
+          className="field sm:w-40"
           value={status}
           onChange={(e) => {
             setPage(1);
@@ -56,8 +62,32 @@ export default function MembersList() {
             </option>
           ))}
         </select>
-        <label className="flex items-center gap-2 text-sm text-muted">
-          <input type="checkbox" checked={parq} onChange={(e) => setParq(e.target.checked)} />
+        <select
+          className="field sm:w-40"
+          value={tier}
+          onChange={(e) => {
+            setPage(1);
+            setTier(e.target.value);
+          }}
+        >
+          {TIERS.map(([v, l]) => (
+            <option key={v} value={v}>{l}</option>
+          ))}
+        </select>
+        <select
+          className="field sm:w-44"
+          value={contract}
+          onChange={(e) => {
+            setPage(1);
+            setContract(e.target.value);
+          }}
+        >
+          {CONTRACTS.map(([v, l]) => (
+            <option key={v} value={v}>{l}</option>
+          ))}
+        </select>
+        <label className="flex items-center gap-2 whitespace-nowrap text-sm text-muted">
+          <input type="checkbox" checked={parq} onChange={(e) => { setPage(1); setParq(e.target.checked); }} />
           PAR-Q flag
         </label>
       </div>

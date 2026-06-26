@@ -13,11 +13,28 @@ export default async function handler(req, res) {
     const q = (url.searchParams.get('q') || '').replace(/[%,]/g, '').trim();
     const status = url.searchParams.get('status');
     const parq = url.searchParams.get('parq');
+    const tier = url.searchParams.get('tier');
+    const contract = url.searchParams.get('contract');
     const page = Math.max(1, parseInt(url.searchParams.get('page') || '1', 10));
     const pageSize = Math.min(50, parseInt(url.searchParams.get('page_size') || '20', 10));
     const from = (page - 1) * pageSize;
 
     const supabase = getSupabase();
+
+    // Tier / contract live on memberships — resolve the matching member ids first.
+    let memberIdFilter = null;
+    if (tier || contract) {
+      let mq = supabase.from('memberships').select('member_id').eq('state', 'active');
+      if (tier) mq = mq.eq('tier', tier);
+      if (contract) mq = mq.eq('contract_duration', contract);
+      const { data: ms, error: msErr } = await mq;
+      if (msErr) return serverError(res, msErr.message);
+      memberIdFilter = [...new Set((ms || []).map((m) => m.member_id))];
+      if (!memberIdFilter.length) {
+        return ok(res, { members: [], total: 0, page, page_size: pageSize, pages: 0 });
+      }
+    }
+
     let query = supabase
       .from('members')
       .select('id, full_name, membership_number, phone, email, status, parq_flag, created_at', {
@@ -33,6 +50,7 @@ export default async function handler(req, res) {
     }
     if (status) query = query.eq('status', status);
     if (parq === '1') query = query.eq('parq_flag', true);
+    if (memberIdFilter) query = query.in('id', memberIdFilter);
 
     const { data, count, error } = await query;
     if (error) return serverError(res, error.message);
