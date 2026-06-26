@@ -50,6 +50,8 @@ create table if not exists gym.admin_users (
   job_title         text,                       -- e.g. Manager, Receptionist
   phone             text,
   photo_url         text,                       -- passport photo for the ID card
+  contract_start    date,                        -- employment start
+  contract_end      date,                        -- employment end (blank = ongoing)
   failed_logins     integer not null default 0,
   locked_until      timestamptz,
   last_login_at     timestamptz,

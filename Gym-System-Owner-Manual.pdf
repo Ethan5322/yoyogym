@@ -3881,7 +3881,7 @@ endobj
 endobj
 50 0 obj
 <<
-/Length 4220
+/Length 4840
 >>
 stream
 0.5670000000000001 w
@@ -3991,10 +3991,10 @@ BT
 (Sees only their own clients.) Tj
 ET
 0.96 g
-51.0236220472441033 638.0789763779526993 493.2283464566929752 -65.1968503937007995 re
+51.0236220472441033 638.0789763779526993 493.2283464566929752 -93.5433070866141776 re
 f
 0.9 0.22 0.27 rg
-51.0236220472441033 638.0789763779526993 4.2519685039370083 -65.1968503937007995 re
+51.0236220472441033 638.0789763779526993 4.2519685039370083 -93.5433070866141776 re
 f
 BT
 /F2 10 Tf
@@ -4008,34 +4008,62 @@ BT
 11.5 TL
 0.086 g
 65.1968503937007995 606.8978740157480161 Td
-(As the owner, register staff yourself in Staff & Roles: enter their details, capture a face scan + photo, and) Tj
+(As the owner, register staff yourself in Staff & Roles: enter their details \(incl. job title and contract) Tj
 ET
 BT
 /F1 10 Tf
 11.5 TL
 0.086 g
 65.1968503937007995 592.7246456692912489 Td
-(they instantly get a login, a Staff ID card + PDF \(with staff number, verification code and verify QR\), and) Tj
+(start/end dates\), capture a face scan + photo, and they instantly get a login, face access, a Staff ID card,) Tj
 ET
 BT
 /F1 10 Tf
 11.5 TL
 0.086 g
 65.1968503937007995 578.5514173228345953 Td
-(face access — just like members. You can also change roles, enable/disable, and reset passwords.) Tj
+(and a professional Staff Employment Agreement PDF — their details plus standard staff terms &) Tj
+ET
+BT
+/F1 10 Tf
+11.5 TL
+0.086 g
+65.1968503937007995 564.3781889763779418 Td
+(conditions and signature lines, ready to print and sign. You can also change roles, enable/disable, and) Tj
+ET
+BT
+/F1 10 Tf
+11.5 TL
+0.086 g
+65.1968503937007995 550.2049606299211746 Td
+(reset passwords.) Tj
 ET
 BT
 /F1 10.5 Tf
 12.0749999999999993 TL
 0.086 g
-51.0236220472441033 561.5435433070865656 Td
+51.0236220472441033 533.1970866141731449 Td
+(Note: the staff agreement is a professional template — have it checked against current labour law and fill) Tj
+ET
+BT
+/F1 10.5 Tf
+12.0749999999999993 TL
+0.086 g
+51.0236220472441033 517.8899999999998727 Td
+(in pay/notice specifics before signing.) Tj
+ET
+BT
+/F1 10.5 Tf
+12.0749999999999993 TL
+0.086 g
+51.0236220472441033 498.3309448818896499 Td
 (Tip: the Audit Log \(owner/manager\) records important staff actions — status changes, deletions, refunds,) Tj
 ET
 BT
 /F1 10.5 Tf
 12.0749999999999993 TL
 0.086 g
-51.0236220472441033 546.2364566929132934 Td
+51.0236220472441033 483.0238582677164345 Td
 (settings and staff edits — so you always know who did what.) Tj
 ET
 0.88 G
@@ -4624,7 +4652,7 @@ endobj
 69 0 obj
 <<
 /Producer (jsPDF 4.2.1)
-/CreationDate (D:20260626162856+02'00')
+/CreationDate (D:20260626170714+02'00')
 >>
 endobj
 70 0 obj
@@ -4638,8 +4666,8 @@ endobj
 xref
 0 71
 0000000000 65535 f 
-0000098967 00000 n 
-0000100962 00000 n 
+0000099587 00000 n 
+0000101582 00000 n 
 0000000015 00000 n 
 0000000152 00000 n 
 0000001315 00000 n 
@@ -4688,33 +4716,33 @@ xref
 0000082402 00000 n 
 0000085842 00000 n 
 0000085981 00000 n 
-0000090254 00000 n 
-0000090393 00000 n 
-0000093770 00000 n 
-0000093909 00000 n 
-0000099197 00000 n 
-0000099323 00000 n 
-0000099454 00000 n 
-0000099588 00000 n 
-0000099726 00000 n 
-0000099850 00000 n 
-0000099979 00000 n 
-0000100111 00000 n 
-0000100247 00000 n 
-0000100375 00000 n 
-0000100502 00000 n 
-0000100631 00000 n 
-0000100764 00000 n 
-0000100866 00000 n 
-0000101215 00000 n 
-0000101301 00000 n 
+0000090874 00000 n 
+0000091013 00000 n 
+0000094390 00000 n 
+0000094529 00000 n 
+0000099817 00000 n 
+0000099943 00000 n 
+0000100074 00000 n 
+0000100208 00000 n 
+0000100346 00000 n 
+0000100470 00000 n 
+0000100599 00000 n 
+0000100731 00000 n 
+0000100867 00000 n 
+0000100995 00000 n 
+0000101122 00000 n 
+0000101251 00000 n 
+0000101384 00000 n 
+0000101486 00000 n 
+0000101835 00000 n 
+0000101921 00000 n 
 trailer
 <<
 /Size 71
 /Root 70 0 R
 /Info 69 0 R
-/ID [ <02CC04E877CFBA34D24158BE30A999B6> <02CC04E877CFBA34D24158BE30A999B6> ]
+/ID [ <6887272F3E86406454BEE782DF5BE1ED> <6887272F3E86406454BEE782DF5BE1ED> ]
 >>
 startxref
-101405
+102025
 %%EOF

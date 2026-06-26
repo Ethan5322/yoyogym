@@ -40,6 +40,8 @@ export default async function handler(req, res) {
         job_title: s.job_title || null,
         phone: s.phone || null,
         photo_url: s.photo_url || null,
+        contract_start: s.contract_start || null,
+        contract_end: s.contract_end || null,
       }));
       return ok(res, { staff });
     }
@@ -78,6 +80,8 @@ export default async function handler(req, res) {
         job_title: b.job_title || null,
         phone: b.phone || null,
         photo_url: b.photo_url || null,
+        contract_start: b.contract_start || null,
+        contract_end: b.contract_end || null,
       };
 
       // Try the full credential insert; fall back to a basic account if the

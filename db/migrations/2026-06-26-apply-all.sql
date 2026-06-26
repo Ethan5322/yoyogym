@@ -28,6 +28,8 @@ alter table gym.admin_users add column if not exists verification_code text;
 alter table gym.admin_users add column if not exists job_title         text;
 alter table gym.admin_users add column if not exists phone             text;
 alter table gym.admin_users add column if not exists photo_url         text;
+alter table gym.admin_users add column if not exists contract_start    date;
+alter table gym.admin_users add column if not exists contract_end      date;
 create unique index if not exists admin_users_staff_number_key
   on gym.admin_users(staff_number) where staff_number is not null;
 

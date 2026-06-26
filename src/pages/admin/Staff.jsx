@@ -8,7 +8,7 @@ import FaceCapture from '../../chatbot/components/FaceCapture.jsx';
 import CredentialActions from '../../components/CredentialActions.jsx';
 
 const ROLES = ['owner', 'manager', 'reception', 'trainer'];
-const empty = { username: '', full_name: '', email: '', role: 'reception', job_title: '', phone: '', password: '', trainer_id: '', photo_url: '', face_descriptor: null };
+const empty = { username: '', full_name: '', email: '', role: 'reception', job_title: '', phone: '', password: '', trainer_id: '', contract_start: '', contract_end: '', photo_url: '', face_descriptor: null };
 
 export default function Staff() {
   const [staff, setStaff] = useState(null);
@@ -37,6 +37,11 @@ export default function Staff() {
         verification_code: r.verification_code,
         badge: form.job_title || form.role,
         photo_url: form.photo_url,
+        job_title: form.job_title,
+        phone: form.phone,
+        email: form.email,
+        contract_start: form.contract_start,
+        contract_end: form.contract_end,
       });
       setMsg('Staff account created. Download their ID card & PDF below.');
       setForm(empty);
@@ -92,6 +97,12 @@ export default function Staff() {
             </select>
           )}
           <input className="field" type="password" placeholder="Temporary password (min 8)" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} />
+          <label className="text-xs text-muted">Contract start
+            <input className="field mt-1" type="date" value={form.contract_start} onChange={(e) => setForm({ ...form, contract_start: e.target.value })} />
+          </label>
+          <label className="text-xs text-muted">Contract end (blank = ongoing)
+            <input className="field mt-1" type="date" value={form.contract_end} onChange={(e) => setForm({ ...form, contract_end: e.target.value })} />
+          </label>
         </div>
 
         <div className="mt-4 flex flex-wrap items-center gap-4">
@@ -128,7 +139,7 @@ export default function Staff() {
                 </td>
                 <td className="px-4 py-2"><span className={s.is_active ? 'text-success' : 'text-muted'}>{s.is_active ? 'Active' : 'Disabled'}</span></td>
                 <td className="px-4 py-2">
-                  <CredentialActions person={{ kind: 'staff', id: s.id, name: s.full_name || s.username, number: s.staff_number, verification_code: s.verification_code, badge: s.job_title || s.role, photo_url: s.photo_url }} />
+                  <CredentialActions person={{ kind: 'staff', id: s.id, name: s.full_name || s.username, number: s.staff_number, verification_code: s.verification_code, badge: s.job_title || s.role, photo_url: s.photo_url, job_title: s.job_title, phone: s.phone, email: s.email, contract_start: s.contract_start, contract_end: s.contract_end }} />
                 </td>
                 <td className="px-4 py-2">
                   <div className="flex flex-wrap gap-2">

@@ -383,7 +383,8 @@ twoCol([
   ['Reception', 'Verify, scan, today, register walk-ins, visitors, incidents.'],
   ['Trainer', 'Sees only their own clients.'],
 ], 40);
-callout('Self-service', 'As the owner, register staff yourself in Staff & Roles: enter their details, capture a face scan + photo, and they instantly get a login, a Staff ID card + PDF (with staff number, verification code and verify QR), and face access — just like members. You can also change roles, enable/disable, and reset passwords.');
+callout('Self-service', 'As the owner, register staff yourself in Staff & Roles: enter their details (incl. job title and contract start/end dates), capture a face scan + photo, and they instantly get a login, face access, a Staff ID card, and a professional Staff Employment Agreement PDF — their details plus standard staff terms & conditions and signature lines, ready to print and sign. You can also change roles, enable/disable, and reset passwords.');
+para('Note: the staff agreement is a professional template — have it checked against current labour law and fill in pay/notice specifics before signing.');
 para('Tip: the Audit Log (owner/manager) records important staff actions — status changes, deletions, refunds, settings and staff edits — so you always know who did what.');
 
 // ===================== 23 ALERTS =====================
