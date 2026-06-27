@@ -43,6 +43,9 @@ export default function Dashboard() {
             {d.classes_full > 0 && (
               <Banner tone="warn" to="/admin/today">{d.classes_full} class(es) today at 90%+ capacity.</Banner>
             )}
+            {d.unread_messages > 0 && (
+              <Banner tone="warn" to="/admin/inbox">{d.unread_messages} unread message(s) in your inbox.</Banner>
+            )}
           </div>
 
           <div className="mt-6 grid grid-cols-2 gap-4 lg:grid-cols-4">
@@ -54,6 +57,8 @@ export default function Dashboard() {
             <StatCard label="Lapsed (win-back)" value={d.lapsed_members} to="/admin/members?status=lapsed" deltaGood={false} />
             <StatCard label="Revenue Today" value={zar(d.revenue_today)} to="/admin/payments" />
             <StatCard label="Revenue This Month" value={zar(d.revenue_month)} to="/admin/payments" delta={d.revenue_month - d.revenue_month_prev} />
+            <StatCard label="Outstanding" value={zar(d.outstanding_total)} to="/admin/payments" deltaGood={false} />
+            <StatCard label="Unread Messages" value={d.unread_messages ?? 0} to="/admin/inbox" />
           </div>
 
           <div className="mt-8 grid gap-4 lg:grid-cols-2">

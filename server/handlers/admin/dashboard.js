@@ -83,6 +83,16 @@ export default async function handler(req, res) {
       supabase.from('payments').select('id', { count: 'exact', head: true }).eq('status', 'failed')
     );
 
+    // Outstanding (unsettled) balance + unread inbox messages for the home tiles.
+    const { data: unsettled } = await supabase.from('payments').select('amount').in('status', ['pending', 'failed']);
+    const outstandingTotal = sumAmount(unsettled);
+    let unreadMessages = 0;
+    try {
+      unreadMessages = await count(supabase.from('admin_inbox').select('id', { count: 'exact', head: true }).eq('is_read', false));
+    } catch {
+      /* admin_inbox not migrated yet */
+    }
+
     // Previous-month-to-date comparators for KPI trend deltas.
     const [newMonthPrev, revMonthPrev] = await Promise.all([
       count(
@@ -146,6 +156,8 @@ export default async function handler(req, res) {
       revenue_month: sumAmount(revMonth.data),
       new_month_prev: newMonthPrev,
       revenue_month_prev: sumAmount(revMonthPrev.data),
+      outstanding_total: outstandingTotal,
+      unread_messages: unreadMessages,
       recent_registrations: recent.data || [],
       activity: feed,
     });

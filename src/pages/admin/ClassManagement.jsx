@@ -158,6 +158,15 @@ function BookingsModal({ klass, onClose }) {
       setMsg(e.message);
     }
   }
+  async function act(body, label) {
+    try {
+      await apiFetch('/admin/class-bookings', { method: 'POST', body });
+      setMsg(label);
+      load();
+    } catch (e) {
+      setMsg(e.message);
+    }
+  }
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4" onClick={onClose}>
@@ -178,9 +187,19 @@ function BookingsModal({ klass, onClose }) {
                 <button className="text-xs text-error hover:underline" onClick={() => cancelDate(date)}>Cancel &amp; notify</button>
               </div>
               {list.map((b) => (
-                <div key={b.id} className="flex justify-between text-sm">
-                  <span className="text-body">{b.member_name}</span>
-                  <span className="text-muted">{b.status}</span>
+                <div key={b.id} className="flex items-center justify-between gap-2 py-1 text-sm">
+                  <span className="min-w-0 truncate text-body">{b.member_name} <span className="text-xs text-muted">{b.status}</span></span>
+                  <span className="flex shrink-0 gap-2 text-xs">
+                    {b.status === 'waitlisted' && (
+                      <button className="text-accent hover:underline" onClick={() => act({ op: 'promote', booking_id: b.id }, 'Promoted from waitlist.')}>Promote</button>
+                    )}
+                    {b.status === 'booked' && (
+                      <>
+                        <button className="text-success hover:underline" onClick={() => act({ op: 'mark', booking_id: b.id, status: 'attended' }, 'Marked attended.')}>Attended</button>
+                        <button className="text-error hover:underline" onClick={() => act({ op: 'mark', booking_id: b.id, status: 'no_show' }, 'Marked no-show.')}>No-show</button>
+                      </>
+                    )}
+                  </span>
                 </div>
               ))}
             </div>

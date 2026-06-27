@@ -69,7 +69,22 @@ export default async function handler(req, res) {
     }
 
     // POST
-    const { class_id, session_date, op, subject, message } = await readJsonBody(req);
+    const { class_id, session_date, op, subject, message, booking_id, status } = await readJsonBody(req);
+
+    // Per-member ops (only need the booking id).
+    if (op === 'mark') {
+      if (!booking_id || !['attended', 'no_show', 'booked'].includes(status)) return badRequest(res, 'booking_id and a valid status are required.');
+      const { error: e } = await supabase.from('class_bookings').update({ status }).eq('id', booking_id);
+      if (e) return serverError(res, e.message);
+      return ok(res, { updated: true });
+    }
+    if (op === 'promote') {
+      if (!booking_id) return badRequest(res, 'booking_id is required.');
+      const { error: e } = await supabase.from('class_bookings').update({ status: 'booked', waitlist_position: null }).eq('id', booking_id);
+      if (e) return serverError(res, e.message);
+      return ok(res, { promoted: true });
+    }
+
     if (!class_id || !session_date) return badRequest(res, 'class_id and session_date are required.');
 
     const { data: klass } = await supabase.from('classes').select('name').eq('id', class_id).maybeSingle();
