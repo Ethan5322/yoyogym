@@ -37,11 +37,12 @@ export default function MemberPortal() {
         </button>
       </header>
 
-      <nav className="grid grid-cols-5 border-b border-white/5 bg-surface text-xs">
+      <nav className="grid grid-cols-6 border-b border-white/5 bg-surface text-xs">
         {[
           ['status', 'Status'],
           ['checkin', 'Check In'],
           ['classes', 'Classes'],
+          ['progress', 'Progress'],
           ['history', 'History'],
           ['contact', 'Contact'],
         ].map(([key, label]) => (
@@ -61,6 +62,7 @@ export default function MemberPortal() {
         {tab === 'status' && <StatusTab />}
         {tab === 'checkin' && <CheckInTab />}
         {tab === 'classes' && <ClassesTab />}
+        {tab === 'progress' && <ProgressTab />}
         {tab === 'history' && <HistoryTab />}
         {tab === 'contact' && <ContactTab />}
       </main>
@@ -168,6 +170,102 @@ function MemberLogin({ onLoggedIn }) {
         <Link to="/" className="block text-center text-sm text-muted hover:text-body">
           ← Back
         </Link>
+      </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------- progress
+const PROGRESS_FIELDS = [
+  ['weight_kg', 'Weight (kg)'],
+  ['body_fat_pct', 'Body fat (%)'],
+  ['chest_cm', 'Chest (cm)'],
+  ['waist_cm', 'Waist (cm)'],
+  ['hips_cm', 'Hips (cm)'],
+  ['arms_cm', 'Arms (cm)'],
+  ['thighs_cm', 'Thighs (cm)'],
+];
+
+function ProgressTab() {
+  const [entries, setEntries] = useState(null);
+  const [form, setForm] = useState({});
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState('');
+
+  function load() {
+    memberFetch('/member/progress').then((d) => setEntries(d.entries || [])).catch((e) => setErr(e.message));
+  }
+  useEffect(load, []);
+
+  async function save() {
+    setBusy(true); setErr('');
+    try {
+      await memberFetch('/member/progress', { method: 'POST', body: form });
+      setForm({});
+      load();
+    } catch (e) { setErr(e.message); } finally { setBusy(false); }
+  }
+  async function del(id) {
+    if (!confirm('Delete this entry?')) return;
+    try { await memberFetch(`/member/progress?id=${id}`, { method: 'DELETE' }); load(); } catch (e) { setErr(e.message); }
+  }
+
+  // weight trend: latest vs first
+  const withWeight = (entries || []).filter((e) => e.weight_kg != null);
+  const latest = withWeight[0];
+  const first = withWeight[withWeight.length - 1];
+  const delta = latest && first && withWeight.length > 1 ? Number(latest.weight_kg) - Number(first.weight_kg) : null;
+
+  return (
+    <div className="space-y-4">
+      <div className="text-center">
+        <h2 className="font-display text-lg uppercase text-body">My Progress</h2>
+        <p className="mt-1 text-sm text-muted">Log your weight &amp; measurements to track your journey.</p>
+      </div>
+
+      {latest && (
+        <div className="card flex items-center justify-between">
+          <div>
+            <div className="text-sm text-muted">Latest weight</div>
+            <div className="font-display text-3xl text-body">{latest.weight_kg} kg</div>
+          </div>
+          {delta != null && (
+            <div className={`text-right text-sm font-medium ${delta < 0 ? 'text-success' : delta > 0 ? 'text-error' : 'text-muted'}`}>
+              {delta > 0 ? '▲' : delta < 0 ? '▼' : '→'} {Math.abs(delta).toFixed(1)} kg
+              <div className="text-xs text-muted">since you started</div>
+            </div>
+          )}
+        </div>
+      )}
+
+      <div className="card space-y-2">
+        <h3 className="font-display uppercase text-body">Add an entry</h3>
+        <div className="grid grid-cols-2 gap-2">
+          {PROGRESS_FIELDS.map(([k, label]) => (
+            <input key={k} className="field" type="number" inputMode="decimal" placeholder={label} value={form[k] ?? ''} onChange={(e) => setForm({ ...form, [k]: e.target.value })} />
+          ))}
+        </div>
+        <textarea className="field min-h-[60px]" placeholder="Note (optional)" value={form.note ?? ''} onChange={(e) => setForm({ ...form, note: e.target.value })} />
+        {err && <p className="rounded-lg bg-error/10 px-3 py-2 text-sm text-error">{err}</p>}
+        <button className="btn-primary w-full" onClick={save} disabled={busy}>{busy ? 'Saving…' : 'Save entry'}</button>
+      </div>
+
+      <div className="space-y-2">
+        {(entries || []).map((e) => (
+          <div key={e.id} className="card">
+            <div className="flex items-center justify-between">
+              <span className="font-display text-body">{fmt(e.recorded_on)}</span>
+              <button className="text-xs text-muted hover:text-error" onClick={() => del(e.id)}>Delete</button>
+            </div>
+            <div className="mt-1 flex flex-wrap gap-x-4 gap-y-1 text-sm text-muted">
+              {PROGRESS_FIELDS.filter(([k]) => e[k] != null).map(([k, label]) => (
+                <span key={k}><span className="text-body">{e[k]}</span> {label.replace(/ \(.*\)/, '').toLowerCase()}</span>
+              ))}
+            </div>
+            {e.note && <p className="mt-1 text-sm text-muted">{e.note}</p>}
+          </div>
+        ))}
+        {entries && !entries.length && <p className="text-center text-sm text-muted">No entries yet — add your first above.</p>}
       </div>
     </div>
   );

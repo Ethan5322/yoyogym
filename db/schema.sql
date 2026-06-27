@@ -395,6 +395,25 @@ create index if not exists admin_inbox_unread_idx on gym.admin_inbox(is_read) wh
 create index if not exists admin_inbox_member_idx on gym.admin_inbox(member_id);
 
 -- -----------------------------------------------------------------------------
+-- progress_entries — member self-tracked weight & body measurements
+-- -----------------------------------------------------------------------------
+create table if not exists gym.progress_entries (
+  id           uuid primary key default gen_random_uuid(),
+  member_id    uuid not null references gym.members(id) on delete cascade,
+  recorded_on  date not null default current_date,
+  weight_kg    numeric,
+  body_fat_pct numeric,
+  chest_cm     numeric,
+  waist_cm     numeric,
+  hips_cm      numeric,
+  arms_cm      numeric,
+  thighs_cm    numeric,
+  note         text,
+  created_at   timestamptz not null default now()
+);
+create index if not exists progress_member_idx on gym.progress_entries(member_id, recorded_on desc);
+
+-- -----------------------------------------------------------------------------
 -- announcements — gym news feed (management -> members)
 -- -----------------------------------------------------------------------------
 create table if not exists gym.announcements (
