@@ -37,6 +37,7 @@ const Visitors = lazy(() => import('./pages/admin/Visitors.jsx'));
 const Incidents = lazy(() => import('./pages/admin/Incidents.jsx'));
 const Staff = lazy(() => import('./pages/admin/Staff.jsx'));
 const AuditLog = lazy(() => import('./pages/admin/AuditLog.jsx'));
+const Inbox = lazy(() => import('./pages/admin/Inbox.jsx'));
 
 const owner = ['owner'];
 const mgr = ['owner', 'manager'];
@@ -88,6 +89,7 @@ export default function App() {
         <Route path="/admin/settings" element={guard(owner, <Settings />)} />
         <Route path="/admin/staff" element={guard(owner, <Staff />)} />
         <Route path="/admin/audit" element={guard(mgr, <AuditLog />)} />
+        <Route path="/admin/inbox" element={guard(mgr, <Inbox />)} />
         <Route path="/admin/clients" element={guard(trainer, <Clients />)} />
 
         <Route path="/admin/*" element={<Navigate to="/admin" replace />} />

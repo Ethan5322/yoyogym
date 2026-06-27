@@ -6,6 +6,7 @@ import { useEffect, useState } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../lib/auth.jsx';
 import { useBranding } from '../lib/branding.js';
+import { apiFetch } from '../lib/api.js';
 
 // Grouped navigation reads as an organised product, not a random row of buttons.
 const GROUPS = [
@@ -14,6 +15,7 @@ const GROUPS = [
     items: [
       { to: '/admin', label: 'Dashboard', icon: '▣', roles: ['owner', 'manager'], exact: true },
       { to: '/admin/today', label: 'Today', icon: '◷', roles: ['owner', 'manager', 'reception'] },
+      { to: '/admin/inbox', label: 'Inbox', icon: '✉', roles: ['owner', 'manager'] },
     ],
   },
   {
@@ -70,9 +72,20 @@ export default function AdminShell({ children }) {
   const { pathname } = useLocation();
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState('');
+  const [unread, setUnread] = useState(0);
 
   // Close the mobile drawer whenever the route changes.
   useEffect(() => setOpen(false), [pathname]);
+
+  // Poll the inbox unread count for the notification badge (owner/manager).
+  useEffect(() => {
+    if (!['owner', 'manager'].includes(user?.role)) return;
+    let active = true;
+    const poll = () => apiFetch('/admin/inbox?unread=1&limit=1').then((d) => active && setUnread(d.unread_count || 0)).catch(() => {});
+    poll();
+    const t = setInterval(poll, 60000);
+    return () => { active = false; clearInterval(t); };
+  }, [user?.role, pathname]);
 
   function handleLogout() {
     logout();
@@ -138,6 +151,9 @@ export default function AdminShell({ children }) {
                 <Link key={n.to} to={n.to} className={`admin-link ${isActive(n) ? 'is-active' : ''}`}>
                   <span className="admin-link__icon">{n.icon}</span>
                   <span>{n.label}</span>
+                  {n.label === 'Inbox' && unread > 0 && (
+                    <span className="ml-auto rounded-full bg-accent px-2 py-0.5 text-[10px] font-bold text-white">{unread}</span>
+                  )}
                 </Link>
               ))}
             </div>

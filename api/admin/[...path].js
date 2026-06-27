@@ -34,6 +34,8 @@ import staff from '../../server/handlers/admin/staff.js';
 import audit from '../../server/handlers/admin/audit.js';
 import finance from '../../server/handlers/admin/finance.js';
 import notifications from '../../server/handlers/admin/notifications.js';
+import inbox from '../../server/handlers/admin/inbox.js';
+import message from '../../server/handlers/admin/message.js';
 
 const routes = {
   dashboard,
@@ -68,6 +70,8 @@ const routes = {
   audit,
   finance,
   notifications,
+  inbox,
+  message,
 };
 
 export default async function handler(req, res) {

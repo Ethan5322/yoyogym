@@ -37,12 +37,13 @@ export default function MemberPortal() {
         </button>
       </header>
 
-      <nav className="grid grid-cols-4 border-b border-white/5 bg-surface text-xs">
+      <nav className="grid grid-cols-5 border-b border-white/5 bg-surface text-xs">
         {[
           ['status', 'Status'],
           ['checkin', 'Check In'],
           ['classes', 'Classes'],
           ['history', 'History'],
+          ['contact', 'Contact'],
         ].map(([key, label]) => (
           <button
             key={key}
@@ -61,6 +62,7 @@ export default function MemberPortal() {
         {tab === 'checkin' && <CheckInTab />}
         {tab === 'classes' && <ClassesTab />}
         {tab === 'history' && <HistoryTab />}
+        {tab === 'contact' && <ContactTab />}
       </main>
     </div>
   );
@@ -166,6 +168,46 @@ function MemberLogin({ onLoggedIn }) {
         <Link to="/" className="block text-center text-sm text-muted hover:text-body">
           ← Back
         </Link>
+      </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------- contact
+function ContactTab() {
+  const [subject, setSubject] = useState('');
+  const [body, setBody] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState('');
+  const [err, setErr] = useState('');
+
+  async function send() {
+    setBusy(true); setErr(''); setMsg('');
+    try {
+      const r = await memberFetch('/member/message', { method: 'POST', body: { subject, body } });
+      setMsg(r.message || 'Sent.');
+      setSubject(''); setBody('');
+    } catch (e) {
+      setErr(e.message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="space-y-4">
+      <div className="text-center">
+        <h2 className="font-display text-lg uppercase text-body">Message Management</h2>
+        <p className="mt-1 text-sm text-muted">Questions, requests or feedback go straight to the gym’s management team.</p>
+      </div>
+      <div className="card space-y-3">
+        <input className="field" placeholder="Subject (optional)" value={subject} onChange={(e) => setSubject(e.target.value)} />
+        <textarea className="field min-h-[160px]" placeholder="Write your message…" value={body} onChange={(e) => setBody(e.target.value)} />
+        {msg && <p className="rounded-lg bg-success/10 px-3 py-2 text-sm text-success">{msg}</p>}
+        {err && <p className="rounded-lg bg-error/10 px-3 py-2 text-sm text-error">{err}</p>}
+        <button className="btn-primary w-full" onClick={send} disabled={busy || !body.trim()}>
+          {busy ? 'Sending…' : 'Send to Management'}
+        </button>
       </div>
     </div>
   );
