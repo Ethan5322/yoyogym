@@ -339,7 +339,68 @@ function StatusTab() {
 
       <PlanChangeRequest currentPlan={m?.plan_name} />
 
+      <ProfileEditor />
+
       <DeletionRequest />
+    </div>
+  );
+}
+
+function ProfileEditor() {
+  const [open, setOpen] = useState(false);
+  const [form, setForm] = useState(null);
+  const [msg, setMsg] = useState('');
+  const [err, setErr] = useState('');
+  const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    if (!open || form) return;
+    memberFetch('/member/profile').then((d) => setForm(d.profile || {})).catch(() => setForm({}));
+  }, [open, form]);
+
+  const F = [
+    ['phone', 'Phone'], ['email', 'Email'],
+    ['address_street', 'Street'], ['address_suburb', 'Suburb'], ['address_city', 'City'], ['address_postal_code', 'Postal code'],
+    ['emergency_name', 'Emergency contact'], ['emergency_phone', 'Emergency phone'],
+    ['medical_aid_provider', 'Medical aid'],
+  ];
+
+  async function save() {
+    setBusy(true); setErr(''); setMsg('');
+    try {
+      const r = await memberFetch('/member/profile', { method: 'PATCH', body: form });
+      setMsg(r.message || 'Saved.');
+    } catch (e) {
+      setErr(e.message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="card">
+      <div className="flex items-center justify-between">
+        <div>
+          <p className="font-display uppercase text-body">My details</p>
+          <p className="text-xs text-muted">Keep your contact &amp; emergency info up to date.</p>
+        </div>
+        {!open && <button className="btn-outline px-3 py-1.5 text-sm" onClick={() => setOpen(true)}>Edit</button>}
+      </div>
+      {open && (
+        <div className="mt-3 space-y-2">
+          {!form ? <p className="text-sm text-muted">Loading…</p> : F.map(([k, label]) => (
+            <input key={k} className="field" placeholder={label} value={form[k] || ''} onChange={(e) => setForm({ ...form, [k]: e.target.value })} />
+          ))}
+          {msg && <p className="rounded-lg bg-success/10 px-3 py-2 text-sm text-success">{msg}</p>}
+          {err && <p className="rounded-lg bg-error/10 px-3 py-2 text-sm text-error">{err}</p>}
+          {form && (
+            <div className="flex gap-2">
+              <button className="btn-primary flex-1" onClick={save} disabled={busy}>{busy ? 'Saving…' : 'Save'}</button>
+              <button className="btn-outline" onClick={() => setOpen(false)}>Close</button>
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }
