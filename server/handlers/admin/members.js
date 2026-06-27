@@ -15,18 +15,25 @@ export default async function handler(req, res) {
     const parq = url.searchParams.get('parq');
     const tier = url.searchParams.get('tier');
     const contract = url.searchParams.get('contract');
+    const expiring = url.searchParams.get('expiring'); // days until membership end_date
     const page = Math.max(1, parseInt(url.searchParams.get('page') || '1', 10));
     const pageSize = Math.min(50, parseInt(url.searchParams.get('page_size') || '20', 10));
     const from = (page - 1) * pageSize;
 
     const supabase = getSupabase();
 
-    // Tier / contract live on memberships — resolve the matching member ids first.
+    // Tier / contract / expiry live on memberships — resolve the matching member ids first.
     let memberIdFilter = null;
-    if (tier || contract) {
+    if (tier || contract || expiring) {
       let mq = supabase.from('memberships').select('member_id').eq('state', 'active');
       if (tier) mq = mq.eq('tier', tier);
       if (contract) mq = mq.eq('contract_duration', contract);
+      if (expiring) {
+        const days = Math.max(1, Math.min(365, parseInt(expiring, 10) || 7));
+        const today = new Date().toISOString().slice(0, 10);
+        const until = new Date(Date.now() + days * 86400000).toISOString().slice(0, 10);
+        mq = mq.gte('end_date', today).lte('end_date', until);
+      }
       const { data: ms, error: msErr } = await mq;
       if (msErr) return serverError(res, msErr.message);
       memberIdFilter = [...new Set((ms || []).map((m) => m.member_id))];

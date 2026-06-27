@@ -1,6 +1,7 @@
 // Payments & financial management (spec 4.9): list, filter, revenue breakdown,
 // manual payment recording, CSV export, refunds.
 import { useEffect, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import AdminShell from '../../components/AdminShell.jsx';
 import { apiFetch } from '../../lib/api.js';
 
@@ -8,7 +9,8 @@ const zar = (n) => 'R' + Number(n || 0).toLocaleString('en-ZA', { minimumFractio
 const CATS = ['joining_fee', 'monthly_fee', 'session_pack', 'personal_training', 'class_addon', 'day_pass', 'other'];
 
 export default function PaymentsAdmin() {
-  const [status, setStatus] = useState('');
+  const [sp, setSp] = useSearchParams();
+  const [status, setStatus] = useState(sp.get('status') || '');
   const [data, setData] = useState(null);
   const [error, setError] = useState('');
   const [manual, setManual] = useState(false);
@@ -16,6 +18,7 @@ export default function PaymentsAdmin() {
   function load() {
     const p = new URLSearchParams();
     if (status) p.set('status', status);
+    setSp(status ? { status } : {}, { replace: true });
     apiFetch(`/admin/payments?${p}`).then(setData).catch((e) => setError(e.message));
   }
   useEffect(load, [status]);

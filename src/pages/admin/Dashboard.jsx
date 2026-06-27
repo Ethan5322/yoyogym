@@ -28,31 +28,31 @@ export default function Dashboard() {
 
       {d && (
         <>
-          {/* Alert banners */}
+          {/* Alert banners — each links to the filtered work queue it refers to */}
           <div className="mt-4 space-y-2">
             {d.failed_payments > 0 && (
-              <Banner tone="error">{d.failed_payments} failed payment(s) need attention.</Banner>
+              <Banner tone="error" to="/admin/payments?status=failed">{d.failed_payments} failed payment(s) need attention.</Banner>
             )}
             {d.parq_flags > 0 && (
-              <Banner tone="warn">{d.parq_flags} member(s) with PAR-Q medical flags.</Banner>
+              <Banner tone="warn" to="/admin/members?parq=1">{d.parq_flags} member(s) with PAR-Q medical flags.</Banner>
             )}
             {d.expiring_soon > 0 && (
-              <Banner tone="warn">{d.expiring_soon} membership(s) expiring within 7 days.</Banner>
+              <Banner tone="warn" to="/admin/members?expiring=7">{d.expiring_soon} membership(s) expiring within 7 days.</Banner>
             )}
             {d.classes_full > 0 && (
-              <Banner tone="warn">{d.classes_full} class(es) today at 90%+ capacity.</Banner>
+              <Banner tone="warn" to="/admin/today">{d.classes_full} class(es) today at 90%+ capacity.</Banner>
             )}
           </div>
 
           <div className="mt-6 grid grid-cols-2 gap-4 lg:grid-cols-4">
-            <Stat label="Check-ins Today" value={d.checkins_today} />
-            <Stat label="New Today" value={d.new_today} />
-            <Stat label="New This Week" value={d.new_week} />
-            <Stat label="New This Month" value={d.new_month} />
-            <Stat label="Active Members" value={d.active_members} />
-            <Stat label="Lapsed (win-back)" value={d.lapsed_members} />
-            <Stat label="Revenue Today" value={zar(d.revenue_today)} />
-            <Stat label="Revenue This Month" value={zar(d.revenue_month)} />
+            <Stat label="Check-ins Today" value={d.checkins_today} to="/admin/today" />
+            <Stat label="New Today" value={d.new_today} to="/admin/members" />
+            <Stat label="New This Week" value={d.new_week} to="/admin/members" />
+            <Stat label="New This Month" value={d.new_month} to="/admin/members" />
+            <Stat label="Active Members" value={d.active_members} to="/admin/members?status=active" />
+            <Stat label="Lapsed (win-back)" value={d.lapsed_members} to="/admin/members?status=lapsed" />
+            <Stat label="Revenue Today" value={zar(d.revenue_today)} to="/admin/payments" />
+            <Stat label="Revenue This Month" value={zar(d.revenue_month)} to="/admin/payments" />
           </div>
 
           <div className="mt-8 grid gap-4 lg:grid-cols-2">
@@ -105,15 +105,35 @@ export default function Dashboard() {
   );
 }
 
-function Stat({ label, value }) {
-  return (
-    <div className="card">
-      <div className="text-sm text-muted">{label}</div>
+function Stat({ label, value, to }) {
+  const inner = (
+    <>
+      <div className="flex items-center justify-between text-sm text-muted">
+        <span>{label}</span>
+        {to && <span className="text-accent opacity-0 transition group-hover:opacity-100">→</span>}
+      </div>
       <div className="mt-2 font-display text-3xl text-body">{value}</div>
-    </div>
+    </>
   );
+  if (to) {
+    return (
+      <Link to={to} className="card group transition hover:border-accent/40 hover:bg-surface">
+        {inner}
+      </Link>
+    );
+  }
+  return <div className="card">{inner}</div>;
 }
-function Banner({ tone, children }) {
+function Banner({ tone, children, to }) {
   const cls = tone === 'error' ? 'bg-error/10 text-error' : 'bg-accent-soft text-accent';
-  return <div className={`rounded-lg px-4 py-2 text-sm ${cls}`}>{children}</div>;
+  const content = (
+    <span className="flex items-center justify-between gap-3">
+      <span>{children}</span>
+      {to && <span aria-hidden className="shrink-0">→</span>}
+    </span>
+  );
+  if (to) {
+    return <Link to={to} className={`block rounded-lg px-4 py-2 text-sm transition hover:brightness-125 ${cls}`}>{content}</Link>;
+  }
+  return <div className={`rounded-lg px-4 py-2 text-sm ${cls}`}>{content}</div>;
 }

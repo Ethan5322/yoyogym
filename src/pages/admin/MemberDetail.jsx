@@ -173,7 +173,28 @@ export default function MemberDetail() {
             <Row key={a.id} label={a.addon_services?.name || 'Add-on'} value={zar(a.price_at_purchase)} />
           )) : <p className="text-sm text-muted">None.</p>}
         </Section>
+
+        <Section title="Class Bookings">
+          {data.bookings?.length ? data.bookings.slice(0, 8).map((b, i) => (
+            <Row key={i} label={`${fmt(b.session_date)} · ${b.classes?.name || 'Class'}`} value={b.status} />
+          )) : <p className="text-sm text-muted">No bookings.</p>}
+        </Section>
+
+        <Section title="Incidents">
+          {data.incidents?.length ? data.incidents.map((i) => (
+            <Row key={i.id} label={`${fmt(i.created_at)} · ${i.by}`} value={i.note} />
+          )) : <p className="text-sm text-muted">No incidents on record.</p>}
+        </Section>
       </div>
+
+      <Section title="Activity Log">
+        {data.activity?.length ? data.activity.map((a, i) => (
+          <div key={i} className="flex justify-between gap-3 border-b border-white/5 py-2 text-sm last:border-0">
+            <span className="text-body">{a.action.replace(/[._]/g, ' ')}{a.detail ? ` — ${a.detail}` : ''}</span>
+            <span className="whitespace-nowrap text-muted">{a.admin_name} · {fmt(a.created_at)}</span>
+          </div>
+        )) : <p className="text-sm text-muted">No recorded staff actions for this member.</p>}
+      </Section>
 
       <Section title="Staff Notes">
         <textarea className="field min-h-[80px]" value={notes} onChange={(e) => setNotes(e.target.value)} />

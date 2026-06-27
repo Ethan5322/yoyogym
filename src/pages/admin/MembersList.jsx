@@ -1,20 +1,24 @@
 // Member management list — search + filters (spec 4.4). Owner/Manager.
 import { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import AdminShell from '../../components/AdminShell.jsx';
 import { apiFetch } from '../../lib/api.js';
 
-const STATUSES = ['', 'new', 'active', 'expiring', 'lapsed', 'suspended'];
+const STATUSES = ['', 'new', 'active', 'lapsed', 'suspended'];
 const TIERS = [['', 'All tiers'], ['basic', 'Basic'], ['standard', 'Standard'], ['premium', 'Premium'], ['vip', 'VIP']];
 const CONTRACTS = [['', 'All contracts'], ['month_to_month', 'Month-to-month'], ['3_month', '3 month'], ['6_month', '6 month'], ['12_month', '12 month']];
 
 export default function MembersList() {
-  const [q, setQ] = useState('');
-  const [status, setStatus] = useState('');
-  const [tier, setTier] = useState('');
-  const [contract, setContract] = useState('');
-  const [parq, setParq] = useState(false);
-  const [page, setPage] = useState(1);
+  // Filters are URL-driven so dashboard banners/cards can deep-link here and a
+  // shared/bookmarked URL reopens the same filtered view (corporate workflow).
+  const [sp, setSp] = useSearchParams();
+  const [q, setQ] = useState(sp.get('q') || '');
+  const [status, setStatus] = useState(sp.get('status') || '');
+  const [tier, setTier] = useState(sp.get('tier') || '');
+  const [contract, setContract] = useState(sp.get('contract') || '');
+  const [parq, setParq] = useState(sp.get('parq') === '1');
+  const [expiring, setExpiring] = useState(sp.get('expiring') || '');
+  const [page, setPage] = useState(Number(sp.get('page')) || 1);
   const [data, setData] = useState(null);
   const [error, setError] = useState('');
 
@@ -25,6 +29,8 @@ export default function MembersList() {
     if (tier) params.set('tier', tier);
     if (contract) params.set('contract', contract);
     if (parq) params.set('parq', '1');
+    if (expiring) params.set('expiring', expiring);
+    setSp(params, { replace: true }); // keep the address bar in sync with the view
     setError('');
     const t = setTimeout(() => {
       apiFetch(`/admin/members?${params.toString()}`)
@@ -32,7 +38,8 @@ export default function MembersList() {
         .catch((e) => setError(e.message));
     }, 250); // debounce search
     return () => clearTimeout(t);
-  }, [q, status, tier, contract, parq, page]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [q, status, tier, contract, parq, expiring, page]);
 
   return (
     <AdminShell>
@@ -91,6 +98,15 @@ export default function MembersList() {
           PAR-Q flag
         </label>
       </div>
+
+      {expiring && (
+        <button
+          className="mt-3 inline-flex items-center gap-2 rounded-full bg-accent-soft px-3 py-1 text-xs text-accent"
+          onClick={() => { setPage(1); setExpiring(''); }}
+        >
+          Expiring within {expiring} days · clear ✕
+        </button>
+      )}
 
       {error && <p className="mt-4 text-error">{error}</p>}
 

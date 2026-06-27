@@ -47,7 +47,7 @@ export default async function handler(req, res) {
     if (!member) return badRequest(res, 'Member not found.');
 
     const since30 = new Date(Date.now() - 30 * 86400000);
-    const [{ data: memberships }, { data: payments }, { data: checkins }, { data: bookings }, { data: parq }, { data: addons }, { count: visits30 }, config] =
+    const [{ data: memberships }, { data: payments }, { data: checkins }, { data: bookings }, { data: parq }, { data: addons }, { data: incidents }, { data: activity }, { count: visits30 }, config] =
       await Promise.all([
         supabase.from('memberships').select('*, plans(name)').eq('member_id', id).order('created_at', { ascending: false }),
         supabase.from('payments').select('*').eq('member_id', id).order('created_at', { ascending: false }).limit(50),
@@ -55,6 +55,8 @@ export default async function handler(req, res) {
         supabase.from('class_bookings').select('session_date, status, classes(name)').eq('member_id', id).order('session_date', { ascending: false }).limit(30),
         supabase.from('parq_responses').select('*').eq('member_id', id).maybeSingle(),
         supabase.from('member_addons').select('*, addon_services(name)').eq('member_id', id),
+        supabase.from('incidents').select('id, note, created_at, admin_users(full_name)').eq('member_id', id).order('created_at', { ascending: false }).limit(10),
+        supabase.from('audit_log').select('action, detail, admin_name, created_at').eq('entity', 'member').eq('entity_id', String(id)).order('created_at', { ascending: false }).limit(15),
         supabase.from('checkins').select('id', { count: 'exact', head: true }).eq('member_id', id).gte('checked_in_at', since30.toISOString()),
         loadCompliance(supabase),
       ]);
@@ -70,6 +72,8 @@ export default async function handler(req, res) {
       bookings: bookings || [],
       parq: parq || null,
       addons: addons || [],
+      incidents: (incidents || []).map((i) => ({ id: i.id, note: i.note, by: i.admin_users?.full_name || 'Staff', created_at: i.created_at })),
+      activity: activity || [],
       adherence: { ...score, visits_30d: visits30 || 0, expected_30d: expected },
     });
   } catch (err) {
