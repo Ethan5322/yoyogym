@@ -12,6 +12,7 @@ import history from '../../server/handlers/member/history.js';
 import requestDeletion from '../../server/handlers/member/request-deletion.js';
 import pay from '../../server/handlers/member/pay.js';
 import message from '../../server/handlers/member/message.js';
+import messages from '../../server/handlers/member/messages.js';
 import requestPlanChange from '../../server/handlers/member/request-plan-change.js';
 
 const routes = {
@@ -26,6 +27,7 @@ const routes = {
   'request-deletion': requestDeletion,
   pay,
   message,
+  messages,
   'request-plan-change': requestPlanChange,
 };
 

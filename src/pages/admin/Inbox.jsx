@@ -18,6 +18,7 @@ export default function Inbox() {
   const [kind, setKind] = useState('');
   const [unreadOnly, setUnreadOnly] = useState(false);
   const [compose, setCompose] = useState(false);
+  const [replyTo, setReplyTo] = useState(null);
 
   function load() {
     const p = new URLSearchParams();
@@ -79,12 +80,18 @@ export default function Inbox() {
                 </div>
                 {it.body && <p className="mt-1 whitespace-pre-wrap text-sm text-body">{it.body}</p>}
                 <div className="mt-2 flex flex-wrap items-center gap-3 text-xs">
-                  {it.sender_name && <span className="text-muted">From: {it.sender_name}</span>}
+                  {it.sender_name && <span className="text-muted">{it.direction === 'out' ? 'To member' : `From: ${it.sender_name}`}</span>}
                   {it.link && <Link to={it.link} className="text-accent hover:underline">Open member →</Link>}
+                  {it.kind === 'message' && it.direction !== 'out' && it.member_id && (
+                    <button className="text-accent hover:underline" onClick={() => setReplyTo(replyTo === it.id ? null : it.id)}>
+                      {replyTo === it.id ? 'Cancel reply' : 'Reply'}
+                    </button>
+                  )}
                   <button className="text-muted hover:text-body" onClick={() => markRead(it, !it.is_read)}>
                     {it.is_read ? 'Mark unread' : 'Mark read'}
                   </button>
                 </div>
+                {replyTo === it.id && <ReplyBox item={it} toast={toast} onSent={() => { setReplyTo(null); load(); }} />}
               </div>
             </div>
           ))}
@@ -94,6 +101,25 @@ export default function Inbox() {
 
       {compose && <Compose toast={toast} onClose={() => setCompose(false)} />}
     </AdminShell>
+  );
+}
+
+function ReplyBox({ item, toast, onSent }) {
+  const [body, setBody] = useState('');
+  const [busy, setBusy] = useState(false);
+  async function send() {
+    setBusy(true);
+    try {
+      await apiFetch('/admin/inbox', { method: 'POST', body: { member_id: item.member_id, body, parent_id: item.id } });
+      toast.success('Reply sent to member.');
+      onSent();
+    } catch (e) { toast.error(e.message); setBusy(false); }
+  }
+  return (
+    <div className="mt-3 space-y-2 rounded-lg bg-surface p-3">
+      <textarea className="field min-h-[80px]" placeholder="Write a reply — the member sees it in their portal and by email…" value={body} onChange={(e) => setBody(e.target.value)} />
+      <button className="btn-primary px-4 py-1.5 text-sm" onClick={send} disabled={busy || !body.trim()}>{busy ? 'Sending…' : 'Send reply'}</button>
+    </div>
   );
 }
 

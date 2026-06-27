@@ -175,18 +175,23 @@ function MemberLogin({ onLoggedIn }) {
 
 // ---------------------------------------------------------------- contact
 function ContactTab() {
+  const [thread, setThread] = useState([]);
   const [subject, setSubject] = useState('');
   const [body, setBody] = useState('');
   const [busy, setBusy] = useState(false);
-  const [msg, setMsg] = useState('');
   const [err, setErr] = useState('');
 
+  function load() {
+    memberFetch('/member/messages').then((d) => setThread(d.messages || [])).catch(() => {});
+  }
+  useEffect(load, []);
+
   async function send() {
-    setBusy(true); setErr(''); setMsg('');
+    setBusy(true); setErr('');
     try {
-      const r = await memberFetch('/member/message', { method: 'POST', body: { subject, body } });
-      setMsg(r.message || 'Sent.');
+      await memberFetch('/member/message', { method: 'POST', body: { subject, body } });
       setSubject(''); setBody('');
+      load();
     } catch (e) {
       setErr(e.message);
     } finally {
@@ -198,15 +203,27 @@ function ContactTab() {
     <div className="space-y-4">
       <div className="text-center">
         <h2 className="font-display text-lg uppercase text-body">Message Management</h2>
-        <p className="mt-1 text-sm text-muted">Questions, requests or feedback go straight to the gym’s management team.</p>
+        <p className="mt-1 text-sm text-muted">Questions, requests or feedback — and replies from the team.</p>
       </div>
+
+      {thread.length > 0 && (
+        <div className="space-y-2">
+          {thread.map((m) => (
+            <div key={m.id} className={`max-w-[85%] rounded-xl px-3 py-2 text-sm ${m.from === 'management' ? 'bg-accent-soft text-accent' : 'ml-auto bg-surface text-body'}`}>
+              <div className="mb-0.5 text-[10px] uppercase tracking-wide opacity-70">{m.from === 'management' ? 'Management' : 'You'}</div>
+              <p className="whitespace-pre-wrap">{m.body}</p>
+              <div className="mt-1 text-[10px] opacity-60">{new Date(m.at).toLocaleString('en-ZA')}</div>
+            </div>
+          ))}
+        </div>
+      )}
+
       <div className="card space-y-3">
-        <input className="field" placeholder="Subject (optional)" value={subject} onChange={(e) => setSubject(e.target.value)} />
-        <textarea className="field min-h-[160px]" placeholder="Write your message…" value={body} onChange={(e) => setBody(e.target.value)} />
-        {msg && <p className="rounded-lg bg-success/10 px-3 py-2 text-sm text-success">{msg}</p>}
+        {!thread.length && <input className="field" placeholder="Subject (optional)" value={subject} onChange={(e) => setSubject(e.target.value)} />}
+        <textarea className="field min-h-[110px]" placeholder="Write your message…" value={body} onChange={(e) => setBody(e.target.value)} />
         {err && <p className="rounded-lg bg-error/10 px-3 py-2 text-sm text-error">{err}</p>}
         <button className="btn-primary w-full" onClick={send} disabled={busy || !body.trim()}>
-          {busy ? 'Sending…' : 'Send to Management'}
+          {busy ? 'Sending…' : thread.length ? 'Send' : 'Send to Management'}
         </button>
       </div>
     </div>

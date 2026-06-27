@@ -6,15 +6,53 @@
 import { getSupabase } from '../../lib/supabase.js';
 import { allowMethods, readJsonBody, ok, badRequest, serverError } from '../../lib/http.js';
 import { requireRole } from '../../lib/auth.js';
+import { notifyAdmin } from '../../lib/inbox.js';
+import { notifyMemberEmail } from '../../lib/notify/index.js';
 
 export default async function handler(req, res) {
-  if (!allowMethods(req, res, ['GET', 'PATCH'])) return;
-  if (!requireRole(req, res, ['owner', 'manager'])) return;
+  if (!allowMethods(req, res, ['GET', 'POST', 'PATCH'])) return;
+  const admin = requireRole(req, res, ['owner', 'manager']);
+  if (!admin) return;
 
   const supabase = getSupabase();
   const url = new URL(req.url, 'http://localhost');
 
   try {
+    if (req.method === 'POST') {
+      // Reply to a member (creates an 'out' message in the thread + emails them).
+      const b = await readJsonBody(req);
+      const text = (b.body || '').trim();
+      if (!b.member_id || !text) return badRequest(res, 'member_id and body are required.');
+
+      const { data: member } = await supabase
+        .from('members')
+        .select('id, full_name, email')
+        .eq('id', b.member_id)
+        .maybeSingle();
+      if (!member) return badRequest(res, 'Member not found.');
+
+      const r = await notifyAdmin(supabase, {
+        kind: 'message',
+        type: 'admin.reply',
+        title: 'Reply from management',
+        body: text,
+        member_id: member.id,
+        sender_name: admin.full_name || admin.username || 'Management',
+        sender_role: 'admin',
+        direction: 'out',
+        parent_id: b.parent_id || null,
+        is_read: true,
+        is_read_member: false,
+        link: `/admin/members/${member.id}`,
+      });
+      if (!r.ok) return serverError(res, 'Could not send the reply.');
+
+      if (member.email) {
+        await notifyMemberEmail(supabase, { id: member.id, full_name: member.full_name, email: member.email }, 'admin_reply', { body: text });
+      }
+      return ok(res, { sent: true });
+    }
+
     if (req.method === 'PATCH') {
       if (url.searchParams.get('all') === '1') {
         const { error } = await supabase.from('admin_inbox').update({ is_read: true }).eq('is_read', false);

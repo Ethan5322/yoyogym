@@ -275,6 +275,19 @@ export const memberTemplates = {
        ${signoff(gymName)}`
     ),
   }),
+
+  // Reply from management to a member's message (shown in their inbox by email).
+  admin_reply: ({ gymName, member, body }) => ({
+    subject: `${gymName} — Reply from the management team`,
+    html: shell(
+      gymName,
+      `<p style="font-size:16px">Hi ${member.full_name?.split(' ')[0]},</p>
+       <p>You have a reply from the <b>${gymName}</b> management team:</p>
+       ${panel((body || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/\n/g, '<br>'))}
+       <p style="color:#9A9590;font-size:13px">You can reply from the Contact tab in your member portal.</p>
+       ${signoff(gymName)}`
+    ),
+  }),
 };
 
 export const ownerTemplates = {
@@ -349,4 +362,18 @@ export const ownerTemplates = {
 
   incident: ({ person, note }) =>
     `🚨 INCIDENT logged for ${person}: ${note}`,
+
+  new_message: ({ from, role, subject, body }) =>
+    [
+      `✉️ NEW MESSAGE (${role || 'member'})`,
+      ``,
+      `From: ${from}`,
+      subject ? `Subject: ${subject}` : null,
+      ``,
+      (body || '').slice(0, 400),
+      ``,
+      `Reply in Admin → Inbox.`,
+    ]
+      .filter((l) => l !== null)
+      .join('\n'),
 };

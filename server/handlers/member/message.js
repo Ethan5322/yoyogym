@@ -4,6 +4,8 @@ import { getSupabase } from '../../lib/supabase.js';
 import { allowMethods, readJsonBody, ok, badRequest, serverError } from '../../lib/http.js';
 import { authenticateMember } from '../../lib/memberauth.js';
 import { notifyAdmin } from '../../lib/inbox.js';
+import { notifyOwner } from '../../lib/notify/index.js';
+import { ownerTemplates } from '../../lib/notify/templates.js';
 import { rateLimit } from '../../lib/ratelimit.js';
 
 export default async function handler(req, res) {
@@ -33,9 +35,18 @@ export default async function handler(req, res) {
       member_id: member.id,
       sender_name: `${member.full_name} (${member.membership_number})`,
       sender_role: 'member',
+      direction: 'in',
+      is_read_member: true,
       link: `/admin/members/${member.id}`,
     });
     if (!r.ok) return serverError(res, 'Could not send your message. Please try again.');
+
+    await notifyOwner(
+      supabase,
+      'new_message',
+      ownerTemplates.new_message({ from: `${member.full_name} (${member.membership_number})`, role: 'member', subject, body: text }),
+      member.id
+    );
     return ok(res, { sent: true, message: 'Your message has been sent to management.' });
   } catch (err) {
     console.error('member message error:', err.message);
