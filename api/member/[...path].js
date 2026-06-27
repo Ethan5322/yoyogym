@@ -18,6 +18,7 @@ import profile from '../../server/handlers/member/profile.js';
 import announcements from '../../server/handlers/member/announcements.js';
 import progress from '../../server/handlers/member/progress.js';
 import refer from '../../server/handlers/member/refer.js';
+import enrollFace from '../../server/handlers/member/enroll-face.js';
 
 const routes = {
   login,
@@ -37,6 +38,7 @@ const routes = {
   announcements,
   progress,
   refer,
+  'enroll-face': enrollFace,
 };
 
 export default async function handler(req, res) {

@@ -8,8 +8,8 @@ import { allowMethods, readJsonBody, ok, badRequest, unauthorized, serverError }
 import { signMemberToken } from '../../lib/memberauth.js';
 import { rateLimit } from '../../lib/ratelimit.js';
 
-const THRESHOLD = 0.48; // absolute max Euclidean distance for a match
-const MARGIN = 0.06;    // best must beat the runner-up by at least this much
+const THRESHOLD = 0.6;  // absolute max Euclidean distance (face-api standard)
+const MARGIN = 0.05;    // best must beat the runner-up by at least this much
 
 function distance(a, b) {
   if (!a || !b || a.length !== b.length) return Infinity;

@@ -439,6 +439,8 @@ function StatusTab() {
 
       <PlanChangeRequest currentPlan={m?.plan_name} />
 
+      <FaceEnrol />
+
       <ReferFriend />
 
       <ProfileEditor />
@@ -466,6 +468,46 @@ function Announcements() {
           </div>
         ))}
       </div>
+    </div>
+  );
+}
+
+function FaceEnrol() {
+  const [open, setOpen] = useState(false);
+  const [msg, setMsg] = useState('');
+  const [err, setErr] = useState('');
+
+  async function onCapture(result) {
+    setOpen(false);
+    if (!result?.descriptor) return;
+    setErr(''); setMsg('');
+    try {
+      const r = await memberFetch('/member/enroll-face', {
+        method: 'POST',
+        body: { descriptor: Array.from(result.descriptor), image: result.image },
+      });
+      setMsg(r.message || 'Face scan updated.');
+    } catch (e) {
+      setErr(e.message);
+    }
+  }
+
+  return (
+    <div className="card">
+      <div className="flex items-center justify-between">
+        <div>
+          <p className="font-display uppercase text-body">Face sign-in 🛡️</p>
+          <p className="text-xs text-muted">Update your face scan for fast, secure sign-in &amp; gym access.</p>
+        </div>
+        {!open && <button className="btn-outline px-3 py-1.5 text-sm" onClick={() => { setMsg(''); setErr(''); setOpen(true); }}>Update scan</button>}
+      </div>
+      {msg && <p className="mt-2 rounded-lg bg-success/10 px-3 py-2 text-sm text-success">{msg}</p>}
+      {err && <p className="mt-2 rounded-lg bg-error/10 px-3 py-2 text-sm text-error">{err}</p>}
+      {open && (
+        <div className="mt-3">
+          <FaceCapture onSubmit={onCapture} />
+        </div>
+      )}
     </div>
   );
 }

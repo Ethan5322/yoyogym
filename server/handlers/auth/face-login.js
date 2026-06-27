@@ -6,7 +6,7 @@ import { allowMethods, readJsonBody, ok, badRequest, unauthorized, serverError }
 import { signToken } from '../../lib/auth.js';
 import { rateLimit } from '../../lib/ratelimit.js';
 
-const THRESHOLD = 0.48; // a little stricter than member matching, for login
+const THRESHOLD = 0.55; // a little stricter than member matching, for admin login
 
 function distance(a, b) {
   if (!a || !b || a.length !== b.length) return Infinity;

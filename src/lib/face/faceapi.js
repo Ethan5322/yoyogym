@@ -11,7 +11,13 @@ export async function getFaceApi() {
     _faceapi = await import('@vladmandic/face-api');
   }
   if (!_modelsLoaded) {
+    // Tiny detector = fast live positioning guidance.
+    // SSD MobileNet v1 = higher-accuracy detection used for the actual
+    //   enrolment template + match probes (better face alignment -> a more
+    //   discriminating 128-D descriptor across eyes/nose/jaw/face shape).
+    // 68-pt landmarks align the face before the recognition net runs.
     await _faceapi.nets.tinyFaceDetector.loadFromUri(MODEL_URL);
+    await _faceapi.nets.ssdMobilenetv1.loadFromUri(MODEL_URL);
     await _faceapi.nets.faceLandmark68Net.loadFromUri(MODEL_URL);
     await _faceapi.nets.faceRecognitionNet.loadFromUri(MODEL_URL);
     _modelsLoaded = true;
@@ -48,10 +54,27 @@ export async function detectFull(el) {
   };
 }
 
-/** High-recall detection for ACCESS scanning — larger input + lower threshold
- *  so harder faces (poor light, just-washed/shiny skin, slight angle) are still
- *  found. Returns { score, descriptor } or null. */
+/** High-ACCURACY detection (SSD MobileNet v1) used for enrolment templates and
+ *  match probes — better alignment than the tiny detector means a descriptor
+ *  that captures the full facial arrangement more reliably across lighting,
+ *  angle and a few days' change. Returns { box, score, descriptor } or null. */
+export async function detectAccurate(el) {
+  const faceapi = await getFaceApi();
+  const det = await faceapi
+    .detectSingleFace(el, new faceapi.SsdMobilenetv1Options({ minConfidence: 0.3 }))
+    .withFaceLandmarks()
+    .withFaceDescriptor();
+  if (!det) return null;
+  const b = det.detection.box;
+  return { box: { x: b.x, y: b.y, width: b.width, height: b.height }, score: det.detection.score, descriptor: Array.from(det.descriptor) };
+}
+
+/** High-recall detection for ACCESS scanning. Uses the accurate SSD detector
+ *  for a discriminating descriptor. Returns { score, descriptor } or null. */
 export async function detectMatch(el) {
+  const acc = await detectAccurate(el);
+  if (acc) return { score: acc.score, descriptor: acc.descriptor };
+  // Fallback to the tiny detector in poor conditions so we still get a probe.
   const faceapi = await getFaceApi();
   const det = await faceapi
     .detectSingleFace(el, new faceapi.TinyFaceDetectorOptions({ inputSize: 416, scoreThreshold: 0.3 }))
@@ -109,5 +132,7 @@ export function faceDistance(a, b) {
   return Math.sqrt(sum);
 }
 
-// Match threshold: < 0.5 is a confident match (face-api convention is ~0.6).
-export const MATCH_THRESHOLD = 0.5;
+// Match threshold (Euclidean distance on the 128-D descriptor). The face-api
+// convention is ~0.6 for a confident same-person match; 0.6 tolerates lighting
+// and a few days' change while still separating different people.
+export const MATCH_THRESHOLD = 0.6;

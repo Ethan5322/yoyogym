@@ -4,7 +4,7 @@
 // Used in registration, admin face enrolment, and admin face login.
 import { useEffect, useRef, useState } from 'react';
 
-const SAMPLES = 5; // face templates captured & averaged for accuracy
+const SAMPLES = 8; // high-accuracy face templates captured & averaged
 
 export default function FaceCapture({ onSubmit }) {
   const videoRef = useRef(null);
@@ -71,7 +71,7 @@ export default function FaceCapture({ onSubmit }) {
   }
 
   async function runGuideLoop() {
-    const { detectFull } = await import('../../lib/face/faceapi.js');
+    const { detectFull, detectAccurate } = await import('../../lib/face/faceapi.js');
     while (loopRef.current) {
       const v = videoRef.current;
       let g = 'Position your face in the circle';
@@ -108,10 +108,13 @@ export default function FaceCapture({ onSubmit }) {
         }
       }
 
-      // Collect a quality sample only when well-positioned.
-      if (ok && det?.descriptor) {
-        samplesRef.current.push(det.descriptor);
-      } else if (!ok) {
+      // Collect a quality sample only when well-positioned. The sample is taken
+      // with the high-accuracy SSD detector (tiny is only for live guidance), so
+      // the averaged template captures the full facial arrangement reliably.
+      if (ok) {
+        const acc = await detectAccurate(v);
+        if (acc?.descriptor) samplesRef.current.push(acc.descriptor);
+      } else {
         samplesRef.current = [];
       }
       const pct = Math.min(100, Math.round((samplesRef.current.length / SAMPLES) * 100));
