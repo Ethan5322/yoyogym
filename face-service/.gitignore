@@ -1,0 +1,7 @@
+.venv/
+__pycache__/
+*.pyc
+faces.json
+data/
+.insightface/
+models/
