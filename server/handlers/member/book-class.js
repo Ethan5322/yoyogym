@@ -7,6 +7,7 @@ import { allowMethods, readJsonBody, ok, badRequest, serverError } from '../../l
 import { authenticateMember } from '../../lib/memberauth.js';
 import { loadCompliance, rulesFor } from '../../lib/compliance.js';
 import { notifyMemberEmail } from '../../lib/notify/index.js';
+import { notifyAdmin } from '../../lib/inbox.js';
 
 export default async function handler(req, res) {
   if (!allowMethods(req, res, ['POST'])) return;
@@ -22,7 +23,7 @@ export default async function handler(req, res) {
     // Member must be active.
     const { data: member } = await supabase
       .from('members')
-      .select('status')
+      .select('status, full_name, membership_number')
       .eq('id', auth.sub)
       .maybeSingle();
     if (!member || member.status !== 'active') {
@@ -123,6 +124,18 @@ export default async function handler(req, res) {
       { onConflict: 'class_id,member_id,session_date' }
     );
     if (error) return serverError(res, error.message);
+
+    // Notify management (admin inbox).
+    await notifyAdmin(supabase, {
+      kind: 'event',
+      type: status === 'booked' ? 'class.booked' : 'class.waitlisted',
+      title: status === 'booked' ? `${member.full_name} booked ${klass.name}` : `${member.full_name} joined the waitlist for ${klass.name}`,
+      body: `${session_date}${waitlist_position ? ` · waitlist #${waitlist_position}` : ''}`,
+      member_id: auth.sub,
+      sender_name: `${member.full_name} (${member.membership_number})`,
+      sender_role: 'system',
+      link: `/admin/members/${auth.sub}`,
+    });
 
     // Confirmation email (spec 2.6 #4) — only for confirmed bookings.
     if (status === 'booked') {

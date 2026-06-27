@@ -5,6 +5,7 @@ import { getSupabase } from '../../lib/supabase.js';
 import { allowMethods, readJsonBody, ok, badRequest, serverError } from '../../lib/http.js';
 import { authenticateMember } from '../../lib/memberauth.js';
 import { notifyMemberEmail } from '../../lib/notify/index.js';
+import { notifyAdmin } from '../../lib/inbox.js';
 
 export default async function handler(req, res) {
   if (!allowMethods(req, res, ['POST'])) return;
@@ -40,7 +41,20 @@ export default async function handler(req, res) {
       .eq('id', booking.id);
 
     // confirmation to the member
-    const { data: mem } = await supabase.from('members').select('full_name, email').eq('id', auth.sub).maybeSingle();
+    const { data: mem } = await supabase.from('members').select('full_name, email, membership_number').eq('id', auth.sub).maybeSingle();
+
+    // Notify management (admin inbox).
+    await notifyAdmin(supabase, {
+      kind: 'event',
+      type: 'class.cancelled',
+      title: `${mem?.full_name || 'A member'} cancelled ${klass?.name || 'a class'}${late ? ' (late notice)' : ''}`,
+      body: `${session_date}`,
+      member_id: auth.sub,
+      sender_name: mem ? `${mem.full_name} (${mem.membership_number})` : null,
+      sender_role: 'system',
+      link: `/admin/members/${auth.sub}`,
+    });
+
     if (mem?.email) {
       await notifyMemberEmail(supabase, { id: auth.sub, full_name: mem.full_name, email: mem.email }, 'booking_cancelled', {
         className: klass?.name || 'your class',

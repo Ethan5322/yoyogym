@@ -244,8 +244,15 @@ function StatusTab() {
   if (error) return <p className="text-error">{error}</p>;
   const m = data.membership;
   const badge = data.member?.status === 'active' ? 'text-success' : 'text-error';
+  const firstName = (data.member?.full_name || '').split(' ')[0];
   return (
     <div className="space-y-4">
+      <div className="rounded-xl bg-gradient-to-br from-accent/20 to-transparent p-5">
+        <div className="text-sm text-muted">Welcome back</div>
+        <div className="font-display text-2xl uppercase text-body">{firstName || 'Member'}</div>
+        <div className={`mt-1 text-xs uppercase tracking-wide ${badge}`}>● {data.member?.status}</div>
+      </div>
+
       <div className="card">
         <div className="text-sm text-muted">Membership</div>
         <div className="font-display text-xl text-body">{m?.plan_name || '—'}</div>
@@ -313,7 +320,66 @@ function StatusTab() {
         </div>
       )}
 
+      <PlanChangeRequest currentPlan={m?.plan_name} />
+
       <DeletionRequest />
+    </div>
+  );
+}
+
+function PlanChangeRequest({ currentPlan }) {
+  const [open, setOpen] = useState(false);
+  const [plans, setPlans] = useState([]);
+  const [planId, setPlanId] = useState('');
+  const [note, setNote] = useState('');
+  const [msg, setMsg] = useState('');
+  const [err, setErr] = useState('');
+  const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    if (!open || plans.length) return;
+    memberFetch('/catalog', { auth: false })
+      .then((c) => setPlans(c.plans || []))
+      .catch(() => {});
+  }, [open, plans.length]);
+
+  async function submit() {
+    setBusy(true); setErr(''); setMsg('');
+    try {
+      const r = await memberFetch('/member/request-plan-change', { method: 'POST', body: { plan_id: planId, note } });
+      setMsg(r.message || 'Request sent.');
+      setNote(''); setPlanId('');
+    } catch (e) {
+      setErr(e.message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="card">
+      <div className="flex items-center justify-between">
+        <div>
+          <p className="font-display uppercase text-body">Change my plan</p>
+          <p className="text-xs text-muted">Currently on {currentPlan || 'your plan'}. Request a change — management will confirm.</p>
+        </div>
+        {!open && <button className="btn-outline px-3 py-1.5 text-sm" onClick={() => setOpen(true)}>Request</button>}
+      </div>
+      {open && (
+        <div className="mt-3 space-y-3">
+          <select className="field" value={planId} onChange={(e) => setPlanId(e.target.value)}>
+            <option value="">Choose a plan…</option>
+            {plans.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+          </select>
+          <textarea className="field min-h-[70px]" placeholder="Anything we should know? (optional)" value={note} onChange={(e) => setNote(e.target.value)} />
+          {msg && <p className="rounded-lg bg-success/10 px-3 py-2 text-sm text-success">{msg}</p>}
+          {err && <p className="rounded-lg bg-error/10 px-3 py-2 text-sm text-error">{err}</p>}
+          <div className="flex gap-2">
+            <button className="btn-primary flex-1" onClick={submit} disabled={busy || !planId}>{busy ? 'Sending…' : 'Send request'}</button>
+            <button className="btn-outline" onClick={() => setOpen(false)}>Close</button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
