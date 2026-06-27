@@ -1,9 +1,11 @@
 // Member management list — search + filters (spec 4.4). Owner/Manager.
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import AdminShell from '../../components/AdminShell.jsx';
 import { apiFetch } from '../../lib/api.js';
 import { exportCsv } from '../../lib/csv.js';
+import { parseMembersCsv } from '../../lib/csv.js';
+import { useToast } from '../../lib/toast.jsx';
 import { SkeletonRows } from '../../components/ui.jsx';
 
 const STATUSES = ['', 'new', 'active', 'lapsed', 'suspended'];
@@ -23,6 +25,9 @@ export default function MembersList() {
   const [page, setPage] = useState(Number(sp.get('page')) || 1);
   const [data, setData] = useState(null);
   const [error, setError] = useState('');
+  const toast = useToast();
+  const fileRef = useRef(null);
+  const [importing, setImporting] = useState(false);
 
   useEffect(() => {
     const params = new URLSearchParams({ page: String(page) });
@@ -52,13 +57,50 @@ export default function MembersList() {
     );
   }
 
+  async function onImportFile(e) {
+    const file = e.target.files?.[0];
+    e.target.value = ''; // allow re-selecting the same file
+    if (!file) return;
+    setImporting(true);
+    try {
+      const rows = parseMembersCsv(await file.text());
+      if (!rows.length) { toast.error('No valid rows found. Need a "name" column at least.'); return; }
+      if (!confirm(`Import ${rows.length} member(s)? Each gets a new membership number.`)) return;
+      const r = await apiFetch('/admin/members-import', { method: 'POST', body: { rows } });
+      toast.success(`Imported ${r.created}${r.skipped ? `, skipped ${r.skipped}` : ''}.`);
+      setPage(1);
+      load();
+    } catch (err) {
+      toast.error(err.message);
+    } finally {
+      setImporting(false);
+    }
+  }
+
+  function load() {
+    const params = new URLSearchParams({ page: String(page) });
+    if (q) params.set('q', q);
+    if (status) params.set('status', status);
+    if (tier) params.set('tier', tier);
+    if (contract) params.set('contract', contract);
+    if (parq) params.set('parq', '1');
+    if (expiring) params.set('expiring', expiring);
+    apiFetch(`/admin/members?${params.toString()}`).then(setData).catch((e) => setError(e.message));
+  }
+
   return (
     <AdminShell>
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h1 className="text-2xl font-bold uppercase text-body">Members</h1>
-        <button className="btn-outline px-3 py-1 text-sm" onClick={downloadCsv} disabled={!data?.members?.length}>
-          Export CSV
-        </button>
+        <div className="flex gap-2">
+          <input ref={fileRef} type="file" accept=".csv,text/csv" className="hidden" onChange={onImportFile} />
+          <button className="btn-outline px-3 py-1 text-sm" onClick={() => fileRef.current?.click()} disabled={importing}>
+            {importing ? 'Importing…' : 'Import CSV'}
+          </button>
+          <button className="btn-outline px-3 py-1 text-sm" onClick={downloadCsv} disabled={!data?.members?.length}>
+            Export CSV
+          </button>
+        </div>
       </div>
 
       <div className="admin-toolbar mt-5">

@@ -2,19 +2,46 @@
 import { useEffect, useState } from 'react';
 import AdminShell from '../../components/AdminShell.jsx';
 import { apiFetch } from '../../lib/api.js';
+import { useToast } from '../../lib/toast.jsx';
+import { useBranding } from '../../lib/branding.js';
+import { downloadBoardReportPdf } from '../../lib/boardReportPdf.js';
 
 const zar = (n) => 'R' + Number(n || 0).toLocaleString('en-ZA');
 
 export default function Analytics() {
   const [d, setD] = useState(null);
   const [error, setError] = useState('');
+  const [busy, setBusy] = useState(false);
+  const toast = useToast();
+  const branding = useBranding();
   useEffect(() => {
     apiFetch('/admin/analytics').then(setD).catch((e) => setError(e.message));
   }, []);
 
+  async function boardReport() {
+    setBusy(true);
+    try {
+      const [dashboard, analytics, finance] = await Promise.all([
+        apiFetch('/admin/dashboard').catch(() => ({})),
+        d ? Promise.resolve(d) : apiFetch('/admin/analytics'),
+        apiFetch('/admin/finance').catch(() => ({})),
+      ]);
+      downloadBoardReportPdf({ gymName: branding.name || 'Yoyo GYM', accent: branding.accent_color || '#E63946', dashboard, analytics, finance });
+    } catch (e) {
+      toast.error(e.message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
   return (
     <AdminShell>
-      <h1 className="text-2xl font-bold uppercase text-body">Analytics</h1>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <h1 className="text-2xl font-bold uppercase text-body">Analytics</h1>
+        <button className="btn-outline px-3 py-1 text-sm" onClick={boardReport} disabled={busy}>
+          {busy ? 'Preparing…' : 'Download board report (PDF)'}
+        </button>
+      </div>
       {error && <p className="mt-4 text-error">{error}</p>}
       {d && (
         <>

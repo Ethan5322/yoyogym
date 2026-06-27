@@ -36,6 +36,7 @@ import finance from '../../server/handlers/admin/finance.js';
 import notifications from '../../server/handlers/admin/notifications.js';
 import inbox from '../../server/handlers/admin/inbox.js';
 import message from '../../server/handlers/admin/message.js';
+import membersImport from '../../server/handlers/admin/members-import.js';
 
 const routes = {
   dashboard,
@@ -72,6 +73,7 @@ const routes = {
   notifications,
   inbox,
   message,
+  'members-import': membersImport,
 };
 
 export default async function handler(req, res) {
