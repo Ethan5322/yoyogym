@@ -38,10 +38,13 @@ export default function Communications() {
 
       <div className="mt-4 flex gap-2 border-b border-white/5">
         <Tab active={tab === 'compose'} onClick={() => setTab('compose')}>Compose</Tab>
+        <Tab active={tab === 'announce'} onClick={() => setTab('announce')}>Announcements</Tab>
         <Tab active={tab === 'history'} onClick={() => setTab('history')}>History</Tab>
       </div>
 
-      {tab === 'compose' ? <Compose toast={toast} /> : <History />}
+      {tab === 'compose' && <Compose toast={toast} />}
+      {tab === 'announce' && <Announcements toast={toast} />}
+      {tab === 'history' && <History />}
     </AdminShell>
   );
 }
@@ -96,6 +99,65 @@ function Compose({ toast }) {
       <button className="btn-primary w-full" disabled={busy || !subject || !message} onClick={send}>
         {busy ? 'Sending…' : 'Send Email Broadcast'}
       </button>
+    </div>
+  );
+}
+
+function Announcements({ toast }) {
+  const [list, setList] = useState(null);
+  const [title, setTitle] = useState('');
+  const [body, setBody] = useState('');
+  const [busy, setBusy] = useState(false);
+
+  function load() {
+    apiFetch('/admin/announcements').then((d) => setList(d.announcements || [])).catch((e) => toast.error(e.message));
+  }
+  useEffect(load, []);
+
+  async function create() {
+    setBusy(true);
+    try {
+      await apiFetch('/admin/announcements', { method: 'POST', body: { title, body } });
+      toast.success('Announcement published.');
+      setTitle(''); setBody('');
+      load();
+    } catch (e) { toast.error(e.message); } finally { setBusy(false); }
+  }
+  async function remove(a) {
+    if (!confirm('Delete this announcement?')) return;
+    try { await apiFetch(`/admin/announcements?id=${a.id}`, { method: 'DELETE' }); load(); }
+    catch (e) { toast.error(e.message); }
+  }
+  async function toggle(a) {
+    try { await apiFetch(`/admin/announcements?id=${a.id}`, { method: 'PATCH', body: { is_published: !a.is_published } }); load(); }
+    catch (e) { toast.error(e.message); }
+  }
+
+  return (
+    <div className="mt-6 space-y-5">
+      <div className="card space-y-3">
+        <h2 className="font-display uppercase text-body">New announcement</h2>
+        <input className="field" placeholder="Title" value={title} onChange={(e) => setTitle(e.target.value)} />
+        <textarea className="field min-h-[110px]" placeholder="What's the news? (closures, events, promotions…)" value={body} onChange={(e) => setBody(e.target.value)} />
+        <button className="btn-primary w-full" onClick={create} disabled={busy || !title.trim()}>{busy ? 'Publishing…' : 'Publish to members'}</button>
+      </div>
+
+      {list && list.map((a) => (
+        <div key={a.id} className="card">
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0">
+              <div className="font-display uppercase text-body">{a.title} {!a.is_published && <span className="text-xs text-muted">(hidden)</span>}</div>
+              {a.body && <p className="mt-1 whitespace-pre-wrap text-sm text-muted">{a.body}</p>}
+              <div className="mt-1 text-xs text-muted">{new Date(a.created_at).toLocaleString('en-ZA')} · {a.created_by_name || 'Management'}</div>
+            </div>
+            <div className="flex shrink-0 flex-col gap-2 text-xs">
+              <button className="text-accent hover:underline" onClick={() => toggle(a)}>{a.is_published ? 'Hide' : 'Publish'}</button>
+              <button className="text-error hover:underline" onClick={() => remove(a)}>Delete</button>
+            </div>
+          </div>
+        </div>
+      ))}
+      {list && !list.length && <p className="text-muted">No announcements yet.</p>}
     </div>
   );
 }

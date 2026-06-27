@@ -270,6 +270,8 @@ function StatusTab() {
         <div className={`mt-1 text-xs uppercase tracking-wide ${badge}`}>● {data.member?.status}</div>
       </div>
 
+      <Announcements />
+
       <div className="card">
         <div className="text-sm text-muted">Membership</div>
         <div className="font-display text-xl text-body">{m?.plan_name || '—'}</div>
@@ -342,6 +344,28 @@ function StatusTab() {
       <ProfileEditor />
 
       <DeletionRequest />
+    </div>
+  );
+}
+
+function Announcements() {
+  const [list, setList] = useState([]);
+  useEffect(() => {
+    memberFetch('/member/announcements').then((d) => setList(d.announcements || [])).catch(() => {});
+  }, []);
+  if (!list.length) return null;
+  return (
+    <div className="card">
+      <h3 className="mb-2 font-display text-sm uppercase tracking-wider text-accent">📣 Gym News</h3>
+      <div className="space-y-3">
+        {list.slice(0, 5).map((a) => (
+          <div key={a.id} className="border-b border-white/5 pb-2 last:border-0 last:pb-0">
+            <div className="font-display uppercase text-body">{a.title}</div>
+            {a.body && <p className="mt-0.5 whitespace-pre-wrap text-sm text-muted">{a.body}</p>}
+            <div className="mt-1 text-[10px] uppercase tracking-wide text-muted">{new Date(a.created_at).toLocaleDateString('en-ZA')}</div>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }

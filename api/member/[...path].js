@@ -15,6 +15,7 @@ import message from '../../server/handlers/member/message.js';
 import messages from '../../server/handlers/member/messages.js';
 import requestPlanChange from '../../server/handlers/member/request-plan-change.js';
 import profile from '../../server/handlers/member/profile.js';
+import announcements from '../../server/handlers/member/announcements.js';
 
 const routes = {
   login,
@@ -31,6 +32,7 @@ const routes = {
   messages,
   'request-plan-change': requestPlanChange,
   profile,
+  announcements,
 };
 
 export default async function handler(req, res) {

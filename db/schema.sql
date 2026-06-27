@@ -395,6 +395,20 @@ create index if not exists admin_inbox_unread_idx on gym.admin_inbox(is_read) wh
 create index if not exists admin_inbox_member_idx on gym.admin_inbox(member_id);
 
 -- -----------------------------------------------------------------------------
+-- announcements — gym news feed (management -> members)
+-- -----------------------------------------------------------------------------
+create table if not exists gym.announcements (
+  id              uuid primary key default gen_random_uuid(),
+  title           text not null,
+  body            text,
+  is_published    boolean not null default true,
+  created_by      uuid references gym.admin_users(id) on delete set null,
+  created_by_name text,
+  created_at      timestamptz not null default now()
+);
+create index if not exists announcements_created_idx on gym.announcements(created_at desc);
+
+-- -----------------------------------------------------------------------------
 -- settings — all gym configuration (spec 4.13). Keyed by `key`.
 -- Known keys: gym_profile, notifications, notification_toggles,
 --             contract_discounts, compliance, legal_terms, parq_settings ...
