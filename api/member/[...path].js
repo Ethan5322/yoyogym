@@ -2,6 +2,7 @@
 import { json } from '../../server/lib/http.js';
 import { captureError } from '../../server/lib/observability.js';
 import login from '../../server/handlers/member/login.js';
+import faceLogin from '../../server/handlers/member/face-login.js';
 import status from '../../server/handlers/member/status.js';
 import checkin from '../../server/handlers/member/checkin.js';
 import classes from '../../server/handlers/member/classes.js';
@@ -13,6 +14,7 @@ import pay from '../../server/handlers/member/pay.js';
 
 const routes = {
   login,
+  'face-login': faceLogin,
   status,
   checkin,
   classes,

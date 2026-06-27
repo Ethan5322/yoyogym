@@ -370,6 +370,27 @@ create table if not exists gym.notifications_log (
 create index if not exists notifications_member_idx on gym.notifications_log(member_id);
 
 -- -----------------------------------------------------------------------------
+-- admin_inbox — inbound messages (member/staff -> management) + member-action
+-- alerts. Backs the admin notification bell and the message inbox.
+--   kind: message | event
+-- -----------------------------------------------------------------------------
+create table if not exists gym.admin_inbox (
+  id          uuid primary key default gen_random_uuid(),
+  kind        text not null default 'message',
+  type        text,
+  title       text,
+  body        text,
+  member_id   uuid references gym.members(id) on delete set null,
+  sender_name text,
+  sender_role text,
+  link        text,
+  is_read     boolean not null default false,
+  created_at  timestamptz not null default now()
+);
+create index if not exists admin_inbox_created_idx on gym.admin_inbox(created_at desc);
+create index if not exists admin_inbox_unread_idx on gym.admin_inbox(is_read) where is_read = false;
+
+-- -----------------------------------------------------------------------------
 -- settings — all gym configuration (spec 4.13). Keyed by `key`.
 -- Known keys: gym_profile, notifications, notification_toggles,
 --             contract_discounts, compliance, legal_terms, parq_settings ...

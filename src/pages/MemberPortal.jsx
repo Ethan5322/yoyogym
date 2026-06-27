@@ -6,6 +6,7 @@ import { memberFetch, getMemberToken, setMemberToken, clearMemberToken } from '.
 import { logQrScan } from '../lib/scan.js';
 import PersonalQr from '../components/PersonalQr.jsx';
 import IdCardButton from '../components/IdCardButton.jsx';
+import FaceCapture from '../chatbot/components/FaceCapture.jsx';
 
 export default function MemberPortal() {
   const [token, setTok] = useState(getMemberToken());
@@ -71,6 +72,7 @@ function MemberLogin({ onLoggedIn }) {
   const [phone, setPhone] = useState('');
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
+  const [faceMode, setFaceMode] = useState(false);
 
   async function submit(e) {
     e.preventDefault();
@@ -90,35 +92,81 @@ function MemberLogin({ onLoggedIn }) {
     }
   }
 
+  async function onFace(result) {
+    if (!result?.descriptor) {
+      setFaceMode(false);
+      return;
+    }
+    setError('');
+    setBusy(true);
+    try {
+      const { token, member } = await memberFetch('/member/face-login', {
+        method: 'POST',
+        auth: false,
+        body: { descriptor: Array.from(result.descriptor) },
+      });
+      onLoggedIn(token, member);
+    } catch (err) {
+      setError(err.message || 'Face not recognised.');
+      setFaceMode(false);
+    } finally {
+      setBusy(false);
+    }
+  }
+
   return (
     <div className="flex min-h-[100dvh] items-center justify-center bg-bg px-6">
-      <form onSubmit={submit} className="w-full max-w-sm animate-fade-up space-y-4">
+      <div className="w-full max-w-sm animate-fade-up space-y-4">
         <div className="text-center">
           <h1 className="text-2xl font-bold uppercase text-body">Member Sign In</h1>
-          <p className="mt-2 text-sm text-muted">Enter your membership number and phone.</p>
+          <p className="mt-2 text-sm text-muted">
+            {faceMode ? 'Look at the camera to sign in' : 'Use your face, or your membership number.'}
+          </p>
         </div>
-        <input
-          className="field"
-          placeholder="Membership number (GYM-2025-XXXXXX)"
-          value={membership_number}
-          onChange={(e) => setNum(e.target.value)}
-          required
-        />
-        <input
-          className="field"
-          placeholder="Phone (+27…)"
-          value={phone}
-          onChange={(e) => setPhone(e.target.value)}
-          required
-        />
+
         {error && <p className="rounded-lg bg-error/10 px-3 py-2 text-sm text-error">{error}</p>}
-        <button className="btn-primary w-full" disabled={busy}>
-          {busy ? 'Signing in…' : 'Sign In'}
-        </button>
+
+        {faceMode ? (
+          <div className="card space-y-3">
+            <FaceCapture onSubmit={onFace} />
+            <button className="w-full text-sm text-muted hover:text-body" onClick={() => setFaceMode(false)}>
+              ← Use membership number instead
+            </button>
+          </div>
+        ) : (
+          <>
+            <button className="btn-primary w-full" onClick={() => { setError(''); setFaceMode(true); }}>
+              🛡️ Sign in with Face
+            </button>
+            <div className="flex items-center gap-3 text-xs uppercase tracking-wide text-muted">
+              <span className="h-px flex-1 bg-white/10" /> or <span className="h-px flex-1 bg-white/10" />
+            </div>
+            <form onSubmit={submit} className="space-y-4">
+              <input
+                className="field"
+                placeholder="Membership number (GYM-2025-XXXXXX)"
+                value={membership_number}
+                onChange={(e) => setNum(e.target.value)}
+                required
+              />
+              <input
+                className="field"
+                placeholder="Phone (+27…)"
+                value={phone}
+                onChange={(e) => setPhone(e.target.value)}
+                required
+              />
+              <button className="btn-outline w-full" disabled={busy}>
+                {busy ? 'Signing in…' : 'Sign In'}
+              </button>
+            </form>
+          </>
+        )}
+
         <Link to="/" className="block text-center text-sm text-muted hover:text-body">
           ← Back
         </Link>
-      </form>
+      </div>
     </div>
   );
 }
