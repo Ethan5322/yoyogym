@@ -9,7 +9,7 @@ import { SkeletonRows } from '../../components/ui.jsx';
 
 const fmt = (d) => (d ? new Date(d).toLocaleString('en-ZA') : '—');
 const FILTERS = [['', 'All'], ['message', 'Messages'], ['event', 'Alerts']];
-const ICON = { 'member.message': '✉', 'staff.message': '✉', 'class.booked': '◈', 'class.cancelled': '⊘', 'plan.change_request': '↔' };
+const ICON = { 'member.message': '✉', 'staff.message': '✉', 'class.booked': '◈', 'class.cancelled': '⊘', 'plan.change_request': '↔', referral: '🎁', 'admin.reply': '↩' };
 
 export default function Inbox() {
   const toast = useToast();

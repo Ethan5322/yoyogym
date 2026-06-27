@@ -17,6 +17,7 @@ import requestPlanChange from '../../server/handlers/member/request-plan-change.
 import profile from '../../server/handlers/member/profile.js';
 import announcements from '../../server/handlers/member/announcements.js';
 import progress from '../../server/handlers/member/progress.js';
+import refer from '../../server/handlers/member/refer.js';
 
 const routes = {
   login,
@@ -35,6 +36,7 @@ const routes = {
   profile,
   announcements,
   progress,
+  refer,
 };
 
 export default async function handler(req, res) {

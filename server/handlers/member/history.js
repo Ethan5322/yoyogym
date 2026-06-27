@@ -11,7 +11,7 @@ export default async function handler(req, res) {
 
   try {
     const supabase = getSupabase();
-    const [{ data: checkins }, { data: bookings }] = await Promise.all([
+    const [{ data: checkins }, { data: bookings }, sessionsRes] = await Promise.all([
       supabase
         .from('checkins')
         .select('checked_in_at, checked_out_at, method')
@@ -24,6 +24,14 @@ export default async function handler(req, res) {
         .eq('member_id', auth.sub)
         .order('session_date', { ascending: false })
         .limit(20),
+      supabase
+        .from('training_sessions')
+        .select('scheduled_at, completed_at, workout_notes, trainers(full_name)')
+        .eq('member_id', auth.sub)
+        .not('workout_notes', 'is', null)
+        .order('scheduled_at', { ascending: false })
+        .limit(20)
+        .then((r) => r, () => ({ data: [] })),
     ]);
 
     return ok(res, {
@@ -32,6 +40,11 @@ export default async function handler(req, res) {
         session_date: b.session_date,
         status: b.status,
         class_name: b.classes?.name || 'Class',
+      })),
+      sessions: (sessionsRes?.data || []).map((s) => ({
+        at: s.completed_at || s.scheduled_at,
+        notes: s.workout_notes,
+        trainer: s.trainers?.full_name || 'Trainer',
       })),
     });
   } catch (err) {

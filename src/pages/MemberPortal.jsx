@@ -439,6 +439,8 @@ function StatusTab() {
 
       <PlanChangeRequest currentPlan={m?.plan_name} />
 
+      <ReferFriend />
+
       <ProfileEditor />
 
       <DeletionRequest />
@@ -464,6 +466,70 @@ function Announcements() {
           </div>
         ))}
       </div>
+    </div>
+  );
+}
+
+function ReferFriend() {
+  const [open, setOpen] = useState(false);
+  const [refs, setRefs] = useState([]);
+  const [form, setForm] = useState({ friend_name: '', friend_phone: '', friend_email: '' });
+  const [msg, setMsg] = useState('');
+  const [err, setErr] = useState('');
+  const [busy, setBusy] = useState(false);
+
+  function load() {
+    memberFetch('/member/refer').then((d) => setRefs(d.referrals || [])).catch(() => {});
+  }
+  useEffect(() => { if (open) load(); }, [open]);
+
+  async function submit() {
+    setBusy(true); setErr(''); setMsg('');
+    try {
+      const r = await memberFetch('/member/refer', { method: 'POST', body: form });
+      setMsg(r.message || 'Thanks!');
+      setForm({ friend_name: '', friend_phone: '', friend_email: '' });
+      load();
+    } catch (e) {
+      setErr(e.message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="card">
+      <div className="flex items-center justify-between">
+        <div>
+          <p className="font-display uppercase text-body">Refer a friend 🎁</p>
+          <p className="text-xs text-muted">Train better together — invite a friend to join.</p>
+        </div>
+        {!open && <button className="btn-outline px-3 py-1.5 text-sm" onClick={() => setOpen(true)}>Invite</button>}
+      </div>
+      {open && (
+        <div className="mt-3 space-y-2">
+          <input className="field" placeholder="Friend's name" value={form.friend_name} onChange={(e) => setForm({ ...form, friend_name: e.target.value })} />
+          <input className="field" placeholder="Their phone" value={form.friend_phone} onChange={(e) => setForm({ ...form, friend_phone: e.target.value })} />
+          <input className="field" placeholder="Their email" value={form.friend_email} onChange={(e) => setForm({ ...form, friend_email: e.target.value })} />
+          {msg && <p className="rounded-lg bg-success/10 px-3 py-2 text-sm text-success">{msg}</p>}
+          {err && <p className="rounded-lg bg-error/10 px-3 py-2 text-sm text-error">{err}</p>}
+          <div className="flex gap-2">
+            <button className="btn-primary flex-1" onClick={submit} disabled={busy || !form.friend_name.trim()}>{busy ? 'Sending…' : 'Send invite'}</button>
+            <button className="btn-outline" onClick={() => setOpen(false)}>Close</button>
+          </div>
+          {refs.length > 0 && (
+            <div className="pt-2">
+              <div className="mb-1 text-xs uppercase tracking-wide text-muted">Your referrals</div>
+              {refs.map((r, i) => (
+                <div key={i} className="flex justify-between text-sm">
+                  <span className="text-body">{r.friend_name}</span>
+                  <span className="text-muted">{r.status}</span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }
@@ -777,6 +843,21 @@ function HistoryTab() {
           <p className="text-sm text-muted">No check-ins yet.</p>
         )}
       </div>
+      {data.sessions?.length > 0 && (
+        <div>
+          <h3 className="mb-2 font-display text-sm uppercase tracking-wider text-accent">Trainer Notes</h3>
+          {data.sessions.map((s, i) => (
+            <div key={i} className="border-b border-white/5 py-2 text-sm">
+              <div className="flex justify-between">
+                <span className="text-body">{s.trainer}</span>
+                <span className="text-muted">{fmt(s.at)}</span>
+              </div>
+              <p className="mt-0.5 whitespace-pre-wrap text-muted">{s.notes}</p>
+            </div>
+          ))}
+        </div>
+      )}
+
       <div>
         <h3 className="mb-2 font-display text-sm uppercase tracking-wider text-accent">Class Bookings</h3>
         {data.bookings.length ? (

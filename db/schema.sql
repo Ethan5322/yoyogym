@@ -414,6 +414,21 @@ create table if not exists gym.progress_entries (
 create index if not exists progress_member_idx on gym.progress_entries(member_id, recorded_on desc);
 
 -- -----------------------------------------------------------------------------
+-- referrals — member-get-member referral program
+-- -----------------------------------------------------------------------------
+create table if not exists gym.referrals (
+  id                 uuid primary key default gen_random_uuid(),
+  referrer_member_id uuid references gym.members(id) on delete set null,
+  referrer_name      text,
+  friend_name        text not null,
+  friend_phone       text,
+  friend_email       text,
+  status             text not null default 'pending',
+  created_at         timestamptz not null default now()
+);
+create index if not exists referrals_referrer_idx on gym.referrals(referrer_member_id);
+
+-- -----------------------------------------------------------------------------
 -- announcements — gym news feed (management -> members)
 -- -----------------------------------------------------------------------------
 create table if not exists gym.announcements (
