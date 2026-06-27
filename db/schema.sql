@@ -165,7 +165,8 @@ create table if not exists gym.members (
   manually_registered  boolean not null default false,
   staff_notes          text,
   photo_url            text,
-  face_descriptor      jsonb,                            -- biometric (Phase 88)
+  face_descriptor      jsonb,                            -- biometric (Phase 88, face-api 128-D)
+  arcface_embedding    jsonb,                            -- InsightFace ArcFace 512-D (high-accuracy)
   biometric_enrolled   boolean not null default false,
   popia_consent_at     timestamptz,
   created_at           timestamptz not null default now(),

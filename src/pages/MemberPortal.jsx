@@ -107,7 +107,10 @@ function MemberLogin({ onLoggedIn }) {
       const { token, member } = await memberFetch('/member/face-login', {
         method: 'POST',
         auth: false,
-        body: { descriptor: Array.from(result.descriptor) },
+        body: {
+          image: result.image,                                   // ArcFace (preferred)
+          descriptor: result.descriptor ? Array.from(result.descriptor) : undefined, // face-api fallback
+        },
       });
       onLoggedIn(token, member);
     } catch (err) {

@@ -12,6 +12,7 @@
 import { getSupabase } from '../../lib/supabase.js';
 import { allowMethods, readJsonBody, ok, badRequest, serverError } from '../../lib/http.js';
 import { generateMembershipNumber, generateVerificationCode } from '../../lib/identifiers.js';
+import { faceServiceConfigured, embedFace } from '../../lib/faceservice.js';
 import { computeMembership, addonsTotal, totalDueToday, DURATION_MONTHS } from '../../../shared/pricing.js';
 import { onNewMember } from '../../lib/notify/index.js';
 import { rateLimit } from '../../lib/ratelimit.js';
@@ -155,6 +156,15 @@ export default async function handler(req, res) {
       memberRow.face_descriptor = a.face.descriptor;
       memberRow.biometric_enrolled = true;
       memberRow.photo_url = a.face.image || null;
+    }
+    // High-accuracy ArcFace embedding when the InsightFace service is configured.
+    if (a.face?.image && faceServiceConfigured()) {
+      const emb = await embedFace(a.face.image);
+      if (emb) {
+        memberRow.arcface_embedding = emb;
+        memberRow.biometric_enrolled = true;
+        if (!memberRow.photo_url) memberRow.photo_url = a.face.image;
+      }
     }
     const { data: member, error: memberErr } = await supabase
       .from('members')
