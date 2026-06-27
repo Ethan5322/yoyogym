@@ -4,6 +4,7 @@ import { Link } from 'react-router-dom';
 import AdminShell from '../../components/AdminShell.jsx';
 import { useAuth } from '../../lib/auth.jsx';
 import { apiFetch } from '../../lib/api.js';
+import { StatCard, SkeletonStats } from '../../components/ui.jsx';
 
 const zar = (n) => 'R' + Number(n || 0).toLocaleString('en-ZA', { minimumFractionDigits: 2 });
 
@@ -24,7 +25,7 @@ export default function Dashboard() {
       <p className="mt-1 text-muted">Today at a glance</p>
 
       {error && <p className="mt-4 rounded-lg bg-error/10 px-3 py-2 text-error">{error}</p>}
-      {!d && !error && <p className="mt-6 text-muted">Loading…</p>}
+      {!d && !error && <div className="mt-6"><SkeletonStats count={8} /></div>}
 
       {d && (
         <>
@@ -45,14 +46,14 @@ export default function Dashboard() {
           </div>
 
           <div className="mt-6 grid grid-cols-2 gap-4 lg:grid-cols-4">
-            <Stat label="Check-ins Today" value={d.checkins_today} to="/admin/today" />
-            <Stat label="New Today" value={d.new_today} to="/admin/members" />
-            <Stat label="New This Week" value={d.new_week} to="/admin/members" />
-            <Stat label="New This Month" value={d.new_month} to="/admin/members" />
-            <Stat label="Active Members" value={d.active_members} to="/admin/members?status=active" />
-            <Stat label="Lapsed (win-back)" value={d.lapsed_members} to="/admin/members?status=lapsed" />
-            <Stat label="Revenue Today" value={zar(d.revenue_today)} to="/admin/payments" />
-            <Stat label="Revenue This Month" value={zar(d.revenue_month)} to="/admin/payments" />
+            <StatCard label="Check-ins Today" value={d.checkins_today} to="/admin/today" />
+            <StatCard label="New Today" value={d.new_today} to="/admin/members" />
+            <StatCard label="New This Week" value={d.new_week} to="/admin/members" />
+            <StatCard label="New This Month" value={d.new_month} to="/admin/members" delta={d.new_month - d.new_month_prev} />
+            <StatCard label="Active Members" value={d.active_members} to="/admin/members?status=active" />
+            <StatCard label="Lapsed (win-back)" value={d.lapsed_members} to="/admin/members?status=lapsed" deltaGood={false} />
+            <StatCard label="Revenue Today" value={zar(d.revenue_today)} to="/admin/payments" />
+            <StatCard label="Revenue This Month" value={zar(d.revenue_month)} to="/admin/payments" delta={d.revenue_month - d.revenue_month_prev} />
           </div>
 
           <div className="mt-8 grid gap-4 lg:grid-cols-2">
@@ -105,25 +106,6 @@ export default function Dashboard() {
   );
 }
 
-function Stat({ label, value, to }) {
-  const inner = (
-    <>
-      <div className="flex items-center justify-between text-sm text-muted">
-        <span>{label}</span>
-        {to && <span className="text-accent opacity-0 transition group-hover:opacity-100">→</span>}
-      </div>
-      <div className="mt-2 font-display text-3xl text-body">{value}</div>
-    </>
-  );
-  if (to) {
-    return (
-      <Link to={to} className="card group transition hover:border-accent/40 hover:bg-surface">
-        {inner}
-      </Link>
-    );
-  }
-  return <div className="card">{inner}</div>;
-}
 function Banner({ tone, children, to }) {
   const cls = tone === 'error' ? 'bg-error/10 text-error' : 'bg-accent-soft text-accent';
   const content = (

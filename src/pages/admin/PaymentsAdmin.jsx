@@ -4,12 +4,15 @@ import { useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import AdminShell from '../../components/AdminShell.jsx';
 import { apiFetch } from '../../lib/api.js';
+import { useToast } from '../../lib/toast.jsx';
+import { exportCsv } from '../../lib/csv.js';
 
 const zar = (n) => 'R' + Number(n || 0).toLocaleString('en-ZA', { minimumFractionDigits: 2 });
 const CATS = ['joining_fee', 'monthly_fee', 'session_pack', 'personal_training', 'class_addon', 'day_pass', 'other'];
 
 export default function PaymentsAdmin() {
   const [sp, setSp] = useSearchParams();
+  const toast = useToast();
   const [status, setStatus] = useState(sp.get('status') || '');
   const [data, setData] = useState(null);
   const [error, setError] = useState('');
@@ -27,21 +30,19 @@ export default function PaymentsAdmin() {
     if (!confirm(`Mark ${zar(p.amount)} payment from ${p.member_name} as refunded?`)) return;
     try {
       await apiFetch(`/admin/payments?id=${p.id}`, { method: 'PATCH', body: { refunded_amount: p.amount } });
+      toast.success(`Refund recorded for ${p.member_name}.`);
       load();
     } catch (e) {
-      setError(e.message);
+      toast.error(e.message);
     }
   }
 
-  function exportCsv() {
-    if (!data) return;
-    const rows = [['Date', 'Member', 'Number', 'Category', 'Amount', 'Status', 'Method']];
-    for (const p of data.payments) {
-      rows.push([p.created_at, p.member_name, p.membership_number, p.category, p.amount, p.status, p.method]);
-    }
-    const csv = rows.map((r) => r.map((c) => `"${String(c ?? '')}"`).join(',')).join('\n');
-    import('../../lib/download.js').then(({ downloadBlob }) =>
-      downloadBlob(new Blob([csv], { type: 'text/csv' }), 'payments.csv')
+  function downloadCsv() {
+    if (!data?.payments?.length) return;
+    exportCsv(
+      `payments-${new Date().toISOString().slice(0, 10)}`,
+      ['Date', 'Member', 'Number', 'Category', 'Amount', 'Status', 'Method'],
+      data.payments.map((p) => [p.created_at, p.member_name, p.membership_number, p.category, p.amount, p.status, p.method])
     );
   }
 
@@ -50,7 +51,7 @@ export default function PaymentsAdmin() {
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h1 className="text-2xl font-bold uppercase text-body">Payments</h1>
         <div className="flex gap-2">
-          <button className="btn-outline px-3 py-1 text-sm" onClick={exportCsv}>Export CSV</button>
+          <button className="btn-outline px-3 py-1 text-sm" onClick={downloadCsv}>Export CSV</button>
           <button className="btn-primary px-3 py-1 text-sm" onClick={() => setManual(true)}>+ Record Payment</button>
         </div>
       </div>
@@ -78,6 +79,9 @@ export default function PaymentsAdmin() {
                 <tr><th className="px-3 py-2">Date</th><th className="px-3 py-2">Member</th><th className="px-3 py-2">Category</th><th className="px-3 py-2">Amount</th><th className="px-3 py-2">Status</th><th className="px-3 py-2"></th></tr>
               </thead>
               <tbody>
+                {!data.payments.length && (
+                  <tr><td colSpan={6} className="px-3 py-8 text-center text-muted">No payments match this filter.</td></tr>
+                )}
                 {data.payments.map((p) => (
                   <tr key={p.id} className="border-t border-white/5">
                     <td className="px-3 py-2 text-muted">{new Date(p.created_at).toLocaleDateString('en-ZA')}</td>
@@ -104,12 +108,14 @@ export default function PaymentsAdmin() {
 }
 
 function ManualPayment({ onClose }) {
+  const toast = useToast();
   const [form, setForm] = useState({ amount: '', category: 'monthly_fee', method: 'cash', description: '' });
   const [err, setErr] = useState('');
   async function save() {
     setErr('');
     try {
       await apiFetch('/admin/payments', { method: 'POST', body: { ...form, amount: Number(form.amount) } });
+      toast.success(`Payment of ${zar(form.amount)} recorded.`);
       onClose();
     } catch (e) {
       setErr(e.message);

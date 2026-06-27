@@ -69,6 +69,7 @@ export default function AdminShell({ children }) {
   const navigate = useNavigate();
   const { pathname } = useLocation();
   const [open, setOpen] = useState(false);
+  const [search, setSearch] = useState('');
 
   // Close the mobile drawer whenever the route changes.
   useEffect(() => setOpen(false), [pathname]);
@@ -76,6 +77,17 @@ export default function AdminShell({ children }) {
   function handleLogout() {
     logout();
     navigate('/admin/login', { replace: true });
+  }
+
+  // Global jump-to-member search (owner/manager). Reuses the URL-driven
+  // Members filter so the result page opens pre-searched.
+  const canSearch = ['owner', 'manager'].includes(user?.role);
+  function submitSearch(e) {
+    e.preventDefault();
+    const q = search.trim();
+    if (!q) return;
+    navigate(`/admin/members?q=${encodeURIComponent(q)}`);
+    setSearch('');
   }
 
   const isActive = (n) => (n.exact ? pathname === n.to : pathname.startsWith(n.to));
@@ -104,6 +116,19 @@ export default function AdminShell({ children }) {
           <span className="font-display text-xl font-bold uppercase tracking-wider text-accent">{gymName}</span>
           <span className="text-[10px] uppercase tracking-[0.25em] text-muted">Management</span>
         </div>
+
+        {canSearch && (
+          <form onSubmit={submitSearch} className="px-3 pb-2">
+            <input
+              className="field w-full py-2 text-sm"
+              type="search"
+              placeholder="Search members…"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              aria-label="Search members"
+            />
+          </form>
+        )}
 
         <nav className="admin-nav">
           {visibleGroups.map((g) => (

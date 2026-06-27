@@ -4,6 +4,7 @@ import { useParams, Link, useNavigate } from 'react-router-dom';
 import AdminShell from '../../components/AdminShell.jsx';
 import { apiFetch } from '../../lib/api.js';
 import { useAuth } from '../../lib/auth.jsx';
+import { useToast } from '../../lib/toast.jsx';
 import PersonalQr from '../../components/PersonalQr.jsx';
 import IdCardButton from '../../components/IdCardButton.jsx';
 
@@ -20,10 +21,10 @@ export default function MemberDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
   const { user } = useAuth();
+  const toast = useToast();
   const [data, setData] = useState(null);
   const [error, setError] = useState('');
   const [notes, setNotes] = useState('');
-  const [savedMsg, setSavedMsg] = useState('');
   const [plans, setPlans] = useState([]);
 
   useEffect(() => {
@@ -51,24 +52,22 @@ export default function MemberDetail() {
   useEffect(load, [id]);
 
   async function patch(body) {
-    setSavedMsg('');
     try {
       await apiFetch(`/admin/member?id=${id}`, { method: 'PATCH', body });
-      setSavedMsg('Saved.');
+      toast.success('Saved.');
       load();
     } catch (e) {
-      setSavedMsg(e.message);
+      toast.error(e.message);
     }
   }
 
   async function action(name, extra = {}) {
-    setSavedMsg('');
     try {
       const r = await apiFetch(`/admin/member-action?id=${id}`, { method: 'POST', body: { action: name, ...extra } });
-      setSavedMsg(r.message || 'Done.');
+      toast.success(r.message || 'Done.');
       load();
     } catch (e) {
-      setSavedMsg(e.message);
+      toast.error(e.message);
     }
   }
 
@@ -108,7 +107,6 @@ export default function MemberDetail() {
           )}
         </div>
       </div>
-      {savedMsg && <p className="mt-2 text-sm text-success">{savedMsg}</p>}
 
       <div className="mt-3 flex items-center gap-2">
         <span className="text-sm text-muted">Change plan:</span>
@@ -202,7 +200,6 @@ export default function MemberDetail() {
           <button className="btn-primary px-4 py-2 text-sm" onClick={() => patch({ staff_notes: notes })}>
             Save notes
           </button>
-          {savedMsg && <span className="text-sm text-muted">{savedMsg}</span>}
         </div>
       </Section>
 

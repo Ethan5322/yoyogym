@@ -31,6 +31,13 @@ export default async function handler(req, res) {
     const in7 = new Date(Date.now() + 7 * 86400000).toISOString().slice(0, 10);
     const todayDate = new Date().toISOString().slice(0, 10);
 
+    // Same window in the previous month (month-to-date vs prev-month-to-date),
+    // so KPI deltas compare like-for-like elapsed time, not full vs partial.
+    const monthStartDate = new Date(monthStart);
+    const prevMonthStart = new Date(monthStartDate);
+    prevMonthStart.setMonth(prevMonthStart.getMonth() - 1);
+    const prevMonthCutoff = new Date(prevMonthStart.getTime() + (Date.now() - monthStartDate.getTime()));
+
     const c = (extra) => supabase.from('members').select('id', { count: 'exact', head: true });
 
     const [
@@ -75,6 +82,21 @@ export default async function handler(req, res) {
     const failedPayments = await count(
       supabase.from('payments').select('id', { count: 'exact', head: true }).eq('status', 'failed')
     );
+
+    // Previous-month-to-date comparators for KPI trend deltas.
+    const [newMonthPrev, revMonthPrev] = await Promise.all([
+      count(
+        c()
+          .gte('created_at', prevMonthStart.toISOString())
+          .lt('created_at', prevMonthCutoff.toISOString())
+      ),
+      supabase
+        .from('payments')
+        .select('amount')
+        .eq('status', 'received')
+        .gte('paid_at', prevMonthStart.toISOString())
+        .lt('paid_at', prevMonthCutoff.toISOString()),
+    ]);
 
     // Classes today at 90%+ capacity (alert banner, spec 4.2)
     const today = new Date();
@@ -122,6 +144,8 @@ export default async function handler(req, res) {
       revenue_today: sumAmount(revToday.data),
       revenue_week: sumAmount(revWeek.data),
       revenue_month: sumAmount(revMonth.data),
+      new_month_prev: newMonthPrev,
+      revenue_month_prev: sumAmount(revMonthPrev.data),
       recent_registrations: recent.data || [],
       activity: feed,
     });

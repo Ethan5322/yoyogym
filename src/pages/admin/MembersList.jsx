@@ -3,6 +3,8 @@ import { useEffect, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import AdminShell from '../../components/AdminShell.jsx';
 import { apiFetch } from '../../lib/api.js';
+import { exportCsv } from '../../lib/csv.js';
+import { SkeletonRows } from '../../components/ui.jsx';
 
 const STATUSES = ['', 'new', 'active', 'lapsed', 'suspended'];
 const TIERS = [['', 'All tiers'], ['basic', 'Basic'], ['standard', 'Standard'], ['premium', 'Premium'], ['vip', 'VIP']];
@@ -41,9 +43,23 @@ export default function MembersList() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [q, status, tier, contract, parq, expiring, page]);
 
+  function downloadCsv() {
+    if (!data?.members?.length) return;
+    exportCsv(
+      `members-${new Date().toISOString().slice(0, 10)}`,
+      ['Name', 'Number', 'Phone', 'Email', 'Status', 'PAR-Q'],
+      data.members.map((m) => [m.full_name, m.membership_number, m.phone, m.email, m.status, m.parq_flag ? 'Yes' : 'No'])
+    );
+  }
+
   return (
     <AdminShell>
-      <h1 className="text-2xl font-bold uppercase text-body">Members</h1>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <h1 className="text-2xl font-bold uppercase text-body">Members</h1>
+        <button className="btn-outline px-3 py-1 text-sm" onClick={downloadCsv} disabled={!data?.members?.length}>
+          Export CSV
+        </button>
+      </div>
 
       <div className="admin-toolbar mt-5">
         <input
@@ -110,7 +126,9 @@ export default function MembersList() {
 
       {error && <p className="mt-4 text-error">{error}</p>}
 
-      <div className="mt-4 overflow-hidden rounded-xl border border-white/5">
+      {!data && !error && <div className="mt-4"><SkeletonRows rows={8} cols={4} /></div>}
+
+      {data && <div className="mt-4 overflow-hidden rounded-xl border border-white/5">
         <table className="w-full text-sm">
           <thead className="bg-surface text-left text-muted">
             <tr>
@@ -144,7 +162,7 @@ export default function MembersList() {
             )}
           </tbody>
         </table>
-      </div>
+      </div>}
 
       {data && data.pages > 1 && (
         <div className="mt-4 flex items-center justify-center gap-4 text-sm">
