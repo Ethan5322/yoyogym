@@ -5,6 +5,8 @@ import AdminShell from '../../components/AdminShell.jsx';
 import { apiFetch } from '../../lib/api.js';
 import { useAuth } from '../../lib/auth.jsx';
 import { useToast } from '../../lib/toast.jsx';
+import { useBranding } from '../../lib/branding.js';
+import { downloadReceiptPdf } from '../../lib/receiptPdf.js';
 import PersonalQr from '../../components/PersonalQr.jsx';
 import IdCardButton from '../../components/IdCardButton.jsx';
 
@@ -22,6 +24,7 @@ export default function MemberDetail() {
   const navigate = useNavigate();
   const { user } = useAuth();
   const toast = useToast();
+  const branding = useBranding();
   const [data, setData] = useState(null);
   const [error, setError] = useState('');
   const [notes, setNotes] = useState('');
@@ -150,7 +153,25 @@ export default function MemberDetail() {
 
         <Section title="Payments">
           {data.payments.length ? data.payments.slice(0, 8).map((p) => (
-            <Row key={p.id} label={`${fmt(p.created_at)} · ${p.category}`} value={`${zar(p.amount)} (${p.status})`} />
+            <div key={p.id} className="flex items-center justify-between gap-3 text-sm">
+              <span className="text-muted">{fmt(p.created_at)} · {p.category}</span>
+              <span className="flex items-center gap-2 text-right">
+                <span className="text-body">{zar(p.amount)} ({p.status})</span>
+                {p.status === 'received' && (
+                  <button
+                    className="text-xs text-accent hover:underline"
+                    onClick={() => downloadReceiptPdf({
+                      gymName: branding.name || 'Yoyo GYM',
+                      accent: branding.accent_color || '#E63946',
+                      payment: p,
+                      member: { full_name: m.full_name, membership_number: m.membership_number },
+                    })}
+                  >
+                    Receipt
+                  </button>
+                )}
+              </span>
+            </div>
           )) : <p className="text-sm text-muted">No payments.</p>}
         </Section>
 

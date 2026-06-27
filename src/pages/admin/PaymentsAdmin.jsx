@@ -6,6 +6,8 @@ import AdminShell from '../../components/AdminShell.jsx';
 import { apiFetch } from '../../lib/api.js';
 import { useToast } from '../../lib/toast.jsx';
 import { exportCsv } from '../../lib/csv.js';
+import { useBranding } from '../../lib/branding.js';
+import { downloadReceiptPdf } from '../../lib/receiptPdf.js';
 
 const zar = (n) => 'R' + Number(n || 0).toLocaleString('en-ZA', { minimumFractionDigits: 2 });
 const CATS = ['joining_fee', 'monthly_fee', 'session_pack', 'personal_training', 'class_addon', 'day_pass', 'other'];
@@ -13,10 +15,13 @@ const CATS = ['joining_fee', 'monthly_fee', 'session_pack', 'personal_training',
 export default function PaymentsAdmin() {
   const [sp, setSp] = useSearchParams();
   const toast = useToast();
+  const branding = useBranding();
   const [status, setStatus] = useState(sp.get('status') || '');
   const [data, setData] = useState(null);
+  const [finance, setFinance] = useState(null);
   const [error, setError] = useState('');
   const [manual, setManual] = useState(false);
+  const [reminding, setReminding] = useState(null);
 
   function load() {
     const p = new URLSearchParams();
@@ -25,6 +30,32 @@ export default function PaymentsAdmin() {
     apiFetch(`/admin/payments?${p}`).then(setData).catch((e) => setError(e.message));
   }
   useEffect(load, [status]);
+
+  function loadFinance() {
+    apiFetch('/admin/finance').then(setFinance).catch(() => {});
+  }
+  useEffect(loadFinance, []);
+
+  async function remind(m) {
+    setReminding(m.member_id);
+    try {
+      const r = await apiFetch('/admin/finance', { method: 'POST', body: { member_id: m.member_id } });
+      toast.success(`Reminder sent to ${m.name} (${zar(r.amount)}).`);
+    } catch (e) {
+      toast.error(e.message);
+    } finally {
+      setReminding(null);
+    }
+  }
+
+  function receipt(p) {
+    downloadReceiptPdf({
+      gymName: branding.name || 'Yoyo GYM',
+      accent: branding.accent_color || '#E63946',
+      payment: p,
+      member: { full_name: p.member_name, membership_number: p.membership_number },
+    });
+  }
 
   async function refund(p) {
     if (!confirm(`Mark ${zar(p.amount)} payment from ${p.member_name} as refunded?`)) return;
@@ -66,6 +97,49 @@ export default function PaymentsAdmin() {
             ))}
           </div>
 
+          {finance && finance.total > 0 && (
+            <div className="card mt-6">
+              <div className="mb-3 flex items-center justify-between">
+                <h2 className="font-display uppercase text-body">Outstanding &amp; Aging</h2>
+                <span className="font-display text-xl text-error">{zar(finance.total)}</span>
+              </div>
+              <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                <AgeBucket label="0–30 days" value={finance.buckets.current} />
+                <AgeBucket label="31–60 days" value={finance.buckets.d30} tone="warn" />
+                <AgeBucket label="61–90 days" value={finance.buckets.d60} tone="warn" />
+                <AgeBucket label="90+ days" value={finance.buckets.d90} tone="bad" />
+              </div>
+              {finance.members.length > 0 && (
+                <div className="mt-4 overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead className="text-left text-muted">
+                      <tr><th className="py-2">Member</th><th className="py-2">Owing</th><th className="py-2 hidden sm:table-cell">Oldest</th><th className="py-2"></th></tr>
+                    </thead>
+                    <tbody>
+                      {finance.members.map((m) => (
+                        <tr key={m.member_id} className="border-t border-white/5">
+                          <td className="py-2 text-body">{m.name} <span className="text-muted">{m.number}</span></td>
+                          <td className="py-2 text-error">{zar(m.total)}</td>
+                          <td className="py-2 hidden text-muted sm:table-cell">{m.oldest_days}d</td>
+                          <td className="py-2 text-right">
+                            <button
+                              className="text-xs text-accent hover:underline disabled:opacity-40"
+                              disabled={!m.has_email || reminding === m.member_id}
+                              title={m.has_email ? 'Email a balance reminder' : 'No email on file'}
+                              onClick={() => remind(m)}
+                            >
+                              {reminding === m.member_id ? 'Sending…' : 'Remind'}
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          )}
+
           <div className="mt-4 flex gap-3">
             <select className="field w-48" value={status} onChange={(e) => setStatus(e.target.value)}>
               <option value="">All statuses</option>
@@ -91,7 +165,10 @@ export default function PaymentsAdmin() {
                     <td className="px-3 py-2"><span className="text-accent">{p.status}</span></td>
                     <td className="px-3 py-2 text-right">
                       {p.status === 'received' && (
-                        <button className="text-xs text-error hover:underline" onClick={() => refund(p)}>Refund</button>
+                        <span className="flex justify-end gap-3">
+                          <button className="text-xs text-accent hover:underline" onClick={() => receipt(p)}>Receipt</button>
+                          <button className="text-xs text-error hover:underline" onClick={() => refund(p)}>Refund</button>
+                        </span>
                       )}
                     </td>
                   </tr>
@@ -104,6 +181,16 @@ export default function PaymentsAdmin() {
 
       {manual && <ManualPayment onClose={() => { setManual(false); load(); }} />}
     </AdminShell>
+  );
+}
+
+function AgeBucket({ label, value, tone }) {
+  const cls = tone === 'bad' ? 'text-error' : tone === 'warn' ? 'text-yellow-400' : 'text-body';
+  return (
+    <div className="rounded-lg border border-white/5 bg-surface px-3 py-2">
+      <div className="text-xs text-muted">{label}</div>
+      <div className={`mt-1 font-display text-lg ${cls}`}>{zar(value)}</div>
+    </div>
   );
 }
 
