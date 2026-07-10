@@ -417,7 +417,7 @@ function StatusTab() {
             <img src={data.member.photo_url} alt="" className="mx-auto mb-3 h-28 w-[84px] rounded object-cover gold-frame" />
           )}
           <p className="font-display text-lg uppercase text-body">Membership ID Card</p>
-          <p className="mb-3 text-xs text-muted">Front: photo, details &amp; QR. Back: your details &amp; scan barcode.</p>
+          <p className="mb-3 text-xs text-muted">Bank-card size — photo, details, QR &amp; scan barcode, all on one face.</p>
           <IdCardButton
             member={{ ...data.member, tier: m?.tier, valid_until: m?.end_date }}
           />
