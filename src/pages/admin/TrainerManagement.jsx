@@ -79,7 +79,7 @@ export default function TrainerManagement() {
               </div>
             </div>
             <div className="flex flex-wrap items-center gap-2">
-              <CredentialActions person={{ kind: 'trainer', id: t.id, name: t.full_name, number: t.trainer_number, verification_code: t.verification_code, badge: t.specialization || 'TRAINER', photo_url: t.photo_url }} />
+              <CredentialActions person={{ kind: 'trainer', id: t.id, name: t.full_name, number: t.trainer_number, verification_code: t.verification_code, badge: t.specialization || 'TRAINER', photo_url: t.photo_url, phone: t.phone, email: t.email }} />
               <button className="btn-outline px-3 py-1 text-sm" onClick={() => setQrFor(t)}>QR</button>
               <button className="btn-outline px-3 py-1 text-sm" onClick={() => setForm({ ...blank, ...t })}>Edit</button>
               <button className="text-sm text-error" onClick={() => remove(t.id)}>Remove</button>
@@ -135,7 +135,7 @@ export default function TrainerManagement() {
         <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/80 p-4" onClick={() => setFaceOpen(false)}>
           <div className="card w-full max-w-sm" onClick={(e) => e.stopPropagation()}>
             <h2 className="mb-3 font-display uppercase text-body">Capture trainer face & photo</h2>
-            <FaceCapture onSubmit={(res) => { if (res?.descriptor) setForm((f) => ({ ...f, face_descriptor: res.descriptor, photo_url: res.image })); setFaceOpen(false); }} />
+            <FaceCapture onSubmit={(res) => { if (res?.descriptor) setForm((f) => ({ ...f, face_descriptor: res.descriptor, face_descriptors: res.descriptors, photo_url: res.image })); setFaceOpen(false); }} />
           </div>
         </div>
       )}

@@ -12,7 +12,9 @@
 import { getSupabase } from '../../lib/supabase.js';
 import { allowMethods, readJsonBody, ok, badRequest, serverError } from '../../lib/http.js';
 import { generateMembershipNumber, generateVerificationCode } from '../../lib/identifiers.js';
-import { faceServiceConfigured, embedFace } from '../../lib/faceservice.js';
+import { faceServiceConfigured, embedEnrolmentImages } from '../../lib/faceservice.js';
+import { enrolmentGallery } from '../../lib/facematch.js';
+import { insertFaceRow } from '../../lib/facedb.js';
 import { computeMembership, addonsTotal, totalDueToday, DURATION_MONTHS } from '../../../shared/pricing.js';
 import { onNewMember } from '../../lib/notify/index.js';
 import { rateLimit } from '../../lib/ratelimit.js';
@@ -150,27 +152,33 @@ export default async function handler(req, res) {
       manually_registered: !!a.manual,
       popia_consent_at: new Date().toISOString(),
     };
-    // Phase 88 — face biometric. Added only when captured, so registration
-    // still works if the biometric columns haven't been added yet.
-    if (a.face?.descriptor) {
-      memberRow.face_descriptor = a.face.descriptor;
+    // Phase 88 — face biometric. A GALLERY of poses is stored (not one averaged
+    // template) so a later haircut, beard or makeup change still matches; added
+    // only when captured, so registration still works if the biometric columns
+    // haven't been migrated yet (the insert retries without them below).
+    const faceDescriptors = (Array.isArray(a.face?.descriptors) ? a.face.descriptors : [a.face?.descriptor]).filter(
+      (d) => Array.isArray(d) && d.length >= 64
+    );
+    const faceImages = (Array.isArray(a.face?.images) ? a.face.images : [a.face?.image]).filter(
+      (i) => typeof i === 'string' && i.startsWith('data:image')
+    );
+    if (faceDescriptors.length) {
+      memberRow.face_descriptor = faceDescriptors[0];
+      memberRow.face_templates = enrolmentGallery(faceDescriptors);
       memberRow.biometric_enrolled = true;
-      memberRow.photo_url = a.face.image || null;
     }
-    // High-accuracy ArcFace embedding when the InsightFace service is configured.
-    if (a.face?.image && faceServiceConfigured()) {
-      const emb = await embedFace(a.face.image);
-      if (emb) {
-        memberRow.arcface_embedding = emb;
+    if (faceImages.length) memberRow.photo_url = faceImages[0];
+    // High-accuracy ArcFace embeddings when the InsightFace service is configured.
+    if (faceImages.length && faceServiceConfigured()) {
+      const embeddings = await embedEnrolmentImages(faceImages);
+      if (embeddings.length) {
+        memberRow.arcface_embedding = embeddings[0];
+        memberRow.arcface_templates = enrolmentGallery(embeddings);
         memberRow.biometric_enrolled = true;
-        if (!memberRow.photo_url) memberRow.photo_url = a.face.image;
       }
     }
-    const { data: member, error: memberErr } = await supabase
-      .from('members')
-      .insert(memberRow)
-      .select('id')
-      .single();
+    // insertFaceRow retries without the gallery columns on an un-migrated tenant.
+    const { data: member, error: memberErr } = await insertFaceRow(supabase, 'members', memberRow, 'id');
     if (memberErr) return serverError(res, memberErr.message);
     createdMemberId = member.id;
 

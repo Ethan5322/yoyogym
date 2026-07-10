@@ -43,7 +43,10 @@ create table if not exists gym.admin_users (
   role              text not null default 'reception',
   trainer_id        uuid,                      -- links a 'trainer' login to gym.trainers
   is_active         boolean not null default true,
-  face_descriptor   jsonb,                     -- admin face-login (Phase 88)
+  face_descriptor   jsonb,                     -- admin face-login (Phase 88) — first template
+  face_templates    jsonb,                     -- face-api 128-D gallery [{v,src,at}] (multi-pose)
+  arcface_embedding jsonb,                     -- ArcFace 512-D admin face-login — first template
+  arcface_templates jsonb,                     -- ArcFace 512-D gallery [{v,src,at}]
   -- Staff credential (ID card + verify QR), set when an owner registers staff:
   staff_number      text unique,               -- STF-YYYY-XXXXXX
   verification_code text,                       -- 8-char access/verify code
@@ -70,7 +73,10 @@ create table if not exists gym.trainers (
   specialization    text,
   certifications    text,
   bio               text,
-  face_descriptor   jsonb,
+  face_descriptor   jsonb,                       -- first template
+  face_templates    jsonb,                       -- face-api 128-D gallery [{v,src,at}]
+  arcface_embedding jsonb,                       -- ArcFace 512-D — first template
+  arcface_templates jsonb,                       -- ArcFace 512-D gallery [{v,src,at}]
   photo_url         text,                        -- passport photo for the ID card
   trainer_number    text unique,                 -- TRN-YYYY-XXXXXX
   verification_code text,                         -- 8-char verify code
@@ -165,8 +171,10 @@ create table if not exists gym.members (
   manually_registered  boolean not null default false,
   staff_notes          text,
   photo_url            text,
-  face_descriptor      jsonb,                            -- biometric (Phase 88, face-api 128-D)
-  arcface_embedding    jsonb,                            -- InsightFace ArcFace 512-D (high-accuracy)
+  face_descriptor      jsonb,                            -- biometric (Phase 88, face-api 128-D) — first template
+  face_templates       jsonb,                            -- face-api 128-D gallery [{v,src,at}] (multi-pose + learned)
+  arcface_embedding    jsonb,                            -- InsightFace ArcFace 512-D (high-accuracy) — first template
+  arcface_templates    jsonb,                            -- ArcFace 512-D gallery [{v,src,at}] (multi-pose + learned)
   biometric_enrolled   boolean not null default false,
   popia_consent_at     timestamptz,
   created_at           timestamptz not null default now(),

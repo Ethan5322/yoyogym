@@ -28,8 +28,13 @@ from pydantic import BaseModel
 from PIL import Image
 
 # ── Config ──────────────────────────────────────────────────────────────────
-THRESHOLD = float(os.getenv("FACE_THRESHOLD", "0.45"))   # cosine sim for a match
-MARGIN = float(os.getenv("FACE_MARGIN", "0.04"))         # best must beat 2nd by this
+# A permissive absolute threshold plus a person-level margin: the margin, not a
+# punishing cut-off, is what keeps look-alikes out, so a member survives a new
+# beard/haircut/makeup without being locked out.
+THRESHOLD = float(os.getenv("FACE_THRESHOLD", "0.36"))   # cosine sim for a match
+MARGIN = float(os.getenv("FACE_MARGIN", "0.05"))         # best must beat 2nd by this
+MAX_TEMPLATES = int(os.getenv("FACE_MAX_TEMPLATES", "10"))  # gallery size per person
+FLIP_TTA = os.getenv("FACE_FLIP_TTA", "1") != "0"        # average with mirror image
 DATA_DIR = os.getenv("FACE_DATA_DIR", "/data" if os.path.isdir("/data") else ".")
 STORE_PATH = os.path.join(DATA_DIR, "faces.json")
 API_KEY = os.getenv("FACE_API_KEY")                      # optional shared secret
@@ -58,56 +63,67 @@ def get_engine():
     return _engine
 
 
-# ── Enrolment store (member_id -> normalised 512-D embedding) ────────────────
+# ── Enrolment store (member_id -> GALLERY of normalised 512-D embeddings) ────
+# Each member keeps several templates (different looks), so a probe only has to
+# resemble one of them. This is the standalone-mode store; when the gym app is
+# wired up, matching happens in Node against Supabase and only /embed[-batch] is
+# used. The store degrades gracefully from the old single-vector JSON format.
 _store_lock = threading.Lock()
-_ids: list[str] = []
-_mat: Optional[np.ndarray] = None  # shape (N, 512), L2-normalised
+_gallery: dict[str, list] = {}  # member_id -> list[np.ndarray(512,)]
 
 
 def _load_store():
-    global _ids, _mat
+    global _gallery
     if os.path.exists(STORE_PATH):
         try:
             with open(STORE_PATH, "r", encoding="utf-8") as f:
                 raw = json.load(f)
-            _ids = list(raw.keys())
-            _mat = np.array([raw[k] for k in _ids], dtype=np.float32) if _ids else None
+            gallery = {}
+            for mid, val in raw.items():
+                # New format: list of vectors. Old format: a single vector.
+                vecs = val if val and isinstance(val[0], list) else [val]
+                gallery[mid] = [np.asarray(v, dtype=np.float32) for v in vecs]
+            _gallery = gallery
         except Exception as e:  # noqa: BLE001
             print("store load failed:", e)
 
 
 def _save_store():
-    if _mat is None:
-        data = {}
-    else:
-        data = {mid: _mat[i].tolist() for i, mid in enumerate(_ids)}
+    data = {mid: [v.tolist() for v in vecs] for mid, vecs in _gallery.items()}
     os.makedirs(DATA_DIR, exist_ok=True)
     with open(STORE_PATH, "w", encoding="utf-8") as f:
         json.dump(data, f)
 
 
 def _upsert(member_id: str, emb: np.ndarray):
-    global _ids, _mat
+    """Append a template to the member's gallery (rolling window, capped)."""
     with _store_lock:
-        if member_id in _ids:
-            _mat[_ids.index(member_id)] = emb
-        else:
-            _ids.append(member_id)
-            _mat = emb[None, :] if _mat is None else np.vstack([_mat, emb])
+        vecs = _gallery.get(member_id, [])
+        # Skip a near-duplicate of a template we already hold — keep diversity.
+        if any(float(v @ emb) >= 0.92 for v in vecs):
+            return
+        vecs.append(emb)
+        _gallery[member_id] = vecs[-MAX_TEMPLATES:]
         _save_store()
 
 
 def _identify(emb: np.ndarray):
-    """Return (member_id, similarity, confident) for the closest enrolment."""
-    if _mat is None or not len(_ids):
+    """Return (member_id, similarity, confident) — closest template per person,
+    with a person-level margin over the runner-up."""
+    if not _gallery:
         return None, 0.0, False
-    sims = _mat @ emb  # cosine similarity (all vectors are L2-normalised)
-    order = np.argsort(-sims)
-    best_i = int(order[0])
-    best = float(sims[best_i])
-    second = float(sims[int(order[1])]) if len(order) > 1 else -1.0
+    scores = [(mid, max(float(v @ emb) for v in vecs)) for mid, vecs in _gallery.items() if vecs]
+    if not scores:
+        return None, 0.0, False
+    scores.sort(key=lambda x: -x[1])
+    best_id, best = scores[0]
+    second = scores[1][1] if len(scores) > 1 else -1.0
     confident = best >= THRESHOLD and (best - second) >= MARGIN
-    return _ids[best_i], best, confident
+    return best_id, best, confident
+
+
+def _enrolled_count():
+    return len(_gallery)
 
 
 # ── Image helpers ───────────────────────────────────────────────────────────
@@ -120,14 +136,33 @@ def _decode(image: str) -> np.ndarray:
     return np.array(img)
 
 
+def _l2(v: np.ndarray) -> np.ndarray:
+    n = np.linalg.norm(v)
+    return v / n if n else v
+
+
 def _largest_face(rgb: np.ndarray):
-    """Detect faces and return the largest one's normalised embedding + meta."""
+    """Detect faces and return the largest one's normalised embedding + meta.
+
+    Flip test-time augmentation: the embedding is averaged with that of the
+    horizontally-mirrored crop and re-normalised. A face is near-symmetric, so
+    the mirror is a free extra "view" that cancels some pose/lighting noise and
+    makes the template a little more robust to appearance changes.
+    """
     faces = get_engine().get(rgb[:, :, ::-1])  # InsightFace expects BGR
     if not faces:
         return None
     faces.sort(key=lambda f: (f.bbox[2] - f.bbox[0]) * (f.bbox[3] - f.bbox[1]), reverse=True)
     f = faces[0]
     emb = np.asarray(f.normed_embedding, dtype=np.float32)
+
+    if FLIP_TTA:
+        flipped = get_engine().get(rgb[:, ::-1, ::-1])  # mirror, then to BGR
+        if flipped:
+            flipped.sort(key=lambda g: (g.bbox[2] - g.bbox[0]) * (g.bbox[3] - g.bbox[1]), reverse=True)
+            emb2 = np.asarray(flipped[0].normed_embedding, dtype=np.float32)
+            emb = _l2(emb + emb2)
+
     return {
         "embedding": emb,
         "det_score": float(f.det_score),
@@ -161,6 +196,11 @@ class CompareIn(BaseModel):
     api_key: Optional[str] = None
 
 
+class BatchIn(BaseModel):
+    images: list[str]
+    api_key: Optional[str] = None
+
+
 def _auth(key: Optional[str]):
     return not API_KEY or key == API_KEY
 
@@ -172,7 +212,7 @@ def _startup():
 
 @app.get("/health")
 def health():
-    return {"ok": True, "enrolled": len(_ids), "threshold": THRESHOLD, "gpu": USE_GPU}
+    return {"ok": True, "enrolled": _enrolled_count(), "threshold": THRESHOLD, "gpu": USE_GPU}
 
 
 @app.post("/embed")
@@ -191,6 +231,33 @@ def embed(body: ImageIn):
     }
 
 
+@app.post("/embed-batch")
+def embed_batch(body: BatchIn):
+    """Embed several images in one call — used for multi-pose enrolment so the
+    app collects a gallery of looks without a round trip per pose."""
+    if not _auth(body.api_key):
+        return {"ok": False, "error": "unauthorized"}
+    results = []
+    for image in body.images or []:
+        try:
+            face = _largest_face(_decode(image))
+        except Exception as e:  # noqa: BLE001
+            results.append({"ok": False, "error": f"decode_failed: {e}"})
+            continue
+        if not face:
+            results.append({"ok": False, "error": "no_face"})
+            continue
+        results.append(
+            {
+                "ok": True,
+                "embedding": face["embedding"].tolist(),
+                "det_score": face["det_score"],
+                "faces": face["count"],
+            }
+        )
+    return {"ok": True, "results": results}
+
+
 @app.post("/enroll")
 def enroll(body: EnrollIn):
     """Store (or update) a member's face template."""
@@ -204,7 +271,7 @@ def enroll(body: EnrollIn):
     if face["det_score"] < 0.5:
         return {"ok": False, "error": "low_quality"}
     _upsert(body.member_id.strip(), face["embedding"])
-    return {"ok": True, "member_id": body.member_id.strip(), "enrolled": len(_ids)}
+    return {"ok": True, "member_id": body.member_id.strip(), "enrolled": _enrolled_count()}
 
 
 @app.post("/verify")
@@ -251,7 +318,7 @@ def _build_ui():
         if face["det_score"] < 0.5:
             return "Face too unclear — move closer / improve lighting."
         _upsert(member_id.strip(), face["embedding"])
-        return f"✅ Enrolled {member_id.strip()} (quality {face['det_score']:.2f}). Total: {len(_ids)}."
+        return f"✅ Enrolled {member_id.strip()} (quality {face['det_score']:.2f}). Total: {_enrolled_count()}."
 
     def ui_verify(img):
         if img is None:

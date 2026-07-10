@@ -100,15 +100,30 @@ export function averageDescriptors(list) {
   return out;
 }
 
+/** Templates of a person: the `templates` gallery, or a single `descriptor`. */
+function personTemplates(p) {
+  if (Array.isArray(p.templates) && p.templates.length) {
+    return p.templates.map((t) => (Array.isArray(t) ? t : t?.v)).filter(Array.isArray);
+  }
+  return Array.isArray(p.descriptor) ? [p.descriptor] : [];
+}
+
 /** Best match with a confidence margin: returns { person, distance, confident }.
- *  `confident` requires the best to be under threshold AND clearly better than
- *  the runner-up — this prevents look-alike mistakes. */
+ *  Each person is scored by their CLOSEST enrolled template — so a member only
+ *  has to resemble one of their stored looks (e.g. clean-shaven OR bearded),
+ *  not an average of them. `confident` requires the best person to be under
+ *  threshold AND clearly closer than the runner-up person, which keeps
+ *  look-alikes out even with the looser per-template matching. */
 export function bestMatch(descriptor, people, threshold = MATCH_THRESHOLD, margin = 0.05) {
   let best = null;
   let bestDist = Infinity;
   let second = Infinity;
   for (const p of people) {
-    const d = faceDistance(descriptor, p.descriptor);
+    let d = Infinity;
+    for (const t of personTemplates(p)) {
+      const dt = faceDistance(descriptor, t);
+      if (dt < d) d = dt;
+    }
     if (d < bestDist) {
       second = bestDist;
       bestDist = d;

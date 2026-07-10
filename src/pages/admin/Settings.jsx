@@ -227,7 +227,11 @@ function AdminFaceEnroll() {
   async function onCapture(result) {
     if (!result?.descriptor) { setOpen(false); return; }
     try {
-      await apiFetch('/admin/enroll-face', { method: 'POST', body: { descriptor: result.descriptor } });
+      // Send the full multi-pose gallery so a later hair/beard change still matches.
+      await apiFetch('/admin/enroll-face', {
+        method: 'POST',
+        body: { descriptors: result.descriptors || [result.descriptor], images: result.images || [] },
+      });
       setMsg('Face enrolled — you can now log in with your face.');
     } catch (e) {
       setMsg(e.message);

@@ -135,7 +135,7 @@ function MemberLogin({ onLoggedIn }) {
 
         {faceMode ? (
           <div className="card space-y-3">
-            <FaceCapture onSubmit={onFace} />
+            <FaceCapture mode="verify" onSubmit={onFace} />
             <button className="w-full text-sm text-muted hover:text-body" onClick={() => setFaceMode(false)}>
               ← Use membership number instead
             </button>
@@ -417,15 +417,9 @@ function StatusTab() {
             <img src={data.member.photo_url} alt="" className="mx-auto mb-3 h-28 w-[84px] rounded object-cover gold-frame" />
           )}
           <p className="font-display text-lg uppercase text-body">Membership ID Card</p>
-          <p className="mb-3 text-xs text-muted">Your photo, details &amp; QR — use it as your gym ID.</p>
+          <p className="mb-3 text-xs text-muted">Front: photo, details &amp; QR. Back: your details &amp; scan barcode.</p>
           <IdCardButton
-            member={{
-              full_name: data.member.full_name,
-              membership_number: data.member.membership_number,
-              tier: m?.tier,
-              valid_until: m?.end_date,
-              photo_url: data.member.photo_url,
-            }}
+            member={{ ...data.member, tier: m?.tier, valid_until: m?.end_date }}
           />
         </div>
       )}
@@ -487,7 +481,11 @@ function FaceEnrol() {
     try {
       const r = await memberFetch('/member/enroll-face', {
         method: 'POST',
-        body: { descriptor: Array.from(result.descriptor), image: result.image },
+        // Send the full multi-pose gallery so a later hair/beard/makeup change still matches.
+        body: {
+          descriptors: result.descriptors || [result.descriptor],
+          images: result.images || (result.image ? [result.image] : []),
+        },
       });
       setMsg(r.message || 'Face scan updated.');
     } catch (e) {
