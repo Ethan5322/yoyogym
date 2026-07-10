@@ -23,34 +23,41 @@ export default function CredentialActions({ person, className = '' }) {
   const idLabel = isTrainer ? 'TRAINER NO.' : 'STAFF NO.';
   const qrUrl = `${window.location.origin}/p/${isTrainer ? 't' : 's'}/${person.id}`;
 
-  async function card() {
-    setBusy('card'); setErr('');
+  // Built from the person's CURRENT record, so recent changes (job title,
+  // photo, contract dates) show up as soon as the card is downloaded.
+  function idPayload() {
+    return {
+      gymName, accent,
+      name: person.name,
+      membershipNumber: person.number || '',
+      roleLabel, subtitle, idLabel,
+      badgeText: person.badge || roleLabel,
+      validLabel: 'STATUS', validUntil: 'ACTIVE',
+      photoUrl: person.photo_url || '',
+      qrUrl,
+      // Back of the card: who the holder is + a scannable verification code.
+      verificationCode: person.verification_code || '',
+      fields: [
+        { label: isTrainer ? 'Specialization' : 'Job Title', value: person.badge || person.job_title || '' },
+        { label: 'Mobile', value: person.phone || '' },
+        { label: 'Email', value: person.email || '' },
+        ...(isTrainer
+          ? []
+          : [
+              { label: 'Contract Start', value: fmt(person.contract_start) },
+              { label: 'Contract End', value: fmt(person.contract_end) || 'Ongoing' },
+            ]),
+      ],
+      issuedOn: fmt(new Date()),
+    };
+  }
+
+  async function card(kind) {
+    setBusy(kind === 'pdf' ? 'card-pdf' : 'card'); setErr('');
     try {
-      const { downloadIdCard } = await import('../lib/idcard.js');
-      await downloadIdCard({
-        gymName, accent,
-        name: person.name,
-        membershipNumber: person.number || '',
-        roleLabel, subtitle, idLabel,
-        badgeText: person.badge || roleLabel,
-        validLabel: 'STATUS', validUntil: 'ACTIVE',
-        photoUrl: person.photo_url || '',
-        qrUrl,
-        // Back of the card: who the holder is + a scannable verification code.
-        verificationCode: person.verification_code || '',
-        fields: [
-          { label: isTrainer ? 'Specialization' : 'Job Title', value: person.badge || person.job_title || '' },
-          { label: 'Mobile', value: person.phone || '' },
-          { label: 'Email', value: person.email || '' },
-          ...(isTrainer
-            ? []
-            : [
-                { label: 'Contract Start', value: fmt(person.contract_start) },
-                { label: 'Contract End', value: fmt(person.contract_end) || 'Ongoing' },
-              ]),
-        ],
-        issuedOn: fmt(new Date()),
-      });
+      const lib = await import('../lib/idcard.js');
+      if (kind === 'pdf') await lib.downloadIdCardPdf(idPayload());
+      else await lib.downloadIdCard(idPayload());
     } catch (e) { setErr(e.message || 'Could not generate ID card.'); } finally { setBusy(''); }
   }
 
@@ -92,7 +99,8 @@ export default function CredentialActions({ person, className = '' }) {
   return (
     <div className={className}>
       <div className="flex flex-wrap gap-2">
-        <button className="btn-outline px-3 py-1.5 text-xs" onClick={card} disabled={!!busy}>{busy === 'card' ? '…' : '⬇ ID Card'}</button>
+        <button className="btn-outline px-3 py-1.5 text-xs" onClick={() => card('png')} disabled={!!busy}>{busy === 'card' ? '…' : '⬇ ID Card (Image)'}</button>
+        <button className="btn-outline px-3 py-1.5 text-xs" onClick={() => card('pdf')} disabled={!!busy}>{busy === 'card-pdf' ? '…' : '⬇ ID Card (PDF)'}</button>
         {person.kind === 'staff' ? (
           <button className="btn-outline px-3 py-1.5 text-xs" onClick={contractPdf} disabled={!!busy}>{busy === 'contract' ? '…' : '⬇ Contract PDF'}</button>
         ) : (

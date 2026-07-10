@@ -31,9 +31,9 @@ from PIL import Image
 # A permissive absolute threshold plus a person-level margin: the margin, not a
 # punishing cut-off, is what keeps look-alikes out, so a member survives a new
 # beard/haircut/makeup without being locked out.
-THRESHOLD = float(os.getenv("FACE_THRESHOLD", "0.38"))   # cosine sim for a match
+THRESHOLD = float(os.getenv("FACE_THRESHOLD", "0.36"))   # cosine sim for a match
 MARGIN = float(os.getenv("FACE_MARGIN", "0.05"))         # best must beat 2nd by this
-MAX_TEMPLATES = int(os.getenv("FACE_MAX_TEMPLATES", "8"))  # gallery size per person
+MAX_TEMPLATES = int(os.getenv("FACE_MAX_TEMPLATES", "10"))  # gallery size per person
 FLIP_TTA = os.getenv("FACE_FLIP_TTA", "1") != "0"        # average with mirror image
 DATA_DIR = os.getenv("FACE_DATA_DIR", "/data" if os.path.isdir("/data") else ".")
 STORE_PATH = os.path.join(DATA_DIR, "faces.json")

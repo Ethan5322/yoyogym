@@ -1,11 +1,15 @@
-// Guided, corporate-grade MULTI-POSE face capture.
+// Guided, corporate-grade face capture with two modes:
 //
-// A single face template freezes one look. When the person later changes their
-// hairstyle, grows or shaves a beard, or wears makeup, that frozen template
-// stops matching. So enrolment walks the user through a short series of poses
-// (look straight, turn slightly left, slightly right, tilt up) and captures one
-// template + one frame per pose. The result is a GALLERY the matcher scores by
-// its closest entry — the person only has to resemble one stored look.
+//   mode="enroll"  — walks the user through several poses and captures one
+//                    template + one photo PER POSE, building a GALLERY. This is
+//                    what makes recognition survive a new hairstyle, beard or
+//                    makeup, and a member returning after a month away: the
+//                    matcher scores against the closest of many stored looks.
+//   mode="verify"  — a single quick capture for logging in / turnstile probes.
+//
+// A single stored template freezes one look and stops matching once the person
+// changes — so enrolment deliberately captures breadth, and every captured
+// image is embedded server-side into the accurate ArcFace gallery (not just one).
 //
 // onSubmit receives:
 //   { descriptors: number[][], images: string[],   // the full gallery
@@ -13,16 +17,24 @@
 //                                                    // login and legacy callers
 import { useEffect, useRef, useState } from 'react';
 
-// Each pose: an instruction, and how many steady frames to average for it.
-const POSES = [
-  { key: 'center', label: 'Look straight ahead', capture: true, samples: 4 },
-  { key: 'left', label: 'Turn your head slightly LEFT', capture: false, samples: 3 },
-  { key: 'right', label: 'Turn your head slightly RIGHT', capture: false, samples: 3 },
-  { key: 'up', label: 'Lift your chin up a little', capture: false, samples: 3 },
+// Enrolment sweeps five poses and photographs each, so both engines get a
+// multi-template gallery spanning angle and expression.
+const ENROLL_POSES = [
+  { key: 'center', label: 'Look straight ahead', samples: 5 },
+  { key: 'left', label: 'Turn your head slightly LEFT', samples: 4 },
+  { key: 'right', label: 'Turn your head slightly RIGHT', samples: 4 },
+  { key: 'up', label: 'Lift your chin up a little', samples: 4 },
+  { key: 'down', label: 'Tuck your chin down a little', samples: 4 },
 ];
-const DWELL_MS = 900; // give the user a moment to move into each new pose
+// Login just needs one solid probe.
+const VERIFY_POSES = [{ key: 'center', label: 'Look at the camera', samples: 6 }];
 
-export default function FaceCapture({ onSubmit }) {
+const DWELL_MS = 800; // let the user settle into each new pose before sampling
+
+export default function FaceCapture({ onSubmit, mode = 'enroll' }) {
+  const isEnroll = mode !== 'verify';
+  const poses = isEnroll ? ENROLL_POSES : VERIFY_POSES;
+
   const videoRef = useRef(null);
   const streamRef = useRef(null);
   const loopRef = useRef(false);
@@ -79,7 +91,7 @@ export default function FaceCapture({ onSubmit }) {
       stop();
     };
     // eslint-disable-next-line
-  }, [attempt]);
+  }, [attempt, mode]);
 
   function stop() {
     if (streamRef.current) {
@@ -89,9 +101,8 @@ export default function FaceCapture({ onSubmit }) {
   }
 
   // Is the face acceptably framed right now? Returns whether the frame is good
-  // enough to sample, plus a corrective hint. Tolerances are looser than a
-  // single-pose capture because the turned/tilted poses move the face off-centre
-  // on purpose.
+  // enough to sample, plus a corrective hint. Tolerances are loose because the
+  // turned/tilted poses move the face off-centre on purpose.
   function assess(det, fw, fh) {
     if (!det) return { ok: false, g: 'Position your face in the circle' };
     const { box } = det;
@@ -112,9 +123,9 @@ export default function FaceCapture({ onSubmit }) {
   async function runPoseSequence() {
     const { detectFull, detectAccurate, averageDescriptors } = await import('../../lib/face/faceapi.js');
 
-    for (let pi = 0; pi < POSES.length; pi++) {
+    for (let pi = 0; pi < poses.length; pi++) {
       if (!loopRef.current) return;
-      const pose = POSES[pi];
+      const pose = poses[pi];
       setPoseIndex(pi);
       setGuide(pose.label);
       setGood(false);
@@ -124,8 +135,11 @@ export default function FaceCapture({ onSubmit }) {
       await sleep(DWELL_MS);
 
       const samples = [];
-      let lastImage = null;
-      while (loopRef.current && samples.length < pose.samples) {
+      let bestImage = null;
+      let bestScore = -1;
+      const started = Date.now();
+      // Cap each pose so a difficult angle can't stall enrolment forever.
+      while (loopRef.current && samples.length < pose.samples && Date.now() - started < 12000) {
         const v = videoRef.current;
         let a = { ok: false, g: pose.label };
         if (v && v.videoWidth) {
@@ -140,22 +154,27 @@ export default function FaceCapture({ onSubmit }) {
             const acc = await detectAccurate(v);
             if (acc?.descriptor) {
               samples.push(acc.descriptor);
-              if (pose.capture) lastImage = grabFrame(v);
+              // Keep the sharpest frame of this pose as its photo.
+              if ((acc.score || 0) > bestScore) {
+                bestScore = acc.score || 0;
+                bestImage = grabFrame(v);
+              }
             }
           }
         }
         setGood(a.ok);
         setGuide(a.ok ? `${pose.label} — hold still (${samples.length}/${pose.samples})` : a.g);
         setProgress(Math.round((samples.length / pose.samples) * 100));
-        await sleep(160);
+        await sleep(150);
       }
       if (!loopRef.current) return;
 
       if (samples.length) {
-        // One robust template per pose (average of that pose's steady frames).
+        // One robust template per pose (average of that pose's steady frames)…
         galleryRef.current.descriptors.push(averageDescriptors(samples));
-        // Capture a clean passport frame at the straight-ahead pose.
-        if (pose.capture) galleryRef.current.images.push(lastImage || grabFrame(videoRef.current));
+        // …and a photo per pose, so the accurate ArcFace engine gets a full
+        // gallery server-side rather than a single template.
+        if (bestImage) galleryRef.current.images.push(bestImage);
       }
     }
 
@@ -211,7 +230,7 @@ export default function FaceCapture({ onSubmit }) {
   // progress ring geometry
   const R = 130;
   const C = 2 * Math.PI * R;
-  const overall = Math.round(((poseIndex + progress / 100) / POSES.length) * 100);
+  const overall = Math.round(((poseIndex + progress / 100) / poses.length) * 100);
 
   return (
     <div className="space-y-3 text-center">
@@ -244,7 +263,8 @@ export default function FaceCapture({ onSubmit }) {
         )}
         {(phase === 'scanning' || phase === 'capturing') && (
           <div className="absolute -bottom-1 left-1/2 -translate-x-1/2 rounded-full bg-black/70 px-3 py-1 font-display text-sm text-accent">
-            Step {Math.min(poseIndex + 1, POSES.length)}/{POSES.length} · {overall}%
+            {isEnroll ? `Step ${Math.min(poseIndex + 1, poses.length)}/${poses.length} · ` : ''}
+            {overall}%
           </div>
         )}
       </div>
@@ -260,11 +280,15 @@ export default function FaceCapture({ onSubmit }) {
           <button className="btn-outline" onClick={skip}>Skip</button>
         </div>
       ) : (
-        <button className="btn-outline w-full" onClick={skip}>Skip — enrol later</button>
+        <button className="btn-outline w-full" onClick={skip}>
+          {isEnroll ? 'Skip — enrol later' : 'Cancel'}
+        </button>
       )}
-      <p className="text-xs text-muted">
-        We capture a few angles so your face still unlocks after a haircut, beard or makeup change. Stored privately (POPIA).
-      </p>
+      {isEnroll && (
+        <p className="text-xs text-muted">
+          We capture several angles so your face still unlocks after a haircut, beard or makeup change. Stored privately (POPIA).
+        </p>
+      )}
     </div>
   );
 }

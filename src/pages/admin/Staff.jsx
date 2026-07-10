@@ -160,7 +160,7 @@ export default function Staff() {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4" onClick={() => setFaceOpen(false)}>
           <div className="card w-full max-w-sm" onClick={(e) => e.stopPropagation()}>
             <h2 className="mb-3 font-display uppercase text-body">Capture staff face & photo</h2>
-            <FaceCapture onSubmit={(res) => { if (res?.descriptor) setForm((f) => ({ ...f, face_descriptor: res.descriptor, photo_url: res.image })); setFaceOpen(false); }} />
+            <FaceCapture onSubmit={(res) => { if (res?.descriptor) setForm((f) => ({ ...f, face_descriptor: res.descriptor, face_descriptors: res.descriptors, photo_url: res.image })); setFaceOpen(false); }} />
           </div>
         </div>
       )}

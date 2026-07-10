@@ -21,41 +21,53 @@ function identityFields(member) {
 }
 
 export default function IdCardButton({ member, className = 'btn-primary w-full' }) {
-  const [busy, setBusy] = useState(false);
+  const [busy, setBusy] = useState('');
   const [err, setErr] = useState('');
   const branding = useBranding();
 
-  async function go() {
-    setBusy(true);
+  // The card is always built from the member's CURRENT record, so any recent
+  // change (tier, photo, details) is reflected the moment it is downloaded.
+  function payload() {
+    return {
+      gymName: branding.name || 'Yoyo GYM',
+      accent: branding.accent_color || '#E63946',
+      name: member.full_name,
+      membershipNumber: member.membership_number,
+      tier: member.tier || '',
+      validUntil: fmt(member.valid_until) || 'ONGOING',
+      photoUrl: member.photo_url || '',
+      qrUrl: `${window.location.origin}/p/m/${member.membership_number}`,
+      verificationCode: member.verification_code || '',
+      fields: identityFields(member),
+      issuedOn: fmt(new Date()),
+    };
+  }
+
+  async function go(kind) {
+    setBusy(kind);
     setErr('');
     try {
-      const { downloadIdCard } = await import('../lib/idcard.js');
-      await downloadIdCard({
-        gymName: branding.name || 'Yoyo GYM',
-        accent: branding.accent_color || '#E63946',
-        name: member.full_name,
-        membershipNumber: member.membership_number,
-        tier: member.tier || '',
-        validUntil: fmt(member.valid_until) || 'ONGOING',
-        photoUrl: member.photo_url || '',
-        qrUrl: `${window.location.origin}/p/m/${member.membership_number}`,
-        verificationCode: member.verification_code || '',
-        fields: identityFields(member),
-        issuedOn: fmt(new Date()),
-      });
+      const lib = await import('../lib/idcard.js');
+      if (kind === 'pdf') await lib.downloadIdCardPdf(payload());
+      else await lib.downloadIdCard(payload());
     } catch (e) {
       setErr(e.message || 'Could not generate ID card.');
     } finally {
-      setBusy(false);
+      setBusy('');
     }
   }
 
   return (
-    <>
-      <button className={className} onClick={go} disabled={busy}>
-        {busy ? 'Preparing your ID…' : '⬇ Download My ID Card'}
-      </button>
+    <div>
+      <div className="flex gap-2">
+        <button className={className} onClick={() => go('png')} disabled={!!busy}>
+          {busy === 'png' ? 'Preparing…' : '⬇ ID Card (Image)'}
+        </button>
+        <button className={className} onClick={() => go('pdf')} disabled={!!busy}>
+          {busy === 'pdf' ? 'Preparing…' : '⬇ ID Card (PDF)'}
+        </button>
+      </div>
       {err && <p className="mt-1 text-sm text-error">{err}</p>}
-    </>
+    </div>
   );
 }

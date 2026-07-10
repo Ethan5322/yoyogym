@@ -67,7 +67,7 @@ export default function AdminLogin() {
         {faceMode ? (
           <div className="card space-y-3">
             <p className="text-center text-sm text-muted">Look at the camera to verify</p>
-            <FaceCapture onSubmit={onFace} />
+            <FaceCapture mode="verify" onSubmit={onFace} />
             <button className="w-full text-sm text-muted hover:text-body" onClick={() => setFaceMode(false)}>
               ← Use password instead
             </button>

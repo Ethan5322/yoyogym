@@ -8,6 +8,7 @@ import { allowMethods, readJsonBody, ok, badRequest, serverError } from '../../l
 import { requireRole, hashPassword, ROLES } from '../../lib/auth.js';
 import { recordAudit } from '../../lib/audit.js';
 import { generateStaffNumber, generateStaffCode } from '../../lib/identifiers.js';
+import { enrolmentGallery } from '../../lib/facematch.js';
 
 export default async function handler(req, res) {
   if (!allowMethods(req, res, ['GET', 'POST', 'PATCH', 'DELETE'])) return;
@@ -63,6 +64,11 @@ export default async function handler(req, res) {
         /* columns not migrated yet — account is still created below */
       }
 
+      // Multi-pose face gallery (for face-login/turnstile robustness). First
+      // pose stays in the legacy column so an un-migrated tenant still matches.
+      const faceDescriptors = (Array.isArray(b.face_descriptors) ? b.face_descriptors : [b.face_descriptor]).filter(
+        (d) => Array.isArray(d) && d.length >= 64
+      );
       const base = {
         username: b.username.trim(),
         full_name: b.full_name || null,
@@ -71,7 +77,7 @@ export default async function handler(req, res) {
         trainer_id: b.trainer_id || null,
         password_hash,
         is_active: true,
-        face_descriptor: b.face_descriptor || null,
+        face_descriptor: faceDescriptors[0] || null,
       };
       const full = {
         ...base,
@@ -82,6 +88,7 @@ export default async function handler(req, res) {
         photo_url: b.photo_url || null,
         contract_start: b.contract_start || null,
         contract_end: b.contract_end || null,
+        face_templates: faceDescriptors.length ? enrolmentGallery(faceDescriptors) : null,
       };
 
       // Try the full credential insert; fall back to a basic account if the

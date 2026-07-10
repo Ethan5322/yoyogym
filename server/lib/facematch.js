@@ -158,15 +158,22 @@ export function withLearnedTemplate(gallery, vector, { max = 8 } = {}) {
 // deliberately below the old 0.45 — the person-level margin, not a punishing
 // absolute cut-off, is what keeps look-alikes out.
 export const ARCFACE = {
-  threshold: Number(process.env.FACE_THRESHOLD || 0.38),
+  // With a multi-pose gallery the best-template similarity of the true person
+  // stays high even after weeks away, so this can sit low enough to absorb
+  // appearance drift; the person-level margin is what actually rejects
+  // look-alikes.
+  threshold: Number(process.env.FACE_THRESHOLD || 0.36),
   margin: Number(process.env.FACE_MARGIN || 0.05),
   // Admin panel: a higher bar, since a false accept here is an authorisation
   // breach rather than a turnstile mistake.
   adminThreshold: Number(process.env.FACE_ADMIN_THRESHOLD || 0.45),
   adminMargin: Number(process.env.FACE_ADMIN_MARGIN || 0.08),
-  learnAbove: Number(process.env.FACE_LEARN_ABOVE || 0.55),
+  // Learn from a clearly-correct login so a member's gallery keeps up with how
+  // they actually look over time (kept well above the accept threshold so a
+  // borderline accept can never poison the gallery).
+  learnAbove: Number(process.env.FACE_LEARN_ABOVE || 0.5),
   redundantAbove: Number(process.env.FACE_LEARN_REDUNDANT || 0.86),
-  maxTemplates: Number(process.env.FACE_MAX_TEMPLATES || 8),
+  maxTemplates: Number(process.env.FACE_MAX_TEMPLATES || 10),
 };
 
 // face-api.js 128-D fallback, expressed as negative Euclidean distance so the

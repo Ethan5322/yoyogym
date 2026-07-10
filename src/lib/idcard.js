@@ -284,51 +284,96 @@ function wrapText(ctx, text, x, y, maxWidth, lineHeight) {
   if (line) ctx.fillText(line, x, yy);
 }
 
-export async function downloadIdCard({
-  gymName = 'YOYO GYM',
-  accent = '#E63946',
-  name = '',
-  membershipNumber = '',
-  tier = '',
-  validUntil = '',
-  photoUrl = '',
-  qrUrl = '',
-  // Generalised labels so the same premium card works for staff & trainers.
-  roleLabel = 'MEMBER', // shown above the name
-  subtitle = 'OFFICIAL MEMBERSHIP ID', // shown under the gym name
-  idLabel = 'MEMBERSHIP NO.', // label above the number
-  badgeText = '', // e.g. job title / specialization (overrides tier badge)
-  badgeColor = '', // hex for the badge fill
-  validLabel = 'VALID UNTIL',
-  // Back of the card:
-  verificationCode = '', // rendered as a Code 128 barcode + human-readable text
-  fields = [], // [{ label, value }] identifying details of the card holder
-  issuedOn = '',
-  footerNote = '',
-}) {
+// Business-card physical size (ISO CR80-ish), used for the print-ready PDF.
+const CARD_W_MM = 85.6;
+const CARD_H_MM = 54;
+
+function normalise(o) {
+  return {
+    gymName: 'YOYO GYM',
+    accent: '#E63946',
+    name: '',
+    membershipNumber: '',
+    tier: '',
+    validUntil: '',
+    photoUrl: '',
+    qrUrl: '',
+    roleLabel: 'MEMBER',
+    subtitle: 'OFFICIAL MEMBERSHIP ID',
+    idLabel: 'MEMBERSHIP NO.',
+    badgeText: '',
+    badgeColor: '',
+    validLabel: 'VALID UNTIL',
+    verificationCode: '',
+    fields: [],
+    issuedOn: '',
+    footerNote: '',
+    ...o,
+  };
+}
+
+async function ready() {
   try {
     await (document.fonts?.ready || Promise.resolve());
   } catch {
     /* ignore */
   }
+}
 
-  const opts = {
-    gymName, accent, name, membershipNumber, tier, validUntil, photoUrl, qrUrl,
-    roleLabel, subtitle, idLabel, badgeText, badgeColor, validLabel,
-    verificationCode, fields, issuedOn, footerNote,
-  };
-
+/** Render one card face ('front' | 'back') to its own high-resolution canvas.
+ *  `scale` multiplies the pixel density — 3x gives a crisp, print-ready image. */
+async function renderFace(o, which, scale = 3) {
   const canvas = document.createElement('canvas');
-  canvas.width = W;
-  canvas.height = H * 2 + GAP;
+  canvas.width = Math.round(W * scale);
+  canvas.height = Math.round(H * scale);
   const ctx = canvas.getContext('2d');
+  ctx.scale(scale, scale);
+  if (which === 'front') await drawFront(ctx, 0, o);
+  else drawBack(ctx, 0, o);
+  return canvas;
+}
+
+const fileBase = (o) => `yoyo-id-${(o.membershipNumber || o.name || 'member').replace(/\s+/g, '-')}`;
+
+/** Download the ID card as a high-resolution PNG (front above back). */
+export async function downloadIdCard(input) {
+  const o = normalise(input);
+  await ready();
+
+  const scale = 3; // 3× ≈ 3036×3894 px — sharp when printed at card size
+  const canvas = document.createElement('canvas');
+  canvas.width = Math.round(W * scale);
+  canvas.height = Math.round((H * 2 + GAP) * scale);
+  const ctx = canvas.getContext('2d');
+  ctx.scale(scale, scale);
 
   // The gap between the two faces reads as a cut line when the card is printed.
   ctx.fillStyle = '#050505';
-  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  ctx.fillRect(0, 0, W, H * 2 + GAP);
 
-  await drawFront(ctx, 0, opts);
-  drawBack(ctx, H + GAP, opts);
+  await drawFront(ctx, 0, o);
+  drawBack(ctx, H + GAP, o);
 
-  await downloadCanvas(canvas, `yoyo-id-${(membershipNumber || name || 'member').replace(/\s+/g, '-')}.png`);
+  await downloadCanvas(canvas, `${fileBase(o)}.png`);
+}
+
+/** Download the ID card as a print-ready PDF: page 1 front, page 2 back,
+ *  each sized to a physical business card. */
+export async function downloadIdCardPdf(input) {
+  const o = normalise(input);
+  await ready();
+
+  const [{ jsPDF }, front, back] = await Promise.all([
+    import('jspdf'),
+    renderFace(o, 'front', 3),
+    renderFace(o, 'back', 3),
+  ]);
+
+  const doc = new jsPDF({ unit: 'mm', format: [CARD_W_MM, CARD_H_MM], orientation: 'landscape' });
+  const pw = doc.internal.pageSize.getWidth();
+  const ph = doc.internal.pageSize.getHeight();
+  doc.addImage(front.toDataURL('image/jpeg', 0.95), 'JPEG', 0, 0, pw, ph, undefined, 'FAST');
+  doc.addPage([CARD_W_MM, CARD_H_MM], 'landscape');
+  doc.addImage(back.toDataURL('image/jpeg', 0.95), 'JPEG', 0, 0, pw, ph, undefined, 'FAST');
+  doc.save(`${fileBase(o)}.pdf`);
 }
