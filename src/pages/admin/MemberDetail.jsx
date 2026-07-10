@@ -226,9 +226,7 @@ export default function MemberDetail() {
 
       <Section title="Membership ID Card & QR">
         <div className="mb-4 max-w-xs">
-          <IdCardButton
-            member={{ full_name: m.full_name, membership_number: m.membership_number, tier: current?.tier, valid_until: current?.end_date, photo_url: m.photo_url }}
-          />
+          <IdCardButton member={{ ...m, tier: current?.tier, valid_until: current?.end_date }} />
         </div>
         <PersonalQr url={`${window.location.origin}/p/m/${m.membership_number}`} name={m.full_name} />
       </Section>

@@ -35,7 +35,11 @@ export default function FaceScan() {
   useEffect(() => {
     apiFetch('/admin/face-descriptors')
       .then((d) => {
-        peopleRef.current = (d.people || []).filter((p) => Array.isArray(p.descriptor));
+        // Each person carries a `templates` gallery (bestMatch scores by the
+        // closest one); tolerate the legacy single-`descriptor` shape too.
+        peopleRef.current = (d.people || []).filter(
+          (p) => (Array.isArray(p.templates) && p.templates.length) || Array.isArray(p.descriptor)
+        );
         setPhase('idle');
       })
       .catch((e) => {

@@ -17,7 +17,11 @@ export default async function handler(req, res) {
       await Promise.all([
         supabase
           .from('members')
-          .select('full_name, membership_number, verification_code, status, parq_flag, training_frequency, photo_url')
+          // The identity columns feed the ID card (front + back) a member downloads.
+          .select(
+            'full_name, membership_number, verification_code, status, parq_flag, training_frequency, photo_url, ' +
+              'date_of_birth, gender, id_number, passport_number, phone, emergency_name, emergency_phone'
+          )
           .eq('id', auth.sub)
           .maybeSingle(),
         supabase

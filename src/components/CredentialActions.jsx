@@ -6,6 +6,8 @@
 import { useState } from 'react';
 import { useBranding } from '../lib/branding.js';
 
+const fmt = (d) => (d ? new Date(d).toLocaleDateString('en-ZA', { day: '2-digit', month: 'short', year: 'numeric' }).toUpperCase() : '');
+
 export default function CredentialActions({ person, className = '' }) {
   // person: { kind, id, name, number, verification_code, badge, photo_url,
   //           job_title, phone, email, contract_start, contract_end }
@@ -34,6 +36,20 @@ export default function CredentialActions({ person, className = '' }) {
         validLabel: 'STATUS', validUntil: 'ACTIVE',
         photoUrl: person.photo_url || '',
         qrUrl,
+        // Back of the card: who the holder is + a scannable verification code.
+        verificationCode: person.verification_code || '',
+        fields: [
+          { label: isTrainer ? 'Specialization' : 'Job Title', value: person.badge || person.job_title || '' },
+          { label: 'Mobile', value: person.phone || '' },
+          { label: 'Email', value: person.email || '' },
+          ...(isTrainer
+            ? []
+            : [
+                { label: 'Contract Start', value: fmt(person.contract_start) },
+                { label: 'Contract End', value: fmt(person.contract_end) || 'Ongoing' },
+              ]),
+        ],
+        issuedOn: fmt(new Date()),
       });
     } catch (e) { setErr(e.message || 'Could not generate ID card.'); } finally { setBusy(''); }
   }

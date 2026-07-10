@@ -79,7 +79,7 @@ export default function TrainerManagement() {
               </div>
             </div>
             <div className="flex flex-wrap items-center gap-2">
-              <CredentialActions person={{ kind: 'trainer', id: t.id, name: t.full_name, number: t.trainer_number, verification_code: t.verification_code, badge: t.specialization || 'TRAINER', photo_url: t.photo_url }} />
+              <CredentialActions person={{ kind: 'trainer', id: t.id, name: t.full_name, number: t.trainer_number, verification_code: t.verification_code, badge: t.specialization || 'TRAINER', photo_url: t.photo_url, phone: t.phone, email: t.email }} />
               <button className="btn-outline px-3 py-1 text-sm" onClick={() => setQrFor(t)}>QR</button>
               <button className="btn-outline px-3 py-1 text-sm" onClick={() => setForm({ ...blank, ...t })}>Edit</button>
               <button className="text-sm text-error" onClick={() => remove(t.id)}>Remove</button>
