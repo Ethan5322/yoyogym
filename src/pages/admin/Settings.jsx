@@ -5,6 +5,8 @@ import { useEffect, useState } from 'react';
 import AdminShell from '../../components/AdminShell.jsx';
 import { apiFetch } from '../../lib/api.js';
 import FaceCapture from '../../chatbot/components/FaceCapture.jsx';
+import IdPhotoUpload from '../../components/IdPhotoUpload.jsx';
+import CredentialActions from '../../components/CredentialActions.jsx';
 
 export default function Settings() {
   const [s, setS] = useState(null);
@@ -62,6 +64,8 @@ export default function Settings() {
       <PasswordSection />
 
       <AdminFaceEnroll />
+
+      <MyIdCard />
 
       <TextSection title="Gym Rules & Code of Conduct" k="gym_rules" value={s.gym_rules?.text} defaultText={DEFAULTS.gym_rules} note="Shown to members during registration and printed on their confirmation." saved={savedKey === 'gym_rules'} onSave={(text) => save('gym_rules', { text }, 'rules')} />
       <TextSection title="Indemnity Waiver" k="indemnity_text" value={s.indemnity_text?.text} defaultText={DEFAULTS.indemnity_text} note="Legal waiver the member must accept before joining (CPA-aligned)." saved={savedKey === 'indemnity_text'} onSave={(text) => save('indemnity_text', { text }, 'terms')} />
@@ -250,6 +254,101 @@ function AdminFaceEnroll() {
         </div>
       ) : (
         <button className="btn-primary px-4 py-2 text-sm" onClick={() => { setMsg(''); setOpen(true); }}>Enrol my face</button>
+      )}
+    </div>
+  );
+}
+
+// My ID photo & card — self-service for the signed-in admin/owner. Change the
+// photo that appears on your ID as often as you like: take a fresh one with
+// the camera OR upload from your gallery (auto-cropped to the corporate ID
+// standard), then download your updated card.
+function MyIdCard() {
+  const [profile, setProfile] = useState(null);
+  const [mode, setMode] = useState(null); // null | 'camera'
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState('');
+  const [err, setErr] = useState('');
+
+  function load() {
+    apiFetch('/admin/profile').then((d) => setProfile(d.profile)).catch((e) => setErr(e.message));
+  }
+  useEffect(load, []);
+
+  async function savePhoto(photo_url) {
+    if (!photo_url) return;
+    setBusy(true); setMsg(''); setErr('');
+    try {
+      await apiFetch('/admin/profile', { method: 'POST', body: { photo_url } });
+      setMsg('ID photo updated. Download your refreshed card below.');
+      setMode(null);
+      load();
+    } catch (e) {
+      setErr(e.message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="card mt-6">
+      <h2 className="mb-1 font-display uppercase text-body">My ID Photo &amp; Card</h2>
+      <p className="mb-3 text-xs text-muted">
+        Change the photo on your ID whenever you like — take a new one or upload from your gallery.
+        We auto-crop it to the corporate ID standard. Stored privately (POPIA).
+      </p>
+      {msg && <p className="mb-3 text-sm text-success">{msg}</p>}
+      {err && <p className="mb-3 text-sm text-error">{err}</p>}
+
+      {mode === 'camera' ? (
+        <div className="max-w-xs">
+          <FaceCapture mode="verify" onSubmit={(res) => savePhoto(res?.image)} />
+        </div>
+      ) : (
+        <div className="flex flex-wrap items-center gap-4">
+          {profile?.photo_url ? (
+            <img src={profile.photo_url} alt="" className="h-24 w-[72px] rounded object-cover gold-frame" />
+          ) : (
+            <div className="flex h-24 w-[72px] items-center justify-center rounded bg-elevated text-center text-[10px] text-muted">
+              No photo
+            </div>
+          )}
+          <div className="flex flex-wrap gap-2">
+            <button className="btn-outline px-4 py-2 text-sm" disabled={busy} onClick={() => { setMsg(''); setErr(''); setMode('camera'); }}>
+              📷 Take a photo
+            </button>
+            <IdPhotoUpload
+              className="btn-outline px-4 py-2 text-sm"
+              label={busy ? 'Saving…' : '🖼️ Upload from gallery'}
+              onPhoto={(url) => savePhoto(url)}
+            />
+          </div>
+        </div>
+      )}
+
+      {profile && mode !== 'camera' && (
+        <div className="mt-4 border-t border-white/5 pt-4">
+          <p className="mb-2 text-xs text-muted">
+            {profile.staff_number ? <>ID No: <span className="text-accent">{profile.staff_number}</span> · </> : null}
+            Download your corporate ID card:
+          </p>
+          <CredentialActions
+            person={{
+              kind: 'staff',
+              id: profile.id,
+              name: profile.full_name || profile.username,
+              number: profile.staff_number,
+              verification_code: profile.verification_code,
+              badge: profile.job_title || profile.role,
+              photo_url: profile.photo_url,
+              job_title: profile.job_title || profile.role,
+              phone: profile.phone,
+              email: profile.email,
+              contract_start: profile.contract_start,
+              contract_end: profile.contract_end,
+            }}
+          />
+        </div>
       )}
     </div>
   );

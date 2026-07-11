@@ -31,6 +31,7 @@ import incident from '../../server/handlers/admin/incident.js';
 import resolveMember from '../../server/handlers/admin/resolve-member.js';
 import enrollFace from '../../server/handlers/admin/enroll-face.js';
 import staff from '../../server/handlers/admin/staff.js';
+import profile from '../../server/handlers/admin/profile.js';
 import audit from '../../server/handlers/admin/audit.js';
 import finance from '../../server/handlers/admin/finance.js';
 import notifications from '../../server/handlers/admin/notifications.js';
@@ -69,6 +70,7 @@ const routes = {
   'resolve-member': resolveMember,
   'enroll-face': enrollFace,
   staff,
+  profile,
   audit,
   finance,
   notifications,

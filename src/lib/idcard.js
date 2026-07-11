@@ -68,28 +68,38 @@ function fit(ctx, text, maxWidth) {
   return `${t}…`;
 }
 
-/** The obsidian card body: background, racing stripe, frame and corner diamonds. */
+// Card geometry (shared by the shell and the content layout so zones align).
+const HEADER_H = 120; // header band height
+const FOOTER_Y = 540; // top of the barcode / verification footer zone
+
+/** The obsidian card body: background, contained racing accent, frame, header
+ *  rule and corner diamonds. The accent is CLIPPED to the header so it never
+ *  crosses the photo, the details grid or the machine-readable barcode. */
 function drawShell(ctx, accent) {
   ctx.fillStyle = INK;
   ctx.fillRect(0, 0, W, H);
 
-  // red diagonal racing band (right side)
+  // Racing accent, confined to the header band (a top-right flourish, not a
+  // full-height slash across the card's content).
   ctx.save();
-  ctx.globalAlpha = 0.9;
-  ctx.fillStyle = accent;
   ctx.beginPath();
-  ctx.moveTo(W * 0.66, 0);
-  ctx.lineTo(W * 0.74, 0);
-  ctx.lineTo(W * 0.5, H);
-  ctx.lineTo(W * 0.42, H);
+  ctx.rect(0, 0, W, HEADER_H);
+  ctx.clip();
+  ctx.fillStyle = accent;
+  ctx.globalAlpha = 0.9;
+  ctx.beginPath();
+  ctx.moveTo(W * 0.62, -20);
+  ctx.lineTo(W * 0.72, -20);
+  ctx.lineTo(W * 0.5, HEADER_H + 20);
+  ctx.lineTo(W * 0.4, HEADER_H + 20);
   ctx.closePath();
   ctx.fill();
   ctx.globalAlpha = 0.35;
   ctx.beginPath();
-  ctx.moveTo(W * 0.76, 0);
-  ctx.lineTo(W * 0.8, 0);
-  ctx.lineTo(W * 0.56, H);
-  ctx.lineTo(W * 0.52, H);
+  ctx.moveTo(W * 0.75, -20);
+  ctx.lineTo(W * 0.8, -20);
+  ctx.lineTo(W * 0.58, HEADER_H + 20);
+  ctx.lineTo(W * 0.53, HEADER_H + 20);
   ctx.closePath();
   ctx.fill();
   ctx.restore();
@@ -101,6 +111,16 @@ function drawShell(ctx, accent) {
   ctx.strokeStyle = GOLD;
   ctx.lineWidth = 2;
   ctx.strokeRect(24, 24, W - 48, H - 48);
+
+  // gold hairline under the header, separating it from the identity zone
+  ctx.strokeStyle = GOLD;
+  ctx.lineWidth = 1;
+  ctx.globalAlpha = 0.5;
+  ctx.beginPath();
+  ctx.moveTo(40, HEADER_H);
+  ctx.lineTo(W - 40, HEADER_H);
+  ctx.stroke();
+  ctx.globalAlpha = 1;
 
   // diamond corners (gold)
   ctx.fillStyle = GOLD;
@@ -285,7 +305,7 @@ async function ready() {
 }
 
 /** Render the card to a high-resolution canvas (`scale`× pixel density). */
-async function renderCard(o, scale = 3) {
+export async function renderCard(o, scale = 3) {
   const canvas = document.createElement('canvas');
   canvas.width = Math.round(W * scale);
   canvas.height = Math.round(H * scale);
