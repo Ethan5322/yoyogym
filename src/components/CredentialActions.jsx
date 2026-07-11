@@ -37,10 +37,10 @@ export default function CredentialActions({ person, className = '' }) {
       qrUrl,
       // Back of the card: who the holder is + a scannable verification code.
       verificationCode: person.verification_code || '',
+      // Personal email is intentionally left off the printed card.
       fields: [
         { label: isTrainer ? 'Specialization' : 'Job Title', value: person.badge || person.job_title || '' },
         { label: 'Mobile', value: person.phone || '' },
-        { label: 'Email', value: person.email || '' },
         ...(isTrainer
           ? []
           : [

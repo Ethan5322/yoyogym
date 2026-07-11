@@ -162,9 +162,9 @@ async function drawCard(ctx, o) {
   // 210×280 on the 1012-px canvas prints at ≈17.8×23.7 mm on the CR80 card —
   // the recommended corporate/ID-badge photo size (SA smart-ID class).
   const px = 56;
-  const py = 132;
+  const py = 130;
   const pw = 210;
-  const ph = 280;
+  const ph = 258;
   const photo = await loadImg(o.photoUrl);
   ctx.fillStyle = '#1A1A1A';
   ctx.fillRect(px, py, pw, ph);
@@ -184,17 +184,17 @@ async function drawCard(ctx, o) {
   const dw = W - dx - 220; // stops short of the QR block
   ctx.fillStyle = MUTED;
   ctx.font = '600 14px Oswald, sans-serif';
-  ctx.fillText(o.roleLabel.toUpperCase(), dx, 156);
+  ctx.fillText(o.roleLabel.toUpperCase(), dx, 154);
   ctx.fillStyle = PAPER;
   ctx.font = '600 40px "Bebas Neue", Oswald, sans-serif';
-  ctx.fillText(fit(ctx, o.name.toUpperCase(), dw), dx, 198);
+  ctx.fillText(fit(ctx, o.name.toUpperCase(), dw), dx, 194);
 
   ctx.fillStyle = MUTED;
   ctx.font = '600 12px Oswald, sans-serif';
-  ctx.fillText(o.idLabel.toUpperCase(), dx, 234);
+  ctx.fillText(o.idLabel.toUpperCase(), dx, 226);
   ctx.fillStyle = o.accent;
   ctx.font = '500 27px "DM Mono", monospace';
-  ctx.fillText(o.membershipNumber, dx, 264);
+  ctx.fillText(o.membershipNumber, dx, 254);
 
   // Badge: explicit text (job title / specialization) overrides the tier badge.
   const label = (o.badgeText || o.tier || '').toUpperCase();
@@ -202,74 +202,99 @@ async function drawCard(ctx, o) {
     ctx.font = '700 16px Oswald, sans-serif';
     const tw = ctx.measureText(label).width + 24;
     ctx.fillStyle = o.badgeColor || TIER_COLOR[o.tier] || GOLD;
-    ctx.fillRect(dx, 284, tw, 30);
+    ctx.fillRect(dx, 272, tw, 30);
     ctx.fillStyle = INK;
-    ctx.fillText(label, dx + 12, 305);
+    ctx.fillText(label, dx + 12, 293);
   }
 
   ctx.fillStyle = MUTED;
   ctx.font = '600 12px Oswald, sans-serif';
-  ctx.fillText(o.validLabel.toUpperCase(), dx, 346);
+  ctx.fillText(o.validLabel.toUpperCase(), dx, 330);
   ctx.fillStyle = PAPER;
   ctx.font = '500 20px "DM Mono", monospace';
-  ctx.fillText(o.validUntil || 'ONGOING', dx, 372);
+  ctx.fillText(o.validUntil || 'ONGOING', dx, 356);
 
-  // Issue date sits under the valid-until, right of the photo.
+  // Issue date sits alongside the valid-until, right of the photo.
   if (o.issuedOn) {
     ctx.fillStyle = MUTED;
     ctx.font = '600 12px Oswald, sans-serif';
-    ctx.fillText('ISSUED', dx + 250, 346);
+    ctx.fillText('ISSUED', dx + 250, 330);
     ctx.fillStyle = PAPER;
     ctx.font = '500 20px "DM Mono", monospace';
-    ctx.fillText(o.issuedOn, dx + 250, 372);
+    ctx.fillText(o.issuedOn, dx + 250, 356);
   }
 
-  // ── Holder identification: divider + 3×2 compact grid ────────────────────
+  // ── Holder identification: divider + compact grid ────────────────────────
   const fields = (o.fields || []).filter((f) => f && f.value);
   if (fields.length) {
     ctx.strokeStyle = GOLD;
     ctx.lineWidth = 1;
     ctx.globalAlpha = 0.6;
     ctx.beginPath();
-    ctx.moveTo(56, 430);
-    ctx.lineTo(W - 56, 430);
+    ctx.moveTo(56, 398);
+    ctx.lineTo(W - 56, 398);
     ctx.stroke();
     ctx.globalAlpha = 1;
 
     const colX = [56, 372, 688];
     const colW = 280;
+    // Tight label→value pairing with a compact row pitch (was airy).
     fields.slice(0, 6).forEach((f, i) => {
       const x = colX[i % 3];
-      const y = 458 + Math.floor(i / 3) * 50;
+      const y = 424 + Math.floor(i / 3) * 40;
       ctx.fillStyle = MUTED;
       ctx.font = '600 11px Oswald, sans-serif';
       ctx.fillText(String(f.label).toUpperCase(), x, y);
       ctx.fillStyle = PAPER;
       ctx.font = '500 17px "DM Mono", monospace';
-      ctx.fillText(fit(ctx, f.value, colW), x, y + 22);
+      ctx.fillText(fit(ctx, f.value, colW), x, y + 20);
     });
   }
 
-  // ── Verification barcode strip (bottom) ──────────────────────────────────
+  // ── Footer: verification barcode (left) + agency credit (right) ──────────
+  const footY = 522;
+
+  // Verification code: label ON TOP of the barcode (right after the details),
+  // with the human-readable code beneath the bars — not off to the side.
   if (o.verificationCode) {
-    const bx = 56;
-    const bw = 470;
-    const bh = 46;
-    const by = 556;
+    ctx.fillStyle = MUTED;
+    ctx.font = '600 11px Oswald, sans-serif';
+    ctx.fillText('VERIFICATION CODE', 56, footY);
+
+    const bx = 64;
+    const bw = 360;
+    const bh = 40;
+    const by = footY + 12;
+    // White quiet zone wraps the bars + the code text, and is inset from the
+    // card frame (a clear margin all round — the barcode never touches it).
     ctx.fillStyle = '#FFFFFF';
-    ctx.fillRect(bx - 8, by - 8, bw + 16, bh + 16);
+    ctx.fillRect(bx - 8, by - 6, bw + 16, bh + 34);
     try {
       drawBarcode(ctx, o.verificationCode, { x: bx, y: by, width: bw, height: bh, quietZone: 8 });
     } catch {
-      /* code outside Code 128 B — the plain text below still identifies it */
+      /* code outside Code 128 B — the text below still identifies it */
     }
-    ctx.fillStyle = MUTED;
-    ctx.font = '600 11px Oswald, sans-serif';
-    ctx.fillText('VERIFICATION CODE', bx + bw + 28, by + 8);
-    ctx.fillStyle = PAPER;
-    ctx.font = '500 24px "DM Mono", monospace';
-    ctx.fillText(o.verificationCode, bx + bw + 28, by + 38);
+    ctx.fillStyle = INK;
+    ctx.font = '600 16px "DM Mono", monospace';
+    ctx.textAlign = 'center';
+    ctx.fillText(o.verificationCode, bx + bw / 2, by + bh + 20);
+    ctx.textAlign = 'left';
   }
+
+  // Agency credit — every card is designed & built by MuleSoo Digital Services.
+  const cx = 470;
+  ctx.fillStyle = MUTED;
+  ctx.font = '600 10px Oswald, sans-serif';
+  ctx.fillText('DESIGNED & BUILT BY', cx, footY);
+  ctx.fillStyle = GOLD;
+  ctx.font = '700 16px Oswald, sans-serif';
+  ctx.fillText(o.builtBy.toUpperCase(), cx, footY + 23);
+  ctx.fillStyle = PAPER;
+  ctx.font = '500 13px "DM Mono", monospace';
+  ctx.fillText(o.builtByUrl, cx, footY + 45);
+  ctx.fillStyle = MUTED;
+  ctx.font = '500 12px "DM Mono", monospace';
+  ctx.fillText(o.builtByEmail, cx, footY + 65);
 }
 
 function normalise(o) {
@@ -292,6 +317,10 @@ function normalise(o) {
     fields: [],
     issuedOn: '',
     footerNote: '',
+    // Agency credit printed on every card.
+    builtBy: 'MuleSoo Digital Services',
+    builtByUrl: 'mulesoo.com',
+    builtByEmail: 'hello@mulesoo.com',
     ...o,
   };
 }
