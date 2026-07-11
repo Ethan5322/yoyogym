@@ -24,6 +24,13 @@ const TIER_COLOR = {
 // Canvas design space. 1012×638 matches the CR80 ratio (85.6/54 ≈ 1.586).
 const W = 1012;
 const H = 638;
+// MuleSoo agency-credit lockup: the transparent logo + wordmark (Sora) + contact
+// (DM Sans), rendered once by MuleSoo's brand pipeline and served from /public.
+// The card is dark, so the light-ink variant. Aspect is fixed — size by it, never
+// stretch the mark.
+const MULESOO_CREDIT_SRC = '/brand/mulesoo-credit-on-dark.png';
+const MULESOO_CREDIT_ASPECT = 4.25;
+
 const GOLD = '#C8922A';
 const INK = '#0A0A0A';
 const PAPER = '#F0EDE8';
@@ -282,19 +289,34 @@ async function drawCard(ctx, o) {
   }
 
   // Agency credit — every card is designed & built by MuleSoo Digital Services.
+  //
+  // This used to be four lines of Oswald/DM Mono: Yoyo GYM's own typefaces, with
+  // no MuleSoo logo at all. It is now the official lockup — the transparent
+  // MuleSoo mark, the wordmark in Sora, and the contact line in DM Sans — so the
+  // agency signature is in MuleSoo's brand while the card itself stays Yoyo's.
+  //
+  // It occupies the band to the RIGHT of the barcode (x ≥ 470); the barcode ends
+  // at x = 424, so the two can never collide.
   const cx = 470;
-  ctx.fillStyle = MUTED;
-  ctx.font = '600 10px Oswald, sans-serif';
-  ctx.fillText('DESIGNED & BUILT BY', cx, footY);
-  ctx.fillStyle = GOLD;
-  ctx.font = '700 16px Oswald, sans-serif';
-  ctx.fillText(o.builtBy.toUpperCase(), cx, footY + 23);
-  ctx.fillStyle = PAPER;
-  ctx.font = '500 13px "DM Mono", monospace';
-  ctx.fillText(o.builtByUrl, cx, footY + 45);
-  ctx.fillStyle = MUTED;
-  ctx.font = '500 12px "DM Mono", monospace';
-  ctx.fillText(o.builtByEmail, cx, footY + 65);
+  const creditW = Math.min(470, W - cx - 30);
+  const creditH = creditW / MULESOO_CREDIT_ASPECT;
+  const creditY = Math.min(footY - 6, H - creditH - 14);
+
+  const credit = await loadImg(MULESOO_CREDIT_SRC);
+  if (credit) {
+    ctx.drawImage(credit, cx, creditY, creditW, creditH);
+  } else {
+    // Attribution must survive even if the asset fails to load.
+    ctx.fillStyle = MUTED;
+    ctx.font = '600 10px Oswald, sans-serif';
+    ctx.fillText('DESIGNED & BUILT BY', cx, footY);
+    ctx.fillStyle = GOLD;
+    ctx.font = '700 16px Oswald, sans-serif';
+    ctx.fillText(o.builtBy.toUpperCase(), cx, footY + 23);
+    ctx.fillStyle = PAPER;
+    ctx.font = '500 13px "DM Mono", monospace';
+    ctx.fillText(`${o.builtByUrl}  |  ${o.builtByEmail}`, cx, footY + 45);
+  }
 }
 
 function normalise(o) {
