@@ -9,8 +9,13 @@ import { useBranding } from '../../lib/branding.js';
 import { downloadReceiptPdf } from '../../lib/receiptPdf.js';
 import PersonalQr from '../../components/PersonalQr.jsx';
 import IdCardButton from '../../components/IdCardButton.jsx';
+import { countryByCode } from '../../../shared/countries.js';
 
 const zar = (n) => 'R' + Number(n || 0).toLocaleString('en-ZA', { minimumFractionDigits: 2 });
+const country = (code) => {
+  const c = countryByCode(code);
+  return c ? `${c.flag} ${c.name}` : '—';
+};
 const fmt = (d) => (d ? new Date(d).toLocaleDateString('en-ZA', { day: 'numeric', month: 'short', year: 'numeric' }) : '—');
 const ADH = {
   excellent: 'bg-success/20 text-success',
@@ -136,7 +141,9 @@ export default function MemberDetail() {
           <Row label="Phone" value={m.phone} />
           <Row label="Email" value={m.email} />
           <Row label="Date of Birth" value={fmt(m.date_of_birth)} />
-          <Row label="ID / Passport" value={m.id_number || m.passport_number || '—'} />
+          <Row label="Nationality" value={country(m.nationality)} />
+          <Row label={m.id_number ? 'SA ID Number' : 'Passport No.'} value={m.id_number || m.passport_number || '—'} />
+          <Row label="Country of Residence" value={country(m.residence_country)} />
           <Row label="Address" value={[m.address_street, m.address_suburb, m.address_city, m.address_postal_code].filter(Boolean).join(', ') || '—'} />
           <Row label="Emergency" value={`${m.emergency_name || '—'} ${m.emergency_phone || ''}`} />
           <Row label="Medical Aid" value={m.medical_aid_provider || '—'} />

@@ -1,13 +1,14 @@
 // Button that generates + downloads the member's corporate ID card (front + back).
 import { useState } from 'react';
 import { useBranding } from '../lib/branding.js';
+import { countryByCode } from '../../shared/countries.js';
 
 const fmt = (d) => (d ? new Date(d).toLocaleDateString('en-ZA', { day: '2-digit', month: 'short', year: 'numeric' }).toUpperCase() : '');
 const GENDER = { male: 'Male', female: 'Female', prefer_not_to_say: 'Not disclosed' };
 
-/** The holder details printed on the back of a member's card. */
+/** The holder details printed on a member's card (6-slot grid). */
 function identityFields(member) {
-  return [
+  const fields = [
     { label: 'Date of Birth', value: fmt(member.date_of_birth) },
     { label: 'Gender', value: GENDER[member.gender] || member.gender || '' },
     // A member has either an SA ID number or a passport number, never both.
@@ -18,6 +19,13 @@ function identityFields(member) {
     { label: 'Emergency Contact', value: member.emergency_name || '' },
     { label: 'Emergency Phone', value: member.emergency_phone || '' },
   ];
+  // For non-South-African nationals, nationality is key identity info on the
+  // card — show it in place of gender so the grid still fits six fields.
+  const nat = countryByCode(member.nationality);
+  if (nat && member.nationality !== 'ZA') {
+    fields[1] = { label: 'Nationality', value: nat.name };
+  }
+  return fields;
 }
 
 export default function IdCardButton({ member, className = 'btn-primary w-full' }) {
