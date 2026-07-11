@@ -17,6 +17,7 @@
 //   when(a)     optional predicate; step is skipped when it returns false
 //   validate(v, a)  returns null or an error string
 import { greeting, firstName } from './messages.js';
+import { countryByCode, dialForCountry, HOME_COUNTRY } from '../../shared/countries.js';
 import {
   validateName,
   validateDOB,
@@ -25,8 +26,20 @@ import {
   validatePhone,
   validateEmail,
   validatePostal,
+  validatePostalIntl,
+  validateCountry,
   required,
 } from './validators.js';
+
+// Registration adapts to the member's identity: their NATIONALITY drives the
+// ID document (South Africans give a 13-digit SA ID; everyone else a passport),
+// while their RESIDENCE country drives address format, phone dialling code,
+// medical-aid options and the currency prices are shown in. So an Ethiopian
+// national living in South Africa is asked for a passport (nationality) but a
+// South African address (residence).
+const isHomeNational = (a) => a.nationality === HOME_COUNTRY;
+const isHomeResident = (a) => (a.residence_country || a.nationality) === HOME_COUNTRY;
+const countryName = (code) => countryByCode(code)?.name || 'your country';
 
 // Titles for the 11 registration sections (progress: "Step X of 11").
 export const SECTION_TITLES = [
@@ -67,6 +80,26 @@ export const FLOW = [
     validate: (v) => validateName(v),
   },
   {
+    id: 'nationality',
+    section: 2,
+    type: 'country',
+    field: 'nationality',
+    prompt: (a) =>
+      `Thanks${firstName(a)}! What’s your nationality? This tells us which ID document to ask for.`,
+    validate: (v) => validateCountry(v),
+  },
+  {
+    id: 'residence_country',
+    section: 2,
+    type: 'country',
+    field: 'residence_country',
+    prompt: (a) =>
+      `And which country do you live in? ${
+        a.nationality ? `(Tap ${countryName(a.nationality)} again if it’s the same.)` : ''
+      }`.trim(),
+    validate: (v) => validateCountry(v),
+  },
+  {
     id: 'date_of_birth',
     section: 2,
     type: 'date',
@@ -86,25 +119,16 @@ export const FLOW = [
       { label: 'Prefer not to say', value: 'prefer_not_to_say' },
     ],
   },
-  {
-    id: 'id_type',
-    section: 2,
-    type: 'select',
-    field: 'id_type',
-    prompt: () =>
-      `For identity verification (a standard requirement at SA gyms), will you use your South African ID or a passport?`,
-    options: [
-      { label: 'South African ID', value: 'sa_id' },
-      { label: 'Passport', value: 'passport' },
-    ],
-  },
+  // ID document is chosen automatically from nationality — South Africans give
+  // an SA ID, everyone else a passport. No extra "which document?" question.
   {
     id: 'id_number',
     section: 2,
     type: 'text',
     field: 'id_number',
-    when: (a) => a.id_type === 'sa_id',
-    prompt: () => `Please enter your 13-digit South African ID number.`,
+    when: (a) => isHomeNational(a),
+    prompt: () =>
+      `For identity verification (a standard requirement at SA gyms), please enter your 13-digit South African ID number.`,
     validate: (v) => validateSAID(v),
   },
   {
@@ -112,8 +136,11 @@ export const FLOW = [
     section: 2,
     type: 'text',
     field: 'passport_number',
-    when: (a) => a.id_type === 'passport',
-    prompt: () => `Please enter your passport number.`,
+    when: (a) => !isHomeNational(a),
+    prompt: (a) =>
+      `For identity verification, please enter your passport number${
+        a.nationality ? ` (${countryName(a.nationality)} passport)` : ''
+      }.`,
     validate: (v) => validatePassport(v),
   },
   {
@@ -121,7 +148,12 @@ export const FLOW = [
     section: 2,
     type: 'tel',
     field: 'phone',
-    prompt: () => `What’s the best phone number to reach you? Include your country code (e.g. +27 82 123 4567).`,
+    prompt: (a) => {
+      const dial = dialForCountry(a.residence_country);
+      return `What’s the best phone number to reach you? Include your country code${
+        dial ? ` (e.g. +${dial} …)` : ' (e.g. +27 82 123 4567)'
+      }.`;
+    },
     validate: (v) => validatePhone(v),
   },
   {
@@ -145,8 +177,11 @@ export const FLOW = [
     section: 2,
     type: 'text',
     field: 'address_suburb',
-    prompt: () => `Which suburb?`,
-    validate: (v) => required(v, 'Suburb'),
+    // "Suburb" is South African phrasing; elsewhere ask for state/region and
+    // allow skipping, since not every address has one.
+    optional: (a) => !isHomeResident(a),
+    prompt: (a) => (isHomeResident(a) ? `Which suburb?` : `Which state / province / region? (Optional)`),
+    validate: (v, a) => (isHomeResident(a) ? required(v, 'Suburb') : null),
   },
   {
     id: 'address_city',
@@ -161,8 +196,12 @@ export const FLOW = [
     section: 2,
     type: 'text',
     field: 'address_postal_code',
-    prompt: () => `Last bit of your address — your 4-digit postal code.`,
-    validate: (v) => validatePostal(v),
+    optional: (a) => !isHomeResident(a),
+    prompt: (a) =>
+      isHomeResident(a)
+        ? `Last bit of your address — your 4-digit postal code.`
+        : `Last bit of your address — your postal / ZIP code. (Optional)`,
+    validate: (v, a) => (isHomeResident(a) ? validatePostal(v) : validatePostalIntl(v)),
   },
   {
     id: 'emergency_name',
@@ -187,8 +226,8 @@ export const FLOW = [
     type: 'face',
     field: 'face',
     prompt: (a) =>
-      `Almost done with your profile${firstName(a)}! Let’s capture your face for fast, secure gym access — ` +
-      `look at the camera and tap Capture. (You can skip and enrol at reception.)`,
+      `Almost done with your profile${firstName(a)}! Your membership card carries an official photo, and we can also enrol your face for fast, hands-free gym access.\n\n` +
+      `Scan your face now (biometric + ID photo in one go), or skip the biometric and upload a photo from your gallery — we’ll auto-crop it to the corporate ID standard.`,
   },
 
   // ---- SECTION 3 — PAR-Q HEALTH SCREENING ----------------------------------
@@ -375,15 +414,19 @@ export const FLOW = [
     section: 7,
     type: 'yesno',
     field: 'has_medical_aid',
-    prompt: () =>
-      `Do you have a medical aid? Some providers (like Discovery Vitality) offer gym discounts or cashbacks — well worth checking! 💳`,
+    prompt: (a) =>
+      isHomeResident(a)
+        ? `Do you have a medical aid? Some providers (like Discovery Vitality) offer gym discounts or cashbacks — well worth checking! 💳`
+        : `Do you have medical aid or health insurance? Some plans offer gym or wellness benefits. 💳`,
   },
+  // South African residents pick from local schemes; everyone else types their
+  // provider (both write the same medical_aid_provider column).
   {
     id: 'medical_aid_provider',
     section: 7,
     type: 'select',
     field: 'medical_aid_provider',
-    when: (a) => a.has_medical_aid === true,
+    when: (a) => a.has_medical_aid === true && isHomeResident(a),
     prompt: () => `Great! Which medical aid provider?`,
     options: [
       { label: 'Discovery Vitality', value: 'discovery_vitality' },
@@ -397,6 +440,15 @@ export const FLOW = [
       { label: 'Universal 360', value: 'universal_360' },
       { label: 'Other', value: 'other' },
     ],
+  },
+  {
+    id: 'medical_aid_provider_intl',
+    section: 7,
+    type: 'text',
+    field: 'medical_aid_provider',
+    when: (a) => a.has_medical_aid === true && !isHomeResident(a),
+    prompt: () => `Great! Which medical aid / health insurance provider? (Type the name)`,
+    validate: (v) => required(v, 'Provider name'),
   },
 
   // ---- SECTION 8 — SUMMARY -------------------------------------------------

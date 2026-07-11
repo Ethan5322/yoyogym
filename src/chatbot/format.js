@@ -1,5 +1,7 @@
 // Formats a stored answer back into a human-readable string for the
 // transcript (the "you said" bubble) and the final summary.
+import { countryByCode } from '../../shared/countries.js';
+
 export function formatAnswer(step, value) {
   if (value === null || value === undefined || value === '') {
     return step?.optional ? 'Skipped' : '—';
@@ -7,6 +9,10 @@ export function formatAnswer(step, value) {
   switch (step?.type) {
     case 'yesno':
       return value ? 'Yes' : 'No';
+    case 'country': {
+      const c = countryByCode(value);
+      return c ? `${c.flag} ${c.name}` : String(value);
+    }
     case 'select': {
       const o = (step.options || []).find((o) => o.value === value);
       return o ? o.label : String(value);
@@ -25,7 +31,7 @@ export function formatAnswer(step, value) {
     case 'agreement':
       return `Accepted & signed — ${value.signature}`;
     case 'face':
-      return value?.descriptor ? '📸 Face captured ✓' : 'Skipped';
+      return value?.descriptor ? '📸 Face captured ✓' : value?.photo ? '🖼️ ID photo added ✓' : 'Skipped';
     case 'date':
       try {
         return new Date(value).toLocaleDateString('en-ZA', {

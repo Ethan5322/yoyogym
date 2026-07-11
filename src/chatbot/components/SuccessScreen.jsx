@@ -5,6 +5,7 @@
 import { useState } from 'react';
 import { formatZAR } from '../../../shared/pricing.js';
 import { apiFetch } from '../../lib/api.js';
+import LocalAmount from '../../components/LocalAmount.jsx';
 
 export default function SuccessScreen({ result, paid = false }) {
   const [pdfBusy, setPdfBusy] = useState(false);
@@ -72,7 +73,10 @@ export default function SuccessScreen({ result, paid = false }) {
         )}
         <div className="flex justify-between">
           <span className="text-sm text-muted">Due today</span>
-          <span className="font-display text-accent">{formatZAR(result.amount_due_today)}</span>
+          <span className="text-right font-display text-accent">
+            {formatZAR(result.amount_due_today)}
+            <LocalAmount zar={result.amount_due_today} currency={result.currency} className="ml-2 block font-sans sm:inline" />
+          </span>
         </div>
         {result.recurring_amount > 0 && (
           <div className="flex justify-between">

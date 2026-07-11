@@ -76,3 +76,17 @@ export function validatePostal(v) {
   if (!/^\d{4}$/.test((v || '').trim())) return 'A South African postal code is 4 digits.';
   return null;
 }
+
+/** Postal/ZIP for any country — lenient, accepts the many formats worldwide. */
+export function validatePostalIntl(v) {
+  const s = (v || '').trim();
+  if (!s) return null; // optional outside South Africa
+  if (!/^[A-Za-z0-9][A-Za-z0-9 -]{1,10}$/.test(s)) return 'Please enter a valid postal / ZIP code.';
+  return null;
+}
+
+/** A country must be chosen from the picker (stores an ISO alpha-2 code). */
+export function validateCountry(v) {
+  if (!v || !/^[A-Za-z]{2}$/.test(String(v))) return 'Please choose a country.';
+  return null;
+}

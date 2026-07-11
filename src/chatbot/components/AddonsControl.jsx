@@ -3,6 +3,8 @@
 import { useState } from 'react';
 import { useCatalog } from '../../lib/useCatalog.js';
 import { formatZAR, addonsTotal } from '../../../shared/pricing.js';
+import { currencyForCountry } from '../../../shared/countries.js';
+import LocalAmount from '../../components/LocalAmount.jsx';
 
 const CATEGORY_TITLES = {
   personal_training: 'Personal Training',
@@ -11,8 +13,9 @@ const CATEGORY_TITLES = {
 };
 const BILLING_SUFFIX = { monthly: '/month', per_session: '/session', once_off: '' };
 
-export default function AddonsControl({ defaultValue, onSubmit }) {
+export default function AddonsControl({ defaultValue, answers, onSubmit }) {
   const { catalog, loading, error } = useCatalog();
+  const currency = currencyForCountry(answers?.residence_country || answers?.nationality);
   const [selectedIds, setSelectedIds] = useState(
     Array.isArray(defaultValue) ? defaultValue.map((a) => a.id) : []
   );
@@ -94,7 +97,10 @@ export default function AddonsControl({ defaultValue, onSubmit }) {
       {selected.length > 0 && (
         <div className="mt-3 flex items-center justify-between rounded-lg bg-elevated px-4 py-2 text-sm">
           <span className="text-muted">Add-ons total</span>
-          <span className="font-display text-accent">{formatZAR(total)}</span>
+          <span className="text-right font-display text-accent">
+            {formatZAR(total)}
+            <LocalAmount zar={total} currency={currency} className="ml-2 font-sans" />
+          </span>
         </div>
       )}
 

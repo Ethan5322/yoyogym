@@ -3,12 +3,19 @@
 // done via the engine's "go back" (the user can step back to any answer).
 import { formatZAR, addonsTotal, totalDueToday } from '../../../shared/pricing.js';
 import { parqAnyYes } from '../flow.js';
+import { currencyForCountry } from '../../../shared/countries.js';
+import LocalAmount from '../../components/LocalAmount.jsx';
 
-function Row({ label, value, strong }) {
+function Row({ label, value, zar, currency, strong }) {
   return (
     <div className="flex items-center justify-between py-1.5">
       <span className="text-sm text-muted">{label}</span>
-      <span className={strong ? 'font-display text-accent' : 'text-body'}>{value}</span>
+      <span className="text-right">
+        <span className={strong ? 'font-display text-accent' : 'text-body'}>{value}</span>
+        {zar != null && currency !== 'ZAR' && (
+          <LocalAmount zar={zar} currency={currency} className="ml-2 block sm:ml-2 sm:inline" />
+        )}
+      </span>
     </div>
   );
 }
@@ -18,6 +25,7 @@ export default function SummaryView({ answers, onSubmit }) {
   const addons = answers.addons || [];
   const addonSum = addonsTotal(addons);
   const today = totalDueToday(m, addons);
+  const currency = currencyForCountry(answers.residence_country || answers.nationality);
 
   return (
     <div>
@@ -39,8 +47,8 @@ export default function SummaryView({ answers, onSubmit }) {
         {m.sessions_total ? <Row label="Sessions" value={`${m.sessions_total} sessions`} /> : null}
         {m.visit_type === 'full' && (
           <>
-            <Row label="Monthly fee" value={formatZAR(m.monthly_amount)} />
-            <Row label="Joining fee" value={formatZAR(m.joining_fee)} />
+            <Row label="Monthly fee" value={formatZAR(m.monthly_amount)} zar={m.monthly_amount} currency={currency} />
+            <Row label="Joining fee" value={formatZAR(m.joining_fee)} zar={m.joining_fee} currency={currency} />
           </>
         )}
 
@@ -55,11 +63,19 @@ export default function SummaryView({ answers, onSubmit }) {
         )}
 
         <div className="my-3 border-t border-white/10" />
-        <Row label="Total due today" value={formatZAR(today)} strong />
+        <Row label="Total due today" value={formatZAR(today)} zar={today} currency={currency} strong />
         {m.recurring_amount > 0 && (
-          <Row label="Monthly thereafter" value={formatZAR(m.recurring_amount)} />
+          <Row label="Monthly thereafter" value={formatZAR(m.recurring_amount)} zar={m.recurring_amount} currency={currency} />
         )}
-        {m.contract_value && <Row label="Total contract value" value={formatZAR(m.contract_value)} />}
+        {m.contract_value && (
+          <Row label="Total contract value" value={formatZAR(m.contract_value)} zar={m.contract_value} currency={currency} />
+        )}
+
+        {currency !== 'ZAR' && (
+          <p className="mt-2 text-xs text-muted">
+            Local amounts are indicative (live rate). You’ll be charged in South African Rand (ZAR).
+          </p>
+        )}
 
         {answers.has_medical_aid && (
           <p className="mt-3 text-xs text-muted">

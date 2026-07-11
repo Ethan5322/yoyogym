@@ -4,6 +4,7 @@
 import { useState } from 'react';
 import { apiFetch } from '../../lib/api.js';
 import { formatZAR } from '../../../shared/pricing.js';
+import LocalAmount from '../../components/LocalAmount.jsx';
 
 export default function PaymentScreen({ result }) {
   const [busy, setBusy] = useState(false);
@@ -40,10 +41,16 @@ export default function PaymentScreen({ result }) {
         <div className="mt-1 font-display text-4xl text-accent">
           {formatZAR(result.amount_due_today)}
         </div>
+        <LocalAmount zar={result.amount_due_today} currency={result.currency} className="mt-1 block" />
         <div className="mt-2 text-sm text-body">{result.plan_name}</div>
         {result.recurring_amount > 0 && (
           <div className="text-xs text-muted">
             then {formatZAR(result.recurring_amount)}/month
+          </div>
+        )}
+        {result.currency && result.currency !== 'ZAR' && (
+          <div className="mt-2 text-xs text-muted">
+            Charged in ZAR (South African Rand). Local amount is indicative.
           </div>
         )}
       </div>

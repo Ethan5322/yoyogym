@@ -5,6 +5,7 @@ import { apiFetch } from '../../lib/api.js';
 import PersonalQr from '../../components/PersonalQr.jsx';
 import FaceCapture from '../../chatbot/components/FaceCapture.jsx';
 import CredentialActions from '../../components/CredentialActions.jsx';
+import IdPhotoUpload from '../../components/IdPhotoUpload.jsx';
 
 const blank = { full_name: '', phone: '', email: '', specialization: '', certifications: '', bio: '', is_active: true, photo_url: '', face_descriptor: null };
 
@@ -118,10 +119,16 @@ export default function TrainerManagement() {
               ) : (
                 <div className="flex h-16 w-12 items-center justify-center rounded bg-elevated text-[10px] text-muted">No photo</div>
               )}
-              <button className="btn-outline px-3 py-2 text-sm" onClick={() => setFaceOpen(true)}>
-                {form.face_descriptor ? '✓ Retake face & photo' : '📷 Capture face & photo'}
-              </button>
+              <div className="space-y-2">
+                <button className="btn-outline px-3 py-2 text-sm" onClick={() => setFaceOpen(true)}>
+                  {form.face_descriptor ? '✓ Retake face & photo' : '📷 Capture face & photo'}
+                </button>
+                <IdPhotoUpload onPhoto={(url) => setForm((f) => ({ ...f, photo_url: url }))} />
+              </div>
             </div>
+            <p className="text-xs text-muted">
+              No biometric? Upload a photo from the gallery instead — it’s auto-cropped to the corporate ID standard and appears on the trainer’s card.
+            </p>
 
             <div className="flex gap-3">
               <button className="btn-primary flex-1" onClick={save}>Save</button>

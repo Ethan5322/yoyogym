@@ -16,6 +16,17 @@
 const WRITE_FALLBACK_TIERS = [
   ['arcface_templates', 'face_templates'],
   ['arcface_templates', 'face_templates', 'arcface_embedding'],
+  // Internationalisation columns (nationality / residence / display currency)
+  // arrive with the 2026-07-11 migration; drop them too so a gym that has not
+  // migrated yet can still register members.
+  [
+    'arcface_templates',
+    'face_templates',
+    'arcface_embedding',
+    'nationality',
+    'residence_country',
+    'display_currency',
+  ],
 ];
 
 /**

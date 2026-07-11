@@ -150,6 +150,9 @@ create table if not exists gym.members (
   gender               text,                            -- male | female | prefer_not_to_say
   id_number            text,                            -- SA ID (or null)
   passport_number      text,                            -- passport (or null)
+  nationality          text,                            -- ISO-3166 alpha-2 (drives ID type)
+  residence_country    text,                            -- ISO-3166 alpha-2 (drives address/phone/currency)
+  display_currency     text,                            -- ISO-4217 for the "≈ local" price hint (charge is ZAR)
   phone                text,
   email                text,
   address_street       text,

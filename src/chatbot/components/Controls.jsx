@@ -2,12 +2,13 @@
 // the chosen value via onSubmit. Supports all step types used across the
 // whole flow (statement / text / tel / email / date / textarea / select /
 // multiselect / yesno) so later build steps need no new control code.
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import MembershipControl from './MembershipControl.jsx';
 import AddonsControl from './AddonsControl.jsx';
 import SummaryView from './SummaryView.jsx';
 import AgreementControl from './AgreementControl.jsx';
-import FaceCapture from './FaceCapture.jsx';
+import IdPhotoStep from './IdPhotoStep.jsx';
+import { COUNTRIES } from '../../../shared/countries.js';
 
 export default function Controls({ step, error, defaultValue, answers, onSubmit }) {
   switch (step.type) {
@@ -17,16 +18,18 @@ export default function Controls({ step, error, defaultValue, answers, onSubmit 
           {step.cta || 'Continue'}
         </button>
       );
+    case 'country':
+      return <CountryControl step={step} value={defaultValue} onSubmit={onSubmit} />;
     case 'membership':
-      return <MembershipControl defaultValue={defaultValue} onSubmit={onSubmit} />;
+      return <MembershipControl defaultValue={defaultValue} answers={answers} onSubmit={onSubmit} />;
     case 'addons':
-      return <AddonsControl defaultValue={defaultValue} onSubmit={onSubmit} />;
+      return <AddonsControl defaultValue={defaultValue} answers={answers} onSubmit={onSubmit} />;
     case 'summary':
       return <SummaryView answers={answers} onSubmit={onSubmit} />;
     case 'agreement':
       return <AgreementControl defaultValue={defaultValue} error={error} onSubmit={onSubmit} />;
     case 'face':
-      return <FaceCapture onSubmit={onSubmit} />;
+      return <IdPhotoStep onSubmit={onSubmit} />;
     case 'select':
       return <SelectControl step={step} value={defaultValue} onSubmit={onSubmit} />;
     case 'multiselect':
@@ -43,9 +46,9 @@ export default function Controls({ step, error, defaultValue, answers, onSubmit 
         </div>
       );
     case 'textarea':
-      return <TextControl step={step} value={defaultValue} error={error} onSubmit={onSubmit} multiline />;
+      return <TextControl step={step} value={defaultValue} error={error} answers={answers} onSubmit={onSubmit} multiline />;
     default:
-      return <TextControl step={step} value={defaultValue} error={error} onSubmit={onSubmit} />;
+      return <TextControl step={step} value={defaultValue} error={error} answers={answers} onSubmit={onSubmit} />;
   }
 }
 
@@ -54,9 +57,13 @@ function FieldError({ error }) {
   return <p className="mt-2 text-sm text-error">{error}</p>;
 }
 
-function TextControl({ step, value, error, onSubmit, multiline }) {
+function TextControl({ step, value, error, answers, onSubmit, multiline }) {
   const [val, setVal] = useState(value ?? '');
   useEffect(() => setVal(value ?? ''), [step.id, value]);
+
+  // `optional` may be a boolean or a predicate of the answers so far (e.g.
+  // address fields are optional only for members living outside South Africa).
+  const optional = typeof step.optional === 'function' ? step.optional(answers || {}) : !!step.optional;
 
   const inputType =
     step.type === 'email' ? 'email' : step.type === 'tel' ? 'tel' : step.type === 'date' ? 'date' : 'text';
@@ -92,11 +99,55 @@ function TextControl({ step, value, error, onSubmit, multiline }) {
         <button className="btn-primary flex-1" onClick={submit}>
           Continue
         </button>
-        {step.optional && (
+        {optional && (
           <button className="btn-outline" onClick={() => onSubmit('')}>
             Skip
           </button>
         )}
+      </div>
+    </div>
+  );
+}
+
+// Searchable country picker. Buttons carry the flag + name; typing filters the
+// list. Submits the ISO-3166 alpha-2 code (e.g. 'ZA'). The rest of the flow
+// reads that code to adapt ID type, phone, address, medical aid and currency.
+function CountryControl({ step, value, onSubmit }) {
+  const [q, setQ] = useState('');
+  const list = useMemo(() => {
+    const needle = q.trim().toLowerCase();
+    if (!needle) return COUNTRIES;
+    return COUNTRIES.filter(
+      (c) => c.name.toLowerCase().includes(needle) || c.code.toLowerCase() === needle
+    );
+  }, [q]);
+
+  return (
+    <div>
+      <input
+        className="field"
+        placeholder="Search country…"
+        value={q}
+        autoFocus
+        onChange={(e) => setQ(e.target.value)}
+      />
+      <div className="mt-3 grid max-h-[42vh] gap-2 overflow-y-auto pr-1">
+        {list.map((c) => (
+          <button
+            key={c.code}
+            onClick={() => onSubmit(c.code)}
+            className={[
+              'flex w-full items-center gap-3 rounded-lg border px-4 py-3 text-left transition',
+              value === c.code
+                ? 'border-accent bg-accent text-black'
+                : 'border-accent/50 text-body hover:bg-accent-soft',
+            ].join(' ')}
+          >
+            <span className="text-xl">{c.flag}</span>
+            <span className="font-display uppercase tracking-wide">{c.name}</span>
+          </button>
+        ))}
+        {!list.length && <p className="py-4 text-center text-sm text-muted">No match — try another spelling.</p>}
       </div>
     </div>
   );

@@ -16,6 +16,7 @@ import { faceServiceConfigured, embedEnrolmentImages } from '../../lib/faceservi
 import { enrolmentGallery } from '../../lib/facematch.js';
 import { insertFaceRow } from '../../lib/facedb.js';
 import { computeMembership, addonsTotal, totalDueToday, DURATION_MONTHS } from '../../../shared/pricing.js';
+import { currencyForCountry, HOME_COUNTRY } from '../../../shared/countries.js';
 import { onNewMember } from '../../lib/notify/index.js';
 import { rateLimit } from '../../lib/ratelimit.js';
 
@@ -122,6 +123,17 @@ export default async function handler(req, res) {
     const anyYes = PARQ_KEYS.some((k) => a[k] === true);
     const age = ageFrom(a.date_of_birth);
 
+    // ---- identity / locale (Phase — international) ----
+    // Nationality drives which ID document was collected; residence drives the
+    // display currency. Fall back to the legacy id_type + home country so older
+    // clients (and the SA-only flow) keep working unchanged.
+    const nationality = /^[A-Za-z]{2}$/.test(a.nationality || '') ? a.nationality.toUpperCase() : null;
+    const residenceCountry = /^[A-Za-z]{2}$/.test(a.residence_country || '')
+      ? a.residence_country.toUpperCase()
+      : null;
+    const isHomeNational = nationality ? nationality === HOME_COUNTRY : a.id_type !== 'passport';
+    const displayCurrency = currencyForCountry(residenceCountry || nationality || HOME_COUNTRY);
+
     // ---- insert member ----
     const memberRow = {
       membership_number: membershipNumber,
@@ -129,8 +141,11 @@ export default async function handler(req, res) {
       full_name: a.full_name.trim(),
       date_of_birth: a.date_of_birth,
       gender: a.gender || null,
-      id_number: a.id_type === 'sa_id' ? a.id_number || null : null,
-      passport_number: a.id_type === 'passport' ? a.passport_number || null : null,
+      id_number: isHomeNational ? a.id_number || null : null,
+      passport_number: isHomeNational ? null : a.passport_number || null,
+      nationality: nationality,
+      residence_country: residenceCountry,
+      display_currency: displayCurrency,
       phone: a.phone,
       email: a.email,
       address_street: a.address_street || null,
@@ -167,7 +182,13 @@ export default async function handler(req, res) {
       memberRow.face_templates = enrolmentGallery(faceDescriptors);
       memberRow.biometric_enrolled = true;
     }
+    // ID-card photo: best biometric frame, else the gallery photo the member
+    // uploaded when declining the biometric (auto-cropped client-side to the
+    // corporate 3:4 portrait). Every card carries a photo either way.
+    const idPhoto =
+      typeof a.face?.photo === 'string' && a.face.photo.startsWith('data:image') ? a.face.photo : null;
     if (faceImages.length) memberRow.photo_url = faceImages[0];
+    else if (idPhoto) memberRow.photo_url = idPhoto;
     // High-accuracy ArcFace embeddings when the InsightFace service is configured.
     if (faceImages.length && faceServiceConfigured()) {
       const embeddings = await embedEnrolmentImages(faceImages);
@@ -296,6 +317,7 @@ export default async function handler(req, res) {
       recurring_amount: membership.recurring_amount,
       parq_flag: anyYes,
       start_date: isoDate(today),
+      currency: displayCurrency, // member's local currency for the "≈" display hint (charge stays ZAR)
     });
   } catch (err) {
     // Best-effort cleanup so a partial failure doesn't orphan a member.

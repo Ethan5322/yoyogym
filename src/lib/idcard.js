@@ -139,10 +139,12 @@ async function drawCard(ctx, o) {
   }
 
   // ── Photo (passport 3:4) with gold frame ─────────────────────────────────
+  // 210×280 on the 1012-px canvas prints at ≈17.8×23.7 mm on the CR80 card —
+  // the recommended corporate/ID-badge photo size (SA smart-ID class).
   const px = 56;
-  const py = 138;
-  const pw = 190;
-  const ph = 253;
+  const py = 132;
+  const pw = 210;
+  const ph = 280;
   const photo = await loadImg(o.photoUrl);
   ctx.fillStyle = '#1A1A1A';
   ctx.fillRect(px, py, pw, ph);
@@ -209,8 +211,8 @@ async function drawCard(ctx, o) {
     ctx.lineWidth = 1;
     ctx.globalAlpha = 0.6;
     ctx.beginPath();
-    ctx.moveTo(56, 414);
-    ctx.lineTo(W - 56, 414);
+    ctx.moveTo(56, 430);
+    ctx.lineTo(W - 56, 430);
     ctx.stroke();
     ctx.globalAlpha = 1;
 
@@ -218,7 +220,7 @@ async function drawCard(ctx, o) {
     const colW = 280;
     fields.slice(0, 6).forEach((f, i) => {
       const x = colX[i % 3];
-      const y = 444 + Math.floor(i / 3) * 52;
+      const y = 458 + Math.floor(i / 3) * 50;
       ctx.fillStyle = MUTED;
       ctx.font = '600 11px Oswald, sans-serif';
       ctx.fillText(String(f.label).toUpperCase(), x, y);

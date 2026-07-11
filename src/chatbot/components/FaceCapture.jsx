@@ -16,6 +16,7 @@
 //     descriptor: number[], image: string }         // pose 1, for single-probe
 //                                                    // login and legacy callers
 import { useEffect, useRef, useState } from 'react';
+import { corporateFrame, renderIdPhoto } from '../../lib/idPhoto.js';
 
 // Enrolment sweeps five poses and photographs each, so both engines get a
 // multi-template gallery spanning angle and expression.
@@ -157,7 +158,7 @@ export default function FaceCapture({ onSubmit, mode = 'enroll' }) {
               // Keep the sharpest frame of this pose as its photo.
               if ((acc.score || 0) > bestScore) {
                 bestScore = acc.score || 0;
-                bestImage = grabFrame(v);
+                bestImage = grabFrame(v, acc.box);
               }
             }
           }
@@ -182,24 +183,24 @@ export default function FaceCapture({ onSubmit, mode = 'enroll' }) {
     await finalize();
   }
 
-  // Clear passport-style 3:4 portrait (used for the ID card and ArcFace embed).
-  function grabFrame(v) {
+  // Corporate-standard 3:4 portrait (used for the ID card and ArcFace embed).
+  // When the detector's face box is available the frame follows the ICAO
+  // convention (head ~55% of frame, eye line in the upper half) instead of a
+  // plain centre crop.
+  function grabFrame(v, box) {
     if (!v || !v.videoWidth) return null;
-    const ow = 600;
-    const oh = 800;
-    const canvas = document.createElement('canvas');
-    canvas.width = ow;
-    canvas.height = oh;
-    let sw = v.videoWidth;
-    let sh = (sw * 4) / 3;
-    if (sh > v.videoHeight) {
-      sh = v.videoHeight;
-      sw = (sh * 3) / 4;
+    let frame = null;
+    if (box?.width) frame = corporateFrame(v.videoWidth, v.videoHeight, box, null);
+    if (!frame) {
+      let sw = v.videoWidth;
+      let sh = (sw * 4) / 3;
+      if (sh > v.videoHeight) {
+        sh = v.videoHeight;
+        sw = (sh * 3) / 4;
+      }
+      frame = { x: (v.videoWidth - sw) / 2, y: (v.videoHeight - sh) / 2, w: sw, h: sh };
     }
-    const sx = (v.videoWidth - sw) / 2;
-    const sy = (v.videoHeight - sh) / 2;
-    canvas.getContext('2d').drawImage(v, sx, sy, sw, sh, 0, 0, ow, oh);
-    return canvas.toDataURL('image/jpeg', 0.9);
+    return renderIdPhoto(v, frame);
   }
 
   async function finalize() {

@@ -10,6 +10,8 @@ import {
   DURATION_LABELS,
   monthlyForDuration,
 } from '../../../shared/pricing.js';
+import { currencyForCountry } from '../../../shared/countries.js';
+import LocalAmount from '../../components/LocalAmount.jsx';
 
 const CATEGORY_LABELS = {
   full: 'Full Membership',
@@ -20,10 +22,11 @@ const CATEGORY_LABELS = {
 const CATEGORY_ORDER = ['full', 'session_pack', 'day_pass', 'trial'];
 const DURATIONS = ['month_to_month', '3_month', '6_month', '12_month'];
 
-export default function MembershipControl({ defaultValue, onSubmit }) {
+export default function MembershipControl({ defaultValue, answers, onSubmit }) {
   const { catalog, loading, error } = useCatalog();
   const [stage, setStage] = useState('category');
   const [chosenPlan, setChosenPlan] = useState(null);
+  const currency = currencyForCountry(answers?.residence_country || answers?.nationality);
 
   if (loading) return <Loading text="Loading membership options…" />;
   if (error) return <ErrorBox text={error} />;
@@ -71,6 +74,8 @@ export default function MembershipControl({ defaultValue, onSubmit }) {
             key={plan.id}
             plan={plan}
             priceLine={`${formatZAR(plan.monthly_price)} / month`}
+            hintZar={plan.monthly_price}
+            currency={currency}
             onSelect={() => {
               setChosenPlan(plan);
               setStage('full_duration');
@@ -97,6 +102,8 @@ export default function MembershipControl({ defaultValue, onSubmit }) {
               key={d}
               title={DURATION_LABELS[d]}
               subtitle={`${formatZAR(monthly)}/month${disc ? ` · save ${disc}%` : ''}`}
+              hintZar={monthly}
+              currency={currency}
               onClick={() => onSubmit(computeMembership(chosenPlan, d, discounts))}
             />
           );
@@ -118,6 +125,8 @@ export default function MembershipControl({ defaultValue, onSubmit }) {
               key={plan.id}
               plan={plan}
               priceLine={`${formatZAR(total)} · ${formatZAR(per)}/session`}
+              hintZar={total}
+              currency={currency}
               onSelect={() => onSubmit(computeMembership(plan, null, discounts))}
             />
           );
@@ -143,7 +152,7 @@ function BackLink({ onClick }) {
     </button>
   );
 }
-function CardButton({ title, subtitle, onClick }) {
+function CardButton({ title, subtitle, hintZar, currency, onClick }) {
   return (
     <button
       onClick={onClick}
@@ -152,12 +161,13 @@ function CardButton({ title, subtitle, onClick }) {
       <div>
         <div className="font-display uppercase tracking-wide text-body">{title}</div>
         {subtitle && <div className="text-sm text-muted">{subtitle}</div>}
+        {hintZar != null && <LocalAmount zar={hintZar} currency={currency} />}
       </div>
       <span className="text-accent">→</span>
     </button>
   );
 }
-function PlanCard({ plan, priceLine, onSelect }) {
+function PlanCard({ plan, priceLine, hintZar, currency, onSelect }) {
   const benefits = Array.isArray(plan.benefits) ? plan.benefits : [];
   return (
     <div
@@ -183,6 +193,7 @@ function PlanCard({ plan, priceLine, onSelect }) {
         </ul>
       )}
       <div className="mt-3 font-display text-lg text-accent">{priceLine}</div>
+      {hintZar != null && <LocalAmount zar={hintZar} currency={currency} />}
       <button className="btn-primary mt-3 w-full" onClick={onSelect}>
         Choose {plan.name}
       </button>

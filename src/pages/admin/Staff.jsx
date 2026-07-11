@@ -6,6 +6,7 @@ import AdminShell from '../../components/AdminShell.jsx';
 import { apiFetch } from '../../lib/api.js';
 import FaceCapture from '../../chatbot/components/FaceCapture.jsx';
 import CredentialActions from '../../components/CredentialActions.jsx';
+import IdPhotoUpload from '../../components/IdPhotoUpload.jsx';
 
 const ROLES = ['owner', 'manager', 'reception', 'trainer'];
 const empty = { username: '', full_name: '', email: '', role: 'reception', job_title: '', phone: '', password: '', trainer_id: '', contract_start: '', contract_end: '', photo_url: '', face_descriptor: null };
@@ -114,9 +115,12 @@ export default function Staff() {
           <button className="btn-outline px-4 py-2 text-sm" onClick={() => setFaceOpen(true)}>
             {form.face_descriptor ? '✓ Retake face & photo' : '📷 Capture face & photo'}
           </button>
+          <IdPhotoUpload onPhoto={(url) => setForm((f) => ({ ...f, photo_url: url }))} />
           <button className="btn-primary px-5 py-2 text-sm" onClick={create} disabled={!form.username || !form.password}>Register staff</button>
         </div>
-        <p className="mt-2 text-xs text-muted">Face scan enables fast, secure gym access and puts their photo on the ID. Stored privately (POPIA).</p>
+        <p className="mt-2 text-xs text-muted">
+          Face scan enables fast, secure gym access and puts their photo on the ID. No biometric? Upload a gallery photo instead — auto-cropped to the corporate ID standard. Stored privately (POPIA).
+        </p>
       </div>
 
       {/* List */}
