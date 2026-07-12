@@ -1,33 +1,141 @@
 // Lazy loader for @vladmandic/face-api with models served from a free CDN.
-// Loaded only when the face step is reached, so the heavy TF.js bundle never
+// Loaded only when a face step is reached, so the heavy TF.js bundle never
 // affects the initial page load. No paid API — everything runs in the browser.
+//
+// SPEED RULES (the whole file exists to obey these):
+//  1. Load only the nets a task actually needs, and load them in PARALLEL.
+//     The four nets are ~13 MB together; the recognition net alone is 6.2 MB
+//     and is useless for cropping a photo, while the SSD detector (5.4 MB) is
+//     useless for drawing a positioning circle. Pulling all four for every task
+//     was most of the wait people were feeling.
+//  2. Pin TF.js to the fastest backend the device will actually give us. Left
+//     alone, TF.js can land on its pure-JS `cpu` backend, where a single
+//     detection takes SECONDS. Note that tf.setBackend() reports failure by
+//     RETURNING FALSE, not by throwing — so the result has to be checked.
+//  3. Compile the shaders once, on a blank canvas, while the camera is still
+//     warming up — otherwise the first real frame eats that cost in front of
+//     the user.
 let _faceapi = null;
-let _modelsLoaded = false;
+const _nets = {}; // net name -> in-flight/settled load promise (memoised)
+let _warm = null;
 
 const MODEL_URL = 'https://cdn.jsdelivr.net/npm/@vladmandic/face-api@1.7.15/model';
 
-export async function getFaceApi() {
+const NETS = {
+  tiny: (f) => f.nets.tinyFaceDetector, // ~190 KB — live guidance, first-pass detection
+  landmarks: (f) => f.nets.faceLandmark68Net, // ~350 KB — eye line, alignment
+  ssd: (f) => f.nets.ssdMobilenetv1, // ~5.4 MB — high-accuracy detection
+  recognition: (f) => f.nets.faceRecognitionNet, // ~6.2 MB — the 128-D descriptor
+};
+
+// Fastest first. `webgl` is what every healthy phone gives us. `wasm` is the
+// safety net for devices where WebGL is missing or refuses to initialise (old
+// Androids, hardened/privacy browsers, blocklisted GPU drivers) — it is roughly
+// an order of magnitude quicker than the last-resort pure-JS `cpu` backend,
+// where a single detection takes multiple seconds.
+const BACKENDS = ['webgl', 'wasm', 'cpu'];
+
+// face-api registers the WASM backend but ships no .wasm binaries, so the rung
+// silently fails to initialise unless we point TF at them. They must match the
+// bundled tfjs version exactly.
+const TFJS_VERSION = '4.22.0';
+const WASM_PATH = `https://cdn.jsdelivr.net/npm/@tensorflow/tfjs-backend-wasm@${TFJS_VERSION}/dist/`;
+
+/** The backend we ended up on — surfaced so the UI can warn on the slow path. */
+export let activeBackend = null;
+
+/** Import the library and pin the fastest working backend (once). */
+function lib() {
   if (!_faceapi) {
-    _faceapi = await import('@vladmandic/face-api');
-  }
-  if (!_modelsLoaded) {
-    // Tiny detector = fast live positioning guidance.
-    // SSD MobileNet v1 = higher-accuracy detection used for the actual
-    //   enrolment template + match probes (better face alignment -> a more
-    //   discriminating 128-D descriptor across eyes/nose/jaw/face shape).
-    // 68-pt landmarks align the face before the recognition net runs.
-    await _faceapi.nets.tinyFaceDetector.loadFromUri(MODEL_URL);
-    await _faceapi.nets.ssdMobilenetv1.loadFromUri(MODEL_URL);
-    await _faceapi.nets.faceLandmark68Net.loadFromUri(MODEL_URL);
-    await _faceapi.nets.faceRecognitionNet.loadFromUri(MODEL_URL);
-    _modelsLoaded = true;
+    _faceapi = import('@vladmandic/face-api').then(async (f) => {
+      try {
+        f.tf.setWasmPaths(WASM_PATH);
+      } catch {
+        /* older build without the hook — the wasm rung just won't take */
+      }
+      for (const b of BACKENDS) {
+        try {
+          // setBackend resolves FALSE when a backend can't initialise; it does
+          // not throw. Silently ignoring that is what strands a device on `cpu`.
+          if (await f.tf.setBackend(b)) break;
+        } catch {
+          /* try the next one down */
+        }
+      }
+      await f.tf.ready();
+      activeBackend = f.tf.getBackend();
+      return f;
+    });
   }
   return _faceapi;
 }
 
-/** Fast bounding-box-only detection for live positioning guidance. */
+/** Load the named nets in parallel; each net is fetched at most once. */
+async function loadNets(...names) {
+  const f = await lib();
+  await Promise.all(
+    names.map((n) => {
+      if (!_nets[n]) {
+        _nets[n] = NETS[n](f)
+          .loadFromUri(MODEL_URL)
+          .catch((e) => {
+            delete _nets[n]; // a failed load must not be cached — allow a retry
+            throw e;
+          });
+      }
+      return _nets[n];
+    })
+  );
+  return f;
+}
+
+/** Compile the WebGL shaders on a blank frame so the first real one is fast. */
+async function warmUp(f, opts) {
+  if (_warm) return _warm;
+  _warm = (async () => {
+    try {
+      const c = document.createElement('canvas');
+      c.width = c.height = 160;
+      const ctx = c.getContext('2d');
+      ctx.fillStyle = '#808080';
+      ctx.fillRect(0, 0, 160, 160);
+      await f.detectSingleFace(c, opts).withFaceLandmarks().withFaceDescriptor();
+    } catch {
+      /* warm-up is best-effort — never block the flow on it */
+    }
+  })();
+  return _warm;
+}
+
+/** Nets for the live positioning guide only (box, no descriptor). ~190 KB. */
+export function loadForGuide() {
+  return loadNets('tiny');
+}
+
+/** Nets for cropping a still photo: detector + landmarks, no descriptor. ~540 KB. */
+export function loadForCrop() {
+  return loadNets('tiny', 'landmarks');
+}
+
+/** The accurate detector, loaded on demand when the tiny one finds nothing. */
+export function loadAccurateDetector() {
+  return loadNets('ssd', 'landmarks');
+}
+
+/** Everything needed to produce/compare 128-D descriptors (enrol, login, scan). */
+export async function loadForRecognition() {
+  const f = await loadNets('tiny', 'ssd', 'landmarks', 'recognition');
+  await warmUp(f, new f.TinyFaceDetectorOptions({ inputSize: 224 }));
+  return f;
+}
+
+/** Back-compat alias — callers that just want "the face engine, ready". */
+export const getFaceApi = loadForRecognition;
+
+/** Fast bounding-box-only detection for live positioning guidance.
+ *  No landmarks, no descriptor — this runs every frame, so it stays cheap. */
 export async function detectBox(el) {
-  const faceapi = await getFaceApi();
+  const faceapi = await loadForGuide();
   const det = await faceapi.detectSingleFace(
     el,
     new faceapi.TinyFaceDetectorOptions({ inputSize: 224, scoreThreshold: 0.4 })
@@ -36,11 +144,10 @@ export async function detectBox(el) {
   return { x: det.box.x, y: det.box.y, width: det.box.width, height: det.box.height, score: det.score };
 }
 
-/** Detect a single face and return BOTH its box (for guidance) and 128-d
- *  descriptor (for the template) in one pass. Tuned for the live enrolment
- *  guide loop (responsive). */
+/** Detect a single face and return BOTH its box and 128-d descriptor in one
+ *  pass, using the fast tiny detector. */
 export async function detectFull(el) {
-  const faceapi = await getFaceApi();
+  const faceapi = await loadForRecognition();
   const det = await faceapi
     .detectSingleFace(el, new faceapi.TinyFaceDetectorOptions({ inputSize: 320, scoreThreshold: 0.35 }))
     .withFaceLandmarks()
@@ -59,7 +166,7 @@ export async function detectFull(el) {
  *  that captures the full facial arrangement more reliably across lighting,
  *  angle and a few days' change. Returns { box, score, descriptor } or null. */
 export async function detectAccurate(el) {
-  const faceapi = await getFaceApi();
+  const faceapi = await loadForRecognition();
   const det = await faceapi
     .detectSingleFace(el, new faceapi.SsdMobilenetv1Options({ minConfidence: 0.3 }))
     .withFaceLandmarks()
@@ -69,13 +176,26 @@ export async function detectAccurate(el) {
   return { box: { x: b.x, y: b.y, width: b.width, height: b.height }, score: det.detection.score, descriptor: Array.from(det.descriptor) };
 }
 
-/** High-recall detection for ACCESS scanning. Uses the accurate SSD detector
- *  for a discriminating descriptor. Returns { score, descriptor } or null. */
+/** High-recall detection for ACCESS scanning.
+ *
+ *  Most frames of a scan contain no face at all (the person is still walking
+ *  up), so a cheap tiny box-only gate runs first and those frames cost ~10 ms
+ *  instead of a full SSD + landmarks + descriptor pipeline. Only once a face is
+ *  actually in frame do we pay for the accurate, discriminating descriptor.
+ *  Returns { score, descriptor } or null. */
 export async function detectMatch(el) {
+  const faceapi = await loadForRecognition();
+  const gate = await faceapi.detectSingleFace(
+    el,
+    new faceapi.TinyFaceDetectorOptions({ inputSize: 224, scoreThreshold: 0.3 })
+  );
+  if (!gate) return null;
+
   const acc = await detectAccurate(el);
   if (acc) return { score: acc.score, descriptor: acc.descriptor };
-  // Fallback to the tiny detector in poor conditions so we still get a probe.
-  const faceapi = await getFaceApi();
+
+  // Tiny saw a face the SSD detector missed (harsh light, steep angle) — take a
+  // tiny-aligned probe rather than losing the person entirely.
   const det = await faceapi
     .detectSingleFace(el, new faceapi.TinyFaceDetectorOptions({ inputSize: 416, scoreThreshold: 0.3 }))
     .withFaceLandmarks()

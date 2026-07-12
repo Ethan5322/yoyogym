@@ -19,18 +19,21 @@ import { useEffect, useRef, useState } from 'react';
 import { corporateFrame, renderIdPhoto } from '../../lib/idPhoto.js';
 
 // Enrolment sweeps five poses and photographs each, so both engines get a
-// multi-template gallery spanning angle and expression.
+// multi-template gallery spanning angle and expression. Sample counts are the
+// number of STEADY frames kept per pose — each one costs a full descriptor
+// pass, so they are the main thing that decides how long enrolment feels.
+// Averaging 3–4 steady frames is already enough for a stable template.
 const ENROLL_POSES = [
-  { key: 'center', label: 'Look straight ahead', samples: 5 },
-  { key: 'left', label: 'Turn your head slightly LEFT', samples: 4 },
-  { key: 'right', label: 'Turn your head slightly RIGHT', samples: 4 },
-  { key: 'up', label: 'Lift your chin up a little', samples: 4 },
-  { key: 'down', label: 'Tuck your chin down a little', samples: 4 },
+  { key: 'center', label: 'Look straight ahead', samples: 4 },
+  { key: 'left', label: 'Turn your head slightly LEFT', samples: 3 },
+  { key: 'right', label: 'Turn your head slightly RIGHT', samples: 3 },
+  { key: 'up', label: 'Lift your chin up a little', samples: 3 },
+  { key: 'down', label: 'Tuck your chin down a little', samples: 3 },
 ];
 // Login just needs one solid probe.
-const VERIFY_POSES = [{ key: 'center', label: 'Look at the camera', samples: 6 }];
+const VERIFY_POSES = [{ key: 'center', label: 'Look at the camera', samples: 4 }];
 
-const DWELL_MS = 800; // let the user settle into each new pose before sampling
+const DWELL_MS = 600; // let the user settle into each new pose before sampling
 
 export default function FaceCapture({ onSubmit, mode = 'enroll' }) {
   const isEnroll = mode !== 'verify';
@@ -59,9 +62,12 @@ export default function FaceCapture({ onSubmit, mode = 'enroll' }) {
     (async () => {
       try {
         if (!navigator.mediaDevices?.getUserMedia) throw Object.assign(new Error('x'), { name: 'InsecureContext' });
-        const { getFaceApi } = await import('../../lib/face/faceapi.js');
+        const { loadForRecognition } = await import('../../lib/face/faceapi.js');
         const camP = navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user', width: 480, height: 480 } });
-        await getFaceApi();
+        // Models download in parallel with the camera coming up, and the
+        // shaders are compiled here so the first guided frame isn't the one
+        // that pays for them.
+        await loadForRecognition();
         const stream = await camP;
         if (!active) return stream.getTracks().forEach((t) => t.stop());
         streamRef.current = stream;
@@ -122,7 +128,11 @@ export default function FaceCapture({ onSubmit, mode = 'enroll' }) {
   }
 
   async function runPoseSequence() {
-    const { detectFull, detectAccurate, averageDescriptors } = await import('../../lib/face/faceapi.js');
+    // Guidance uses the box-only detector; the expensive descriptor pass runs
+    // ONLY on a frame we are actually going to keep. (Guiding with a full
+    // detect+landmarks+descriptor pass and then re-detecting the same frame
+    // accurately meant every kept frame ran the recognition net twice.)
+    const { detectBox, detectAccurate, averageDescriptors } = await import('../../lib/face/faceapi.js');
 
     for (let pi = 0; pi < poses.length; pi++) {
       if (!loopRef.current) return;
@@ -146,7 +156,8 @@ export default function FaceCapture({ onSubmit, mode = 'enroll' }) {
         if (v && v.videoWidth) {
           let det = null;
           try {
-            det = await detectFull(v);
+            const b = await detectBox(v); // cheap: box only, no landmarks/descriptor
+            if (b) det = { box: b, score: b.score };
           } catch {
             /* keep going */
           }
@@ -166,7 +177,7 @@ export default function FaceCapture({ onSubmit, mode = 'enroll' }) {
         setGood(a.ok);
         setGuide(a.ok ? `${pose.label} — hold still (${samples.length}/${pose.samples})` : a.g);
         setProgress(Math.round((samples.length / pose.samples) * 100));
-        await sleep(150);
+        await sleep(80);
       }
       if (!loopRef.current) return;
 

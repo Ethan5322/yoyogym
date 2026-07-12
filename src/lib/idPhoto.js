@@ -19,6 +19,13 @@ export const ID_PHOTO_W = 600;
 export const ID_PHOTO_H = 800;
 const RATIO = ID_PHOTO_W / ID_PHOTO_H; // 3:4 portrait
 
+// The crop is taken from a canvas capped at 1200px — double the output's long
+// edge, which is all the detail 600×800 can use. Detection runs on a 512px
+// copy: the detectors downscale their input internally anyway, so a bigger
+// texture buys nothing and costs real milliseconds on a phone GPU.
+const WORK_MAX = 1200;
+const PROBE_MAX = 512;
+
 const clamp = (v, lo, hi) => Math.min(Math.max(v, lo), hi);
 
 /**
@@ -62,31 +69,56 @@ export function renderIdPhoto(source, frame) {
   return out.toDataURL('image/jpeg', 0.9);
 }
 
-function loadFile(file) {
-  return new Promise((resolve, reject) => {
-    const url = URL.createObjectURL(file);
-    const img = new Image();
-    img.onload = () => {
-      URL.revokeObjectURL(url);
-      resolve(img);
-    };
-    img.onerror = () => {
-      URL.revokeObjectURL(url);
-      reject(new Error('Could not read that image. Please try a JPG or PNG.'));
-    };
+// Decode via <img> (which honours the EXIF rotation phone cameras write, so a
+// portrait photo doesn't crop sideways) and prefer img.decode(), which hands the
+// decode of a 12-megapixel file to a background thread instead of janking the UI.
+async function loadImage(file) {
+  const url = URL.createObjectURL(file);
+  const img = new Image();
+  try {
     img.src = url;
-  });
+    if (img.decode) {
+      await img.decode();
+    } else {
+      await new Promise((resolve, reject) => {
+        img.onload = resolve;
+        img.onerror = reject;
+      });
+    }
+    return img;
+  } catch {
+    throw new Error('Could not read that image. Please try a JPG or PNG.');
+  } finally {
+    URL.revokeObjectURL(url);
+  }
 }
 
-// Phone photos can be 4000px+; detection on a capped working canvas is far
-// faster and loses nothing at the 600×800 output size.
-function toWorkCanvas(img) {
-  const scale = Math.min(1, 1600 / Math.max(img.width, img.height));
+function downscale(source, max) {
+  const scale = Math.min(1, max / Math.max(source.width, source.height));
   const canvas = document.createElement('canvas');
-  canvas.width = Math.max(1, Math.round(img.width * scale));
-  canvas.height = Math.max(1, Math.round(img.height * scale));
-  canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
+  canvas.width = Math.max(1, Math.round(source.width * scale));
+  canvas.height = Math.max(1, Math.round(source.height * scale));
+  canvas.getContext('2d').drawImage(source, 0, 0, canvas.width, canvas.height);
   return canvas;
+}
+
+// Find the face on the small probe canvas. The tiny detector (190 KB) handles a
+// normal front-facing gallery photo; the 5.4 MB accurate detector is only
+// downloaded if that fails. The 6.2 MB recognition net is never touched here —
+// cropping needs a box and an eye line, not an identity.
+async function detectPortrait(probe) {
+  const { loadForCrop, loadAccurateDetector } = await import('./face/faceapi.js');
+
+  const fast = await loadForCrop();
+  let det = await fast
+    .detectSingleFace(probe, new fast.TinyFaceDetectorOptions({ inputSize: 416, scoreThreshold: 0.35 }))
+    .withFaceLandmarks();
+  if (det) return det;
+
+  const accurate = await loadAccurateDetector();
+  return accurate
+    .detectSingleFace(probe, new accurate.SsdMobilenetv1Options({ minConfidence: 0.25 }))
+    .withFaceLandmarks();
 }
 
 /**
@@ -100,24 +132,24 @@ export async function autoCropIdPhoto(file) {
   if (file.size > 15 * 1024 * 1024)
     throw new Error('That image is too large — please pick one under 15 MB.');
 
-  const img = await loadFile(file);
-  const work = toWorkCanvas(img);
+  const img = await loadImage(file);
+  const work = downscale(img, WORK_MAX); // what we actually crop from
+  const probe = downscale(work, PROBE_MAX); // what the detector looks at
 
   let frame = null;
   let faceDetected = false;
   try {
-    const { getFaceApi } = await import('./face/faceapi.js');
-    const faceapi = await getFaceApi();
-    const det = await faceapi
-      .detectSingleFace(work, new faceapi.SsdMobilenetv1Options({ minConfidence: 0.3 }))
-      .withFaceLandmarks();
+    const det = await detectPortrait(probe);
     if (det?.detection?.box?.width) {
-      const box = det.detection.box;
+      // Probe coords → work coords.
+      const s = work.width / probe.width;
+      const b = det.detection.box;
+      const box = { x: b.x * s, y: b.y * s, width: b.width * s, height: b.height * s };
       const pts = [...det.landmarks.getLeftEye(), ...det.landmarks.getRightEye()];
       const eyes = pts.length
         ? {
-            x: pts.reduce((s, p) => s + p.x, 0) / pts.length,
-            y: pts.reduce((s, p) => s + p.y, 0) / pts.length,
+            x: (pts.reduce((sum, p) => sum + p.x, 0) / pts.length) * s,
+            y: (pts.reduce((sum, p) => sum + p.y, 0) / pts.length) * s,
           }
         : null;
       frame = corporateFrame(work.width, work.height, box, eyes);

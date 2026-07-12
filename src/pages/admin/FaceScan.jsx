@@ -104,8 +104,8 @@ export default function FaceScan() {
       return;
     }
     try {
-      const { getFaceApi } = await import('../../lib/face/faceapi.js');
-      await getFaceApi(); // load models (CDN) — only for face mode
+      const { loadForRecognition } = await import('../../lib/face/faceapi.js');
+      await loadForRecognition(); // models (CDN, in parallel) + shader warm-up — face mode only
       runLoop();
     } catch {
       stopCamera();
@@ -232,7 +232,9 @@ export default function FaceScan() {
         setPhase('nomatch');
         return;
       }
-      await new Promise((r) => setTimeout(r, 180));
+      // Empty frames are now a cheap box-only check, so we can poll faster and
+      // pick the person up the moment they step into frame.
+      await new Promise((r) => setTimeout(r, 100));
     }
   }
 
