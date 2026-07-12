@@ -3,6 +3,7 @@
 // membership document style. Uses jsPDF (already a dependency) + qrcode.
 import { jsPDF } from 'jspdf';
 import QRCode from 'qrcode';
+import { stampMulesooCredit } from './mulesooCredit.js';
 
 function hexToRgb(hex) {
   const m = /^#?([0-9a-fA-F]{6})$/.exec(hex || '');
@@ -137,12 +138,16 @@ export async function downloadCredentialPdf({
   );
   doc.text('Authorised signature: ____________________________', M, yLine + 24);
 
+  // Agency credit bottom-centre (the ID-card arrangement); the certification
+  // line sits centred above it, clear of the mark.
+  const credit = stampMulesooCredit(doc);
   doc.setTextColor(150, 150, 150);
   doc.setFontSize(8);
   doc.text(
     `This card certifies the holder as ${roleLabel.toLowerCase()} of ${gymName}. Present it for access and identification.`,
-    M,
-    285
+    W / 2,
+    credit.y - 4,
+    { align: 'center' }
   );
 
   doc.save(`${roleLabel.toLowerCase()}-credential-${(number || name || 'id').replace(/\s+/g, '-')}.pdf`);
