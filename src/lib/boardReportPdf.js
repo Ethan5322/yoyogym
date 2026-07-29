@@ -3,6 +3,7 @@
 // into a branded A4 document. Uses jsPDF (already a dependency).
 import { jsPDF } from 'jspdf';
 import { downloadPdf } from './download.js';
+import { stampMulesooCredit } from './mulesooCredit.js';
 
 function hexToRgb(hex) {
   const m = /^#?([0-9a-fA-F]{6})$/.exec(hex || '');
@@ -104,9 +105,12 @@ export function downloadBoardReportPdf({ gymName = 'Yoyo GYM', accent = '#E63946
     line('Total outstanding', zar(finance.total));
   }
 
+  // Agency credit bottom-centre (the ID-card arrangement); the generated-at
+  // line sits centred above it, clear of the mark.
+  const credit = stampMulesooCredit(doc);
   doc.setFontSize(9);
   doc.setTextColor(150, 150, 150);
-  doc.text(`Generated ${new Date().toLocaleString('en-ZA')} · ${gymName} management system`, M, H - 32);
+  doc.text(`Generated ${new Date().toLocaleString('en-ZA')} · ${gymName} management system`, W / 2, credit.y - 10, { align: 'center' });
 
   return downloadPdf(doc, `board-report-${new Date().toISOString().slice(0, 10)}.pdf`);
 }

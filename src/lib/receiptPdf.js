@@ -2,6 +2,7 @@
 // keep or claim from medical aid. Uses jsPDF (already a dependency).
 import { jsPDF } from 'jspdf';
 import { downloadPdf } from './download.js';
+import { stampMulesooCredit } from './mulesooCredit.js';
 
 function hexToRgb(hex) {
   const m = /^#?([0-9a-fA-F]{6})$/.exec(hex || '');
@@ -82,11 +83,13 @@ export function downloadReceiptPdf({ gymName = 'Yoyo GYM', accent = '#E63946', p
   doc.setFontSize(10);
   doc.text(`Status: ${payment.status || 'received'}   ·   Method: ${payment.method || '—'}`, M + 8, y);
 
-  // Footer
+  // Footer — the agency credit sits bottom-centre (the ID-card arrangement);
+  // the disclaimer lines stack centred above it so they can never collide.
+  const credit = stampMulesooCredit(doc);
   doc.setFontSize(9);
   doc.setTextColor(150, 150, 150);
-  doc.text('This is a computer-generated receipt and is valid without a signature.', M, doc.internal.pageSize.getHeight() - 50);
-  doc.text(`Generated ${new Date().toLocaleString('en-ZA')}`, M, doc.internal.pageSize.getHeight() - 36);
+  doc.text('This is a computer-generated receipt and is valid without a signature.', W / 2, credit.y - 22, { align: 'center' });
+  doc.text(`Generated ${new Date().toLocaleString('en-ZA')}`, W / 2, credit.y - 10, { align: 'center' });
 
   return downloadPdf(doc, `receipt-${refNo}.pdf`);
 }

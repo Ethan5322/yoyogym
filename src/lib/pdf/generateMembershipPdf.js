@@ -14,6 +14,7 @@ import {
 } from './labels.js';
 import { gymTerms } from './terms.js';
 import { downloadPdf } from '../download.js';
+import { stampMulesooCredit } from '../mulesooCredit.js';
 
 function hexToRgb(hex) {
   const m = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex || '');
@@ -188,7 +189,8 @@ export async function generateMembershipPdf(data) {
     y = BAND + 34;
   }
   function ensure(space, title) {
-    if (y + space > H - 50) {
+    // Break before the footer band (contact line + agency credit).
+    if (y + space > H - 70) {
       doc.addPage();
       headerBand(title);
     }
@@ -341,16 +343,20 @@ export async function generateMembershipPdf(data) {
   doc.text(`Member — dated ${fmtDate(membership?.contract_accepted_at || member.created_at)}`, M, y + 26);
 
   // =====================================================================
-  // Footers with page numbers (skip page 1 card)
+  // Footers with page numbers (skip page 1 card — it already carries the
+  // agency credit in its own artwork). Pages 2+ get the credit bottom-centre
+  // (the ID-card arrangement) with the gym contact line centred above it and
+  // the page number far right, horizontally clear of the mark.
   // =====================================================================
   const pages = doc.getNumberOfPages();
   for (let i = 2; i <= pages; i++) {
     doc.setPage(i);
+    const credit = stampMulesooCredit(doc);
     tColor(muted);
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(8);
     const foot = [gym.name, gym.phone, gym.email].filter(Boolean).join('  |  ');
-    doc.text(foot, M, H - 24);
+    doc.text(foot, W / 2, credit.y - 8, { align: 'center' });
     doc.text(`Page ${i} of ${pages}`, W - M, H - 24, { align: 'right' });
   }
 

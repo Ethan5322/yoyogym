@@ -4,6 +4,7 @@
 // their own labour advisor before use; amounts/notice can be edited in the doc.
 import { jsPDF } from 'jspdf';
 import { downloadPdf } from './download.js';
+import { stampMulesooCredit } from './mulesooCredit.js';
 
 function hexToRgb(hex) {
   const m = /^#?([0-9a-fA-F]{6})$/.exec(hex || '');
@@ -54,7 +55,8 @@ export async function downloadStaffContract({
   const [r, g, b] = hexToRgb(accent);
   let y = 0;
 
-  const ensure = (h) => { if (y + h > H - 20) { doc.addPage(); y = M; } };
+  // Break before the footer band (divider + info line + agency credit).
+  const ensure = (h) => { if (y + h > H - 28) { doc.addPage(); y = M; } };
 
   // ---- Title block ----
   doc.setFillColor(10, 10, 10);
@@ -162,16 +164,20 @@ export async function downloadStaffContract({
   sig(M + colW + 10, 'For the Employer (name & signature)');
 
   // ---- Footer ----
+  // Agency credit bottom-centre on every page (the ID-card arrangement); the
+  // info line sits centred above it and the page number stays far right,
+  // horizontally clear of the mark.
   const pages = doc.getNumberOfPages();
   for (let p = 1; p <= pages; p++) {
     doc.setPage(p);
+    const credit = stampMulesooCredit(doc);
     doc.setDrawColor(225, 225, 225);
     doc.setLineWidth(0.2);
-    doc.line(M, H - 12, W - M, H - 12);
+    doc.line(M, credit.y - 7, W - M, credit.y - 7);
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(7.5);
     doc.setTextColor(150, 150, 150);
-    doc.text(`${gymName} — Staff Employment Agreement · Issued ${fmtDate(issued)} · Template, not legal advice`, M, H - 8);
+    doc.text(`${gymName} — Staff Employment Agreement · Issued ${fmtDate(issued)} · Template, not legal advice`, W / 2, credit.y - 2.5, { align: 'center' });
     doc.text(`Page ${p} of ${pages}`, W - M, H - 8, { align: 'right' });
   }
 
