@@ -3,6 +3,7 @@
 // SA-aware (BCEA / POPIA) generic template — gyms should have it reviewed by
 // their own labour advisor before use; amounts/notice can be edited in the doc.
 import { jsPDF } from 'jspdf';
+import { downloadPdf } from './download.js';
 
 function hexToRgb(hex) {
   const m = /^#?([0-9a-fA-F]{6})$/.exec(hex || '');
@@ -174,5 +175,5 @@ export async function downloadStaffContract({
     doc.text(`Page ${p} of ${pages}`, W - M, H - 8, { align: 'right' });
   }
 
-  doc.save(`staff-contract-${(employee.staff_number || employee.name || 'staff').replace(/\s+/g, '-')}.pdf`);
+  return downloadPdf(doc, `staff-contract-${(employee.staff_number || employee.name || 'staff').replace(/\s+/g, '-')}.pdf`);
 }

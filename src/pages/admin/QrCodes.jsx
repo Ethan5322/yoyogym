@@ -44,7 +44,11 @@ function QrCard({ title, subtitle, url }) {
 
   async function download() {
     const { downloadCanvas } = await import('../../lib/download.js');
-    await downloadCanvas(canvasRef.current, `qr-${title.toLowerCase().replace(/\s+/g, '-')}.png`);
+    try {
+      await downloadCanvas(canvasRef.current, `qr-${title.toLowerCase().replace(/\s+/g, '-')}.png`);
+    } catch (e) {
+      alert(e.message);
+    }
   }
   function print() {
     const dataUrl = canvasRef.current.toDataURL('image/png');

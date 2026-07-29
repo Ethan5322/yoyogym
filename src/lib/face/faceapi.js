@@ -8,11 +8,19 @@
 //     and is useless for cropping a photo, while the SSD detector (5.4 MB) is
 //     useless for drawing a positioning circle. Pulling all four for every task
 //     was most of the wait people were feeling.
-//  2. Pin TF.js to the fastest backend the device will actually give us. Left
+//  2. Detect with the TINY detector, not SSD MobileNet. Both feed the SAME
+//     68-landmark alignment into the SAME recognition net, so the descriptors
+//     they produce are interchangeable — measured on an enrolled member photo,
+//     the two paths differ by 0.06, an order of magnitude below the 0.6 match
+//     threshold. What they do NOT share is cost: on the same photo SSD took
+//     3077 ms per pass against 492 ms for tiny at inputSize 416. Enrolment runs
+//     ~16 of those passes, so SSD alone was ~49 s of the wait. SSD is kept as a
+//     lazily-downloaded fallback for the frames tiny cannot find a face in.
+//  3. Pin TF.js to the fastest backend the device will actually give us. Left
 //     alone, TF.js can land on its pure-JS `cpu` backend, where a single
 //     detection takes SECONDS. Note that tf.setBackend() reports failure by
 //     RETURNING FALSE, not by throwing — so the result has to be checked.
-//  3. Compile the shaders once, on a blank canvas, while the camera is still
+//  4. Compile the shaders once, on a blank canvas, while the camera is still
 //     warming up — otherwise the first real frame eats that cost in front of
 //     the user.
 let _faceapi = null;
@@ -90,7 +98,7 @@ async function loadNets(...names) {
 }
 
 /** Compile the WebGL shaders on a blank frame so the first real one is fast. */
-async function warmUp(f, opts) {
+async function warmUp(f) {
   if (_warm) return _warm;
   _warm = (async () => {
     try {
@@ -99,7 +107,7 @@ async function warmUp(f, opts) {
       const ctx = c.getContext('2d');
       ctx.fillStyle = '#808080';
       ctx.fillRect(0, 0, 160, 160);
-      await f.detectSingleFace(c, opts).withFaceLandmarks().withFaceDescriptor();
+      await f.detectSingleFace(c, probeOptions(f)).withFaceLandmarks().withFaceDescriptor();
     } catch {
       /* warm-up is best-effort — never block the flow on it */
     }
@@ -122,12 +130,48 @@ export function loadAccurateDetector() {
   return loadNets('ssd', 'landmarks');
 }
 
-/** Everything needed to produce/compare 128-D descriptors (enrol, login, scan). */
+/** Everything needed to produce/compare 128-D descriptors (enrol, login, scan).
+ *  SSD is deliberately NOT in this set: it is 5.4 MB of the 13 MB total and the
+ *  descriptor path no longer routes through it (see SPEED RULE 2). It is still
+ *  fetched lazily by `detectAccurate` for the frames tiny cannot resolve. */
 export async function loadForRecognition() {
-  const f = await loadNets('tiny', 'ssd', 'landmarks', 'recognition');
-  await warmUp(f, new f.TinyFaceDetectorOptions({ inputSize: 224 }));
+  const f = await loadNets('tiny', 'landmarks', 'recognition');
+  await warmUp(f);
   return f;
 }
+
+// Detection settings for a descriptor-producing pass. 416 is the smallest tiny
+// input that holds its recall on a face filling a third of the frame, and it
+// measured no slower than 320 (492 ms vs 483 ms) — the cost at this size is the
+// landmark + recognition passes, not the detector.
+const PROBE_INPUT_SIZE = 416;
+const PROBE_SCORE = 0.35;
+const probeOptions = (f) =>
+  new f.TinyFaceDetectorOptions({ inputSize: PROBE_INPUT_SIZE, scoreThreshold: PROBE_SCORE });
+
+/** One landmark-aligned descriptor pass with the tiny detector. */
+async function probe(f, el) {
+  return f.detectSingleFace(el, probeOptions(f)).withFaceLandmarks().withFaceDescriptor();
+}
+
+/** Last-resort pass with SSD MobileNet, for the harsh-light / steep-angle frames
+ *  the tiny detector misses. Downloads the 5.4 MB net the first time it is
+ *  reached, which is why nothing on the happy path calls it. */
+async function probeSsd(el) {
+  const f = await loadNets('ssd', 'landmarks', 'recognition');
+  return f.detectSingleFace(el, new f.SsdMobilenetv1Options({ minConfidence: 0.3 })).withFaceLandmarks().withFaceDescriptor();
+}
+
+const described = (det) => ({
+  box: {
+    x: det.detection.box.x,
+    y: det.detection.box.y,
+    width: det.detection.box.width,
+    height: det.detection.box.height,
+  },
+  score: det.detection.score,
+  descriptor: Array.from(det.descriptor),
+});
 
 /** Back-compat alias — callers that just want "the face engine, ready". */
 export const getFaceApi = loadForRecognition;
@@ -148,40 +192,26 @@ export async function detectBox(el) {
  *  pass, using the fast tiny detector. */
 export async function detectFull(el) {
   const faceapi = await loadForRecognition();
-  const det = await faceapi
-    .detectSingleFace(el, new faceapi.TinyFaceDetectorOptions({ inputSize: 320, scoreThreshold: 0.35 }))
-    .withFaceLandmarks()
-    .withFaceDescriptor();
-  if (!det) return null;
-  const b = det.detection.box;
-  return {
-    box: { x: b.x, y: b.y, width: b.width, height: b.height },
-    score: det.detection.score,
-    descriptor: Array.from(det.descriptor),
-  };
+  const det = await probe(faceapi, el);
+  return det ? described(det) : null;
 }
 
-/** High-ACCURACY detection (SSD MobileNet v1) used for enrolment templates and
- *  match probes — better alignment than the tiny detector means a descriptor
- *  that captures the full facial arrangement more reliably across lighting,
- *  angle and a few days' change. Returns { box, score, descriptor } or null. */
+/** A descriptor good enough to enrol or to match against, as fast as the device
+ *  can produce one. The tiny detector handles the frame; SSD is only downloaded
+ *  and run when tiny finds nothing, so a difficult angle degrades into a slower
+ *  pass instead of a lost capture. Returns { box, score, descriptor } or null. */
 export async function detectAccurate(el) {
   const faceapi = await loadForRecognition();
-  const det = await faceapi
-    .detectSingleFace(el, new faceapi.SsdMobilenetv1Options({ minConfidence: 0.3 }))
-    .withFaceLandmarks()
-    .withFaceDescriptor();
-  if (!det) return null;
-  const b = det.detection.box;
-  return { box: { x: b.x, y: b.y, width: b.width, height: b.height }, score: det.detection.score, descriptor: Array.from(det.descriptor) };
+  const det = (await probe(faceapi, el)) || (await probeSsd(el));
+  return det ? described(det) : null;
 }
 
 /** High-recall detection for ACCESS scanning.
  *
  *  Most frames of a scan contain no face at all (the person is still walking
- *  up), so a cheap tiny box-only gate runs first and those frames cost ~10 ms
- *  instead of a full SSD + landmarks + descriptor pipeline. Only once a face is
- *  actually in frame do we pay for the accurate, discriminating descriptor.
+ *  up), so a cheap box-only gate runs first and those frames cost ~100 ms
+ *  instead of a full landmarks + descriptor pipeline. Only once a face is
+ *  actually in frame do we pay for the descriptor.
  *  Returns { score, descriptor } or null. */
 export async function detectMatch(el) {
   const faceapi = await loadForRecognition();
@@ -192,16 +222,7 @@ export async function detectMatch(el) {
   if (!gate) return null;
 
   const acc = await detectAccurate(el);
-  if (acc) return { score: acc.score, descriptor: acc.descriptor };
-
-  // Tiny saw a face the SSD detector missed (harsh light, steep angle) — take a
-  // tiny-aligned probe rather than losing the person entirely.
-  const det = await faceapi
-    .detectSingleFace(el, new faceapi.TinyFaceDetectorOptions({ inputSize: 416, scoreThreshold: 0.3 }))
-    .withFaceLandmarks()
-    .withFaceDescriptor();
-  if (!det) return null;
-  return { score: det.detection.score, descriptor: Array.from(det.descriptor) };
+  return acc ? { score: acc.score, descriptor: acc.descriptor } : null;
 }
 
 /** Detect a single face in a video/image element and return its 128-d descriptor. */

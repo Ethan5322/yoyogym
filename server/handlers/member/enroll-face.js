@@ -55,14 +55,30 @@ export default async function handler(req, res) {
     }
 
     const supabase = getSupabase();
-    const { error } = await updateFaceRow(supabase, 'members', auth.sub, patch);
+    const { error, degraded } = await updateFaceRow(supabase, 'members', auth.sub, patch);
     if (error) return serverError(res, error.message);
+
+    // `degraded` means the gallery columns are missing on this tenant, so only
+    // the first pose survived the write. Enrolment still "succeeds", which is
+    // why this went unnoticed: members were being enrolled with ONE frozen
+    // template while the multi-pose sweep, the gallery matching and the
+    // adaptive learning all quietly did nothing. Say so loudly.
+    if (degraded) {
+      console.warn(
+        'face enrolment DEGRADED: gallery columns missing — only 1 template stored. ' +
+          'Apply db/migrations/2026-07-10-face-galleries.sql to this Supabase project.'
+      );
+    }
 
     return ok(res, {
       enrolled: true,
-      arcface: !!patch.arcface_templates,
-      templates: (patch.arcface_templates || patch.face_templates || []).length,
-      message: 'Your face scan has been updated.',
+      arcface: !degraded && !!patch.arcface_templates,
+      // What was actually STORED, not what we tried to store.
+      templates: degraded ? 1 : (patch.arcface_templates || patch.face_templates || []).length,
+      degraded,
+      message: degraded
+        ? 'Your face scan was saved, but this gym has not enabled multi-angle face galleries yet.'
+        : 'Your face scan has been updated.',
     });
   } catch (err) {
     console.error('member enroll-face error:', err.message);

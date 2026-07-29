@@ -22,18 +22,21 @@ import { corporateFrame, renderIdPhoto } from '../../lib/idPhoto.js';
 // multi-template gallery spanning angle and expression. Sample counts are the
 // number of STEADY frames kept per pose — each one costs a full descriptor
 // pass, so they are the main thing that decides how long enrolment feels.
-// Averaging 3–4 steady frames is already enough for a stable template.
+// Averaging 2–3 steady frames is already enough for a stable template, and the
+// BREADTH across poses is what actually makes recognition survive a haircut —
+// so the budget goes into more poses, not more frames of the same pose.
 const ENROLL_POSES = [
-  { key: 'center', label: 'Look straight ahead', samples: 4 },
-  { key: 'left', label: 'Turn your head slightly LEFT', samples: 3 },
-  { key: 'right', label: 'Turn your head slightly RIGHT', samples: 3 },
-  { key: 'up', label: 'Lift your chin up a little', samples: 3 },
-  { key: 'down', label: 'Tuck your chin down a little', samples: 3 },
+  { key: 'center', label: 'Look straight ahead', samples: 3 },
+  { key: 'left', label: 'Turn your head slightly LEFT', samples: 2 },
+  { key: 'right', label: 'Turn your head slightly RIGHT', samples: 2 },
+  { key: 'up', label: 'Lift your chin up a little', samples: 2 },
+  { key: 'down', label: 'Tuck your chin down a little', samples: 2 },
 ];
 // Login just needs one solid probe.
-const VERIFY_POSES = [{ key: 'center', label: 'Look at the camera', samples: 4 }];
+const VERIFY_POSES = [{ key: 'center', label: 'Look at the camera', samples: 3 }];
 
 const DWELL_MS = 600; // let the user settle into each new pose before sampling
+const POSE_TIMEOUT_MS = 8000; // a difficult angle must not stall the whole sweep
 
 export default function FaceCapture({ onSubmit, mode = 'enroll' }) {
   const isEnroll = mode !== 'verify';
@@ -43,6 +46,11 @@ export default function FaceCapture({ onSubmit, mode = 'enroll' }) {
   const streamRef = useRef(null);
   const loopRef = useRef(false);
   const galleryRef = useRef({ descriptors: [], images: [] });
+  // The 6.7 MB recognition set downloads in the background while the user is
+  // already being guided into position; the loop awaits it only when it is
+  // about to keep a frame.
+  const recognitionRef = useRef(null);
+  const recognitionReadyRef = useRef(false);
 
   const [phase, setPhase] = useState('loading'); // loading | scanning | capturing | error
   const [guide, setGuide] = useState('Starting camera…');
@@ -59,15 +67,22 @@ export default function FaceCapture({ onSubmit, mode = 'enroll' }) {
     setProgress(0);
     setPoseIndex(0);
     galleryRef.current = { descriptors: [], images: [] };
+    recognitionReadyRef.current = false;
     (async () => {
       try {
         if (!navigator.mediaDevices?.getUserMedia) throw Object.assign(new Error('x'), { name: 'InsecureContext' });
-        const { loadForRecognition } = await import('../../lib/face/faceapi.js');
+        const { loadForGuide, loadForRecognition } = await import('../../lib/face/faceapi.js');
         const camP = navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user', width: 480, height: 480 } });
-        // Models download in parallel with the camera coming up, and the
-        // shaders are compiled here so the first guided frame isn't the one
-        // that pays for them.
-        await loadForRecognition();
+        // Start the heavy recognition download NOW but do not wait on it —
+        // waiting for all 6.7 MB before the camera preview appeared was dead
+        // time the user spent staring at "Starting camera…". The 190 KB guide
+        // net is all the positioning circle needs.
+        recognitionRef.current = loadForRecognition().then((f) => {
+          recognitionReadyRef.current = true;
+          return f;
+        });
+        recognitionRef.current.catch(() => {});
+        await loadForGuide();
         const stream = await camP;
         if (!active) return stream.getTracks().forEach((t) => t.stop());
         streamRef.current = stream;
@@ -77,7 +92,15 @@ export default function FaceCapture({ onSubmit, mode = 'enroll' }) {
         }
         setPhase('scanning');
         loopRef.current = true;
-        runPoseSequence();
+        // A model download that fails mid-sweep must surface as an error the
+        // user can retry, not leave the sweep hanging on "scanning" forever.
+        runPoseSequence().catch(() => {
+          if (!active) return;
+          loopRef.current = false;
+          stop();
+          setError('Could not load the face models. Check your connection and try again.');
+          setPhase('error');
+        });
       } catch (err) {
         const n = err?.name;
         setError(
@@ -150,9 +173,10 @@ export default function FaceCapture({ onSubmit, mode = 'enroll' }) {
       let bestScore = -1;
       const started = Date.now();
       // Cap each pose so a difficult angle can't stall enrolment forever.
-      while (loopRef.current && samples.length < pose.samples && Date.now() - started < 12000) {
+      while (loopRef.current && samples.length < pose.samples && Date.now() - started < POSE_TIMEOUT_MS) {
         const v = videoRef.current;
         let a = { ok: false, g: pose.label };
+        let sampled = false;
         if (v && v.videoWidth) {
           let det = null;
           try {
@@ -163,7 +187,15 @@ export default function FaceCapture({ onSubmit, mode = 'enroll' }) {
           }
           a = assess(det, v.videoWidth, v.videoHeight);
           if (a.ok) {
+            // The frame is worth keeping, so this is the moment to wait for the
+            // recognition nets if they are still coming down the wire.
+            if (!recognitionReadyRef.current) {
+              setGuide('Hold still — preparing…');
+              await recognitionRef.current;
+              if (!loopRef.current) return;
+            }
             const acc = await detectAccurate(v);
+            sampled = true;
             if (acc?.descriptor) {
               samples.push(acc.descriptor);
               // Keep the sharpest frame of this pose as its photo.
@@ -177,7 +209,9 @@ export default function FaceCapture({ onSubmit, mode = 'enroll' }) {
         setGood(a.ok);
         setGuide(a.ok ? `${pose.label} — hold still (${samples.length}/${pose.samples})` : a.g);
         setProgress(Math.round((samples.length / pose.samples) * 100));
-        await sleep(80);
+        // Only idle between cheap box-only checks. A frame that just paid for a
+        // full descriptor pass has already given the camera plenty of time.
+        if (!sampled) await sleep(80);
       }
       if (!loopRef.current) return;
 

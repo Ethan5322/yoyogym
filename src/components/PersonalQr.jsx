@@ -12,7 +12,11 @@ export default function PersonalQr({ url, name = 'profile', label }) {
   }, [url]);
 
   function download() {
-    downloadCanvas(canvasRef.current, `yoyo-qr-${name.replace(/\s+/g, '-').toLowerCase()}.png`);
+    // downloadCanvas rejects when the browser blocks every delivery route, so
+    // the QR falls back to the print view rather than the click doing nothing.
+    downloadCanvas(canvasRef.current, `yoyo-qr-${name.replace(/\s+/g, '-').toLowerCase()}.png`).catch((e) =>
+      alert(e.message)
+    );
   }
   function print() {
     const dataUrl = canvasRef.current.toDataURL('image/png');

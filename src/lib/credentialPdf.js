@@ -3,6 +3,7 @@
 // membership document style. Uses jsPDF (already a dependency) + qrcode.
 import { jsPDF } from 'jspdf';
 import QRCode from 'qrcode';
+import { downloadPdf } from './download.js';
 
 function hexToRgb(hex) {
   const m = /^#?([0-9a-fA-F]{6})$/.exec(hex || '');
@@ -145,5 +146,5 @@ export async function downloadCredentialPdf({
     285
   );
 
-  doc.save(`${roleLabel.toLowerCase()}-credential-${(number || name || 'id').replace(/\s+/g, '-')}.pdf`);
+  return downloadPdf(doc, `${roleLabel.toLowerCase()}-credential-${(number || name || 'id').replace(/\s+/g, '-')}.pdf`);
 }

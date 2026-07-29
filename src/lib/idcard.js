@@ -11,7 +11,7 @@
 // members, staff and trainers — the caller supplies the role labels and the
 // identification `fields` to print.
 import QRCode from 'qrcode';
-import { downloadCanvas } from './download.js';
+import { downloadCanvas, downloadPdf } from './download.js';
 import { drawBarcode } from './barcode.js';
 
 const TIER_COLOR = {
@@ -388,5 +388,5 @@ export async function downloadIdCardPdf(input) {
   const pw = doc.internal.pageSize.getWidth();
   const ph = doc.internal.pageSize.getHeight();
   doc.addImage(canvas.toDataURL('image/jpeg', 0.95), 'JPEG', 0, 0, pw, ph, undefined, 'FAST');
-  doc.save(`${fileBase(o)}.pdf`);
+  return downloadPdf(doc, `${fileBase(o)}.pdf`);
 }

@@ -49,12 +49,18 @@ export default function PaymentsAdmin() {
   }
 
   function receipt(p) {
-    downloadReceiptPdf({
-      gymName: branding.name || 'Yoyo GYM',
-      accent: branding.accent_color || '#E63946',
-      payment: p,
-      member: { full_name: p.member_name, membership_number: p.membership_number },
-    });
+    try {
+      downloadReceiptPdf({
+        gymName: branding.name || 'Yoyo GYM',
+        accent: branding.accent_color || '#E63946',
+        payment: p,
+        member: { full_name: p.member_name, membership_number: p.membership_number },
+      });
+    } catch (e) {
+      // The download ladder throws only when the browser blocked every route to
+      // the file — say so rather than leaving the click looking dead.
+      toast.error(e.message);
+    }
   }
 
   async function refund(p) {

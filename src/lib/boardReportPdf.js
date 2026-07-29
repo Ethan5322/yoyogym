@@ -2,6 +2,7 @@
 // dashboard KPIs, retention, revenue trend, tiers, busiest hours and AR aging
 // into a branded A4 document. Uses jsPDF (already a dependency).
 import { jsPDF } from 'jspdf';
+import { downloadPdf } from './download.js';
 
 function hexToRgb(hex) {
   const m = /^#?([0-9a-fA-F]{6})$/.exec(hex || '');
@@ -107,5 +108,5 @@ export function downloadBoardReportPdf({ gymName = 'Yoyo GYM', accent = '#E63946
   doc.setTextColor(150, 150, 150);
   doc.text(`Generated ${new Date().toLocaleString('en-ZA')} · ${gymName} management system`, M, H - 32);
 
-  doc.save(`board-report-${new Date().toISOString().slice(0, 10)}.pdf`);
+  return downloadPdf(doc, `board-report-${new Date().toISOString().slice(0, 10)}.pdf`);
 }

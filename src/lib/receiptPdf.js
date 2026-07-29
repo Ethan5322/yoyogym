@@ -1,6 +1,7 @@
 // Branded payment receipt PDF (A4) — corporate proof-of-payment a member can
 // keep or claim from medical aid. Uses jsPDF (already a dependency).
 import { jsPDF } from 'jspdf';
+import { downloadPdf } from './download.js';
 
 function hexToRgb(hex) {
   const m = /^#?([0-9a-fA-F]{6})$/.exec(hex || '');
@@ -87,5 +88,5 @@ export function downloadReceiptPdf({ gymName = 'Yoyo GYM', accent = '#E63946', p
   doc.text('This is a computer-generated receipt and is valid without a signature.', M, doc.internal.pageSize.getHeight() - 50);
   doc.text(`Generated ${new Date().toLocaleString('en-ZA')}`, M, doc.internal.pageSize.getHeight() - 36);
 
-  doc.save(`receipt-${refNo}.pdf`);
+  return downloadPdf(doc, `receipt-${refNo}.pdf`);
 }

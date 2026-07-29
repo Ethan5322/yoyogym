@@ -10,10 +10,15 @@ import LocalAmount from '../../components/LocalAmount.jsx';
 export default function SuccessScreen({ result, paid = false }) {
   const [pdfBusy, setPdfBusy] = useState(false);
   const [pdfErr, setPdfErr] = useState('');
+  // Kept so the member always has a tappable way to reach the file. In-app
+  // browsers (opening the link from WhatsApp) routinely ignore a download
+  // without reporting anything, and this link is what rescues that.
+  const [pdfUrl, setPdfUrl] = useState('');
 
   async function downloadPdf() {
     setPdfBusy(true);
     setPdfErr('');
+    setPdfUrl('');
     try {
       const data = await apiFetch('/document', {
         method: 'POST',
@@ -27,7 +32,8 @@ export default function SuccessScreen({ result, paid = false }) {
       data.companyUrl = data.gym?.website || `${window.location.origin}/member`;
       // Lazy-loaded so jsPDF is not in the initial bundle (keeps load fast).
       const { generateMembershipPdf } = await import('../../lib/pdf/generateMembershipPdf.js');
-      await generateMembershipPdf(data);
+      const delivered = await generateMembershipPdf(data);
+      if (delivered?.url) setPdfUrl(delivered.url);
     } catch (err) {
       setPdfErr(err.message || 'Could not generate PDF.');
     } finally {
@@ -96,6 +102,14 @@ export default function SuccessScreen({ result, paid = false }) {
         {pdfBusy ? 'Preparing your card…' : 'Download Membership PDF'}
       </button>
       {pdfErr && <p className="text-sm text-error">{pdfErr}</p>}
+      {pdfUrl && (
+        <p className="text-xs text-muted">
+          Download didn’t start?{' '}
+          <a href={pdfUrl} target="_blank" rel="noopener noreferrer" className="text-accent underline">
+            Open your membership PDF
+          </a>
+        </p>
+      )}
 
       <div className="card text-left">
         <h3 className="font-display text-sm uppercase tracking-wider text-accent">What happens next</h3>

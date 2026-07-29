@@ -167,12 +167,18 @@ export default function MemberDetail() {
                 {p.status === 'received' && (
                   <button
                     className="text-xs text-accent hover:underline"
-                    onClick={() => downloadReceiptPdf({
-                      gymName: branding.name || 'Yoyo GYM',
-                      accent: branding.accent_color || '#E63946',
-                      payment: p,
-                      member: { full_name: m.full_name, membership_number: m.membership_number },
-                    })}
+                    onClick={() => {
+                      try {
+                        downloadReceiptPdf({
+                          gymName: branding.name || 'Yoyo GYM',
+                          accent: branding.accent_color || '#E63946',
+                          payment: p,
+                          member: { full_name: m.full_name, membership_number: m.membership_number },
+                        });
+                      } catch (e) {
+                        toast.error(e.message);
+                      }
+                    }}
                   >
                     Receipt
                   </button>
