@@ -1,89 +1,196 @@
 ---
-aliases: ["Tenant Architecture", "Tenancy"]
-tags: [architecture, tenancy, blocking, future]
-stage: "Stage 2"
+aliases: ["Tenant Architecture", "Tenancy", "Tenancy Comparison"]
+tags: [architecture, tenancy, blocking, stage-1]
+stage: "Stage 1 (documentation only)"
 status: undecided
 updated: 2026-09-21
 ---
 
 # 06 — Tenant Architecture
 
-**The blocking decision (Q-01).** Nothing in Stages 3–10 can be designed until this is answered.
-Stage 1 is deliberately still closed — this note **states the options and the evidence, and makes
-no recommendation**.
+**The blocking decision (Q-01).** This note is the Stage 1 *comparison*. **No model is chosen here.**
+The choice is the user's and must be recorded in [[18 - Decision Log]] before any Stage 3–10 work.
 
-## Where things stand today — confirmed
+Markers: **[C]** confirmed in repository · **[V]** verified from official vendor docs 2026-09-21 ·
+**[?]** unknown — must not be invented.
 
-```text
-One Vercel deployment + One Supabase project + One env-var set = One gym
-```
+---
 
-**[C]** Evidence:
+## 1. Evidence used
 
-- `db/schema.sql` header: *"the repeatable schema used to stand up a NEW gym tenant (one Supabase
-  project per gym)"*
-- `server/lib/supabase.js` reads `SUPABASE_URL` / `SUPABASE_SERVICE_ROLE_KEY` from `process.env` —
-  one client, one project, per deployment
-- **No `gym_id` or `tenant_id` column exists** in any of the 24 tables
-- Gym identity is therefore **implicit in the deployment's domain**
-- Per-gym configuration also includes `JWT_SECRET`, Paystack keys, Brevo sender, `OWNER_EMAIL`,
-  CallMeBot keys — so a "tenant" today is a *set of secrets*, not a row
-
-This is a **pre-existing architectural decision** that predates the platform brief. The brief
-either ratifies or overturns it.
-
-## The three models
-
-### Model A — separate project + deployment per gym (today's model, scaled)
-
-| Advantages | Risks |
+| Source | What it gave |
 |---|---|
-| Isolation is absolute by construction — cross-gym leakage is physically impossible | ~10,000 Supabase projects |
-| Existing code changes **almost not at all** — `CLAUDE.md` §32 is trivially satisfied | ~10,000 env-var sets to manage and rotate |
-| Blast radius of a bug is one gym | Every migration must run 10,000 times |
-| Per-gym backup/restore is natural | Monitoring, upgrades and support across 10,000 targets |
-| | Provisioning must be fully automated or it is unworkable |
-| | Vercel/Supabase account limits and cost are unknown **[?]** (Q-21) |
+| `db/schema.sql` header **[C]** | *"the repeatable schema used to stand up a NEW gym tenant (one Supabase project per gym)"* |
+| `server/lib/supabase.js` **[C]** | One client per deployment, bound to `process.env` |
+| All 24 tables **[C]** | **No `gym_id` / `tenant_id` column anywhere** |
+| `.env.example` **[C]** | A tenant today is a *set of secrets*, not a row |
+| `DELIVERY.md:3` **[C]** | *"Single-tenant: one Supabase project + one Vercel deployment **per gym**."* |
+| `scripts/business-guide.js:157-196` **[C]** | The documented commercial model — see §2, this is decisive |
+| `vercel.json` + `api/` layout **[C]** | 6-router design; 3 of 8 crons scheduled |
+| [Vercel Limits](https://vercel.com/docs/limits) **[V]** | Project, repo-link, deployment and cron limits |
+| [Supabase billing](https://supabase.com/docs/guides/platform/billing-on-supabase) **[V]** | Per-project dedicated compute, org-based billing |
+| Graphify graph (1,550 nodes) | Surfaced the commercial-model ↔ tenancy link that prose review had missed |
 
-### Model B — shared database, shared deployment, `gym_id` + RLS
+## 2. The decisive evidence — the existing commercial model
 
-| Advantages | Risks |
+Found via Graphify, then **verified in source** at `scripts/business-guide.js:157-162`. The business
+model already makes a deliberate legal and financial decision **[C]**:
+
+> **"For each gym, set these up under the GYM'S OWN accounts, not yours:"**
+> - **Paystack** — the gym's own account. *"Member payments must flow to them. You only paste their
+>   API keys into their instance, so you never handle their members' money or carry financial
+>   liability."*
+> - **Supabase** — *"ideally the gym's own project for clean data isolation and POPIA."*
+> - **POPIA** — *"the gym is the 'responsible party' for member data; you are the
+>   operator/processor."*
+
+And the maintenance model, `business-guide.js:191`:
+
+> *"Fix a bug once → push to GitHub main → every gym's Vercel redeploys automatically… build once,
+> deploy many, maintain centrally."*
+
+**This is not an accident of implementation. It is a deliberate liability posture**, and it is the
+single most important input to Q-01. Pooling every gym's members into one database owned by the
+platform would reverse it: MuleSoo would become the responsible party for ~10,000 gyms' member
+health and biometric data, and — if payments were also pooled — would handle members' money.
+
+> ⚠️ This is a **business/legal** decision recorded in a sales document, not a technical constraint.
+> The user can change it. But it must be changed **deliberately and explicitly**, not silently as a
+> side-effect of picking a database topology.
+
+## 3. Verified platform limits
+
+### Vercel **[V]** ([docs](https://vercel.com/docs/limits), updated 2026-09-16)
+
+| Limit | Hobby | Pro | Enterprise |
+|---|---|---|---|
+| Projects | 200 | **Unlimited** | Unlimited |
+| **Projects connected per Git repository** | 25 | **150** | **Custom** |
+| Deployments/day | 100 | 6,000 | Custom |
+| Deployments/hour | 100 | 450 | 1,800 |
+| Functions per deployment | Framework-dependent | ∞ | ∞ |
+| **Cron jobs per project** | **100** | **100** | **100** |
+| Env vars per project per env | 1,000 | 1,000 | 1,000 |
+| Env var total size | 64 KB | 64 KB | 64 KB |
+
+Two findings:
+
+1. **The 150-projects-per-Git-repository limit is a hard blocker for naive Model A.** The documented
+   model is *"One repo, many Vercel projects"* (`business-guide.js:173`). At 10,000 gyms that is
+   **66× over the Pro limit**. Enterprise is "Custom" — negotiable, but the ceiling is **[?]**.
+2. **The cron constraint in the codebase is now obsolete.** Cron jobs are **100 per project on every
+   plan**; Vercel removed per-team limits in January 2026. The code comment *"Hobby-plan friendly"*
+   in `server/handlers/cron/billing.js` and the choice to schedule only 3 of 8 jobs reflect the
+   **old** limit (2 per team on Hobby). **This is a factual update to the audit, not a defect** —
+   the consolidated orchestrator still works. No code change is proposed here (§32 protected).
+
+### Supabase **[V]** ([docs](https://supabase.com/docs/guides/platform/billing-on-supabase))
+
+- Billing is **per organization**; each org has its own plan, payment method and invoices.
+- **"Each project includes a dedicated Postgres instance running on its own server. You are charged
+  for the Compute resources of that server, independent of your database usage."**
+- **"Each project you launch increases your monthly Compute costs."**
+- Free plan: 2 projects, counted across all orgs where you are Owner/Admin.
+- **Maximum projects per organization on paid plans: not documented [?]** — must be confirmed with
+  Supabase before Model A is costed.
+- Minimum per-project Pro cost: **not disclosed on the billing page [?]**.
+
+**The consequence for Model A is unavoidable: cost scales linearly with gym count, with a floor per
+gym regardless of how small that gym is.** A 40-member Basic-tier gym pays the same compute floor as
+a 500-member Prime gym. That interacts directly with [[11 - Subscription Decisions]].
+
+---
+
+## 4. Comparison across the 16 requested dimensions
+
+| Dimension | **Model A** — project + deployment per gym | **Model B** — shared DB + `gym_id` + RLS | **Model C** — hybrid / sharded |
+|---|---|---|---|
+| **Security isolation** | **Strongest.** Physically separate databases; cross-gym leakage impossible by construction | Weakest. One authorization bug leaks across all gyms; correctness rests on RLS + every handler | Between the two; isolation depends on where the boundary is drawn |
+| **Operational cost** | Linear, with a **per-project compute floor** **[V]**; small gyms are disproportionately expensive | Sub-linear; one cluster serves many gyms; best cost curve | Mixed; pooled registry cheap, siloed data still per-gym |
+| **Provisioning complexity** | **Severe.** Documented runbook is **~1–2 hrs manual per gym** (`business-guide.js:166`) across 8 steps. ×10,000 = 10,000–20,000 hours unless fully automated via the Supabase + Vercel management APIs | **Trivial** — insert a row | Moderate; two provisioning paths to build and maintain |
+| **Vercel limits** | **Blocked at 150 projects per Git repo (Pro)** **[V]**. Needs Enterprise "Custom", ceiling **[?]**. Also 6,000 deploys/day caps a mass redeploy | One project. No limits reached | Depends on shard count; 150/repo caps shards if each is a project |
+| **Supabase limits** | Per-project dedicated compute **[V]**; max projects/org **[?]** | One project; usage quotas apply org-wide | Per-shard compute |
+| **Migration complexity** | Every migration runs **N times**; partial failure leaves gyms on mixed schema versions with no central view | One migration, one run, one schema version | Once per shard + once for the registry |
+| **Existing code impact** | **Near zero.** `getSupabase()` already reads env; the 24 tables and ~76 handlers are untouched. [[03 - Protected Existing Functions]] trivially satisfied | **Severe.** `gym_id` on all 24 tables; tenant scoping in every handler; `membership_number` unique constraint becomes `(gym_id, membership_number)`; RLS policies written from zero. Directly touches the protected surface | Moderate; existing gym code can stay single-tenant if only the platform layer is pooled |
+| **Paystack key management** | **Matches the documented model exactly** — the gym's own account, keys in their own instance, MuleSoo never touches member money **[C]** | Requires per-gym key lookup at runtime, or Paystack subaccounts/split payments. **Reverses the stated liability position** unless carefully designed | Can preserve per-gym keys while pooling platform billing |
+| **JWT secret management** | Per-deployment secret; **compromise affects one gym**; rotation is per-gym | One secret across all gyms; **compromise is platform-wide**. Note admin/member separation rests solely on the JWT `audience` claim with a **shared** secret **[C]** | Per-shard secrets |
+| **Object storage** | No storage today; photos/biometrics sit as `jsonb` **inside each gym's own Postgres** **[C]** — which is consistent with gym-owned data | Every gym's biometric templates in **one** database → concentrated sensitive-data risk, and a much heavier POPIA position | Storage can stay gym-side while metadata pools |
+| **RLS requirements** | **None new.** Default-deny with zero policies remains safe because the browser never touches Supabase **[C]** | **RLS becomes load-bearing for the first time.** Every table needs correct, tested policies before any client-side access | Only pooled tables need policies |
+| **Backup and recovery** | Natural per-gym backup/restore; one gym can be restored without touching others. `RECOVERY.md` exists **[C]** | Restore is all-or-nothing; per-gym point-in-time recovery needs custom tooling | Per-shard restore |
+| **Monitoring** | **10,000 targets.** No aggregate view without building one | One target; central dashboards | Shard count targets |
+| **Updates** | *"Build once, deploy many"* **[C]** — but a mass redeploy of 10,000 projects must respect 6,000 deploys/day and 450/hour **[V]**, i.e. **≥2 days to roll out one fix** | One deploy updates everyone instantly — and breaks everyone instantly | Staged rollout possible, which is a genuine advantage |
+| **Support burden** | Per-gym triage; the gym owns its own Supabase/Paystack accounts, so support requires their access | Central triage; full visibility — which is *also* the privacy problem | Mixed |
+| **Feasibility at ~10,000** | **Not feasible as currently practised.** Manual runbook, the 150/repo limit, per-project compute floor, and 2-day rollout all fail at that scale. Feasible only with full API automation, an Enterprise agreement, and accepted cost | **Technically feasible.** The blocker is legal/commercial, not technical | **Feasible**, at the price of building and operating two models |
+
+---
+
+## 5. Impact on the existing single-gym system
+
+| | Model A | Model B | Model C |
+|---|---|---|---|
+| 24 tables | untouched | all altered | untouched or partly |
+| ~76 handlers | untouched | all tenant-scoped | platform-layer only |
+| Auth (`auth.js`, `memberauth.js`) | untouched | gym scoping added | likely untouched |
+| `membership_number` uniqueness | unchanged, gym-scoped | becomes composite | unchanged |
+| RLS posture | unchanged | rewritten | partly |
+| §32 protected surface | **not violated** | **violated — requires an approved decision** | probably not violated |
+
+Model B cannot be implemented without an explicit approved exception to
+[[03 - Protected Existing Functions]]. That is not an argument against it — it is a procedural
+requirement that must be met first.
+
+## 6. Unknown costs and limits — must not be guessed
+
+| # | Unknown |
 |---|---|
-| One deployment, one migration run, central monitoring | Requires `gym_id` on **all 24 tables** |
-| Gym search, cross-gym identity and aggregate stats become trivial | Every one of the ~76 handlers must be tenant-scoped |
-| Provisioning is inserting a row | Requires real RLS policies — today there are **zero** |
-| Cost scales smoothly | Directly touches the surface [[03 - Protected Existing Functions]] protects |
-| | One authorization bug leaks across gyms |
-| | `membership_number` uniqueness must become per-gym, not global (Q-03) |
+| U-1 | Maximum Supabase projects per organization on paid plans **[?]** |
+| U-2 | Actual per-project monthly floor (compute + plan) at the gym sizes in [[11 - Subscription Decisions]] **[?]** |
+| U-3 | Vercel Enterprise ceiling for projects-per-Git-repository ("Custom") **[?]** |
+| U-4 | Whether Supabase/Vercel offer partner or reseller terms at this volume **[?]** |
+| U-5 | Cost and reliability of automated provisioning via both management APIs **[?]** |
+| U-6 | Real support hours per gym per month — the runbook covers setup, not ongoing support **[?]** |
+| U-7 | Whether gyms will accept MuleSoo-owned infrastructure (Model B) given the current pitch **[?]** |
+| U-8 | Migration cost of moving *existing* live gyms into whichever model is chosen **[?]** |
 
-### Model C — hybrid / sharded
+## 7. What the evidence supports — and what it does not
 
-| Advantages | Risks |
+**No model is chosen.** What the evidence does support, stated plainly:
+
+1. **Pure Model A does not reach ~10,000 gyms as currently practised.** Three independent verified
+   blockers: the 150-projects-per-repo Pro limit **[V]**, the per-project compute floor **[V]**, and
+   a ~1–2 hour manual runbook per gym **[C]**. It could reach that scale only with full provisioning
+   automation, an Enterprise agreement, and accepted linear cost.
+2. **Pure Model B is technically the best fit for 10,000 gyms and directly contradicts the
+   documented commercial posture** — gym-owned Paystack, gym-owned data, gym as POPIA responsible
+   party, MuleSoo as processor **[C]**. That contradiction is resolvable only by the user, as a
+   business decision.
+3. Therefore the realistic space is **Model C, or Model B with an explicit change to the commercial
+   model, or Model A with a lower gym target.**
+
+**One genuine recommendation, offered because the evidence is strong:** *pressure-test the ~10,000
+figure before choosing a topology.* Nothing in the repository or business material describes a path
+to 10,000 gyms — the documented model is a hands-on agency practice selling to independent
+owner-run gyms with a 1–2 hour manual onboarding. The right architecture for **100** gyms
+(Model A, automated) is genuinely different from the right architecture for **10,000** (Model B or
+C). Choosing for 10,000 when the realistic 24-month number is 100 would impose the full cost of
+Model B on the protected single-gym system for a scale that may never arrive.
+
+That is a recommendation about **which question to answer first**, not a recommendation of a model.
+
+## 8. Still requires user approval
+
+| # | Decision |
 |---|---|
-| Pooled platform registry + siloed gym data is possible | Two models to build, operate and reason about |
-| Can shard by region, size or tier | Routing and provisioning are more complex |
-| Allows staged migration from A toward B | Support burden higher than either pure model |
-
-## Evidence that must inform the choice
-
-1. **No object storage exists** — photos and biometric templates live in Postgres as `jsonb`
-   (Audit §3). Under Model B that is one database carrying every gym's biometrics. → Q-24, Q-16
-2. **Vercel plan limits** — the 6-router layout exists to stay inside the Serverless Function
-   budget, and cron count is capped (only 3 of 8 jobs are scheduled). Model A multiplies
-   deployments; Model B multiplies traffic through one.
-3. **`JWT_SECRET` is per-deployment.** Under Model A a compromised secret affects one gym; under
-   Model B it affects all of them.
-4. **Paystack keys are per-gym.** Model B needs a per-gym key lookup or Paystack subaccounts →
-   collides with Q-05 (does the platform take a cut?).
-5. **RLS is enabled with zero policies.** Model B makes RLS load-bearing for the first time.
-
-## What must not happen
-
-Per `CLAUDE.md` §6: **do not add `gym_id`, `tenant_id`, migrations or tenant policies until this
-is decided.** No partial hedging toward a model.
+| Q-01 | **The tenancy model.** Nothing below can be designed first |
+| Q-05 | Revenue model — flat gym subscription vs a share of member payments. Directly determines whether the Paystack posture survives |
+| — | Whether the ~10,000 target is a real 24-month plan or an aspiration (see §7) |
+| — | Whether the gym-owned data / POPIA-processor posture is retained or deliberately changed |
+| Q-02, Q-03 | Platform boundary and member identity — answerable only after Q-01 |
+| — | If Model B: an explicit approved exception to [[03 - Protected Existing Functions]] |
 
 ## Related
 
 [[00 - Project Purpose]] · [[01 - Existing Yoyo Gym Audit]] · [[03 - Protected Existing Functions]] ·
-[[04 - Yoyo Gyms Platform]] · [[12 - Database Architecture]] · [[14 - Security and Privacy]] ·
-[[17 - Open Questions]] · [[18 - Decision Log]] · [[19 - Implementation Phases]]
+[[04 - Yoyo Gyms Platform]] · [[11 - Subscription Decisions]] · [[12 - Database Architecture]] ·
+[[14 - Security and Privacy]] · [[17 - Open Questions]] · [[18 - Decision Log]] ·
+[[19 - Implementation Phases]] · [[20 - Change History]]

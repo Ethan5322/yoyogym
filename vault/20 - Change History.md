@@ -15,6 +15,53 @@ occurrence is answered from notes rather than rediscovered.
 
 ---
 
+## 2026-09-21 — Git commit, Graphify, Stage 1 comparison
+
+**Committed.** `vault/`, `CLAUDE.md` and `.gitignore` on branch `docs/yoyo-gyms-second-brain`
+(23 files, 3,257 insertions). Excluded and now git-ignored: `.obsidian/` (29 MB of vendored plugin
+code, machine-specific layout, and plugin data including `remotely-save` cloud-sync credentials),
+`.smart-env/` (13 MB private embeddings index), `graphify-out/` (regenerable). Secret scan over the
+committed files: clean.
+
+**Graphify built** (v0.9.65, no `--obsidian` — the curated vault must not be overwritten):
+274 files → **1,550 nodes, 4,581 edges, 92 communities**. 1,313 AST + 216 semantic nodes.
+`graphify-out/` holds `graph.html`, `graph.json`, `GRAPH_REPORT.md`.
+
+**Two process notes recorded honestly:**
+
+1. **SQL was silently missing.** The first AST pass warned that 14 `.sql` files — `schema.sql` and
+   every migration — "contributed nothing" because `tree_sitter_sql` was absent. Installing
+   `graphifyy[sql]` and re-running added **+119 nodes**. Without that warning the graph would have
+   had a hole exactly where this project's core is. **Read the tool's warnings.**
+2. **One of four extraction subagents hit a session rate limit** and never delivered its report.
+   Its chunk file *had* already been written and covered all 17 of its files — verified by counting
+   nodes per `source_file` before using it. **A missing report is not the same as missing work;
+   check the artefact, not the messenger.**
+
+**Graph health:** 15 dangling-endpoint edges (0.3%), 2 self-loops, 70 collapsed multi-relation
+pairs (expected in an undirected build). Surfaced rather than hidden.
+
+**Stage 1 documentation** (comparison only, no model chosen) written into
+[[06 - Tenant Architecture]] across all 16 requested dimensions.
+
+**The find of the session — and Graphify earned its keep.** The graph surfaced a
+`semantically_similar_to` edge between *Tenancy Models A/B/C* (vault) and *Single-Tenant Commercial
+Model* (`Yoyo-GYM-Business-Master-Guide.pdf`) that prose review had missed entirely. Following it
+and **verifying the source** at `scripts/business-guide.js:157-162` found a deliberate, documented
+legal posture: each gym uses **its own Paystack account** ("you never handle their members' money or
+carry financial liability"), **ideally its own Supabase project**, and **the gym is the POPIA
+responsible party while MuleSoo is the processor**. Model B reverses all three. That constraint was
+invisible in the code and would have been missed by a purely technical comparison.
+
+**Verified vendor limits** (official docs, not memory): Vercel allows **150 Vercel projects per Git
+repository on Pro** — a hard blocker for the documented "one repo, many Vercel projects" model at
+10,000 gyms — and Supabase bills **dedicated compute per project**, so cost is linear with a
+per-gym floor. Also found: **the cron constraint baked into this codebase is obsolete** — Vercel
+moved to 100 cron jobs per project on every plan in January 2026, so the "Hobby-plan friendly"
+3-of-8 scheduling reflects the old 2-per-team limit. Recorded, not changed (§32).
+
+---
+
 ## 2026-09-21 — Stage 2: vault foundation
 
 **Done.** Created notes 02–16, 19, 20 (this note), completing the §28 structure begun with 00, 01,

@@ -66,6 +66,29 @@ When one is answered, move it to [[18 - Decision Log]] with its rationale.
   **untracked** — so project knowledge is local-only until this is answered.
 - **Q-24** Object storage strategy for photos, documents and biometric templates.
 
+## Unknown costs and limits — opened 2026-09-21 (Stage 1)
+
+Vendor limits that must be confirmed, never guessed. Full context in [[06 - Tenant Architecture]] §6.
+
+- **U-1** Maximum Supabase projects per organization on paid plans — undocumented.
+- **U-2** Real per-project monthly floor (plan + dedicated compute) at Basic/Medium/Prime gym sizes.
+- **U-3** Vercel Enterprise ceiling for projects-per-Git-repository (Pro is **150**; Enterprise is "Custom").
+- **U-4** Whether Supabase/Vercel offer partner or reseller terms at this volume.
+- **U-5** Cost and reliability of automated provisioning via both management APIs.
+- **U-6** Real ongoing support hours per gym per month (the runbook covers setup only).
+- **U-7** Whether gyms will accept MuleSoo-owned infrastructure, given the current gym-owned pitch.
+- **U-8** Migration cost of moving *existing live* gyms into whichever model is chosen.
+
+## Business questions raised by the Stage 1 comparison
+
+- **Q-32** **Is ~10,000 gyms a real 24-month plan or an aspiration?** The documented model is a
+  hands-on agency practice with a 1–2 hour manual onboarding per gym. The right architecture for
+  100 gyms differs materially from the right one for 10,000. This should be answered *before* Q-01.
+- **Q-33** Is the **gym-owned** posture retained — gym's own Paystack, gym's own Supabase, gym as
+  POPIA responsible party and MuleSoo as processor (`scripts/business-guide.js:157-162`)? Model B
+  reverses it. Changing it is legitimate but must be **deliberate**, not a side-effect of a database
+  choice.
+
 ## Platform panel — new, opened 2026-09-21
 
 - **Q-30** Where does the platform admin panel live — same deployment, separate deployment, or
