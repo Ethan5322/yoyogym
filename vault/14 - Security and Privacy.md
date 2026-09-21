@@ -60,6 +60,32 @@ policies first** (Q-20). This is the single most consequential security fact in 
 6. **Member accounts have no recovery path** **[C]** — no password, so no reset; a changed phone
    number requires staff intervention.
 
+## Retention policies — DECIDED 2026-09-21
+
+The first written retention policies for this project. Both were previously **[M] missing**.
+
+| Data | Policy | Mechanism |
+|---|---|---|
+| **Member face templates** (D-055) | Deleted when the member leaves, or on request. Re-enrolment always available | FK cascade on member delete already does this |
+| **Owner application documents** (D-054) | Rejected: purged after a ~90-day appeal window. Approved: kept while the gym trades, deleted a set period after it leaves | `application_documents.retention_until` |
+
+## Multi-country — D-056 changes the compliance surface
+
+Country is now first-class from the start. The system today is **South-Africa shaped**: SA ID Luhn
+validation, ZAR, POPIA consent, CPA contract text.
+
+**What D-015 already solved.** Removing member payments cleared the hardest multi-country problem
+before it was asked — per-country payment gateways for member fees. Gyms collect locally by their
+own means, so currency is now display and record-keeping only (D-057).
+
+**What is left, and must be verified rather than assumed:**
+
+- National identity validation beyond the SA ID / passport split
+- Per-jurisdiction privacy law — POPIA is not GDPR and is not Ethiopia's regime
+- Per-jurisdiction consumer-contract text (CPA is South African)
+- **Whether the platform's billing provider operates in each target country** — check the provider's
+  own documentation, never from memory
+
 ## POPIA / South Africa
 
 **[P]** The system is built for South Africa: POPIA consent (`popia_consent_at`), SA ID numbers
