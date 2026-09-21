@@ -46,20 +46,8 @@ whether members' face templates leave the server**.
 The deciding fact: **on-device 1:N matching means biometric templates for every member sitting on a
 device.** That is the part to say yes or no to.
 
-## 3. 🐛 Found in code, awaiting a decision
+## 4. Stage 4 — platform boundary and gym resolution
 
-**Q-45 — `admin/payments.js` PATCH writes `refunded_amount`, a column that exists on no table.**
-Verified against `db/schema.sql`. The call **does** check its error, so **refunds fail visibly**.
-Pre-existing; never hit because no gym is live. **Deliberately not fixed** — it was outside the
-payment-removal scope. Fixing it needs either a migration adding the column, or a rewrite of the
-refund path to use existing columns.
-
-## 3. Stage 4 — platform boundary and gym resolution
-
-- **Q-02** How does the platform reach a gym — subdomain, path, routing table, API gateway, or a
-  mix? Determines QR design, mobile routing and session scoping.
-- **Q-03** Member identity: one Yoyo identity across gyms, or one per gym? Can a person belong to
-  several? `membership_number` is unique only *within* one gym database; phone numbers in neither.
 - **Q-36** Per-gym secrets store. **Load-bearing** under D-016: per-gym Supabase URLs, service keys
   and `JWT_SECRET`s cannot live in Vercel env vars (64 KB total per deployment). Where do they live,
   how are they fetched per request, how are they rotated?
@@ -70,7 +58,7 @@ refund path to use existing columns.
 - **Q-31** Does the platform owner ever need to *enter* a gym's admin panel (impersonation or
   support access)? In direct tension with "Gym 1 must not see Gym 2 data"; needs its own design.
 
-## 4. Stage 6 — owner onboarding and provisioning
+## 5. Stage 6 — owner onboarding and provisioning
 
 - **Q-09** Which documents must a gym owner submit, and who reviews them?
 - **Q-10** Approval rules, review SLA, rejection and appeal process.
@@ -84,30 +72,31 @@ refund path to use existing columns.
   automated; the cost is still open.
 - **Q-22** Does platform code live in this repository, a sibling repository, or a monorepo?
 
-## 5. Later stages
+## 6. Later stages
 
 **Commercial (Stage 7)** — **Q-04** tiers, prices, currency, billing cadence (provisional only:
 Basic ~40 / Medium ~150 / Prime ~500 active members) · **Q-06** trial period, and whether a payment
 method is required during it.
 
-**Mobile and stores (Stages 8–10)** — **Q-13** framework: extend the existing PWA, React
-Native/Expo, or Flutter? · **Q-08** are subscriptions bought in-app or on the web? · **Q-14**
+**Mobile and stores (Stages 8–10)** — **Q-08** are subscriptions bought in-app or on the web? · **Q-14**
 store rules on digital subscriptions may prohibit an external payment page — **verify from official
 docs at Stage 10, never from memory** · **Q-15** does adding Google Sign-In to iOS trigger Apple's
 Sign in with Apple requirement?
 
 **Security, privacy, legal** — **Q-16** biometric retention policy (face templates already exist as
-`jsonb` in `members`; any policy must cover data already held) · **Q-17** activate the dormant
-ArcFace service, keep the in-browser engine, or drop it? · **Q-18** jurisdictions beyond South
-Africa · **Q-19** `/api/document` authorises on membership number + verification code with no
-session — **must be re-reviewed before any cross-gym exposure** · **Q-20** RLS policies must exist
-before any Supabase client reaches a mobile app.
+`jsonb` in `members`; any policy must cover data already held, and Q-46 may put them on devices) ·
+**Q-18** jurisdictions beyond South Africa · **Q-20** RLS policies must exist before any Supabase
+client reaches a mobile app.
+
+> **Q-19 is no longer here — it was UPGRADED to a blocking pre-launch item (D-034).** Under
+> app-based routing any client can aim `/api/document` at any gym, multiplying the guessing
+> surface by the number of gyms. Must be session-bound and/or per-gym rate-limited before launch.
 
 **Unresolved and explicitly not a dependency** — **Q-41** "Telga". Appears nowhere in this
 repository; whether it is a billing entity, a brand name or a typo is unknown. Per D-024 it is
 **not** part of the architecture and nothing references it.
 
-## 6. Unknown costs and limits
+## 7. Unknown costs and limits
 
 | # | Unknown | Status |
 |---|---|---|
@@ -120,7 +109,7 @@ repository; whether it is a billing entity, a brand name or a typo is unknown. P
 | U-7 | Will gyms accept MuleSoo-owned infrastructure? | **resolved by D-014** — each gym keeps its own database |
 | U-8 | Migration cost for existing live gyms | **resolved by D-019** — none are live |
 
-## 7. ✅ Answered — see [[18 - Decision Log]] for the reasoning
+## 8. ✅ Answered — see [[18 - Decision Log]] for the reasoning
 
 | # | Question | Answer |
 |---|---|---|
@@ -128,6 +117,11 @@ repository; whether it is a billing entity, a brand name or a typo is unknown. P
 | Q-05 | Revenue model | Flat subscription from gyms only; no share of member payments (D-013) |
 | Q-07 | Gym non-payment | 2-day warning → suspend → **data retained** (D-026, D-027) |
 | Q-23 | Commit the vault to git? | Yes; app state and secrets excluded (D-009) |
+| Q-02 | How does a request reach the right gym? | **In-app** — scan the gym QR or search the gym name against the registry. **No subdomains** (D-036) |
+| Q-03 | Member identity across gyms | **Separate identity per gym** (D-041). Existing login unchanged |
+| Q-13 | Mobile framework | **One cross-platform codebase**, real store apps (D-038) |
+| Q-17 | ArcFace service | **Deploy it** (D-039) — ⚠️ see Q-46 |
+| Q-45 | Refund bug | **Refunds removed entirely** (D-037) |
 | Q-25 | Is `IdPhotoStep.jsx` dead code? | No — live, rendered for control type `face` |
 | Q-26 | What activates a member? | `activatePayment()`, then and now (D-017) |
 | Q-27 | Are `settings` keys documented? | No — free-form store; `gym_profile`, `contract_discounts`, `compliance`, now `billing_rules` |
