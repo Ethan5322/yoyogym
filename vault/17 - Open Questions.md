@@ -17,6 +17,18 @@ When one is answered it moves to [[18 - Decision Log]] and is struck from the op
 
 ---
 
+## 0. ✅ Milestone — every user-decidable question is now ANSWERED
+
+As of 2026-09-21, **63 decisions** are recorded. Nothing further is waiting on a product or business
+choice. What remains below is **investigation and verification**, not decisions:
+
+| Kind | Items |
+|---|---|
+| **Needs an external answer** | U-1 (ask Supabase), U-2, U-4, U-5, U-6 |
+| **Verify at Stage 10, never from memory** | Current store rules on subscriptions and steering (Q-14/D-060); Sign in with Apple (Q-15) |
+| **Design work inside a stage** | Q-37 connection pooling, Q-38 migration orchestration |
+| **Deliberately deferred** | Prices (D-058 — needs U-2 first) |
+
 ## 1. 🔴 Highest priority — the risk carrying the whole architecture
 
 **U-1 — maximum Supabase projects per organisation.** Undocumented by Supabase.
