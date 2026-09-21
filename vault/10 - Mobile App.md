@@ -45,6 +45,57 @@ Manual gym search · gym selection · gym QR entry · member-ID QR entry · corr
 Owner application · verification · activation · subscription selection · owner login · open the
 owner's assigned gym system.
 
+## The Telga precedent — inspected 2026-09-21 (read-only)
+
+`Desktop/Telga` is MuleSoo's other product (merchant airtime vending, Ethiopia). The user asked for
+Yoyo Gyms to work the same way. **Nothing in Telga was modified.**
+
+### How Telga actually ships a store app
+
+**Capacitor.** `apps/mobile` is a thin shell wrapping the server's own screens:
+
+> *"This project does not reimplement them, and it must not: a second implementation of a vending
+> flow is a second place for a duplicate sale to come from. What it does is package the existing app
+> as an installable Android application so it can be listed on Google Play, and give it the one
+> thing a browser tab does not have — a launcher icon, its own task in the app switcher, and an
+> update channel."* — `apps/mobile/capacitor.config.ts`
+
+Dependencies are only `@capacitor/core` + `@capacitor/android`. The web app is untouched, and its
+PWA install route still works alongside the store app.
+
+### Stated honestly: Telga is Android-only today
+
+`apps/mobile/ios` **does not exist**. Every script is `cap sync android` / `gradlew.bat`. Capacitor
+*supports* iOS, but **Telga has not proven it**. Treating iOS as demonstrated because Telga exists
+would be wrong.
+
+### Patterns worth copying
+
+| Telga pattern | Why it matters here |
+|---|---|
+| **Shell wraps the server's screens; never reimplements a flow** | The strongest argument yet for not rebuilding 23 admin routes and a 38-step chatbot natively |
+| **`shell.config.json` is the single source of truth for allowed hosts** | Capacitor's `allowNavigation` and the connect screen read one file, so they cannot drift |
+| **The merchant app deliberately CANNOT open the staff console** (`admin.telga.pro` excluded — *"different users, different auth, different threat model"*) | Maps exactly onto D-044: the member app must never reach the platform admin panel |
+| **`npm run docs:validate`** — checks the vault for broken links, orphans and frontmatter | Our vault has no such check; link rot is already a risk at 22 notes |
+| **Numbered vault folders + Graphify + a Decision Log with stable IDs** | The same second-brain shape, further along |
+| **866 tests, typecheck, launch gates** | Yoyo GYM has 49 |
+
+### What this implies for Yoyo Gyms — RECOMMENDATION, not a decision
+
+**Capacitor is very likely the right answer here, and cheaper than React Native or Flutter**, because
+the existing system is *already* a React web app and *already* an installable PWA:
+
+- **Face recognition keeps working.** `@vladmandic/face-api` runs in the webview, which is on the
+  device — so **D-042's "1:1 on-device" is satisfied with no native ML rebuild**. `jsqr` likewise.
+- No reimplementation of the admin panel, the chatbot, or the member portal.
+- One codebase, both stores, consistent with D-038.
+
+**The honest caveats:** a webview app must still satisfy store reviewers that it is more than a
+website; camera permissions and deep links need Capacitor plugins and real-device testing; and
+**iOS is unproven in Telga**, so it is new ground either way.
+
+**Q-13 is therefore narrowed but NOT closed** — Capacitor vs React Native needs the user's word.
+
 ## Framework options (Q-13 — undecided)
 
 | Option | For | Against |
