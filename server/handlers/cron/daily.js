@@ -7,8 +7,8 @@
 import { getSupabase } from '../../lib/supabase.js';
 import { allowMethods, ok } from '../../lib/http.js';
 import { authorizeCron } from '../../lib/cron.js';
-import { run as retrySuspend } from './retry-suspend.js';
-import { run as billing, runReminders as billingReminders } from './billing.js';
+import { run as suspendOverdue } from './suspend-overdue.js';
+import { runReminders as billingReminders } from './billing.js';
 import { run as expiry } from './expiry.js';
 import { run as classReminders } from './class-reminders.js';
 import { run as reengagement } from './reengagement.js';
@@ -21,9 +21,8 @@ export default async function handler(req, res) {
 
   const supabase = getSupabase();
   const jobs = [
-    ['retry_suspend', retrySuspend],
+    ['suspend_overdue', suspendOverdue],
     ['billing_reminders', billingReminders],
-    ['billing', billing],
     ['expiry', expiry],
     ['class_reminders', classReminders],
     ['reengagement', reengagement],

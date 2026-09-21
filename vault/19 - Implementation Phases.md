@@ -1,0 +1,83 @@
+---
+aliases: ["Implementation Phases", "Stages", "Build Stages"]
+tags: [process, stages, planning]
+stage: "Stages 0-3 closed"
+status: active
+updated: 2026-09-21
+---
+
+# 19 — Implementation Phases
+
+Mirrors `CLAUDE.md` §34–35, which is authoritative. This note adds the vault links.
+
+## The binding rule
+
+**One stage is open at a time.** A stage is finished when its exit criteria are met **and the user
+confirms the gate** — not when the code is written. No working ahead, no bundling stages. If a
+stage is blocked, finish everything unblocked in it and report the blocker.
+
+## Stage table
+
+| Stage | Name | Gate | Notes |
+|---|---|---|---|
+| 0 | Discovery and documentation | ✅ **CLOSED** | `CLAUDE.md` v2 approved; prior audit declared permanently absent |
+| 2 | Obsidian vault foundation | ✅ **CLOSED** | 22 notes, committed to git (D-009) |
+| 1 | **Tenancy decision** | ✅ **CLOSED — D-016** | Model C: shared app + per-gym database → [[06 - Tenant Architecture]] |
+| 3 | Platform data model | ✅ **CLOSED — D-022** | 14 tables **approved, not created** → [[12 - Database Architecture]] |
+| — | *Payment-removal slot* | 📋 **DESIGN READY** | → [[21 - Member Payment Removal Design]]. Not a numbered stage; a protected-surface change |
+| 4 | Platform boundary & gym resolution | ⬜ **READY** | `User → Role → Gym → System → Data`. Carries Q-02, Q-03, Q-36, Q-37 |
+| 5 | Main platform admin panel | Blocked by 4 | → [[05 - Main Platform Admin Panel]]. **Gate: Gym 1 cannot see Gym 2 data, proven by test** |
+| 6 | Owner onboarding & provisioning | Blocked by 5 | → [[07 - Owner Workflows]]. Also re-review `/api/document` (Q-19) |
+| 7 | Subscriptions | Blocked by 6 | → [[11 - Subscription Decisions]]. Tiers/prices from the user; nothing hard-coded |
+| 8 | Mobile app | Blocked by 1, 2(boundary) | → [[10 - Mobile App]]. Install the §2 design skill when this opens |
+| 9 | QR & deep links | Blocked by 8 | → [[09 - QR-Code Architecture]]. Verify on real devices |
+| 10 | Store compliance & release | Blocked by 9 | → [[15 - Store Compliance]]. Re-verify store rules from official docs |
+
+> **Stage order note.** Stage 2 was deliberately brought forward ahead of Stage 1 by user decision
+> (D-004 in [[18 - Decision Log]]), so the tenancy choice is made against written evidence rather
+> than recollection. Stage 1 still gates Stages 3–10.
+
+## Current status
+
+```text
+CLOSED:    Stage 0 — discovery and documentation
+           Stage 1 — TENANCY DECIDED (D-016, Model C: shared app + per-gym database)
+           Stage 2 — vault foundation (21 notes, committed to git)
+
+           Stage 3 — PLATFORM DATA MODEL APPROVED (D-022). Design only;
+                     tables NOT created, no migration exists.
+
+OPEN:      none — awaiting the user's word
+
+READY:     Stage 4 — platform boundary and gym resolution
+           Payment-removal slot — DESIGN DELIVERED in note 21, awaiting approval.
+             Sequence is load-bearing: wire activation FIRST (D-017), verify,
+             THEN remove. Reversed, every new member is stranded at 'new'.
+             NB D-021: keep server/lib/paystack.js — the platform needs it.
+
+RISKS:     U-1  max Supabase projects per org — undocumented, and D-016 + D-014 both
+                rest on it. Accepted by the user. ASK SUPABASE DIRECTLY.
+
+CARRIED:   Q-02 platform boundary · Q-03 member identity → Stage 4
+           Q-36 secrets store · Q-37 connection pooling → Stage 4
+           Q-38 migration orchestration → Stage 6 (provisioning)
+           Q-12 retention · Q-24 object storage → Stage 6
+           Q-42/43/44 payment-removal detail → payment slot
+           Q-41 Telga → UNRESOLVED, not a dependency (D-024)
+```
+
+## Gate checklist (every stage)
+
+1. Exit criteria met and demonstrated, not asserted
+2. Tests run, results reported honestly — failures stated with output
+3. [[03 - Protected Existing Functions]] confirmed not violated
+4. Decisions recorded in [[18 - Decision Log]]
+5. New unknowns added to [[17 - Open Questions]]
+6. Affected notes updated; [[20 - Change History]] appended
+7. **Stop and ask.** The user confirms the gate
+
+## Related
+
+[[00 - Project Purpose]] · [[01 - Existing Yoyo Gym Audit]] · [[04 - Yoyo Gyms Platform]] ·
+[[06 - Tenant Architecture]] · [[17 - Open Questions]] · [[18 - Decision Log]] ·
+[[20 - Change History]]

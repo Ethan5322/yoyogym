@@ -3,7 +3,7 @@ import { json } from '../../server/lib/http.js';
 import { captureError } from '../../server/lib/observability.js';
 import daily from '../../server/handlers/cron/daily.js';
 import billing from '../../server/handlers/cron/billing.js';
-import retrySuspend from '../../server/handlers/cron/retry-suspend.js';
+import suspendOverdue from '../../server/handlers/cron/suspend-overdue.js';
 import expiry from '../../server/handlers/cron/expiry.js';
 import classReminders from '../../server/handlers/cron/class-reminders.js';
 import dailySummary from '../../server/handlers/cron/daily-summary.js';
@@ -14,7 +14,7 @@ import weeklySchedule from '../../server/handlers/cron/weekly-schedule.js';
 const routes = {
   daily,
   billing,
-  'retry-suspend': retrySuspend,
+  'suspend-overdue': suspendOverdue,
   expiry,
   'class-reminders': classReminders,
   'daily-summary': dailySummary,

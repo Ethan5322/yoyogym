@@ -1,14 +1,14 @@
 // Payments & financial management (spec 4.9). Owner/Manager.
 //   GET   /api/admin/payments?status=&category=&from=&to=  list + breakdown
 //   POST  /api/admin/payments                              record manual (cash/EFT) payment
-//   PATCH /api/admin/payments?id=...                       record refund
 import { getSupabase } from '../../lib/supabase.js';
 import { allowMethods, readJsonBody, ok, badRequest, serverError } from '../../lib/http.js';
 import { requireRole } from '../../lib/auth.js';
 import { recordAudit } from '../../lib/audit.js';
+import { activateForPayment } from '../../lib/activation.js';
 
 export default async function handler(req, res) {
-  if (!allowMethods(req, res, ['GET', 'POST', 'PATCH'])) return;
+  if (!allowMethods(req, res, ['GET', 'POST'])) return;
   const admin = requireRole(req, res, ['owner', 'manager']);
   if (!admin) return;
 
@@ -19,32 +19,36 @@ export default async function handler(req, res) {
     if (req.method === 'POST') {
       const b = await readJsonBody(req);
       if (!b.amount || !b.category) return badRequest(res, 'amount and category are required.');
-      const { error } = await supabase.from('payments').insert({
-        member_id: b.member_id || null,
-        membership_id: b.membership_id || null,
-        category: b.category,
-        amount: b.amount,
-        status: 'received',
-        method: b.method || 'cash',
-        description: b.description || 'Manual payment',
-        paid_at: new Date().toISOString(),
-      });
-      if (error) return serverError(res, error.message);
-      await recordAudit(supabase, admin, { action: 'payment.manual', entity: 'payment', entity_id: b.member_id, detail: `${b.category} R${b.amount} (${b.method || 'cash'})` });
-      return ok(res, { recorded: true });
-    }
-
-    if (req.method === 'PATCH') {
-      const id = url.searchParams.get('id');
-      if (!id) return badRequest(res, 'id is required.');
-      const b = await readJsonBody(req);
-      const { error } = await supabase
+      const { data: payment, error } = await supabase
         .from('payments')
-        .update({ status: 'refunded', refunded_amount: b.refunded_amount || 0, updated_at: new Date().toISOString() })
-        .eq('id', id);
+        .insert({
+          member_id: b.member_id || null,
+          membership_id: b.membership_id || null,
+          category: b.category,
+          amount: b.amount,
+          status: 'received',
+          method: b.method || 'cash',
+          description: b.description || 'Manual payment',
+          paid_at: new Date().toISOString(),
+        })
+        .select('id, member_id, membership_id, amount, description')
+        .single();
       if (error) return serverError(res, error.message);
-      await recordAudit(supabase, admin, { action: 'payment.refund', entity: 'payment', entity_id: id, detail: `R${b.refunded_amount || 0}` });
-      return ok(res, { refunded: true });
+
+      // Recording a payment is what activates the member (spec: members pay the
+      // gym directly; capture is the activation event).
+      const { activated, error: activationError } = await activateForPayment(supabase, payment);
+
+      await recordAudit(supabase, admin, {
+        action: 'payment.manual',
+        entity: 'payment',
+        entity_id: b.member_id,
+        detail: `${b.category} R${b.amount} (${b.method || 'cash'})${activated ? ' — member activated' : ''}`,
+      });
+
+      // The payment IS recorded even if activation failed; say so plainly
+      // rather than reporting a clean success.
+      return ok(res, { recorded: true, activated, activation_error: activationError || null });
     }
 
     // GET list + breakdown

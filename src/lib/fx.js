@@ -1,6 +1,6 @@
 // Live currency conversion for DISPLAY ONLY.
 //
-// The gym charges in ZAR (Paystack is a ZAR account), but international members
+// The gym prices membership in ZAR, but international members
 // registering through MuleSoo should see the price in their own currency as a
 // guide. This module fetches ZAR→X rates from a free, no-key FX service, caches
 // them, and formats an "≈ local" hint. It never changes what is charged.

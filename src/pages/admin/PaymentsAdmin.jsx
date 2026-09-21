@@ -1,5 +1,5 @@
 // Payments & financial management (spec 4.9): list, filter, revenue breakdown,
-// manual payment recording, CSV export, refunds.
+// manual payment recording, CSV export.
 import { useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import AdminShell from '../../components/AdminShell.jsx';
@@ -59,17 +59,6 @@ export default function PaymentsAdmin() {
     } catch (e) {
       // The download ladder throws only when the browser blocked every route to
       // the file — say so rather than leaving the click looking dead.
-      toast.error(e.message);
-    }
-  }
-
-  async function refund(p) {
-    if (!confirm(`Mark ${zar(p.amount)} payment from ${p.member_name} as refunded?`)) return;
-    try {
-      await apiFetch(`/admin/payments?id=${p.id}`, { method: 'PATCH', body: { refunded_amount: p.amount } });
-      toast.success(`Refund recorded for ${p.member_name}.`);
-      load();
-    } catch (e) {
       toast.error(e.message);
     }
   }
@@ -173,7 +162,6 @@ export default function PaymentsAdmin() {
                       {p.status === 'received' && (
                         <span className="flex justify-end gap-3">
                           <button className="text-xs text-accent hover:underline" onClick={() => receipt(p)}>Receipt</button>
-                          <button className="text-xs text-error hover:underline" onClick={() => refund(p)}>Refund</button>
                         </span>
                       )}
                     </td>

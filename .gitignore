@@ -20,3 +20,15 @@ npm-debug.log*
 .idea/
 
 memory/
+
+# Obsidian second brain: the NOTES in vault/ are committed (project knowledge).
+# The app state is not — 29MB of vendored plugin code, machine-specific window
+# layout, and plugin data.json files (remotely-save holds cloud-sync credentials).
+.obsidian/
+
+# Smart Connections private embeddings index (~13MB, machine-local, regenerable)
+.smart-env/
+
+# Graphify generated output — derived from vault/ + source, regenerate with:
+#   graphify . --obsidian
+graphify-out/
