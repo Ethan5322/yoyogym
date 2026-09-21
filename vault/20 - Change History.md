@@ -15,6 +15,37 @@ occurrence is answered from notes rather than rediscovered.
 
 ---
 
+## 2026-09-21 — Platform authentication, validated against the specifications
+
+**Built** `platform/auth.js` tests-first: passwords, TOTP, recovery codes and platform sessions.
+**85 tests pass** with no environment configured.
+
+**TOTP was implemented rather than installed** (D-087), keeping the project at 10 runtime
+dependencies. The decision that made that defensible: it is **validated against RFC 6238's own
+published test vectors**, and base32 against RFC 4648's. A cryptographic routine tested only against
+itself proves nothing except that it is consistently wrong. All six RFC vectors passed on the first
+run.
+
+**The test caught a real bug the implementation had.** `otpauthUri` used `URLSearchParams`, which is
+**form-encoding** — it turns a space into `+`, and `+` is a literal plus in a URI. "Yoyo Gyms" would
+have reached the authenticator app as "Yoyo+Gyms". Rebuilt with `encodeURIComponent`.
+
+**A slow test led to a better security decision** (D-089). Hashing 10 recovery codes with bcrypt at
+cost 12 made the suite take **two minutes**. The fix was not to lower the cost but to notice that
+**bcrypt was the wrong tool**: its cost factor defends low-entropy *human-chosen* passwords, while a
+recovery code here is ~50 bits of randomness. SHA-256 with constant-time comparison is both correct
+and fast. Suite went to 22 seconds.
+
+**Lesson recorded.** *Slowness was the symptom; the wrong primitive was the cause.* The tempting fix
+— drop the bcrypt cost for tests — would have hidden the real finding and left a misapplied
+primitive in production code.
+
+**Second lesson.** The suite failed in a clean environment because the token tests needed
+`PLATFORM_JWT_SECRET`, which CI does not set. **Run the suite the way CI runs it, not the way your
+shell happens to be configured** — the failure was invisible locally.
+
+---
+
 ## 2026-09-21 — The isolation boundary exists, and was tested before it existed
 
 **Stage 4 implemented** (D-076). `server/lib/tenancy.js` resolves a gym to its own database client;
