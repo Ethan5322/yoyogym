@@ -51,6 +51,42 @@ Nothing depends on this: the graph is a retrieval aid, not a source of truth. Bu
 staleness `npm run docs:validate` (D-064) exists to prevent, and the validator does **not** cover
 `graphify-out/` — so this one needs a human to remember it.
 
+## 0c. 🔴🔴 BLOCKING — D-095 collides with D-078 and D-012
+
+**Q-49 — how does a gym get its own Supabase project, without a manual step at every onboarding?**
+
+D-095 says each gym owns its Supabase account, so the platform pays nothing. That is achievable, but
+**two earlier decisions assumed otherwise** and one of them is the growth plan:
+
+| Collides with | Why |
+|---|---|
+| **D-078** automatic provisioning on approval | You cannot create a project inside someone else's Supabase account without a credential from them |
+| **D-012** thousands of gyms in 24 months | If every gym needs a human to create an account, onboarding is manual at every single gym — the exact maths that killed the 1–2 hour runbook |
+
+**Three ways out, none chosen:**
+
+1. **Owner creates the project manually, pastes URL + service key into onboarding.** Free, simple,
+   no new risk. **Fully manual** — contradicts D-012 at scale.
+2. **Owner generates a Supabase Personal Access Token and gives it to the platform**, which then
+   provisions into *their* account automatically. **Free AND automatic.** But a PAT can create and
+   delete everything in that account: the platform would hold a credential capable of destroying a
+   customer's infrastructure. It must live in the secrets manager and should be **revoked
+   immediately after provisioning**.
+3. **Platform pays** (the design as built). Automatic, scales, ~$10/gym/month.
+
+⚠️ **Also inherited from D-095, and product-affecting: Supabase free projects PAUSE after 7 days of
+inactivity.** An active gym checks members in daily and stays awake, but a new gym in its first
+quiet week, or a seasonal one, would find its system simply stopped. **This needs a decision of its
+own**, because a paused database is indistinguishable from an outage to the gym.
+
+### What it does to the code already built
+
+**Less than it sounds, because provisioning takes its steps as injected dependencies.** Only step 1
+(`createSupabaseProject`) changes — from "create in our org" to "receive credentials" or "create in
+theirs". Steps 2–8 (schema, seed, store secret, register gym, connection, migration baseline) are
+unaffected, and `reconciliation.js` becomes less relevant since the projects are no longer in one
+organisation to list.
+
 ## 1. 🔴 Highest priority — the risk carrying the whole architecture
 
 **U-1 — maximum Supabase projects per organisation.** Undocumented by Supabase.
