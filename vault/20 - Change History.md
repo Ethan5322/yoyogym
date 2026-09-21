@@ -15,6 +15,35 @@ occurrence is answered from notes rather than rediscovered.
 
 ---
 
+## 2026-09-21 — Platform screens, where escaping is the whole security story
+
+**Built** `platform/views.js` — login, applications queue, application detail — as server-rendered
+HTML. No build step, no second Vite config, no React. **103 tests pass.**
+
+**Why server-rendered rather than React:** the no-cross-imports rule (D-081) means the platform
+cannot reuse the gym app's components, so the choice was a second Vite app or plain HTML. For an
+internal panel used by one or two people, React buys very little, and **Telga already proves the
+pattern next door**.
+
+**Five of the ten tests are XSS cases**, because these pages display text a stranger typed: gym
+names, document filenames, rejection reasons. A gym called `<script>alert(1)</script>` is not a
+hypothetical — it is the obvious thing to try on a form that a reviewer will later open.
+
+**Staff input is escaped too.** A reviewer typing a rejection reason is still a person typing into a
+box, and their text is rendered back on a page. Trusting "internal" input is how internal tools get
+compromised.
+
+**No inline event handlers anywhere**, asserted by a test, so a strict Content-Security-Policy stays
+possible later without a rewrite.
+
+**Recorded rather than built (D-092).** Reconciliation should run on a daily cron plus a button, but
+neither is wired: both need the platform deployment, which waits on the Supabase answer (D-093).
+Writing a handler against infrastructure that does not exist would have produced untested code that
+looks finished. **An orphaned project costs ~$10/month silently until something runs that job** — so
+it is a deployment task, written down, not a loose end.
+
+---
+
 ## 2026-09-21 — Application review: the Stage 5 MVP logic is complete
 
 **Built** `platform/applications.js` tests-first. **93 tests pass.** With the schema, provisioning,
