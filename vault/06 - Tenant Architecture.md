@@ -239,13 +239,19 @@ a near-untouched protected surface.
 How a request becomes a gym-scoped database client. The data model behind it is in
 [[12 - Database Architecture]] §4.4.
 
+> **Revised 2026-09-21 (D-036).** There are **no per-gym subdomains**. Each gym has a **name** and
+> its **own QR code**, and members find their gym **inside the Yoyo app** — by scanning that QR or
+> by searching the name against the platform registry. Gym identity therefore arrives as an
+> ordinary request parameter, not as a hostname. See "The rule, restated" below.
+
 ```text
 Platform user
    │  identity from a platform JWT (audience: "platform")  ─── or ───
    │  member/staff identity from a gym JWT (audience: "member" / admin)
    ▼
 Gym identifier
-   │  from the HOST (subdomain) or a SIGNED token claim — never an unverified body field
+   │  from the app: a scanned gym QR, or a gym chosen from search results
+   │  (public information — resolved, then verified; see below)
    ▼
 gyms row            lookup by slug · must be status 'active'
    │                suspended → 402/403 · unknown → 404
@@ -265,13 +271,33 @@ getSupabase()       the existing single function — returns THIS request's clie
 Existing Yoyo Gym system   all 24 tables, all ~76 handlers, UNCHANGED
 ```
 
-### The rule that keeps it safe
+### The rule, restated for app-based routing
 
-> **Gym identity must never come from client-controlled, unverified input.** It comes from the
-> request host, or from a claim inside a signature the server verified. A `gym_id` in a JSON body
-> or query string is an attacker's field, not an identifier.
+The original form of this rule said gym identity must come from the host or a signed claim. With
+D-036 there is no host to read, so the rule is restated — **weakened in form, not in effect**:
 
-This is the multi-tenant form of `CLAUDE.md` §21 — the frontend must never define gym identity.
+> **A client may NAME a gym. It may never be GRANTED anything on the strength of that name alone.**
+>
+> 1. The gym identifier is **public** — anyone can search gyms in the app. It is not a secret and
+>    does not need to be.
+> 2. The server resolves the name to a `gyms` row and that gym's own connection.
+> 3. **Authentication is then verified against that gym's own credentials.** Each gym has its own
+>    `JWT_SECRET`, so a token minted for gym A simply fails verification against gym B.
+> 4. No endpoint returns gym-scoped data on the client's claim alone.
+
+The isolation guarantee is unchanged: it never rested on hiding which gym you were asking for, it
+rests on credentials only working against their own gym's database.
+
+### ⚠️ What this genuinely costs — two consequences to design for
+
+1. **Every unauthenticated, gym-scoped endpoint becomes reachable for every gym.**
+   `/api/catalog`, `/api/content` and `/api/register` are public by design, so this is acceptable —
+   but **rate limiting must become per gym**, not global, or one gym's traffic starves another's.
+2. **`/api/document` gets materially riskier (Q-19).** It authorises on membership number +
+   verification code with no session. Under one gym that is a two-secret bearer token. Once any
+   client can aim it at **any** gym, the guessing surface multiplies by the number of gyms.
+   **This must be fixed before launch** — session-bound, rate-limited per gym, or both. Q-19 is
+   upgraded from "re-review" to a blocking pre-launch item.
 
 ### Token scoping
 

@@ -46,6 +46,33 @@ Members find theirs in the portal; staff find member/trainer QRs on each record.
 
 **No QR contains a gym identifier.** Gym identity is implicit in the domain the QR points at. **[C]**
 
+## DECIDED 2026-09-21 (D-036) — the routing model
+
+**No per-gym subdomains.** Each gym has a **name** and **its own QR code**. Entry is through the
+**Yoyo mobile app**:
+
+```text
+Member opens the Yoyo app
+   ├── scans the gym's QR code        → app resolves the gym directly
+   └── or searches the gym by name    → results come from the platform registry,
+                                         populated when the gym was approved
+        ▼
+   Gym context established in the app
+        ▼
+   The EXISTING member registration / login flow for that gym
+```
+
+**Consequences for QR design:**
+
+- The gym QR must carry a **gym identifier**, which today's codes do not (they carry only a URL on
+  one deployment's origin).
+- It must deep-link into the app when installed, and fall back to web / the store when not — so
+  **Android App Links and Apple Universal Links are now required**, not optional.
+- `scripts/generate-qr.js` hardcodes `https://yoyogym.vercel.app/` and must be reworked to emit
+  per-gym codes from the registry.
+- The gym identifier in the payload is **public** and that is acceptable (D-035) — but it must never
+  be accompanied by a verification code or any reusable secret.
+
 ## Required — future platform
 
 A gym QR must identify the gym, then route to: the app if installed → a web landing page if not →
