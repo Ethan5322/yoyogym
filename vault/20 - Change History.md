@@ -15,6 +15,37 @@ occurrence is answered from notes rather than rediscovered.
 
 ---
 
+## 2026-09-21 — Cookies brought CSRF with them
+
+**Built** `platform/http.js`: session cookies, CSRF tokens and the route guard. **115 tests pass.**
+
+**The finding worth recording.** Choosing server-rendered HTML (D-091) quietly changed the
+authentication model. The gym app holds a Bearer token in JavaScript and attaches it deliberately;
+these pages cannot, so the session lives in a cookie — and **a browser attaches cookies
+automatically to any request to the origin, including one triggered by a form on someone else's
+site.** That is CSRF, and **the gym app has never had this risk**. It arrived as a side effect of a
+decision that looked purely about rendering.
+
+**Two defences, deliberately both.** `SameSite=Strict` is the strong one and would probably suffice.
+A session-bound CSRF token is the belt to those braces: it still holds if a browser is old, or if a
+future change relaxes SameSite for some flow that needs it. **A valid session is not sufficient for
+a POST**, and a test asserts that specifically.
+
+The cookie is `HttpOnly` so XSS cannot read it, `Secure` so it never crosses plain HTTP, and scoped
+to `Path=/platform` so a gym deployment never receives a platform session even by accident.
+
+**A test failed on the stub, not the code.** The mock response lowercased header names in
+`setHeader` but not in `writeHead`, so it stored `Location` while the test read `location`. Node
+treats header names case-insensitively; the stub did not. **Fixed the stub** — a test harness that
+is less faithful than the runtime produces failures that teach nothing.
+
+**Lesson recorded.** *A rendering decision changed the security model.* Nothing in "use
+server-rendered HTML instead of React" announces "you now need CSRF protection", and it would have
+been entirely possible to ship the screens without noticing. Worth asking, after any change to how
+something is delivered: **what does this change about how it is authenticated?**
+
+---
+
 ## 2026-09-21 — Platform screens, where escaping is the whole security story
 
 **Built** `platform/views.js` — login, applications queue, application detail — as server-rendered
