@@ -326,6 +326,65 @@ Store choice is **Q-36, open**. Requirement that drives it: Vercel env vars cap 
 deployment** **[V]** — thousands of gyms cannot fit, which is precisely why the store must be
 external and fetched at runtime.
 
+## 7b. Secrets-manager comparison — RESEARCH, awaiting approval (D-067)
+
+Researched 2026-09-21 from vendor pricing pages, not from memory.
+
+### The finding that decides it: the pricing MODEL matters more than the vendor
+
+| Vendor | Billed on | Cost at 1,000 gyms | Cost at 10,000 gyms |
+|---|---|---|---|
+| **AWS Secrets Manager** | **per secret / month** ($0.40 + API calls) | **~$400/mo** | **~$4,000/mo** |
+| **Infisical** | **per identity** ($20/identity/mo Pro, annual); **secrets unlimited** | **~$60/mo flat** | **~$60/mo flat** |
+| **Doppler** | **per seat** ($21/user/mo Team); non-human identities **free** | ~$21–60/mo flat | ~$21–60/mo flat ⚠️ *see limits* |
+| **HashiCorp Vault (HCP)** | cluster-hour + per-client | not published | not published |
+
+**Per-secret pricing scales with gym count. Per-identity pricing does not.** At the target scale
+that is not a small difference — it is roughly **$60 a month against $48,000 a year**.
+
+### Why per-identity pricing stays flat here — it is the architecture, not luck
+
+Under D-016 the **shared application** fetches each gym's secrets itself. So the whole platform needs
+about **two machine identities**: the gym-serving app, and the migration orchestrator. Gym count does
+not change that.
+
+> ⚠️ **This only holds because of how we designed it.** Had each gym been given its own identity,
+> Infisical would cost **$20 per gym per month** — worse than AWS. The cheap outcome is a consequence
+> of the resolver design, and any future change that gives gyms their own identities **reopens the
+> cost question**.
+
+### Vendor notes
+
+- **Infisical** — MIT-licensed core, **free to self-host** with **no limits** on self-hosted
+  instances. Free cloud tier covers 5 identities, which may cover early operation at **$0**.
+  *Caveat:* supported/licensed self-hosting is a custom negotiation, and it is a younger project.
+- **Doppler** — clean model ("non-human identities ride free"), but **structural limits bite**:
+  Team allows 250 projects, 100 configs per environment, 500 service tokens. Thousands of gyms do not
+  map onto that without Enterprise and custom limits.
+- **AWS Secrets Manager** — most mature, strongest audit, but the cost shape is wrong and it drags
+  AWS into a stack that currently has none. Perfectly reasonable **below a few hundred gyms**.
+- **HCP Vault** — priced per cluster-hour plus per client; exact rates are **not published** and were
+  not obtainable. Heaviest operational burden of the four.
+
+### Design rule, whichever vendor is chosen
+
+**Store ONE secret per gym — a single JSON blob** (Supabase URL, service key, `JWT_SECRET`, Brevo,
+CallMeBot) rather than five separate entries. It cuts any per-secret cost by ~5×, and it makes
+rotation atomic: one write, one version, one cache eviction.
+
+### Recommendation — for approval, not adopted
+
+**Infisical.** Per-identity pricing that our architecture already keeps at ~2 identities, unlimited
+secrets, versioning, rotation and audit, and an MIT core we could self-host if cost or control ever
+demanded it — **an exit AWS does not offer**.
+
+**Start on the free tier** (5 identities) and move to Pro when a third machine identity or a second
+human is needed. Revisit only if Infisical's maturity becomes a blocker.
+
+**Still to verify before committing:** Infisical's rate limits for per-request secret fetches from
+serverless (the resolver will fetch on a cache miss, so this is on the hot path), and whether
+machine identities are billed identically to human ones on the plan chosen.
+
 ## 8. Migration-run flow
 
 ```text
