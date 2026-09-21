@@ -15,6 +15,31 @@ occurrence is answered from notes rather than rediscovered.
 
 ---
 
+## 2026-09-21 — Graph refresh attempted, deliberately not completed
+
+**Attempted** a Graphify refresh after the day's vault changes. The incremental cache worked well:
+of 48 semantic candidates, **30 were cache hits** and only **18 needed re-extraction** — exactly the
+notes that had been edited. The AST half (1,314 nodes from 221 code files) ran locally and free.
+
+**The semantic subagent hit the account session limit and died without writing its output.** Unlike
+the earlier failure that day, nothing was recovered.
+
+**The graph was deliberately NOT rebuilt.** With those 18 notes uncached and unextracted, a rebuild
+would have produced a graph *missing* them entirely — worse than one that is merely out of date.
+Partial state was cleared so the next attempt starts clean, and `manifest.json` was left untouched
+so the same 18 files are re-detected.
+
+**Lesson recorded.** *A stale artifact beats a confidently incomplete one.* The temptation was to
+rebuild with what was available and call the graph refreshed. That would have quietly dropped the
+entire vault from the knowledge graph while reporting success. **When a refresh cannot complete,
+leave the old version and say so** — the tool's own shrink-guard encodes the same rule.
+
+**Second lesson.** The same subagent failure happened twice in one session. The first time the work
+had landed on disk and only the report was lost; the second time nothing landed. **"The agent
+failed" and "the work is gone" are different claims** — check the artifact before assuming either.
+
+---
+
 ## 2026-09-21 — The vault now validates itself
 
 **Added `npm run docs:validate`** (`scripts/validate-vault.mjs`, 150 lines) and wired it into CI

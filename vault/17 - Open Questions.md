@@ -29,6 +29,28 @@ choice. What remains below is **investigation and verification**, not decisions:
 | **Design work inside a stage** | Q-37 connection pooling, Q-38 migration orchestration |
 | **Deliberately deferred** | Prices (D-058 — needs U-2 first) |
 
+## 0b. 🔧 Outstanding chore — the Graphify graph is STALE
+
+`graphify-out/graph.json` was built at **10:58 on 2026-09-21** and describes the vault as it was
+**before** that day's later work. Since then 18 notes changed and the payment removal landed.
+
+**A refresh was attempted and did not complete** — the extraction subagent hit the account session
+limit and died before writing its output. **The graph was deliberately NOT rebuilt**: with the 18
+changed notes uncached and unextracted, a rebuild would have produced a graph *missing* them, which
+is worse than one that is merely out of date. (The tool's own shrink-guard would also have refused
+the write.)
+
+**To finish it** (cheap — the cache means only 18 files need work, one subagent, not four):
+
+```bash
+# after the session limit resets
+graphify . --update      # or re-run the Step-3 flow; the manifest still lists the same 18 files
+```
+
+Nothing depends on this: the graph is a retrieval aid, not a source of truth. But it is exactly the
+staleness `npm run docs:validate` (D-064) exists to prevent, and the validator does **not** cover
+`graphify-out/` — so this one needs a human to remember it.
+
 ## 1. 🔴 Highest priority — the risk carrying the whole architecture
 
 **U-1 — maximum Supabase projects per organisation.** Undocumented by Supabase.
