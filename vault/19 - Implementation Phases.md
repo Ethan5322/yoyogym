@@ -50,12 +50,13 @@ OPEN:      Stage 3 — platform data model (DESIGN DELIVERED, awaiting gate)
 GATE:      Stage 3 closes when the user approves the proposed schema.
            Checklist: secrets-never-in-DB invariant accepted; deletion policy
            accepted; platform_plans as data accepted; no existing table touched.
-           Payment removal — unblocked by D-017/D-018/D-019, but it is a change to the
-           protected surface and needs its own approved slot; it is NOT part of Stage 3
+
+READY:     Payment removal — fully unblocked (D-017/018/019, Q-39 confirmed).
+           A protected-surface change needing its OWN approved slot; not Stage 3.
+           NB D-021: keep server/lib/paystack.js — the platform needs it (D-020).
 
 RISKS:     U-1  max Supabase projects per org — undocumented, and D-016 + D-014 both
                 rest on it. Accepted by the user. ASK SUPABASE DIRECTLY.
-           Q-39 confirm the inferred payment-removal scope before removing any code
 
 CARRIED:   Q-02 platform boundary · Q-03 member identity → Stage 4
            Q-36 secrets store · Q-37 connection pooling → Stage 4
