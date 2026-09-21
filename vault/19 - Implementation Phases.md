@@ -1,7 +1,7 @@
 ---
 aliases: ["Implementation Phases", "Stages", "Build Stages"]
 tags: [process, stages, planning]
-stage: "Stage 2"
+stage: "Stages 0-3 closed"
 status: active
 updated: 2026-09-21
 ---
@@ -20,11 +20,12 @@ stage is blocked, finish everything unblocked in it and report the blocker.
 
 | Stage | Name | Gate | Notes |
 |---|---|---|---|
-| 0 | Discovery and documentation | ✅ **CLOSED** 2026-09-21 | `CLAUDE.md` v2 approved; prior audit declared permanently absent |
-| 2 | Obsidian vault foundation | 🟡 **OPEN** | [[01 - Existing Yoyo Gym Audit]] approved; notes 00–20 created; Q-23 (git tracking) still open |
-| 1 | **Tenancy decision** | ⛔ **DEFERRED by user** | → [[06 - Tenant Architecture]]. **Gates Stages 3–10** |
-| 3 | Platform data model | Blocked by 1 | → [[12 - Database Architecture]]. Platform-side only; the 24 tables stay untouched |
-| 4 | Platform boundary & gym resolution | Blocked by 1 | `User → Role → Gym → System → Data` |
+| 0 | Discovery and documentation | ✅ **CLOSED** | `CLAUDE.md` v2 approved; prior audit declared permanently absent |
+| 2 | Obsidian vault foundation | ✅ **CLOSED** | 22 notes, committed to git (D-009) |
+| 1 | **Tenancy decision** | ✅ **CLOSED — D-016** | Model C: shared app + per-gym database → [[06 - Tenant Architecture]] |
+| 3 | Platform data model | ✅ **CLOSED — D-022** | 14 tables **approved, not created** → [[12 - Database Architecture]] |
+| — | *Payment-removal slot* | 📋 **DESIGN READY** | → [[21 - Member Payment Removal Design]]. Not a numbered stage; a protected-surface change |
+| 4 | Platform boundary & gym resolution | ⬜ **READY** | `User → Role → Gym → System → Data`. Carries Q-02, Q-03, Q-36, Q-37 |
 | 5 | Main platform admin panel | Blocked by 4 | → [[05 - Main Platform Admin Panel]]. **Gate: Gym 1 cannot see Gym 2 data, proven by test** |
 | 6 | Owner onboarding & provisioning | Blocked by 5 | → [[07 - Owner Workflows]]. Also re-review `/api/document` (Q-19) |
 | 7 | Subscriptions | Blocked by 6 | → [[11 - Subscription Decisions]]. Tiers/prices from the user; nothing hard-coded |
@@ -59,7 +60,10 @@ RISKS:     U-1  max Supabase projects per org — undocumented, and D-016 + D-01
 
 CARRIED:   Q-02 platform boundary · Q-03 member identity → Stage 4
            Q-36 secrets store · Q-37 connection pooling → Stage 4
-           Q-38 migration orchestration → Stage 3
+           Q-38 migration orchestration → Stage 6 (provisioning)
+           Q-12 retention · Q-24 object storage → Stage 6
+           Q-42/43/44 payment-removal detail → payment slot
+           Q-41 Telga → UNRESOLVED, not a dependency (D-024)
 ```
 
 ## Gate checklist (every stage)

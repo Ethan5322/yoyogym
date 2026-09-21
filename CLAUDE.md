@@ -1103,11 +1103,16 @@ STAGE 1 DECIDED (D-016, 2026-09-21) — TENANCY MODEL:
   ACCEPTED RISK: U-1, max Supabase projects per organisation, is undocumented.
   If a ceiling exists below target, D-016 and D-014 must both be reopened.
 
-CLOSED:       Stage 0, Stage 1, Stage 2
+CLOSED:       Stage 0, Stage 1, Stage 2, Stage 3
+              Stage 3 = platform data model APPROVED (D-022), 14 tables designed.
+              APPROVED IS NOT BUILT: no table exists, no migration written.
 OPEN STAGE:   none — awaiting the user's word on which opens next
-READY:        Stage 3 (platform data model); and separately the member-payment
-              removal (D-015/017/018/019), which is a protected-surface change
-              needing its own approved slot, not part of Stage 3.
+READY:        Stage 4 (platform boundary and gym resolution)
+              Payment-removal slot — design in vault/21, awaiting approval.
+              Order is load-bearing: wire activation into manual capture FIRST
+              (D-017), verify, THEN remove. Reversed, every newly registered
+              member is stranded at status 'new'.
+              D-021: server/lib/paystack.js is KEPT — platform billing needs it.
 
 --- superseded status below, retained for history ---
 OPEN STAGE:   Stage 2 — Obsidian vault foundation (audit note delivered)
