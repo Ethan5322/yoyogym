@@ -20,6 +20,7 @@ Owner applies in the Yoyo app or on the web
    │    · owner's ID or passport
    │    · proof of premises
    │    · tax clearance / VAT number
+   │  and the gym's LOCATION (coordinates) — required for app search (D-065)
    ▼
 MANUAL review by the platform owner (D-048)
    │  no published SLA. Approve · reject · request more information.

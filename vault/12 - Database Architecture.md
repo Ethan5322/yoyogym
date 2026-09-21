@@ -150,6 +150,8 @@ Roles and permissions are **data, not code** — the same rule §18 sets for sub
 | `owner_user_id` | uuid → `platform_users(id)` on delete restrict | a gym must never be orphaned |
 | `application_id` | uuid → `gym_applications(id)` on delete set null | provenance |
 | `country` / `city` / `timezone` | text | |
+| `latitude` / `longitude` | numeric | **D-065** — powers "gyms near me" in app search. Index for proximity queries; PostGIS only if simple distance proves insufficient |
+| `search_name` | text | normalised gym name for matching; `slug` is the routing key, this is the human one |
 | `activated_at` / `suspended_at` / `terminated_at` | timestamptz | **D-027: suspension never deprovisions.** The gym's Supabase project and data survive a suspension untouched; reactivation is a status change, not a re-provision |
 | `created_at` / `updated_at` | timestamptz | |
 
