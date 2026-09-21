@@ -95,9 +95,16 @@ frees one of the six Serverless Function slots.
 ### 2.4 Environment variables
 
 `PAYSTACK_SECRET_KEY`, `PAYSTACK_PUBLIC_KEY`. **Verified present and non-empty in local `.env`**
-(presence checked only — **values were not read**). Actions: remove from gym-side deployments and
-from `.env.example`'s gym section; **do not destroy the credentials** until it is known whether the
-same Paystack account will serve platform billing (Q-43).
+(presence checked only — **values were not read**).
+
+**Q-43 is now answered (D-025): the platform reuses this same Paystack account and these keys.**
+So the correct action is **move, not delete**:
+
+- Remove them from gym-side deployments and from `.env.example`'s gym-facing section.
+- **Keep the credentials.** They become the *platform's* billing keys.
+- Classify them as a **platform-level secret** — never stored in `gym_secrets` (D-022).
+- Do not revoke or rotate them during the removal; that would break platform billing before it is
+  built.
 
 ### 2.5 Tests
 

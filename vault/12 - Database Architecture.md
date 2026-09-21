@@ -150,7 +150,7 @@ Roles and permissions are **data, not code** — the same rule §18 sets for sub
 | `owner_user_id` | uuid → `platform_users(id)` on delete restrict | a gym must never be orphaned |
 | `application_id` | uuid → `gym_applications(id)` on delete set null | provenance |
 | `country` / `city` / `timezone` | text | |
-| `activated_at` / `suspended_at` / `terminated_at` | timestamptz | |
+| `activated_at` / `suspended_at` / `terminated_at` | timestamptz | **D-027: suspension never deprovisions.** The gym's Supabase project and data survive a suspension untouched; reactivation is a status change, not a re-provision |
 | `created_at` / `updated_at` | timestamptz | |
 
 ### 4.3 Onboarding
@@ -221,8 +221,8 @@ map), `price_cents` int, `currency` char(3), `billing_interval` (`month` \| `yea
 
 **`platform_subscriptions`** — `id`, `gym_id` → gyms cascade, `plan_id` → platform_plans on delete
 restrict, `status` (`trialing` \| `active` \| `past_due` \| `suspended` \| `cancelled` \| `expired`),
-`trial_ends_at`, `current_period_start`, `current_period_end`, `cancel_at`, `cancelled_at`,
-timestamps. Partial unique on `gym_id` where status in (`trialing`,`active`,`past_due`) — one live
+`trial_ends_at`, `current_period_start`, `current_period_end`, **`grace_ends_at`** (the D-026
+2-day warning window — data, never a hard-coded constant), `cancel_at`, `cancelled_at`, timestamps. Partial unique on `gym_id` where status in (`trialing`,`active`,`past_due`) — one live
 subscription per gym.
 
 **`platform_invoices`** — billing status. `id`, `gym_id` → gyms, `subscription_id` → subscriptions

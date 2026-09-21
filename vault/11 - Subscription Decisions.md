@@ -24,6 +24,32 @@ updated: 2026-09-21
 | Where limits and prices live | `platform_plans` rows — data, not code |
 | Member payments in the gym app | **Removed** (D-015/D-018); each gym runs its own plans and collects fees its own way |
 
+## Gym dunning policy — DECIDED (D-026, D-027)
+
+```text
+Gym does not subscribe, or a subscription payment fails
+        │
+        ▼
+   2-DAY WARNING          subscription status 'past_due'; gym still has access
+        │                 warning email to the gym owner
+        ▼
+   SUSPEND                gyms.status = 'suspended' → NO platform access
+        │
+        ▼
+   DATA RETAINED          the gym's Supabase project, database and every row
+                          stay exactly as they are. Nothing is deleted.
+                          Reactivation is a status change, not a re-provision.
+```
+
+**D-027 is an operational invariant, not a preference.** A billing event must never destroy member
+data. The gym remains POPIA responsible party for that data throughout suspension, and destroying it
+because an invoice went unpaid would be both a compliance failure and unrecoverable.
+
+**Schema consequence** for the approved-but-unbuilt model ([[12 - Database Architecture]] §4.5):
+`platform_subscriptions` needs a **grace-window field** — e.g. `grace_ends_at timestamptz` — so the
+2-day warning is data rather than a hard-coded constant, consistent with §18. Cheap to add now,
+since no table has been created yet.
+
 > Note the symmetry worth keeping straight: **Paystack leaves the member-facing gym app and
 > reappears on the platform side.** Same library, opposite direction of money. `paystack.js` is
 > therefore kept, not deleted (D-021).
