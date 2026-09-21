@@ -11,7 +11,42 @@ updated: 2026-09-21
 How a gym owner joins the platform. **Conceptual only — the brief calls this "not yet fully
 finalized" and nothing here is decided.** Does not exist in the repository **[M]**.
 
-## The expected sequence (from the brief, unratified)
+## ✅ The sequence — DECIDED 2026-09-21
+
+```text
+Owner applies in the Yoyo app or on the web
+   │  submits FOUR documents (D-047):
+   │    · business registration (CIPC)
+   │    · owner's ID or passport
+   │    · proof of premises
+   │    · tax clearance / VAT number
+   ▼
+MANUAL review by the platform owner (D-048)
+   │  no published SLA. Approve · reject · request more information.
+   │  Every decision is appended to application_events (never edited).
+   ▼
+APPROVED  →  gym tenant created (D-049)
+   │  Supabase project provisioned, schema loaded, secrets written to the
+   │  secrets manager (D-043), gym row created with status 'provisioning'.
+   ▼
+Owner receives a verification link + code  →  activates the account
+   │  owner_activations stores HASHES only, never the raw token or code.
+   ▼
+SUBSCRIPTION required before the gym goes live (D-049)
+   │  Paystack (D-020). gyms.status stays 'pending' until the first payment.
+   ▼
+ACTIVE  →  owner opens their own existing gym admin panel
+           and the gym becomes findable in app search (D-036)
+```
+
+**Why manual review matters more than it looks.** Under D-036, app search *is* how members find a
+gym. An unvetted listing is not just a bad customer — it is a fake gym appearing in the product's
+own discovery surface. That is the argument that settled D-048.
+
+**Documents are stored in Supabase Storage in the platform project (D-050)** — never in a gym's
+database, referenced by `application_documents.storage_ref`, served by signed URL.
+
+## The original sequence (from the brief, now superseded above)
 
 ```text
 Gym owner applies
@@ -45,14 +80,16 @@ The single-gym system already solves parts of this at gym scale **[C]**:
 
 ## Open, must not be invented
 
-| # | Question |
-|---|---|
-| Q-09 | Which documents must an owner submit? (business registration, ID, proof of premises, tax, insurance — **unknown**) |
-| Q-10 | Approval rules, review SLA, rejection and appeal process |
-| Q-11 | Is the owner identity created **before or after** subscription activation? |
-| Q-12 | Document retention period and storage — **note there is no object storage today** (Q-24) |
-| Q-06 | Trial period; is a payment method required during it? |
-| Q-08 | Are subscriptions bought in-app or on the web? → collides with Q-14 (store billing rules) |
+| # | Question | Status |
+|---|---|---|
+| Q-09 | Required documents | ✅ **all four** (D-047) |
+| Q-10 | Approval process | ✅ **manual, no SLA** (D-048) |
+| Q-11 | Order of tenant vs payment | ✅ **approve → create → pay** (D-049) |
+| Q-24 | Where documents are stored | ✅ **Supabase Storage, platform project** (D-050) |
+| **Q-12** | **How long documents are kept** | ⚠️ **STILL OPEN.** Two of the four are identity documents, so this is a POPIA obligation, not paperwork |
+| Q-10b | Rejection and appeal process | open |
+| Q-06 | Trial period; payment method required during it? | open |
+| Q-08 | Subscriptions bought in-app or on the web? → collides with Q-14 | open |
 
 ## Hard dependency
 
