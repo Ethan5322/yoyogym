@@ -60,6 +60,25 @@ target of thousands of gyms.** The user approved D-016 outright and **accepted t
 **Action: ask Supabase directly.** This is a support ticket, not something to infer. If a ceiling
 exists, D-016 and D-014 both reopen.
 
+## 1b. 💸 Open — the expensive failure mode
+
+**Q-48 — what happens to an orphaned Supabase project?** If provisioning creates the project and a
+later step fails, there is a **real project being billed monthly that the platform database knows
+nothing about**. The orchestrator reports it (`orphanedProjectRef`) and audits
+`gym.provision.failed`, but **deliberately does not delete it**: auto-deleting a database because a
+later step failed is how a transient error destroys a gym's data.
+
+So it is currently **reported and left**, which means somebody must act. Options, none chosen:
+
+1. **A reconciliation job** — list Supabase projects, compare against `gym_connections`, report any
+   project with no registry row. Safe, catches every case, needs building.
+2. **Auto-delete on failure, only when the failure happened before any data existed** (i.e. failure
+   at `applySchema` or earlier, where the project is provably empty). Narrow and safe-ish.
+3. **Retry-then-alert** — attempt the remaining steps again, and alert a human if it still fails.
+
+Until one exists, **a failed provision leaves a bill**. At ~$10/month per project it is small per
+incident and permanent if unnoticed.
+
 ## 2. ⚠️ Conflicting answers — needs the user to resolve
 
 **Q-46 — where does face matching happen?** Two answers on 2026-09-21 point opposite ways:
