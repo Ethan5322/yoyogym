@@ -15,6 +15,37 @@ occurrence is answered from notes rather than rediscovered.
 
 ---
 
+## 2026-09-21 — Application review: the Stage 5 MVP logic is complete
+
+**Built** `platform/applications.js` tests-first. **93 tests pass.** With the schema, provisioning,
+reconciliation, management client and auth already done, the MVP scope from D-079 —
+**applications and provisioning** — is now complete as logic. Only the screens remain.
+
+**The guard that matters: approving twice must not provision twice.** Approval creates a Supabase
+project billed monthly, so a double-click is a double bill. The state machine refuses any decision
+on an application that has already been decided, and a test asserts the second approval creates
+nothing.
+
+**Two defaults rather than one.** `approveApplication` defaults to a dry run *and* passes that to
+the orchestrator, which also defaults to a dry run. Belt and braces, because the consequence of
+getting it wrong is money rather than a wrong answer.
+
+**History cannot be rewritten by accident.** The module is handed `appendEvent` and no update or
+delete function, so the record of why a gym was let in or turned away is append-only *by
+construction*, not by discipline.
+
+**A test was wrong and the code was right.** The first test asserted exactly one event after
+approval; the implementation emits two — `approved` then `provisioned`. **The implementation was
+better**: they can diverge, because a correct human decision can be followed by a failed provision,
+and one combined event would lose that distinction. The test was tightened to assert the sequence
+rather than loosened to accept a single event.
+
+**Lesson recorded.** *When a test fails, the code is not automatically the thing that is wrong.*
+Both were written minutes apart by the same author; the question is which expresses the requirement
+better, not which came first.
+
+---
+
 ## 2026-09-21 — Platform authentication, validated against the specifications
 
 **Built** `platform/auth.js` tests-first: passwords, TOTP, recovery codes and platform sessions.
