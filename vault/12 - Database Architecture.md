@@ -372,7 +372,17 @@ not change that.
 CallMeBot) rather than five separate entries. It cuts any per-secret cost by ~5×, and it makes
 rotation atomic: one write, one version, one cache eviction.
 
-### Recommendation — for approval, not adopted
+### ✅ DECIDED 2026-09-21 (D-069) — Infisical, FREE TIER, no paid plan
+
+**The plan when the free tier runs out:** self-host the MIT core. Free software, but it needs a host
+and someone to run it — that is a real cost in time, not zero. **It is not a surprise bill**, which
+is the point: the ceiling is known in advance and the exit is already chosen.
+
+**The risk, stated plainly:** a vendor free tier is a load-bearing production dependency here. Free
+tiers change. The MIT self-host path is the mitigation, and is exactly why Infisical was preferred
+over AWS, which offers no such exit.
+
+### Recommendation as researched — for the record
 
 **Infisical.** Per-identity pricing that our architecture already keeps at ~2 identities, unlimited
 secrets, versioning, rotation and audit, and an MIT core we could self-host if cost or control ever
