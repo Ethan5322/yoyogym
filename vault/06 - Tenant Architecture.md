@@ -152,6 +152,75 @@ requirement that must be met first.
 | U-7 | Whether gyms will accept MuleSoo-owned infrastructure (Model B) given the current pitch **[?]** |
 | U-8 | Migration cost of moving *existing* live gyms into whichever model is chosen **[?]** |
 
+## 6b. Narrowed by the user's answers — 2026-09-21
+
+Four answers changed the shape of this decision (D-012 … D-015):
+
+| Answer | Effect on Q-01 |
+|---|---|
+| **Thousands of gyms within 24 months — a real plan** | Manual provisioning is dead. Automation via both management APIs is mandatory in every model |
+| **Each gym must have its own database** | **Model B is ruled out.** Pooling special personal information is off the table |
+| **Flat subscription from gyms only; platform never touches member money** | The Paystack-key-management dimension largely disappears from the platform design |
+| **Member payments removed from the product entirely** | See [[03 - Protected Existing Functions]] — protected-surface change, blocked on Q-34 |
+
+### The distinction that opens the door
+
+"Each gym must have its own **database**" does **not** mean "each gym must have its own
+**deployment**." Separating those two questions is what makes thousands of gyms tractable:
+
+| | Own database | Own deployment |
+|---|---|---|
+| **Model A as documented** | ✅ yes | ✅ yes — and this is what breaks |
+| **Model C (shared app, per-gym DB)** | ✅ yes | ❌ no — one app serves all gyms |
+
+Every blocker found in §3 is a **deployment**-side blocker, not a database-side one:
+
+- 150 Vercel projects per Git repo **[V]** → gone with one deployment
+- ≥2 days to roll out one fix (6,000 deploys/day) **[V]** → gone; one deploy
+- 10,000 env-var sets, each capped at 64 KB **[V]** → gone; credentials move to a secrets store
+- 10,000 monitoring targets → one application to monitor (databases still N)
+
+What stays hard under Model C: **N migrations still have to run against N databases** — that is
+inherent to physical isolation and needs an orchestrated migration runner with per-gym version
+tracking. Per-project Supabase compute cost also stays linear **[V]**.
+
+### The seam already exists — evidence from the graph
+
+The Graphify god-node analysis found `getSupabase()` with **159 edges** — the third most connected
+symbol in the codebase. Every one of the ~76 handlers reaches the database through that **single
+function** (`server/lib/supabase.js`), which today returns a module-level singleton bound to
+`process.env`.
+
+**That means gym resolution can be injected at exactly one point.** Changing `getSupabase()` from
+"singleton from env" to "resolve this request's gym → return that gym's client" leaves all 24 tables
+and all ~76 handlers untouched. It is a real change to a protected file and needs its own approved
+decision — but it is one function, not a codebase rewrite.
+
+This is the single most useful thing the knowledge graph surfaced about implementation.
+
+### Recommendation for Q-01 — offered for approval, not adopted
+
+**Model C, in the specific shape of: one shared application deployment + one Supabase project per
+gym + a gym-resolution layer injected at `getSupabase()` + a secrets store for per-gym credentials
++ an orchestrated migration runner.**
+
+It is the only option that satisfies every constraint the user has now fixed: physical data
+isolation (D-014), thousands of gyms (D-012), no Vercel repo/deploy ceilings, instant rollout, and
+a near-untouched protected surface.
+
+**What must still be validated before this becomes a decision:**
+
+1. **U-1 — maximum Supabase projects per organisation.** Undocumented. If a hard ceiling exists
+   below the target, *every* own-database model fails and D-014 has to be revisited.
+2. **U-2 — per-project compute floor × thousands.** The dominant cost, and it sets the floor price
+   of the Basic tier.
+3. Connection management: thousands of Supabase clients from one serverless app needs a pooling and
+   eviction strategy.
+4. Where per-gym secrets live, and how `JWT_SECRET` is kept per-gym.
+
+**I am not choosing this.** Q-01 is the user's decision and must be recorded in
+[[18 - Decision Log]].
+
 ## 7. What the evidence supports — and what it does not
 
 **No model is chosen.** What the evidence does support, stated plainly:

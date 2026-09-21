@@ -66,6 +66,37 @@ When one is answered, move it to [[18 - Decision Log]] with its rationale.
   **untracked** — so project knowledge is local-only until this is answered.
 - **Q-24** Object storage strategy for photos, documents and biometric templates.
 
+## ⚠️ Blocking implementation — opened 2026-09-21
+
+- **Q-34 — the activation gap.** If member payments are removed (D-015), **what activates a new
+  member?** Verified: `activatePayment()` is called only from the two Paystack handlers, and
+  recording a manual cash/EFT payment does **not** activate anyone. A newly registered member would
+  be stranded at `status:'new'`. Options (none chosen): make manual payment capture activate;
+  add an explicit "Activate member" action; or auto-activate on registration and let gyms suspend
+  non-payers. **No payment code may be removed until this is answered.**
+  → [[03 - Protected Existing Functions]]
+- **Q-35 — scope of the payment removal.** Remove the Paystack/online path only, or also the
+  `payments` table, manual capture, AR aging, dunning and receipts? Recommendation: **remove online
+  payment, keep payment tracking** — the membership lifecycle depends on it. Needs confirmation.
+- **Q-36 — per-gym secrets store.** Under any shared-application model, per-gym Supabase URLs,
+  service keys and `JWT_SECRET`s cannot live in Vercel env vars (64 KB total per deployment **[V]**).
+  Where do they live, and how are they rotated?
+- **Q-37 — connection management.** Thousands of Supabase clients from one serverless application
+  needs a pooling and eviction strategy. Unsolved.
+
+## ✅ Answered 2026-09-21 — moved to the decision log
+
+| # | Question | Answer |
+|---|---|---|
+| Q-32 | Is ~10,000 a real plan? | **Real — thousands within 24 months** (D-012). Manual provisioning is therefore dead; automation is mandatory |
+| Q-33 | Keep the gym-owned posture? | **Platform bills gyms only and never touches member money**; each gym's data stays in **its own database** (D-013, D-014) |
+| Q-05 | Revenue model | **Flat subscription from gyms only** (D-013). No share of member payments |
+| — | Member payments | **Removed from the product** (D-015) — blocked on Q-34/Q-35 |
+| Q-23 | Commit vault to git? | **Yes** (D-009) |
+
+**Q-01 is now narrowed**: Model B is ruled out by D-014. See [[06 - Tenant Architecture]] §6b for
+the recommendation awaiting approval.
+
 ## Unknown costs and limits — opened 2026-09-21 (Stage 1)
 
 Vendor limits that must be confirmed, never guessed. Full context in [[06 - Tenant Architecture]] §6.

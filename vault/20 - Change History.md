@@ -15,6 +15,36 @@ occurrence is answered from notes rather than rediscovered.
 
 ---
 
+## 2026-09-21 — Four decisions, and a gap caught before implementation
+
+**User answered the blocking questions** (D-012 … D-015): thousands of gyms in 24 months is a
+**real plan**; the platform takes a **flat subscription from gyms only** and never touches member
+money; **each gym must have its own database**; and **member payments are removed from the product
+entirely**.
+
+**Model B is ruled out** by the own-database requirement. Q-01 narrowed to A vs C, with a
+recommendation recorded in [[06 - Tenant Architecture]] §6b.
+
+**The gap caught.** Before writing up the payment removal, a check of the actual code found that
+`admin/payments.js` POST — "record manual (cash/EFT) payment" — inserts a `payments` row and
+**never touches `members.status` or `memberships.state`**. `activatePayment()` is called from
+exactly two places, both Paystack. **So removing Paystack removes the only automatic path from
+`status:'new'` to `active`, and a newly registered member would be stranded forever.** Logged as
+Q-34, blocking any payment-code removal.
+
+**Lesson recorded.** The decision "remove member payments" sounds like a deletion. It is actually a
+change to the *membership lifecycle*, because activation was coupled to payment. **Ask what a
+removal was silently holding up before removing it** — the failure protocol working as intended,
+one stage earlier than usual.
+
+**Second insight, from the graph.** The god-node analysis put `getSupabase()` at 159 edges: every
+one of ~76 handlers reaches the database through that one function. Gym resolution can therefore be
+injected at a **single point**, leaving all 24 tables and every handler untouched. That is what
+makes a shared-application / per-gym-database model tractable, and it is the most useful
+implementation fact Graphify surfaced.
+
+---
+
 ## 2026-09-21 — Git commit, Graphify, Stage 1 comparison
 
 **Committed.** `vault/`, `CLAUDE.md` and `.gitignore` on branch `docs/yoyo-gyms-second-brain`
