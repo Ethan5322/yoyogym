@@ -60,7 +60,7 @@ target of thousands of gyms.** The user approved D-016 outright and **accepted t
 **Action: ask Supabase directly.** This is a support ticket, not something to infer. If a ceiling
 exists, D-016 and D-014 both reopen.
 
-## 1b. 💸 Open — the expensive failure mode
+## 1b. ✅ Resolved — the expensive failure mode (D-085)
 
 **Q-48 — what happens to an orphaned Supabase project?** If provisioning creates the project and a
 later step fails, there is a **real project being billed monthly that the platform database knows
@@ -68,16 +68,14 @@ nothing about**. The orchestrator reports it (`orphanedProjectRef`) and audits
 `gym.provision.failed`, but **deliberately does not delete it**: auto-deleting a database because a
 later step failed is how a transient error destroys a gym's data.
 
-So it is currently **reported and left**, which means somebody must act. Options, none chosen:
+**Answered: option 1, a reconciliation job** (D-085, built). It compares the real Supabase estate
+against the registry in both directions, reports orphans and dangling rows with an estimated monthly
+waste figure, audits the findings, and **is never given a delete function** so it cannot destroy a
+gym's database. Removal stays a human decision, and `deleteProject()` itself refuses unless the
+caller states the action is permanent.
 
-1. **A reconciliation job** — list Supabase projects, compare against `gym_connections`, report any
-   project with no registry row. Safe, catches every case, needs building.
-2. **Auto-delete on failure, only when the failure happened before any data existed** (i.e. failure
-   at `applySchema` or earlier, where the project is provably empty). Narrow and safe-ish.
-3. **Retry-then-alert** — attempt the remaining steps again, and alert a human if it still fails.
-
-Until one exists, **a failed provision leaves a bill**. At ~$10/month per project it is small per
-incident and permanent if unnoticed.
+**Still to schedule:** nothing runs this yet. It needs a cron entry or a button in the platform
+panel — carried into Stage 5.
 
 ## 2. ⚠️ Conflicting answers — needs the user to resolve
 
