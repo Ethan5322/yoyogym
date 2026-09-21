@@ -1096,6 +1096,20 @@ decision exists to be recorded.
 ## 35. Stage status
 
 ```text
+STAGE 1 DECIDED (D-016, 2026-09-21) — TENANCY MODEL:
+  One shared application deployment + one Supabase project per gym.
+  Gym resolution injected at getSupabase(). Per-gym secrets store.
+  Orchestrated migration runner. Each gym's data stays physically separate.
+  ACCEPTED RISK: U-1, max Supabase projects per organisation, is undocumented.
+  If a ceiling exists below target, D-016 and D-014 must both be reopened.
+
+CLOSED:       Stage 0, Stage 1, Stage 2
+OPEN STAGE:   none — awaiting the user's word on which opens next
+READY:        Stage 3 (platform data model); and separately the member-payment
+              removal (D-015/017/018/019), which is a protected-surface change
+              needing its own approved slot, not part of Stage 3.
+
+--- superseded status below, retained for history ---
 OPEN STAGE:   Stage 2 — Obsidian vault foundation (audit note delivered)
 CLOSED:       Stage 0 — Discovery and documentation
               · this file approved as written (user, 2026-09-21)

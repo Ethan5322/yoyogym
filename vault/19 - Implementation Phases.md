@@ -39,11 +39,23 @@ stage is blocked, finish everything unblocked in it and report the blocker.
 ## Current status
 
 ```text
-OPEN:      Stage 2 — vault foundation (notes 00-20 created)
-CLOSED:    Stage 0
-DEFERRED:  Stage 1 — tenancy (user instruction)
-BLOCKERS:  Q-01 tenancy · Q-02 boundary · Q-03 member identity
-NEXT:      Evaluate tenancy options, then open Stage 1
+CLOSED:    Stage 0 — discovery and documentation
+           Stage 1 — TENANCY DECIDED (D-016, Model C: shared app + per-gym database)
+           Stage 2 — vault foundation (21 notes, committed to git)
+
+OPEN:      none — awaiting the user's word on which stage opens next
+
+READY:     Stage 3 — platform data model (unblocked by D-016)
+           Payment removal — unblocked by D-017/D-018/D-019, but it is a change to the
+           protected surface and needs its own approved slot; it is NOT part of Stage 3
+
+RISKS:     U-1  max Supabase projects per org — undocumented, and D-016 + D-014 both
+                rest on it. Accepted by the user. ASK SUPABASE DIRECTLY.
+           Q-39 confirm the inferred payment-removal scope before removing any code
+
+CARRIED:   Q-02 platform boundary · Q-03 member identity → Stage 4
+           Q-36 secrets store · Q-37 connection pooling → Stage 4
+           Q-38 migration orchestration → Stage 3
 ```
 
 ## Gate checklist (every stage)

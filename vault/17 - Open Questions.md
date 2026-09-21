@@ -66,23 +66,35 @@ When one is answered, move it to [[18 - Decision Log]] with its rationale.
   **untracked** — so project knowledge is local-only until this is answered.
 - **Q-24** Object storage strategy for photos, documents and biometric templates.
 
+## 🔴 Highest priority — the one risk carrying the whole architecture
+
+- **U-1 — maximum Supabase projects per organisation.** Undocumented. **D-016 (the tenancy
+  decision) and D-014 (database per gym) both rest on there being no ceiling below the target.**
+  The user approved outright and accepted this risk. **Action: ask Supabase directly.** If a
+  ceiling exists, both decisions must be reopened.
+
 ## ⚠️ Blocking implementation — opened 2026-09-21
 
-- **Q-34 — the activation gap.** If member payments are removed (D-015), **what activates a new
-  member?** Verified: `activatePayment()` is called only from the two Paystack handlers, and
-  recording a manual cash/EFT payment does **not** activate anyone. A newly registered member would
-  be stranded at `status:'new'`. Options (none chosen): make manual payment capture activate;
-  add an explicit "Activate member" action; or auto-activate on registration and let gyms suspend
-  non-payers. **No payment code may be removed until this is answered.**
-  → [[03 - Protected Existing Functions]]
-- **Q-35 — scope of the payment removal.** Remove the Paystack/online path only, or also the
-  `payments` table, manual capture, AR aging, dunning and receipts? Recommendation: **remove online
-  payment, keep payment tracking** — the membership lifecycle depends on it. Needs confirmation.
-- **Q-36 — per-gym secrets store.** Under any shared-application model, per-gym Supabase URLs,
-  service keys and `JWT_SECRET`s cannot live in Vercel env vars (64 KB total per deployment **[V]**).
-  Where do they live, and how are they rotated?
+- **Q-36 — per-gym secrets store.** Now **load-bearing** under D-016: per-gym Supabase URLs, service
+  keys and `JWT_SECRET`s cannot live in Vercel env vars (64 KB total per deployment **[V]**). Where
+  do they live, how are they fetched per request, and how are they rotated? Stage 4 work.
 - **Q-37 — connection management.** Thousands of Supabase clients from one serverless application
-  needs a pooling and eviction strategy. Unsolved.
+  needs a pooling and eviction strategy. Now load-bearing under D-016. Stage 4 work.
+- **Q-38 — migration orchestration.** N databases means N migration runs with per-gym schema-version
+  tracking, partial-failure handling and a central view of who is on which version. Stage 3 work.
+- **Q-39 — confirm D-018.** The payment-removal *scope* was inferred from *"allow each gym to make
+  its own plan, I am not responsible for each gym plans and things related"*. Read as: remove the
+  online card path, **keep** payment tracking and the per-gym plan catalog. **Confirm before any
+  code is removed.**
+
+## ✅ Answered 2026-09-21 (second round)
+
+| # | Question | Answer |
+|---|---|---|
+| **Q-01** | Tenancy model | **DECIDED — Model C** (D-016). Shared app, per-gym database, resolution at `getSupabase()` |
+| Q-34 | What activates a member without Paystack? | **Manual cash/EFT capture activates them** (D-017), mirroring `activatePayment()` minus Paystack |
+| Q-35 | Scope of payment removal | Online card path out, tracking stays (D-018) — *inferred, see Q-39* |
+| — | Any gym live in production? | **No** (D-019). Clean deletion; no flag, no cutover, no migration |
 
 ## ✅ Answered 2026-09-21 — moved to the decision log
 

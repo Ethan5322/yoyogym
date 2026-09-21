@@ -1,15 +1,28 @@
 ---
 aliases: ["Tenant Architecture", "Tenancy", "Tenancy Comparison"]
-tags: [architecture, tenancy, blocking, stage-1]
-stage: "Stage 1 (documentation only)"
-status: undecided
+tags: [architecture, tenancy, decided, stage-1]
+stage: "Stage 1 — CLOSED"
+status: decided
+decision: "Model C — shared application, per-gym database"
 updated: 2026-09-21
 ---
 
 # 06 — Tenant Architecture
 
-**The blocking decision (Q-01).** This note is the Stage 1 *comparison*. **No model is chosen here.**
-The choice is the user's and must be recorded in [[18 - Decision Log]] before any Stage 3–10 work.
+> ## ✅ DECIDED 2026-09-21 — D-016
+>
+> **Model C: one shared application deployment + one Supabase project per gym + gym resolution
+> injected at `getSupabase()` + a per-gym secrets store + an orchestrated migration runner.**
+>
+> Each gym's data stays physically separate (D-014). The application is deployed once.
+>
+> **Accepted risk:** approved outright rather than pending **U-1** — the maximum number of Supabase
+> projects per organisation is still undocumented. **If a ceiling exists below the target, this
+> decision and D-014 must both be revisited.** Confirm with Supabase directly.
+>
+> The comparison below is retained as the reasoning behind the decision. Do not read §7 as open.
+
+**Q-01 is closed.** The comparison that produced it follows.
 
 Markers: **[C]** confirmed in repository · **[V]** verified from official vendor docs 2026-09-21 ·
 **[?]** unknown — must not be invented.

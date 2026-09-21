@@ -15,6 +15,32 @@ occurrence is answered from notes rather than rediscovered.
 
 ---
 
+## 2026-09-21 — Stage 1 CLOSED: the tenancy model is decided
+
+**D-016.** Model C approved: **one shared application deployment + one Supabase project per gym**,
+with gym resolution injected at `getSupabase()`, a per-gym secrets store and an orchestrated
+migration runner. Stages 0, 1 and 2 are now closed. Stage 3 is unblocked.
+
+**Also decided:** manual cash/EFT capture will activate the member (D-017, closing the Q-34 gap);
+the online card path goes but payment tracking stays (D-018, *inferred* — see Q-39); and **no gym
+is live yet** (D-019), so the payment removal is a clean deletion with no flag, no cutover and no
+in-flight-transaction migration.
+
+**The risk that was accepted, not resolved.** The user approved D-016 outright rather than pending
+**U-1** — the maximum number of Supabase projects per organisation, which Supabase does not
+document. **Both D-016 and D-014 rest on there being no ceiling below the target.** This is now the
+single highest-priority open item and should be settled by asking Supabase directly, not by
+inference. Recorded so that if the architecture is ever revisited, the reason is findable.
+
+**Lesson recorded.** Two of the four answers in this round were free text that did not match any
+offered option, and one of them (Q-35) had to be *interpreted* to be actionable. The interpretation
+was written into D-018 **labelled as an inference**, with a confirmation question (Q-39) rather than
+being quietly adopted as fact. **When a decision is inferred rather than stated, say so in the
+record and ask** — an unmarked inference in a decision log is indistinguishable from a decision the
+next time someone reads it.
+
+---
+
 ## 2026-09-21 — Four decisions, and a gap caught before implementation
 
 **User answered the blocking questions** (D-012 … D-015): thousands of gyms in 24 months is a
