@@ -479,9 +479,12 @@ The owner side must eventually support:
 
 Do not build the mobile app until the tenancy and platform-boundary decisions are completed.
 
-Note: the existing web app is already an installable PWA (`public/manifest.webmanifest`,
-`public/sw.js`) **[verified]**. Whether the mobile app extends this or is a separate native/RN
-codebase is **[undecided]** and belongs to Stage 8.
+**DECIDED 2026-09-21 (D-038):** the app is **one cross-platform codebase shipped as real store
+apps** on Android and iPhone — not a PWA, and not two separate native codebases. The existing PWA
+(`public/manifest.webmanifest`, `public/sw.js`) **[verified]**) stays as the gym's own web surface.
+
+**DECIDED 2026-09-21 (D-036):** entry is **in-app** — scan the gym's QR or search the gym name
+against the platform registry. **No per-gym subdomains.**
 
 ## 16. Future main Yoyo platform admin panel
 

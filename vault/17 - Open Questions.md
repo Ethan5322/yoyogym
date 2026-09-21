@@ -26,7 +26,27 @@ target of thousands of gyms.** The user approved D-016 outright and **accepted t
 **Action: ask Supabase directly.** This is a support ticket, not something to infer. If a ceiling
 exists, D-016 and D-014 both reopen.
 
-## 2. 🐛 Found in code, awaiting a decision
+## 2. ⚠️ Conflicting answers — needs the user to resolve
+
+**Q-46 — where does face matching happen?** Two answers on 2026-09-21 point opposite ways:
+
+- *"Rebuild face matching natively on-device"*
+- *"Deploy ArcFace — the app needs **server-side** matching"* (D-039)
+
+They are not the same design, and the difference is not only engineering effort — **it decides
+whether members' face templates leave the server**.
+
+**Proposed reconciliation (NOT adopted — needs approval).** Split by what is being matched:
+
+| Use | Match | Why |
+|---|---|---|
+| **Member face sign-in** (1:1 — is this *their* face?) | **On-device**, or better, the phone's own biometric unlock guarding a stored credential | Only ever touches that one member's own face. Matches `CLAUDE.md` §20: *"use device biometrics to unlock a secure credential instead of uploading raw face data."* |
+| **Door / turnstile scanner** (1:N — who is this, out of every member?) | **Server-side ArcFace** | 1:N matching on-device would require **shipping the gym's entire member face gallery to a phone**. That is a serious POPIA exposure of special personal information and should not be done |
+
+The deciding fact: **on-device 1:N matching means biometric templates for every member sitting on a
+device.** That is the part to say yes or no to.
+
+## 3. 🐛 Found in code, awaiting a decision
 
 **Q-45 — `admin/payments.js` PATCH writes `refunded_amount`, a column that exists on no table.**
 Verified against `db/schema.sql`. The call **does** check its error, so **refunds fail visibly**.
