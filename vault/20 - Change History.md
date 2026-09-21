@@ -15,6 +15,43 @@ occurrence is answered from notes rather than rediscovered.
 
 ---
 
+## 2026-09-21 — Stage 3 CLOSED; payment-removal design delivered
+
+**D-022.** The platform data model is **approved** with twelve binding conditions. Note 12 is marked
+approved-but-not-built: **no table exists and no migration has been written.**
+
+**Payment-removal design** written to [[21 - Member Payment Removal Design]] (D-023 extends the §28
+vault structure by one note). Inventory from `grep`, not recall: **21 files** reference Paystack —
+6 to delete, 9 to change, the rest untouched. **No existing test touches payments**, so the change
+currently has zero coverage and six new tests are specified.
+
+**Three findings that changed the design, each from reading the code rather than assuming:**
+
+1. **The no-payment path already exists.** `Register.jsx:55-62` already routes *staff* registrations
+   straight to the success screen, taking payment offline. The removal is largely "make every
+   registration take the branch that already works" — a much smaller, safer change than it sounded.
+2. **`billing.js` must be split, not deleted.** It exports two functions. `run()` charges via
+   Paystack; **`runReminders()` touches no Paystack at all** — it reads `next_billing_date` and
+   emails members three days ahead. Deleting the file to remove Paystack would have silently killed
+   billing reminders for gyms collecting cash.
+3. **`retry-suspend.js` couples Paystack retry with overdue suspension.** Suspension is valuable to
+   a cash-collecting gym and arguably inside the preserved "arrears" scope. Opened as Q-42 rather
+   than decided.
+
+**The sequence is the safety property.** Activation must be wired into manual capture and verified
+*before* anything is removed. Reversed, every newly registered member is stranded at `status:'new'`
+with nothing able to activate them. Written into the note as step 1 of 6.
+
+**Lesson recorded.** "Delete the Paystack files" would have been a defensible reading of the
+instruction and would have broken two unrelated things — billing reminders and overdue suspension —
+because **a file named after one job was doing two.** Enumerate a file's exports before deleting it
+for its name.
+
+**Q-41 (Telga) closed as out of scope by instruction** (D-024): unresolved, and explicitly **not a
+confirmed dependency**. Nothing in the architecture references it.
+
+---
+
 ## 2026-09-21 — Stage 3 opened: platform data model designed
 
 **Delivered.** 14 platform tables proposed in [[12 - Database Architecture]] §4, in a **separate

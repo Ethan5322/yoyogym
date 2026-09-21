@@ -43,17 +43,16 @@ CLOSED:    Stage 0 — discovery and documentation
            Stage 1 — TENANCY DECIDED (D-016, Model C: shared app + per-gym database)
            Stage 2 — vault foundation (21 notes, committed to git)
 
-OPEN:      Stage 3 — platform data model (DESIGN DELIVERED, awaiting gate)
-           14 platform tables proposed in note 12. No migration, no SQL,
-           no change to the existing 24 tables.
+           Stage 3 — PLATFORM DATA MODEL APPROVED (D-022). Design only;
+                     tables NOT created, no migration exists.
 
-GATE:      Stage 3 closes when the user approves the proposed schema.
-           Checklist: secrets-never-in-DB invariant accepted; deletion policy
-           accepted; platform_plans as data accepted; no existing table touched.
+OPEN:      none — awaiting the user's word
 
-READY:     Payment removal — fully unblocked (D-017/018/019, Q-39 confirmed).
-           A protected-surface change needing its OWN approved slot; not Stage 3.
-           NB D-021: keep server/lib/paystack.js — the platform needs it (D-020).
+READY:     Stage 4 — platform boundary and gym resolution
+           Payment-removal slot — DESIGN DELIVERED in note 21, awaiting approval.
+             Sequence is load-bearing: wire activation FIRST (D-017), verify,
+             THEN remove. Reversed, every new member is stranded at 'new'.
+             NB D-021: keep server/lib/paystack.js — the platform needs it.
 
 RISKS:     U-1  max Supabase projects per org — undocumented, and D-016 + D-014 both
                 rest on it. Accepted by the user. ASK SUPABASE DIRECTLY.

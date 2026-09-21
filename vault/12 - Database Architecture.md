@@ -1,8 +1,8 @@
 ---
 aliases: ["Database Architecture", "Database Design", "Platform Data Model"]
 tags: [database, architecture, stage-3, proposed]
-stage: "Stage 3 — design"
-status: "existing = confirmed · platform = PROPOSED, awaiting gate"
+stage: "Stage 3 — CLOSED"
+status: "existing = confirmed · platform = APPROVED (D-022), not yet built"
 updated: 2026-09-21
 ---
 
@@ -11,9 +11,11 @@ updated: 2026-09-21
 > **Two halves, two statuses.**
 > §1–§3 describe the **existing single-gym database** — confirmed, unchanged, **not modified by
 > Stage 3**.
-> §4 onward is the **proposed platform data model** — a Stage 3 *design*. **Nothing here is
-> approved, no migration exists, no SQL has been run.** It becomes real only when the user passes
-> the Stage 3 gate and it is recorded in [[18 - Decision Log]].
+> §4 onward is the **approved platform data model** — ✅ **Stage 3 gate closed 2026-09-21 (D-022)**.
+> The design is approved; **the tables are NOT created. No migration exists and no SQL has been
+> run.** Building them is later-stage work. The approved conditions in D-022 are binding on every
+> implementation: no member data in the platform schema, `gym_secrets` holds references only,
+> resolution fails closed, no default-gym fallback, platform and gym roles stay separate.
 
 ---
 
