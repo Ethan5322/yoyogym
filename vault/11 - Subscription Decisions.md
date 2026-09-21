@@ -88,6 +88,61 @@ since no table has been created yet.
 Subscriptions here mean **gyms paying the platform** — not members paying gyms, which already
 exists and works ([[01 - Existing Yoyo Gym Audit]] §11).
 
+## U-2 ANSWERED — what a gym actually costs you (researched 2026-09-21)
+
+From [Supabase pricing](https://supabase.com/pricing) and their
+[billing FAQ](https://supabase.com/docs/guides/platform/billing-faq), not from memory.
+
+### The floor
+
+| Item | Cost |
+|---|---|
+| Pro plan, per **organisation** | **$25/month** |
+| Compute credit included | **$10/month** — covers exactly **one** Micro project |
+| **Every additional project** | **~$10/month minimum** (Micro: 1 GB RAM, shared) |
+| Pro/Team projects auto-pausing | **Never.** Only Free-plan projects pause after a week idle |
+
+> ### 💰 **The number that matters: a gym costs you ~$10/month in database hosting alone, forever.**
+> That is the floor, before Vercel, email, support, or any profit — and before a gym's own usage
+> pushes it off Micro.
+
+### What that means at each scale
+
+| Gyms | Supabase per month | Per year |
+|---|---|---|
+| 100 | **~$1,015** | ~$12,000 |
+| 1,000 | **~$10,000** | ~$120,000 |
+| 10,000 | **~$100,000** | **~$1,200,000** |
+
+*(≈ $25 + gyms × $10 − $10 credit. At roughly R19/USD — an assumption that moves, not a fact.)*
+
+### Three consequences that change decisions
+
+**1. This prices the isolation decision.** D-014 (a database per gym) was made on privacy and POPIA
+grounds and remains right for those reasons — but it is **not free**, and this is its invoice.
+Pooling would have amortised it. That was the trade, now with a number on it.
+
+**2. The Basic tier must clear ~$10/month just to break even on hosting.** At ~R19/USD that is about
+**R190/month of pure cost** for a 40-member gym, before Vercel, Brevo, support or margin. Any Basic
+price near R200 is break-even at best. **This is the constraint D-058 was waiting for.**
+
+**3. The 30-day trial (D-070) costs ~$10 per trialling gym, and the full exposure is ~$40.**
+30 days trial + 90 days suspended (D-071) = **up to 120 days × $10 = ~$40 of hosting for a gym that
+never pays a cent.** At a 30% trial-to-paid rate, roughly **$93 of wasted trial cost is carried by
+every gym that does convert**. A 14-day trial would have halved the first part.
+
+> **Not a recommendation to change D-070 — the user chose 30 days knowing it doubled the carry.**
+> It is the number that choice implies, recorded so it can be revisited with evidence if conversion
+> comes in low.
+
+### What could reduce it — unverified, do not assume
+
+- **Supabase may offer partner or volume terms** at thousands of projects (U-4). **Ask them in the
+  same conversation as U-1** — the project-cap question is already going to them.
+- Deprovisioning abandoned trials **promptly** (D-071) is the single biggest lever fully in your
+  control.
+- Nothing else in the stack comes close to this line item.
+
 ## Provisional tiers (user discussion, unratified)
 
 | Tier | Active members | Locations | Feature set |
