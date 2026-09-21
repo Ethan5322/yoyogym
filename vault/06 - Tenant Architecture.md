@@ -319,6 +319,109 @@ explicitly rather than only by signature failure.
 The last row matters most: a "default gym" fallback anywhere in this chain is a cross-tenant data
 leak waiting to happen.
 
+## 6d. Stage 4 design — platform boundary and gym resolution
+
+**Design only.** No code written. `getSupabase()` is in the protected surface (`CLAUDE.md` §32), so
+the change in §6d.6 needs its own approved decision before implementation.
+
+### 6d.1 Q-37 reframed — there is no connection pool to exhaust
+
+**Verified 2026-09-21:** `@supabase/supabase-js` depends on `@supabase/postgrest-js` and carries
+**no `pg` or TCP driver**. It speaks **HTTPS to PostgREST**. A "client" is a small object holding a
+URL and a key; `.from()` issues an HTTP request.
+
+**So Q-37 was the wrong worry.** Thousands of clients in one process are thousands of small objects,
+not thousands of database connections. Postgres connection limits are handled **server-side per
+project**, by that gym's own PostgREST — which scales naturally, because each gym has its own.
+
+> **The real hot-path cost is the SECRET FETCH, not the connection.** Creating a client is free.
+> Fetching that gym's credentials from Infisical is a network round trip, and on a cold start every
+> cache is empty.
+
+### 6d.2 The three caches, and what each is worth
+
+| Cache | Holds | Lifetime | Why |
+|---|---|---|---|
+| **Registry** | `slug → gyms + gym_connections` row | 60s TTL | Cheap DB read; short TTL so suspension takes effect fast |
+| **Secret** | gym's credential blob from Infisical | 5–15 min TTL, **memory only** | The expensive one. **Never logged, never serialised, never written to disk** |
+| **Client** | the `supabase-js` object | while its secret is cached | Free to rebuild; exists only to avoid re-reading the secret |
+
+Bounded **LRU with eviction** on the secret and client caches — not to protect connections, but to
+bound memory and limit how long any credential lives in a process.
+
+**Any change to a gym's connection or secrets must evict all three** for that gym. A stale client
+pointing at rotated credentials fails closed (401), which is safe — but a stale *registry* entry
+could serve a gym that was just suspended, which is not. Hence the short registry TTL.
+
+### 6d.3 Serverless reality — state this honestly
+
+Vercel functions are ephemeral. A warm instance reuses its caches; **a cold start has none**. So:
+
+- Steady state: registry + secret cached, requests are one HTTP call to that gym's PostgREST.
+- Cold start: one registry read + one Infisical fetch, then normal.
+- **Infisical's rate limits are therefore on the hot path.** Unverified, and listed in §7b as a
+  pre-commitment check. If they are tight, the fallback is a short-lived signed cache in the
+  platform database — **encrypted, never plaintext**, and never in `gym_secrets` (D-022).
+
+### 6d.4 Resolution, in full
+
+```text
+1. Identify the gym          from a scanned QR, or a gym chosen from search (D-036).
+                             PUBLIC information. The client NAMES the gym (D-035).
+2. Registry lookup           gyms by slug → must be status 'active'
+                                unknown → 404 · suspended → 403 · trial expired → 402
+3. Connection                gym_connections where status 'healthy'
+                                unreachable/degraded → 503
+4. Secrets                   gym_secrets.secret_ref → fetch blob from Infisical (D-069)
+                                fetch fails → 503. NEVER a fallback to another gym
+5. Client                    build/reuse supabase-js for THAT project
+6. getSupabase()             existing handlers receive this request's client
+7. Authenticate              verify the caller's token against THAT gym's JWT_SECRET
+                                a token from another gym fails signature verification
+8. Existing system           24 tables, ~76 handlers, UNCHANGED
+```
+
+**Steps 1–2 grant nothing.** Naming a gym gets you as far as that gym's public catalog. Everything
+member- or staff-scoped is gated at step 7, against that gym's own secret.
+
+### 6d.5 Failure modes — all fail closed
+
+| Condition | Response | Never |
+|---|---|---|
+| Unknown slug | 404, no detail | Leak whether the gym exists elsewhere |
+| Suspended / terminated | 403 | Serve data |
+| Trial expired | 402 | Serve data |
+| Connection unreachable | 503 | Fall back to another connection |
+| Secret fetch fails | 503 | **Fall back to another gym's credentials** |
+| No gym resolvable | **Refuse** | **Ever use a "default" gym** |
+
+The last row is the one that matters. **A default-gym fallback anywhere in this chain is a
+cross-tenant data leak waiting to happen.**
+
+### 6d.6 The single code change — needs approval before implementation
+
+`getSupabase()` (`server/lib/supabase.js`) becomes request-scoped instead of a module singleton.
+It is **one function**, and the Graphify god-node analysis showed all ~76 handlers reach the database
+through it — so handlers are untouched.
+
+**It is protected surface (§32).** Required before implementation: why, what it affects, risk,
+rollback, tests. The rollback is simple — it is one file, and the single-gym path must keep working
+from environment variables so an individual gym deployment is unaffected.
+
+### 6d.7 The Stage 5 gate — write the test before the panel
+
+Stage 5 closes only on **"Gym 1 cannot see Gym 2 data, proven by an automated test."** That test
+should be written *now*, while the resolver is being designed:
+
+1. Two gyms, two databases, two secrets.
+2. A member token minted for gym A, presented to gym B → **rejected**.
+3. Gym A's slug with gym B's member credentials → **rejected**.
+4. A suspended gym → refused, even with valid credentials.
+5. Missing/failed secret fetch → 503, and **no data from any gym**.
+6. Concurrent requests for A and B on one warm instance → **never cross over**.
+
+Test 6 is the one that catches cache-key bugs, and cache-key bugs are how this design fails.
+
 ## 7. What the evidence supports — and what it does not
 
 **No model is chosen.** What the evidence does support, stated plainly:

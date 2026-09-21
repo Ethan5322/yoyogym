@@ -85,8 +85,10 @@ device.** That is the part to say yes or no to.
 - **Q-36** Per-gym secrets store. **Load-bearing** under D-016: per-gym Supabase URLs, service keys
   and `JWT_SECRET`s cannot live in Vercel env vars (64 KB total per deployment). Where do they live,
   how are they fetched per request, how are they rotated?
-- **Q-37** Connection management. Thousands of Supabase clients from one serverless application
-  needs pooling and eviction. Unsolved.
+- ~~**Q-37** Connection pooling~~ — **reframed and largely dissolved (D-074).** `supabase-js` speaks
+  HTTPS to PostgREST with no TCP driver, so there is no pool to exhaust. What replaces it:
+  **Q-47 — Infisical's rate limits for per-request secret fetches**, which are now on the hot path
+  and are unverified.
 - **Q-30** Where does the platform admin panel live — same deployment, separate deployment, or a
   separate repository? (Related to Q-22.)
 - **Q-31** Does the platform owner ever need to *enter* a gym's admin panel (impersonation or
