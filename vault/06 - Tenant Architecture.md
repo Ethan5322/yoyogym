@@ -234,6 +234,65 @@ a near-untouched protected surface.
 **I am not choosing this.** Q-01 is the user's decision and must be recorded in
 [[18 - Decision Log]].
 
+## 6c. Tenant resolution chain (Stage 3 design — PROPOSED)
+
+How a request becomes a gym-scoped database client. The data model behind it is in
+[[12 - Database Architecture]] §4.4.
+
+```text
+Platform user
+   │  identity from a platform JWT (audience: "platform")  ─── or ───
+   │  member/staff identity from a gym JWT (audience: "member" / admin)
+   ▼
+Gym identifier
+   │  from the HOST (subdomain) or a SIGNED token claim — never an unverified body field
+   ▼
+gyms row            lookup by slug · must be status 'active'
+   │                suspended → 402/403 · unknown → 404
+   ▼
+gym_connections     status must be 'healthy' · gives supabase_url, project ref, schema
+   │                unreachable → 503
+   ▼
+gym_secrets         secret_ref pointers → fetch VALUES from the external store
+   │                fetch failure → 503 · NEVER fall back to another gym's credentials
+   ▼
+Supabase client     pooled per gym, LRU-evicted, keyed on gym_id
+   │
+   ▼
+getSupabase()       the existing single function — returns THIS request's client
+   │
+   ▼
+Existing Yoyo Gym system   all 24 tables, all ~76 handlers, UNCHANGED
+```
+
+### The rule that keeps it safe
+
+> **Gym identity must never come from client-controlled, unverified input.** It comes from the
+> request host, or from a claim inside a signature the server verified. A `gym_id` in a JSON body
+> or query string is an attacker's field, not an identifier.
+
+This is the multi-tenant form of `CLAUDE.md` §21 — the frontend must never define gym identity.
+
+### Token scoping
+
+Each gym keeps **its own `JWT_SECRET`** (`gym_secrets`). A token minted for gym A therefore fails
+verification against gym B's secret, so the existing `audience` separation (member vs admin) gains
+a second, per-gym dimension for free. Tokens should also carry the gym id so a mismatch is caught
+explicitly rather than only by signature failure.
+
+### Failure modes — all must fail closed
+
+| Condition | Response |
+|---|---|
+| Unknown slug | 404, no detail leaked |
+| Gym `suspended` / `terminated` | 403 (or 402 for billing), never data |
+| Connection `unreachable` / `degraded` | 503 |
+| Secret fetch fails | 503 — **never** a fallback client |
+| Resolver cannot determine a gym | **Refuse the request.** Never a default gym |
+
+The last row matters most: a "default gym" fallback anywhere in this chain is a cross-tenant data
+leak waiting to happen.
+
 ## 7. What the evidence supports — and what it does not
 
 **No model is chosen.** What the evidence does support, stated plainly:

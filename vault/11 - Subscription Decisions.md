@@ -8,9 +8,25 @@ updated: 2026-09-21
 
 # 11 — Subscription Decisions
 
-> **Nothing in this note is decided.** The title is inherited from the approved §28 list; the
-> content is **provisional**. Per `CLAUDE.md` §18: do not implement subscription billing, and do
-> not hard-code limits or prices.
+> **Partly decided now.** Settled: the platform charges gyms a **flat subscription only** (D-013),
+> billed through **Paystack** (D-020), and tiers live as **data** in `platform_plans`
+> ([[12 - Database Architecture]] §4.5). Still **provisional**: the tier names, member limits,
+> prices and feature split below. Per `CLAUDE.md` §18: do not implement subscription billing yet,
+> and never hard-code limits or prices.
+
+## Settled
+
+| | Decision |
+|---|---|
+| Who pays | **Gyms pay the platform.** Members never pay the platform (D-013) |
+| How much the platform takes of member fees | **Nothing.** No revenue share (D-013) |
+| Provider | **Paystack**, for gym subscriptions (D-020) |
+| Where limits and prices live | `platform_plans` rows — data, not code |
+| Member payments in the gym app | **Removed** (D-015/D-018); each gym runs its own plans and collects fees its own way |
+
+> Note the symmetry worth keeping straight: **Paystack leaves the member-facing gym app and
+> reappears on the platform side.** Same library, opposite direction of money. `paystack.js` is
+> therefore kept, not deleted (D-021).
 
 Subscriptions here mean **gyms paying the platform** — not members paying gyms, which already
 exists and works ([[01 - Existing Yoyo Gym Audit]] §11).

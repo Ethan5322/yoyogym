@@ -75,6 +75,37 @@ Two paths change a member's status, and only two:
 `admin/member-action.js` does **not** activate; its actions are `checkin`, `regenerate_code`,
 `renew`, `change_plan`.
 
+## Proposed platform roles (Stage 3 design — NOT approved)
+
+A **separate namespace** from the four gym roles. A gym `owner` must never satisfy a platform check,
+and a platform role must never grant access to gym member data by itself.
+
+| Role key | Purpose | May NOT |
+|---|---|---|
+| `platform_owner` | Full control: plans, pricing, staff, suspension, secret rotation | — |
+| `platform_admin` | Day-to-day operations: applications, provisioning, gym status | change pricing, manage platform staff |
+| `reviewer` | Read applications and documents; approve / reject / request info | touch gyms, secrets or billing |
+| `billing` | Subscriptions, invoices, dunning | approve applications, touch secrets |
+| `support` | Read-only gym metadata + connection health for triage | read member data, read secrets, change status |
+| `read_only` | Reporting and aggregate statistics | any mutation |
+
+Plus `kind = 'gym_owner'` on `platform_users` — **not a staff role**. A gym owner may see only their
+own application, their own gym and their own subscription.
+
+Stored as **data** (`platform_roles`, `platform_permissions`, and their join tables — see
+[[12 - Database Architecture]] §4.1), not as constants in code, so permissions can change without a
+deploy.
+
+### Enforcement rules carried from the existing system
+
+1. **Server-side in every handler**, exactly as `requireRole()` works today. A platform panel guarded
+   only in React is guarded by nothing.
+2. **Separate JWT audience** — `audience: "platform"` — alongside the existing `member` and admin
+   tokens.
+3. **No platform role implies gym data access.** Reaching member data requires resolving to that
+   gym and using its own credentials; `support` seeing a gym is not `support` seeing its members.
+4. **Secret access is itself an audited action**, not a side effect of holding a role.
+
 ## Future — undecided
 
 Platform roles must live in a **separate namespace** so a gym `owner` never satisfies a

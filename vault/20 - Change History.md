@@ -15,6 +15,46 @@ occurrence is answered from notes rather than rediscovered.
 
 ---
 
+## 2026-09-21 — Stage 3 opened: platform data model designed
+
+**Delivered.** 14 platform tables proposed in [[12 - Database Architecture]] §4, in a **separate
+`platform` schema in a separate Supabase project**. Tenant-resolution chain documented in
+[[06 - Tenant Architecture]] §6c, platform roles in [[13 - Authentication and Roles]], risks in
+[[14 - Security and Privacy]]. **Design only — no migration file, no SQL executed, and the existing
+24 single-gym tables were not touched.**
+
+**Two invariants written into the design, not left implicit:**
+
+1. **The platform database holds no member data** — no names, health answers, biometric templates
+   or payments. That is what keeps D-014's POPIA position intact, and it is an invariant rather
+   than a convention.
+2. **`gym_secrets` holds pointers, never values.** A database constraint cannot enforce "this text
+   is not a secret", so it is a documented invariant plus a code-review rule, and any violation is
+   an incident requiring rotation rather than a row deletion.
+
+**The trade-off stated rather than buried.** D-016 gives physical *data* isolation but makes the
+*application* a shared trust boundary: one compromised process can reach every gym's credentials,
+where deployment-per-gym would have reached one. Recorded as R-1…R-10 so the cost of the chosen
+model is findable later, not rediscovered after an incident.
+
+**D-020 / D-021 — Paystack, reversed.** The user set the platform billing provider to Paystack for
+**gym→platform subscriptions**. This produced a non-obvious implementation consequence worth
+recording: **`server/lib/paystack.js` must not be deleted** during the member-payment removal
+(D-018). The same library is needed platform-side, and it already carries proven webhook hardening
+(HMAC plus independent re-verification). Paystack leaves the member-facing app and reappears on the
+platform side — same library, opposite direction of money.
+
+**Lesson recorded.** "Remove Paystack" and "use Paystack" arrived four messages apart and are both
+correct, because they concern different money flows. **Before deleting an integration, ask which
+direction the money was going** — the instruction to remove it did not mean the code had no other
+use.
+
+**Q-41 opened rather than guessed.** The instruction read *"the gym subscribe my telga so use
+paystack for it"*. The Paystack half was unambiguous and became D-020; "telga" is a separate
+project folder on this machine, appears nowhere in this repository, and was **not** interpreted.
+
+---
+
 ## 2026-09-21 — Stage 1 CLOSED: the tenancy model is decided
 
 **D-016.** Model C approved: **one shared application deployment + one Supabase project per gym**,

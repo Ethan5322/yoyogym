@@ -43,9 +43,13 @@ CLOSED:    Stage 0 — discovery and documentation
            Stage 1 — TENANCY DECIDED (D-016, Model C: shared app + per-gym database)
            Stage 2 — vault foundation (21 notes, committed to git)
 
-OPEN:      none — awaiting the user's word on which stage opens next
+OPEN:      Stage 3 — platform data model (DESIGN DELIVERED, awaiting gate)
+           14 platform tables proposed in note 12. No migration, no SQL,
+           no change to the existing 24 tables.
 
-READY:     Stage 3 — platform data model (unblocked by D-016)
+GATE:      Stage 3 closes when the user approves the proposed schema.
+           Checklist: secrets-never-in-DB invariant accepted; deletion policy
+           accepted; platform_plans as data accepted; no existing table touched.
            Payment removal — unblocked by D-017/D-018/D-019, but it is a change to the
            protected surface and needs its own approved slot; it is NOT part of Stage 3
 

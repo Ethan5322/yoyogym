@@ -75,6 +75,11 @@ When one is answered, move it to [[18 - Decision Log]] with its rationale.
 
 ## ⚠️ Blocking implementation — opened 2026-09-21
 
+- **Q-41 — "Telga".** The instruction that set D-020 read *"the gym subscribe my telga so use
+  paystack for it"*. `Telga` is a separate project folder on this machine and the name is not used
+  anywhere in this repository. **Unclear** whether it is the billing entity, a brand name for the
+  platform, or a typo. Recorded rather than guessed — the Paystack half of the instruction was
+  unambiguous and is captured in D-020; this half is not.
 - **Q-36 — per-gym secrets store.** Now **load-bearing** under D-016: per-gym Supabase URLs, service
   keys and `JWT_SECRET`s cannot live in Vercel env vars (64 KB total per deployment **[V]**). Where
   do they live, how are they fetched per request, and how are they rotated? Stage 4 work.

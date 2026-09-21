@@ -64,6 +64,32 @@ Consent is captured; cascade deletes support erasure; a deletion-request endpoin
 Missing for full compliance: automated erasure, retention schedules, a documented biometric policy,
 and any jurisdiction beyond South Africa (Q-18).
 
+## Security risks introduced by D-016 (Stage 3)
+
+> **The headline trade-off, stated plainly.** D-016 buys **physical data isolation** at the price of
+> making the **application a shared trust boundary**. Under deployment-per-gym, compromising the app
+> reached one gym. Under a shared application, the running process can reach **every** gym's
+> credentials. The data is separate; the code path is not. This was accepted knowingly — it is not a
+> flaw to paper over, and it makes the resolver and the secret cache the two most security-critical
+> pieces of code in the platform.
+
+| # | Risk | Why it is serious here | Mitigation direction |
+|---|---|---|---|
+| R-1 | **Resolver bug serves gym A's client to gym B** | Cross-tenant data leak of health and biometric data. The resolver replaces RLS as the isolation mechanism | Resolve from host/signed claim only; never a default-gym fallback; automated cross-tenant test as the Stage 5 gate |
+| R-2 | **Client-cache key confusion** | The pooled Supabase client is keyed on `gym_id`; a stale or wrong key hands over the wrong database | Key on gym id + connection id; evict on any connection or secret change; never key on anything client-supplied |
+| R-3 | **All gyms' secrets reachable from one process** | A single RCE or SSRF in the shared app exposes the fleet | Short TTL in memory; fetch per request scope; never log or serialise; consider per-region process isolation |
+| R-4 | **Secret value written into `gym_secrets`** | Turns the metadata database into a credential store | Documented invariant (§4.4 of [[12 - Database Architecture]]); code review; treat any occurrence as an incident requiring rotation, not deletion |
+| R-5 | **Platform staff over-reach** | A `support` role that can read member data defeats the POPIA position from D-014 | No platform role implies gym data access; secret access is separately audited |
+| R-6 | **Cross-gym token replay** | A token from gym A accepted by gym B | Per-gym `JWT_SECRET` (already the design) **plus** a gym id claim verified against the resolved gym |
+| R-7 | **Connection-pool exhaustion** | Thousands of clients from one serverless app — a DoS and a correctness risk | Q-37, unresolved; bounded LRU with eviction |
+| R-8 | **Document upload is new attack surface** | Applications carry identity documents; object storage does not exist today | Q-24 / Q-12 — retention, scanning, access control all undesigned |
+| R-9 | **Platform audit log tampering** | It is the only record of approvals, suspensions and secret access | Append-only by convention and by permission; no update/delete path in any handler |
+| R-10 | **Migration orchestrator holds fleet-wide write access** | It can alter every gym's schema | Separate credential path, dry-run mode, checksum drift detection (§4.6) |
+
+**Platform billing note (D-020):** platform subscriptions run on **Paystack**, charging gyms. No
+member ever appears in `platform_invoices`. Platform Paystack credentials are a **platform-level**
+secret and must never be stored in `gym_secrets` alongside per-gym credentials.
+
 ## Requirements for the platform
 
 Per `CLAUDE.md` §21 — the frontend must **never** be trusted to define role, **gym identity**,
