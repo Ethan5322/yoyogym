@@ -403,7 +403,7 @@ function StatusTab() {
         )}
       </div>
 
-      {data.has_outstanding && <PayBalance amount={data.outstanding_balance} />}
+      {data.has_outstanding && <OutstandingNotice amount={data.outstanding_balance} />}
 
       {data.member?.parq_flag && (
         <p className="rounded-lg bg-error/10 px-3 py-2 text-xs text-error">
@@ -693,32 +693,18 @@ function PlanChangeRequest({ currentPlan }) {
   );
 }
 
-function PayBalance({ amount }) {
-  const [busy, setBusy] = useState(false);
-  const [err, setErr] = useState('');
-  async function pay() {
-    setBusy(true);
-    setErr('');
-    try {
-      const r = await memberFetch('/member/pay', {
-        method: 'POST',
-        body: { callback_url: `${window.location.origin}/payment/callback` },
-      });
-      if (r.authorization_url) window.location.href = r.authorization_url;
-      else setErr('Could not start payment. Please try again.');
-    } catch (e) {
-      setErr(e.message);
-      setBusy(false);
-    }
-  }
+// Members pay the gym directly, so the portal shows what is owed but offers no
+// online checkout. Staff record the payment at reception, which activates the
+// membership.
+function OutstandingNotice({ amount }) {
   return (
     <div className="card text-center">
-      <p className="font-display text-lg uppercase text-body">Settle your balance</p>
-      <p className="mb-3 text-xs text-muted">Pay your outstanding R{Number(amount).toFixed(2)} securely online.</p>
-      <button className="btn-primary w-full" onClick={pay} disabled={busy}>
-        {busy ? 'Opening secure checkout…' : `Pay R${Number(amount).toFixed(2)} Now`}
-      </button>
-      {err && <p className="mt-2 text-sm text-error">{err}</p>}
+      <p className="font-display text-lg uppercase text-body">Outstanding balance</p>
+      <p className="mt-2 font-display text-3xl text-accent">R{Number(amount).toFixed(2)}</p>
+      <p className="mt-3 text-xs text-muted">
+        Please settle this at reception. Your membership is updated as soon as the gym records your
+        payment.
+      </p>
     </div>
   );
 }

@@ -2,15 +2,16 @@
 aliases: ["Member Payment Removal Design", "Payment Removal", "Paystack Removal"]
 tags: [design, protected-surface, payments, proposed]
 stage: "Payment-removal slot — DESIGN ONLY"
-status: "PROPOSED — not implemented, not approved"
+status: "✅ IMPLEMENTED 2026-09-21"
 updated: 2026-09-21
 ---
 
 # 21 — Member Payment Removal Design
 
-> **Documentation only.** Nothing in this note has been implemented. No file has been deleted,
-> changed or created. Paystack is still fully in place. This is the design to be reviewed **before**
-> the payment-removal slot opens.
+> ## ✅ IMPLEMENTED 2026-09-21 (D-031)
+> Executed in the designed order — activation wired and verified **first**, removals second.
+> **49 tests pass; production build succeeds.** Deviations from this design are recorded in §7.
+> The text below is retained as the plan that was carried out.
 >
 > Governing decisions: **D-015** remove member payments · **D-017** manual capture activates ·
 > **D-018** keep tracking (Q-39 confirmed) · **D-019** no live gyms · **D-020** platform uses
@@ -210,3 +211,46 @@ stranding every new member.**
 [[11 - Subscription Decisions]] · [[12 - Database Architecture]] · [[16 - API Documentation]] ·
 [[17 - Open Questions]] · [[18 - Decision Log]] · [[19 - Implementation Phases]] ·
 [[20 - Change History]]
+
+---
+
+## 7. What actually happened — deviations from the plan
+
+Implemented 2026-09-21. The design held, with four things worth recording.
+
+### 7.1 Two pre-existing bugs found (D-032)
+
+Checking columns against `db/schema.sql` rather than trusting the code turned up two defects that
+had never fired because no gym is live:
+
+1. **`activation.js` wrote `paystack_auth_code` to `payments`.** That column exists only on
+   `memberships`. The update's error was **never checked**, so it failed silently — meaning the
+   payment row never became `received`, and the idempotency guard (`payment.status === 'received'`)
+   could never trip. **Fixed** by the rewrite; the new code checks every error.
+2. **`admin/payments.js` PATCH writes `refunded_amount`**, a column on no table, so **refunds
+   error out**. **Not fixed** — outside this change's scope. Raised as **Q-45**.
+
+### 7.2 `retry-suspend.js` needed redefining, not trimming (D-030)
+
+Suspension was triggered by `payments.status = 'failed'`, which only Paystack retries ever set.
+Removing Paystack would have left the trigger permanently unreachable. It is now
+`suspend-overdue.js`: *billing date passed beyond a grace window with no captured payment*, and it
+is **opt-in per gym, off by default** (D-028). Cron route renamed accordingly.
+
+### 7.3 `billing.js` split as predicted
+
+`run()` (Paystack debit) removed; `runReminders()` kept and promoted to the file's default handler.
+Billing reminders survive, which was the point of not deleting the file.
+
+### 7.4 Final counts
+
+| | |
+|---|---|
+| Deleted | 9 files — 4 payment handlers, the payments router, `PaymentScreen`, `PaymentCallback`, `member/pay.js`, `retry-suspend.js` |
+| Changed | 11 files |
+| Added | `suspend-overdue.js`, `tests/activation.test.js` |
+| Serverless routers | **6 → 5** (a function slot freed) |
+| Tests | 42 → **49, all passing** |
+| Build | ✅ succeeds |
+| Schema | **untouched** — no migration, no column dropped |
+| `server/lib/paystack.js` | **retained** (D-021) |

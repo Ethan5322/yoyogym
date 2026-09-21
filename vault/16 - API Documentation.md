@@ -8,11 +8,12 @@ updated: 2026-09-21
 
 # 16 — API Documentation
 
-Complete endpoint inventory, **[C]** read from the six routers and their handlers on 2026-09-21.
+Complete endpoint inventory, **[C]** read from the routers and their handlers. Updated 2026-09-21
+after the member-payment removal: **5 routers**, not 6.
 
 ## Routing model
 
-Only **6 files** are Serverless Functions; all logic lives in `server/` outside `api/`, to stay
+Only **5 files** are Serverless Functions; all logic lives in `server/` outside `api/`, to stay
 inside the Vercel function budget. Each router is a fixed key map — an unknown key returns 404,
 and every router wraps its handler in `captureError`. **[C]**
 
@@ -20,10 +21,14 @@ and every router wraps its handler in `captureError`. **[C]**
 api/[...path].js          → public       (7 routes)
 api/auth/[...path].js     → admin auth   (4)
 api/admin/[...path].js    → admin        (37)
-api/member/[...path].js   → member       (18)
-api/payments/[...path].js → payments     (4)
+api/member/[...path].js   → member       (17)
 api/cron/[...path].js     → cron         (8)
 ```
+
+> **Changed 2026-09-21.** `api/payments/[...path].js` was **removed** with the member-payment
+> removal ([[21 - Member Payment Removal Design]]), freeing a Serverless Function slot — **5 routers
+> now, not 6**. `/api/member/pay` is gone. Members pay the gym directly; staff record it in
+> Admin → Payments and **that capture activates the member**.
 
 ## Public — no authentication
 
@@ -82,23 +87,27 @@ Roles: **O** owner · **M** manager · **R** reception · **T** trainer.
 | `settings` | **O** | GET all · PUT one `{key,value,category}` |
 | `staff` | **O** | Staff CRUD |
 
-## Member — `/api/member/*` (18 routes)
+## Member — `/api/member/*` (17 routes)
 
 `login` · `face-login` · `status` · `checkin` · `classes` · `book-class` · `cancel-booking` ·
-`history` · `pay` · `profile` · `progress` · `refer` · `message` · `messages` · `announcements` ·
-`request-plan-change` · `request-deletion` · `enroll-face`.
+`history` · `profile` · `progress` · `refer` · `message` · `messages` · `announcements` ·
+`request-plan-change` · `request-deletion` · `enroll-face`. *(`pay` removed 2026-09-21.)*
 
 All except `login` / `face-login` require a member JWT (`audience: 'member'`).
 
-## Payments — `/api/payments/*`
+## Payments — REMOVED 2026-09-21
 
-`initialize` (POST) · `purchase-pack` (POST) · `verify` (POST) · `webhook` (POST, Paystack →
-HMAC + independent re-verify).
+`/api/payments/*` no longer exists. `initialize`, `purchase-pack`, `verify` and `webhook` were
+deleted along with their router. Payment **recording** lives on at
+`POST /api/admin/payments` (manual cash/EFT capture, owner/manager), which now also **activates the
+member and their membership**. `server/lib/paystack.js` is retained for platform subscription
+billing (D-021).
 
 ## Cron — `/api/cron/*`
 
 Scheduled in `vercel.json`: `daily` (06:00) · `daily-summary` (20:00) · `weekly-schedule` (Mon 07:00).
-Callable but **not separately scheduled**: `billing` · `expiry` · `retry-suspend` ·
+Callable but **not separately scheduled**: `billing` (reminders only now) · `expiry` ·
+**`suspend-overdue`** (renamed from `retry-suspend` 2026-09-21; opt-in per gym, off by default) ·
 `reengagement` · `class-reminders` · `attendance-alerts` — each exports `run()` and is invoked by
 the `daily` orchestrator. Authorised by `CRON_SECRET` when triggered externally. **[P]**
 

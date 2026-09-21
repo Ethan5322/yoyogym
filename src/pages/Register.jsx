@@ -5,7 +5,6 @@ import { useState, useCallback, useEffect } from 'react';
 import { useChatEngine } from '../chatbot/engine.js';
 import ChatWindow from '../chatbot/ChatWindow.jsx';
 import SuccessScreen from '../chatbot/components/SuccessScreen.jsx';
-import PaymentScreen from '../chatbot/components/PaymentScreen.jsx';
 import { apiFetch } from '../lib/api.js';
 import { logQrScan } from '../lib/scan.js';
 
@@ -53,14 +52,10 @@ export default function Register({ manual = false }) {
       </div>
     );
   } else if (status === 'done' && result) {
-    // Manual (staff) registration takes payment offline -> straight to success.
-    // Otherwise, if there's an amount due, go to online payment.
-    completeView =
-      !manual && result.amount_due_today > 0 ? (
-        <PaymentScreen result={result} />
-      ) : (
-        <SuccessScreen result={result} />
-      );
+    // Members pay the gym directly (cash / EFT / the gym's own arrangement), so
+    // registration always ends on the confirmation screen. Staff activate the
+    // member by capturing that payment in Admin -> Payments.
+    completeView = <SuccessScreen result={result} />;
   }
 
   return <ChatWindow engine={engine} completeView={completeView} />;

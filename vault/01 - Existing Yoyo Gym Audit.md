@@ -300,6 +300,12 @@ any cross-gym exposure — carried to [[17 - Open Questions]] and `CLAUDE.md` St
 > router registers it at `/api/document` (`api/[...path].js`). The comment is wrong, the route
 > works. Do not "fix" the route to match the comment.
 
+> ⚠️ **Superseded 2026-09-21.** The online card path described below was **removed** —
+> see [[21 - Member Payment Removal Design]]. What remains: the `payments` table, manual cash/EFT
+> capture (which now **activates** the member), AR aging, dunning, receipts and reporting.
+> `server/lib/paystack.js` is retained for platform billing. This section is kept as the record of
+> what the system looked like at commit `c68c8c9`.
+
 ## 11. Payments
 
 Paystack, **ZAR**, amounts converted to kobo/cents. **[C]** (`server/lib/paystack.js`)

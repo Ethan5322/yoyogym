@@ -9,7 +9,6 @@ import { loadBranding } from './lib/branding.js';
 // Public (member-facing)
 const Register = lazy(() => import('./pages/Register.jsx'));
 const MemberPortal = lazy(() => import('./pages/MemberPortal.jsx'));
-const PaymentCallback = lazy(() => import('./pages/PaymentCallback.jsx'));
 const PublicProfile = lazy(() => import('./pages/PublicProfile.jsx'));
 const NotFound = lazy(() => import('./pages/NotFound.jsx'));
 
@@ -63,7 +62,6 @@ export default function App() {
         <Route path="/" element={<Splash />} />
         <Route path="/register" element={<Register />} />
         <Route path="/member" element={<MemberPortal />} />
-        <Route path="/payment/callback" element={<PaymentCallback />} />
         <Route path="/p/:type/:key" element={<PublicProfile />} />
 
         {/* Admin */}

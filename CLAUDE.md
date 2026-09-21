@@ -126,7 +126,8 @@ The existing repository was inspected and confirmed as follows **[verified]**:
 - RLS enabled on every table but with **no policies**, resulting in browser default-deny behaviour.
 - JWT authentication using `jsonwebtoken`.
 - Password hashing using `bcryptjs`.
-- Paystack payment integration.
+- Paystack library retained for PLATFORM billing only (D-021). Member-facing online
+  payment was REMOVED 2026-09-21 — members pay their gym directly and staff capture it.
 - Brevo email integration.
 - CallMeBot WhatsApp and Telegram owner alerts.
 - Client-side PDF generation using `jsPDF`.

@@ -15,6 +15,43 @@ occurrence is answered from notes rather than rediscovered.
 
 ---
 
+## 2026-09-21 — Member payments removed (first code change of the project)
+
+**Implemented** [[21 - Member Payment Removal Design]] end to end. **49 tests pass** (42 + 7 new),
+**production build succeeds**. 9 files deleted, 11 changed, 2 added. The schema was not touched, no
+migration was written, and `server/lib/paystack.js` survives for platform billing (D-021).
+
+**The order was the safety property, and it was followed.** Activation was wired into manual capture
+and verified with tests *before* a single file was deleted. Reversed, every newly registered member
+would have been stranded at `status:'new'`.
+
+**Two pre-existing bugs surfaced (D-032), both invisible because no gym is live:**
+
+1. `activation.js` wrote `paystack_auth_code` to the **`payments`** table — a column that exists
+   only on `memberships` — and **never checked the error**. It failed silently, so the payment row
+   never actually became `received`, which meant the idempotency guard could never trip. Fixed in
+   the rewrite; the new code checks every error and returns `{activated, error}` instead of
+   swallowing failures.
+2. `admin/payments.js` PATCH writes `refunded_amount`, which exists on no table, so **refunds error
+   out**. **Left alone** — outside this change's scope. Raised as Q-45 for a separate decision.
+
+**Lesson recorded.** Both bugs were found by checking column names against `db/schema.sql` instead
+of trusting that working-looking code touches columns that exist. **An unchecked `error` on a
+Supabase write is indistinguishable from success** — the first bug had been sitting in the most
+safety-critical function in the payment path. When rewriting a function, verify its writes against
+the schema, and never leave an error unchecked.
+
+**One design change during implementation (D-030).** `retry-suspend.js` suspended members when
+`payments.status = 'failed'`, which only Paystack retries ever set. Removing Paystack would have
+left that trigger permanently unreachable — dead code that never fires. It became
+`suspend-overdue.js` with a real trigger (billing date past a grace window, no payment captured),
+**opt-in per gym and off by default** (D-028), so no gym inherits a policy it did not choose.
+
+**`billing.js` split exactly as predicted**, which was the point of refusing to delete it: its
+Paystack debit went, its reminder job stayed.
+
+---
+
 ## 2026-09-21 — Stage 3 CLOSED; payment-removal design delivered
 
 **D-022.** The platform data model is **approved** with twelve binding conditions. Note 12 is marked

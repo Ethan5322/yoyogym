@@ -66,6 +66,14 @@ When one is answered, move it to [[18 - Decision Log]] with its rationale.
   **untracked** — so project knowledge is local-only until this is answered.
 - **Q-24** Object storage strategy for photos, documents and biometric templates.
 
+## 🐛 Found in code, awaiting a decision
+
+- **Q-45 — `admin/payments.js` PATCH writes `refunded_amount`, a column that exists on no table.**
+  Verified against `db/schema.sql`: the `payments` table has no such column, and this call **does**
+  check its error, so **refunds fail visibly**. Pre-existing, never hit because no gym is live.
+  **Deliberately not fixed** — outside the payment-removal scope. Fixing it needs either a migration
+  adding `refunded_amount` or a rewrite of the refund to use existing columns. **Your call.**
+
 ## 🔴 Highest priority — the one risk carrying the whole architecture
 
 - **U-1 — maximum Supabase projects per organisation.** Undocumented. **D-016 (the tenancy
