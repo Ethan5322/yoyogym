@@ -15,6 +15,39 @@ occurrence is answered from notes rather than rediscovered.
 
 ---
 
+## 2026-09-21 — The isolation boundary exists, and was tested before it existed
+
+**Stage 4 implemented** (D-076). `server/lib/tenancy.js` resolves a gym to its own database client;
+`getSupabase()` returns it. **56 tests pass, production build succeeds.**
+
+**Built tests-first, as instructed.** `tests/isolation.test.js` was written against a module that did
+not exist, run and watched fail (`ERR_MODULE_NOT_FOUND`), and only then implemented until green.
+The tests landed in the same commit so `main` was never red.
+
+**The design decision that made it cheap: `AsyncLocalStorage`.** The resolved gym lives in
+per-request async context rather than a module variable, which gives two things at once —
+concurrent requests on one warm serverless instance cannot overwrite each other, and **all ~76
+handlers are completely unchanged** because they keep calling `getSupabase()` with no arguments.
+The Graphify god-node analysis had already shown that function was the single seam; this is that
+finding cashed in.
+
+**Test 6 is the one that matters.** It resolves two gyms concurrently with a deliberate 25 ms skew on
+one, then asserts each request still sees its own client. Cache-key confusion under concurrency is
+how this design leaks, and it is invisible to single-request testing.
+
+**One behaviour change recorded rather than hidden (D-080).** The Supabase environment check moved
+from module load to first call. The original comment said *"fail loud at cold-start rather than
+silently mis-querying"* — deliberate, and it had to move: a platform deployment legitimately has no
+gym database of its own, so importing the module would have crashed it. A misconfigured single-gym
+deployment still fails loudly with the identical message, just on first query.
+
+**Lesson recorded.** *Writing the test against a module that does not exist forces the interface to
+be designed from the caller's side.* The dependency injection in `resolveGym` exists because the
+test needed two fake gyms and a failing secrets store — not because it was planned. **The test shaped
+the design, which is the actual argument for tests-first, not the failing-first ritual.**
+
+---
+
 ## 2026-09-21 — Merged to main, and the validator caught its own author
 
 **Merged** `docs/yoyo-gyms-second-brain` into `main` (D-066, `--no-ff`, 25 commits). Not pushed.
