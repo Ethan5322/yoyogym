@@ -8,8 +8,8 @@ updated: 2026-09-21
 
 # 07 — Owner Workflows
 
-How a gym owner joins the platform. **Conceptual only — the brief calls this "not yet fully
-finalized" and nothing here is decided.** Does not exist in the repository **[M]**.
+How a gym owner joins the platform. **The sequence is now DECIDED** (D-047 … D-050) — see below.
+**None of it is built yet [M]**; this is the design Stage 6 will implement.
 
 ## ✅ The sequence — DECIDED 2026-09-21
 
@@ -91,11 +91,20 @@ The single-gym system already solves parts of this at gym scale **[C]**:
 | Q-06 | Trial period; payment method required during it? | open |
 | Q-08 | Subscriptions bought in-app or on the web? → collides with Q-14 | open |
 
-## Hard dependency
+## What "create the tenant" now means — resolved by D-016
 
-Step 4, "gym tenant created", **cannot be specified before Q-01**. Under Model A it provisions a
-Supabase project, a Vercel deployment and a full env-var set; under Model B it inserts a row. The
-owner-facing workflow looks identical either way; the machinery behind it does not.
+Under the chosen model it is **not** a new deployment. Provisioning a gym is:
+
+1. Create a **Supabase project** for that gym (management API).
+2. Load `db/schema.sql`, then run the seeds.
+3. Write that gym's secrets — Supabase URL, service key, `JWT_SECRET` — into the **secrets
+   manager** (D-043), and store only the **references** in `gym_secrets` (D-022).
+4. Insert `gyms` + `gym_connections` rows; set status `provisioning` → `pending`.
+5. Record the baseline in `migration_runs` so the fleet view knows this gym's schema version.
+
+No Vercel project is created: one shared application serves every gym (D-016). **This must be
+automated end to end** — D-012 put thousands of gyms in scope, which killed the 1–2 hour manual
+runbook.
 
 ## Security notes carried forward
 
