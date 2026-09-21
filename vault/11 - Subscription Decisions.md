@@ -2,7 +2,7 @@
 aliases: ["Subscription Decisions", "Subscriptions"]
 tags: [subscriptions, commercial, future, provisional]
 stage: "Stage 2"
-status: provisional-only
+status: "partly decided — tiers still provisional"
 updated: 2026-09-21
 ---
 
@@ -82,20 +82,14 @@ three tiers is a **product decision**, not a technical one, but two technical fa
 
 ## Open questions
 
-| # | Question | Blocks |
-|---|---|---|
-| Q-04 | Tiers, prices, currency, billing cadence | Stage 7 |
-| Q-05 | Does the platform take a share of member payments, or charge gyms only? | Payment architecture |
-| Q-06 | Trial period; payment method required during trial? | Stage 6 |
-| Q-07 | What happens on non-payment — suspend, degrade, or read-only? | Stage 7 |
-| Q-08 | Purchased in the mobile app or on the web? | Collides with Q-14 |
-| Q-14 | Store rules on digital subscriptions may prohibit external payment pages | Stage 10 |
-
-**Q-05 is the consequential one.** Charging gyms a flat subscription is a simple SaaS billing
-problem. Taking a cut of member payments means Paystack split payments or subaccounts, per-gym
-merchant onboarding, and a materially different regulatory position. The existing code assumes
-**per-gym Paystack keys** and the gym keeping 100% (`server/lib/paystack.js`) **[C]** — so a
-revenue share is a change to the payment architecture, not a setting.
+| # | Question | Status | Blocks |
+|---|---|---|---|
+| Q-04 | Tiers, prices, currency, billing cadence | **open** | Stage 7 |
+| Q-06 | Trial period; payment method required during trial? | **open** | Stage 6 |
+| Q-08 | Purchased in the mobile app or on the web? | **open** | Collides with Q-14 |
+| Q-14 | Store rules on digital subscriptions may prohibit external payment pages | **open** | Stage 10 |
+| ~~Q-05~~ | Share of member payments vs gyms only | ✅ **flat subscription only** (D-013) | — |
+| ~~Q-07~~ | What happens on non-payment | ✅ **2-day warning → suspend → data retained** (D-026/027) | — |
 
 ## Constraint from the protected surface
 
