@@ -39,16 +39,21 @@ policies first** (Q-20). This is the single most consequential security fact in 
 
 ## Known weak points — stated honestly
 
-1. **`/api/document` is a two-secret bearer endpoint** **[P]**. `membership_number` +
+1. ⚠️ **`/api/document` — now a BLOCKING pre-launch fix (D-034).** `membership_number` +
    `verification_code` returns a member's full record with **no session**. Sound within one gym
-   where only the member holds both; **must be re-reviewed before any cross-gym exposure** (Q-19).
-   It also means the verification code is effectively a **reusable secret**, which constrains what
-   a member-ID QR may contain → [[09 - QR-Code Architecture]].
-2. **Shared `JWT_SECRET`** across admin and member tokens **[C]**. Separation rests entirely on the
-   `audience` claim. Under a pooled tenancy model, one secret would span all gyms → Q-01.
+   where only the member holds both. But under app-based routing (D-036) **any client can aim it at
+   any gym**, so the guessing surface multiplies by the number of gyms. Must be session-bound,
+   per-gym rate-limited, or both, **before launch**. The verification code is also effectively a
+   **reusable secret**, which constrains what a member-ID QR may carry → [[09 - QR-Code Architecture]].
+2. **Shared `JWT_SECRET`** across admin and member tokens **within one gym** **[C]**. Separation
+   rests entirely on the `audience` claim. **Improved by D-016:** each gym gets its own secret, so a
+   token from gym A cannot verify against gym B — the audience claim now separates roles, and the
+   per-gym secret separates tenants.
 3. **Biometric data in Postgres** **[C]**. Face templates are `jsonb` in `members` — no object
    store, no separate encryption at rest beyond the database's own. **No retention policy exists**
-   (Q-16), and data is already held.
+   (Q-16), and data is already held. **D-042 bounds the exposure:** 1:N matching stays server-side,
+   so a gym's member face gallery never reaches a device; only a member's own template may be
+   matched on their own phone.
 4. **`settings` is an unvalidated free-form key space** **[P]** — see [[12 - Database Architecture]].
 5. **No automated POPIA erasure** **[P]**. `request-deletion.js` flags a record; deletion is manual.
    FK cascades make erasure *possible*, not *automatic*.
@@ -75,7 +80,7 @@ and any jurisdiction beyond South Africa (Q-18).
 
 | # | Risk | Why it is serious here | Mitigation direction |
 |---|---|---|---|
-| R-1 | **Resolver bug serves gym A's client to gym B** | Cross-tenant data leak of health and biometric data. The resolver replaces RLS as the isolation mechanism | Resolve from host/signed claim only; never a default-gym fallback; automated cross-tenant test as the Stage 5 gate |
+| R-1 | **Resolver bug serves gym A's client to gym B** | Cross-tenant data leak of health and biometric data. The resolver replaces RLS as the isolation mechanism | **Updated for D-035/D-036:** the client may *name* a gym but is granted nothing on that name alone — credentials are verified against that gym's own database and `JWT_SECRET`. Never a default-gym fallback. Automated cross-tenant test is the Stage 5 gate |
 | R-2 | **Client-cache key confusion** | The pooled Supabase client is keyed on `gym_id`; a stale or wrong key hands over the wrong database | Key on gym id + connection id; evict on any connection or secret change; never key on anything client-supplied |
 | R-3 | **All gyms' secrets reachable from one process** | A single RCE or SSRF in the shared app exposes the fleet | Short TTL in memory; fetch per request scope; never log or serialise. **Materially reduced by D-044/D-046:** the platform admin panel is a separate deployment that holds **no** gym credentials, so only the gym-serving app and the migration orchestrator ever touch them |
 | R-4 | **Secret value written into `gym_secrets`** | Turns the metadata database into a credential store | Documented invariant (§4.4 of [[12 - Database Architecture]]); code review; treat any occurrence as an incident requiring rotation, not deletion |
@@ -100,7 +105,9 @@ New surfaces the platform introduces, each with new risk:
 - **Document upload** (owner applications) — file storage does not exist today; new attack surface,
   new retention duty → Q-12, Q-24
 - **Cross-gym queries** in the platform panel — the exact thing tenant isolation must prevent
-- **Gym resolution** — if a client can assert which gym it is, isolation is already broken
+- **Gym resolution** — under D-036 a client *does* name its gym, and that is safe **only because**
+  credentials are then verified against that gym's own database and signing secret (D-035). Isolation
+  never rested on hiding which gym was asked for
 - **Mobile session storage** — secure storage, not `localStorage`
 
 ## Never expose
