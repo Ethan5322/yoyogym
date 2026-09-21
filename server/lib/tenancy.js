@@ -1,33 +1,32 @@
 // Gym resolution — the platform's isolation boundary.
 //
-// Under the chosen architecture one application serves every gym, and each gym
-// has its own Supabase project. That means **this file replaces Row Level
-// Security as the thing keeping gyms apart**. A bug here is a cross-tenant leak
-// of health and biometric data, so it is written to fail closed everywhere and
-// is covered by tests/isolation.test.js.
+// TWO TENANCY SHAPES, one resolver.
+//
+//   SCHEMA MODE (in use). All gyms share ONE Supabase project, each with its own
+//     Postgres schema — gym_ironworks.members, gym_flexhouse.members. This is
+//     free on Supabase's free plan and needs no change to the ~76 handlers,
+//     because getSupabase() has always configured `db.schema`. The handlers call
+//     .from('members') and Postgres resolves it inside that gym's schema.
+//
+//   PROJECT MODE (available). A gym has its own Supabase project and its own
+//     credentials — for one that outgrows the shared project, or wants its data
+//     in its own account. The connection row carries a `supabase_url`, and the
+//     credentials come from the secrets store.
+//
+// ⚠️ ISOLATION IS NOW LOGICAL, NOT PHYSICAL. Every gym in schema mode lives in
+// one database. Previously a resolver bug meant a wrong answer; now it means
+// one gym reading another's members, health answers and biometric templates.
+// **This file replaces RLS as the thing keeping gyms apart**, so it fails closed
+// everywhere and is covered by tests/isolation.test.js.
 //
 // Two rules it exists to enforce:
 //
-//   1. A client may NAME a gym; it is never GRANTED anything on that name
-//      alone. Naming gets you as far as public catalog data. Everything else is
-//      gated on credentials verified against that gym's own secret.
-//   2. There is NO default gym. Every failure refuses. A fallback anywhere in
-//      this chain is a cross-tenant leak waiting to happen.
-//
-// Dependencies are injected rather than imported so the resolver can be tested
-// without a platform database, and so the caching layer can be added around it
-// without touching this logic.
+//   1. A client may NAME a gym; it is never GRANTED anything on that name alone.
+//   2. There is NO default. No default gym, and — the dangerous one — **no
+//      default schema**. Falling back to `gym` would serve the original gym's
+//      data to whoever asked.
 import { AsyncLocalStorage } from 'node:async_hooks';
 
-/**
- * Per-request store for the resolved gym.
- *
- * AsyncLocalStorage rather than a module variable, so that concurrent requests
- * on one warm serverless instance cannot overwrite each other — the failure
- * that test 6 exists to catch. It also means the ~76 existing handlers need no
- * changes: they keep calling getSupabase() with no arguments, and it reads the
- * gym from here.
- */
 const store = new AsyncLocalStorage();
 
 /** A refusal carrying the HTTP status the caller should return. */
@@ -40,18 +39,28 @@ export class ResolutionError extends Error {
   }
 }
 
-/** Gym statuses that may serve traffic. Anything else is refused. */
+/** Gym statuses that may serve traffic. */
 const SERVING = new Set(['active']);
 
 /** Connection statuses that may serve traffic. */
 const REACHABLE = new Set(['healthy']);
 
 /**
+ * A schema name must be a plain identifier.
+ *
+ * The value reaches a database client, and a registry row should never contain
+ * anything else. Refused rather than sanitised: sanitising hides the fact that
+ * something put a strange value in the registry, which is the actual problem.
+ */
+const SAFE_SCHEMA = /^[a-z_][a-z0-9_]{0,62}$/i;
+
+/**
  * Resolve a gym identifier to that gym's own database client.
  *
  * @param {string} slug  public gym identifier, from a QR or app search
- * @param {object} deps  { lookupGym, fetchSecrets, createClient }
- * @returns {Promise<{gym, connection, secrets, client}>}
+ * @param {object} deps  { lookupGym, fetchSecrets, createClient, shared }
+ *   `shared` is the platform's own project: { url, key }. Used in schema mode.
+ * @returns {Promise<{gym, connection, schema, client}>}
  * @throws {ResolutionError} on every failure — never a fallback
  */
 export async function resolveGym(slug, deps) {
@@ -61,16 +70,14 @@ export async function resolveGym(slug, deps) {
 
   const record = await deps.lookupGym(slug);
   if (!record || !record.gym) {
-    // Deliberately identical to a suspended gym's shape of failure at the
-    // network level: do not confirm which gyms exist.
     throw new ResolutionError(404, 'Gym not found.', slug);
   }
 
   const { gym, connection } = record;
 
   if (!SERVING.has(gym.status)) {
-    // 'pending' means approved and provisioned but not yet paid — the gym owner
-    // needs to settle, which is a different fix from being suspended.
+    // 'pending' means provisioned but not yet paid, which the owner fixes
+    // differently from a suspension.
     const status = gym.status === 'pending' ? 402 : 403;
     throw new ResolutionError(status, `This gym is not active (${gym.status}).`, slug);
   }
@@ -79,25 +86,49 @@ export async function resolveGym(slug, deps) {
     throw new ResolutionError(503, 'This gym is temporarily unavailable.', slug);
   }
 
-  let secrets;
-  try {
-    secrets = await deps.fetchSecrets(gym.id);
-  } catch {
-    // The secrets store is down. Refuse. Never reach for another gym's
-    // credentials, and never fall back to the deployment's own environment.
+  // The schema IS the isolation boundary in schema mode. A missing or malformed
+  // one is refused — never defaulted.
+  const schema = connection.schema_name;
+  if (!schema || !SAFE_SCHEMA.test(schema)) {
     throw new ResolutionError(503, 'This gym is temporarily unavailable.', slug);
   }
 
-  if (!secrets || !secrets.service_key) {
-    throw new ResolutionError(503, 'This gym is temporarily unavailable.', slug);
+  // Project mode when the connection names its own project; schema mode
+  // otherwise. The distinction is one field, so a gym can be moved to its own
+  // project later by filling it in.
+  const ownProject = Boolean(connection.supabase_url);
+
+  let url;
+  let key;
+
+  if (ownProject) {
+    url = connection.supabase_url;
+    let secrets;
+    try {
+      secrets = await deps.fetchSecrets(gym.id);
+    } catch {
+      throw new ResolutionError(503, 'This gym is temporarily unavailable.', slug);
+    }
+    if (!secrets?.service_key) {
+      // Never quietly fall back to the shared project: that would put this
+      // gym's queries against a database it does not belong to.
+      throw new ResolutionError(503, 'This gym is temporarily unavailable.', slug);
+    }
+    key = secrets.service_key;
+  } else {
+    if (!deps.shared?.url || !deps.shared?.key) {
+      throw new ResolutionError(503, 'This gym is temporarily unavailable.', slug);
+    }
+    url = deps.shared.url;
+    key = deps.shared.key;
   }
 
-  const client = deps.createClient(connection.supabase_url, secrets.service_key, {
+  const client = deps.createClient(url, key, {
     auth: { persistSession: false, autoRefreshToken: false },
-    db: { schema: connection.schema_name || 'gym' },
+    db: { schema },
   });
 
-  return { gym, connection, secrets, client };
+  return { gym, connection, schema, client };
 }
 
 /**

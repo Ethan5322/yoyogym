@@ -434,6 +434,12 @@ Q-36 secrets store · Q-37 connection pooling · Q-38 migration orchestration ·
 target scale** · Q-12 document retention · Q-24 object storage (blocks
 `application_documents.storage_ref` being usable) · Q-40 platform billing provider.
 
+## Storage alternatives
+
+If the shared free project is ever outgrown, [[22 - Storage Migration Assessment]] measures what
+moving off Supabase would cost — including Telga's Railway + SQLite model, and why the
+`getSupabase()` seam keeps that a one-file change rather than a rewrite.
+
 ## Related
 
 [[00 - Project Purpose]] · [[01 - Existing Yoyo Gym Audit]] · [[06 - Tenant Architecture]] ·

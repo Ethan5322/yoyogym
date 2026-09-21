@@ -1,53 +1,78 @@
-// Tenant-isolation tests — the Stage 5 gate, written BEFORE the resolver.
+// Tenant-isolation tests — the Stage 5 gate.
 //
-// The rule these defend: "Gym 1 must not see Gym 2 data." Under the chosen
-// architecture (a shared application over a database per gym) the resolver
-// replaces RLS as the isolation mechanism, so a bug here is a cross-tenant leak
-// of health and biometric data.
+// The rule these defend: "Gym 1 must not see Gym 2 data." The resolver replaces
+// RLS as the isolation mechanism, so a bug here is a cross-tenant leak of health
+// and biometric data.
 //
-// Test 6 is the important one. Cache-key confusion under concurrency is how
-// this design fails, and it is invisible in single-request testing.
+// TWO TENANCY SHAPES, one resolver:
+//
+//   SCHEMA MODE (the one in use)   — all gyms share ONE Supabase project, each
+//     with its own Postgres schema: gym_ironworks.members, gym_flexhouse.members.
+//     Free, and the existing code already speaks it, because getSupabase()
+//     always configured `db.schema`.
+//
+//   PROJECT MODE (kept available)  — a gym has its own Supabase project and its
+//     own credentials. For a gym that outgrows the shared project, or wants its
+//     data in its own account.
+//
+// Isolation in schema mode is LOGICAL, not physical: every gym is in one
+// database. That makes these tests more important than they were when each gym
+// had its own project, not less. Tests 6, 7 and 8 are the ones that matter.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { resolveGym, runWithGym, currentGym, ResolutionError } from '../server/lib/tenancy.js';
 
-/** Two gyms, two databases, two secrets — the whole point of the design. */
+const SHARED = { url: 'https://shared.supabase.co', key: 'shared-service-key' };
+
 const REGISTRY = {
+  // Schema mode: no per-gym url or key, just a schema in the shared project.
   'iron-works': {
     gym: { id: 'gym-a', slug: 'iron-works', status: 'active' },
-    connection: { id: 'conn-a', supabase_url: 'https://a.supabase.co', schema_name: 'gym', status: 'healthy' },
+    connection: { id: 'conn-a', schema_name: 'gym_ironworks', status: 'healthy' },
   },
   'flex-house': {
     gym: { id: 'gym-b', slug: 'flex-house', status: 'active' },
-    connection: { id: 'conn-b', supabase_url: 'https://b.supabase.co', schema_name: 'gym', status: 'healthy' },
+    connection: { id: 'conn-b', schema_name: 'gym_flexhouse', status: 'healthy' },
+  },
+  // Project mode: its own project entirely.
+  'own-project': {
+    gym: { id: 'gym-own', slug: 'own-project', status: 'active' },
+    connection: {
+      id: 'conn-own',
+      supabase_url: 'https://own.supabase.co',
+      schema_name: 'gym',
+      status: 'healthy',
+    },
+  },
+  // A connection with NO schema — must never fall back to the default.
+  'no-schema': {
+    gym: { id: 'gym-x', slug: 'no-schema', status: 'active' },
+    connection: { id: 'conn-x', schema_name: null, status: 'healthy' },
   },
   suspended: {
     gym: { id: 'gym-c', slug: 'suspended', status: 'suspended' },
-    connection: { id: 'conn-c', supabase_url: 'https://c.supabase.co', schema_name: 'gym', status: 'healthy' },
+    connection: { id: 'conn-c', schema_name: 'gym_c', status: 'healthy' },
   },
   'trial-over': {
     gym: { id: 'gym-d', slug: 'trial-over', status: 'pending' },
-    connection: { id: 'conn-d', supabase_url: 'https://d.supabase.co', schema_name: 'gym', status: 'healthy' },
+    connection: { id: 'conn-d', schema_name: 'gym_d', status: 'healthy' },
   },
   unreachable: {
     gym: { id: 'gym-e', slug: 'unreachable', status: 'active' },
-    connection: { id: 'conn-e', supabase_url: 'https://e.supabase.co', schema_name: 'gym', status: 'unreachable' },
+    connection: { id: 'conn-e', schema_name: 'gym_e', status: 'unreachable' },
   },
 };
 
-const SECRETS = {
-  'gym-a': { service_key: 'key-a', jwt_secret: 'jwt-a' },
-  'gym-b': { service_key: 'key-b', jwt_secret: 'jwt-b' },
-};
+const SECRETS = { 'gym-own': { service_key: 'own-key' } };
 
 function deps({ secretFails = false, delayFor = null } = {}) {
   const built = [];
   return {
     built,
+    shared: SHARED,
     lookupGym: async (slug) => REGISTRY[slug] ?? null,
     fetchSecrets: async (gymId) => {
       if (secretFails) throw new Error('secrets store unavailable');
-      // Deliberate skew so a slow gym cannot be masked by a fast one.
       if (delayFor === gymId) await new Promise((r) => setTimeout(r, 25));
       return SECRETS[gymId] ?? null;
     },
@@ -59,93 +84,127 @@ function deps({ secretFails = false, delayFor = null } = {}) {
   };
 }
 
-test('1. resolves a gym to a client built from ITS OWN url and key', async () => {
-  const d = deps();
-  const r = await resolveGym('iron-works', d);
+// ---------------------------------------------------------------------------
+// Schema mode — the shape actually in use
+// ---------------------------------------------------------------------------
+
+test('1. a gym resolves to a client scoped to ITS OWN schema', async () => {
+  const r = await resolveGym('iron-works', deps());
 
   assert.equal(r.gym.id, 'gym-a');
-  assert.equal(r.client.url, 'https://a.supabase.co');
-  assert.equal(r.client.key, 'key-a');
+  assert.equal(r.client.schema, 'gym_ironworks');
+  assert.equal(r.client.url, SHARED.url, 'schema mode shares the project');
 });
 
-test('2. two gyms never share a client', async () => {
+test('2. two gyms in the same project get DIFFERENT schemas', async () => {
   const d = deps();
   const a = await resolveGym('iron-works', d);
   const b = await resolveGym('flex-house', d);
 
   assert.notEqual(a.client, b.client);
-  assert.equal(a.client.key, 'key-a');
-  assert.equal(b.client.key, 'key-b');
-  assert.notEqual(a.secrets.jwt_secret, b.secrets.jwt_secret, 'each gym signs with its own secret');
+  assert.equal(a.client.schema, 'gym_ironworks');
+  assert.equal(b.client.schema, 'gym_flexhouse');
+  assert.notEqual(a.client.schema, b.client.schema, 'the schema IS the isolation boundary');
 });
 
-test('3. an unknown gym is refused — never a default', async () => {
+test('3. a connection with no schema is REFUSED — never the default', async () => {
+  // The dangerous case: falling back to 'gym' would serve the original gym's
+  // data to whoever asked. Fail closed instead.
   const d = deps();
   await assert.rejects(
-    () => resolveGym('does-not-exist', d),
-    (err) => err instanceof ResolutionError && err.status === 404
+    () => resolveGym('no-schema', d),
+    (err) => err instanceof ResolutionError && err.status === 503
   );
-  assert.equal(d.built.length, 0, 'no client may be built for an unknown gym');
+  assert.equal(d.built.length, 0, 'no client may be built without a schema');
 });
 
-test('4. suspended and not-yet-paid gyms are refused, with valid credentials present', async () => {
+// ---------------------------------------------------------------------------
+// Project mode — still supported, for a gym with its own account
+// ---------------------------------------------------------------------------
+
+test('4. a gym with its own project uses its own url and key', async () => {
+  const r = await resolveGym('own-project', deps());
+
+  assert.equal(r.client.url, 'https://own.supabase.co');
+  assert.equal(r.client.key, 'own-key');
+  assert.equal(r.client.schema, 'gym');
+});
+
+test('5. a gym with its own project but no credentials fails closed', async () => {
+  const d = deps({ secretFails: true });
+  await assert.rejects(
+    () => resolveGym('own-project', d),
+    (err) => err instanceof ResolutionError && err.status === 503
+  );
+  assert.equal(d.built.length, 0, 'never fall back to the shared project');
+});
+
+// ---------------------------------------------------------------------------
+// Refusals — every failure fails closed
+// ---------------------------------------------------------------------------
+
+test('6. unknown, suspended, unpaid and unreachable gyms are all refused', async () => {
   const d = deps();
-  await assert.rejects(
-    () => resolveGym('suspended', d),
-    (err) => err instanceof ResolutionError && err.status === 403
-  );
-  await assert.rejects(
-    () => resolveGym('trial-over', d),
-    (err) => err instanceof ResolutionError && err.status === 402
-  );
-  assert.equal(d.built.length, 0, 'a refused gym must never get a client');
+
+  await assert.rejects(() => resolveGym('does-not-exist', d), (e) => e.status === 404);
+  await assert.rejects(() => resolveGym('suspended', d), (e) => e.status === 403);
+  await assert.rejects(() => resolveGym('trial-over', d), (e) => e.status === 402);
+  await assert.rejects(() => resolveGym('unreachable', d), (e) => e.status === 503);
+
+  assert.equal(d.built.length, 0, 'a refused gym never gets a client');
 });
 
-test('5. an unreachable connection or a failed secret fetch fails closed', async () => {
-  await assert.rejects(
-    () => resolveGym('unreachable', deps()),
-    (err) => err instanceof ResolutionError && err.status === 503
-  );
+// ---------------------------------------------------------------------------
+// The ones that matter most now that isolation is logical
+// ---------------------------------------------------------------------------
 
-  const failing = deps({ secretFails: true });
-  await assert.rejects(
-    () => resolveGym('iron-works', failing),
-    (err) => err instanceof ResolutionError && err.status === 503
-  );
-  assert.equal(failing.built.length, 0, 'never fall back to another gym when secrets fail');
-});
-
-test('6. concurrent requests for two gyms never cross over', async () => {
-  // gym-a is deliberately slowed so the requests interleave. If the resolved
-  // gym were held anywhere shared, the fast request would overwrite the slow
-  // one and this test would see gym-b's client inside gym-a's context.
+test('7. concurrent requests for two gyms never cross schemas', async () => {
+  // gym-a is slowed so the requests interleave. If the resolved gym were held
+  // anywhere shared, the fast request would overwrite the slow one.
   const d = deps({ delayFor: 'gym-a' });
   const seen = [];
 
-  const one = async (slug, expectedKey) => {
+  const one = async (slug, expectedSchema) => {
     const r = await resolveGym(slug, d);
     return runWithGym(r, async () => {
       await new Promise((res) => setTimeout(res, 5));
       const ctx = currentGym();
-      seen.push([slug, ctx.client.key]);
-      assert.equal(ctx.client.key, expectedKey, `${slug} must still see its own client`);
+      seen.push([slug, ctx.client.schema]);
+      assert.equal(ctx.client.schema, expectedSchema, `${slug} must still see its own schema`);
     });
   };
 
   await Promise.all([
-    one('iron-works', 'key-a'),
-    one('flex-house', 'key-b'),
-    one('iron-works', 'key-a'),
-    one('flex-house', 'key-b'),
+    one('iron-works', 'gym_ironworks'),
+    one('flex-house', 'gym_flexhouse'),
+    one('iron-works', 'gym_ironworks'),
+    one('flex-house', 'gym_flexhouse'),
   ]);
 
   assert.equal(seen.length, 4);
-  for (const [slug, key] of seen) {
-    assert.equal(key, slug === 'iron-works' ? 'key-a' : 'key-b');
+  for (const [slug, schema] of seen) {
+    assert.equal(schema, slug === 'iron-works' ? 'gym_ironworks' : 'gym_flexhouse');
   }
 });
 
-test('7. outside a request context there is no ambient gym', () => {
+test('8. outside a request context there is no ambient gym', () => {
   // Nothing may leak between requests via module state.
   assert.equal(currentGym(), undefined);
+});
+
+test('9. a schema name that is not a plain identifier is refused', async () => {
+  // The schema name reaches a database client. Anything that is not a simple
+  // identifier is refused rather than sanitised, because a registry row should
+  // never contain such a thing in the first place.
+  const d = deps();
+  d.lookupGym = async () => ({
+    gym: { id: 'gym-evil', slug: 'evil', status: 'active' },
+    connection: { id: 'c', schema_name: 'gym_a"; drop schema gym_b; --', status: 'healthy' },
+  });
+
+  await assert.rejects(
+    () => resolveGym('evil', d),
+    (err) => err instanceof ResolutionError && err.status === 503
+  );
+  assert.equal(d.built.length, 0);
 });

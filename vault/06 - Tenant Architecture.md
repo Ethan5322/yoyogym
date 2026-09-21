@@ -9,6 +9,16 @@ updated: 2026-09-21
 
 # 06 — Tenant Architecture
 
+> ## ⚠️ SUPERSEDED IN PART — D-096 (2026-09-21)
+>
+> **Tenancy is now SCHEMA-PER-GYM in one shared Supabase free project**, not a project per gym.
+> Free, no rewrite, still on Vercel. The resolver and everything below still apply — only *what a
+> gym resolves to* changed, from a separate project to a separate schema.
+>
+> **Isolation is now LOGICAL, not physical.** All gyms share one database, which reverses the
+> physical-separation part of D-014. Accepted knowingly for cost. See [[18 - Decision Log]] D-096
+> and [[22 - Storage Migration Assessment]] for the alternatives that were weighed.
+>
 > ## ✅ DECIDED 2026-09-21 — D-016
 >
 > **Model C: one shared application deployment + one Supabase project per gym + gym resolution
