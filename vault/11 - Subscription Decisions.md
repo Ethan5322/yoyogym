@@ -45,6 +45,37 @@ Gym does not subscribe, or a subscription payment fails
 data. The gym remains POPIA responsible party for that data throughout suspension, and destroying it
 because an invoice went unpaid would be both a compliance failure and unrecoverable.
 
+### The full lifecycle, including the end (D-070, D-071)
+
+```text
+Approved  →  30-DAY FREE TRIAL (D-070)          you pay the hosting
+              │  no payment method required
+              ▼
+          Payment due
+              │
+       ┌──────┴──────┐
+    paid           not paid
+       │               │
+       ▼               ▼
+    ACTIVE        2-day warning (D-026)
+                       │
+                       ▼
+                  SUSPENDED — no platform access, DATA INTACT (D-027)
+                       │  email warnings during this window
+                       │  90 days
+                       ▼
+                  DELETED (D-071) — the gym's Supabase project is removed
+```
+
+> ⚠️ **The exposure, stated in full: 30 days trial + 90 days suspended = up to 120 days of Supabase
+> compute for a gym that never pays anything.** Multiply that by your trial-to-paid conversion rate
+> to get the real cost of the free trial. This is why U-2 (per-project cost) matters — see
+> [[12 - Database Architecture]] §7b for the same lesson on secrets pricing.
+
+**D-027 and D-071 are not in conflict.** D-027 forbids *a billing event* from destroying data —
+suspension alone deletes nothing, ever. D-071 adds a defined end to retention, reached only after 90
+further days and repeated warnings.
+
 **Schema consequence** for the approved-but-unbuilt model ([[12 - Database Architecture]] §4.5):
 `platform_subscriptions` needs a **grace-window field** — e.g. `grace_ends_at timestamptz` — so the
 2-day warning is data rather than a hard-coded constant, consistent with §18. Cheap to add now,
