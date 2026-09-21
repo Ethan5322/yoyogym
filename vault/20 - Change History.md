@@ -15,6 +15,28 @@ occurrence is answered from notes rather than rediscovered.
 
 ---
 
+## 2026-09-21 — Merged to main, and the validator caught its own author
+
+**Merged** `docs/yoyo-gyms-second-brain` into `main` (D-066, `--no-ff`, 25 commits). Not pushed.
+
+**The first thing the validator did on main was fail** — reporting "no YAML frontmatter" on all 22
+notes, which plainly had frontmatter. **The bug was mine, not the vault's.** Git checks these files
+out as CRLF on Windows, and the frontmatter pattern was anchored to `
+`. Line endings are now
+normalised on read, and the negative test was re-run against CRLF files to confirm the checks still
+fire.
+
+**Lesson recorded.** It would have **passed in CI and failed on every Windows checkout of the same
+commit** — Linux runners use LF. A tool that validates text must normalise line endings before it
+reads anything, and *"it passes on my machine and in CI"* is not the same as *"it works"* when the
+team is on Windows and CI is not.
+
+**Worth noting where it surfaced.** The failure appeared on the merge commit, not on the branch,
+because the branch's working files were still the LF versions just written. **Verify after the
+merge, not only before it** — the merge changed the bytes on disk.
+
+---
+
 ## 2026-09-21 — Graph refresh attempted, deliberately not completed
 
 **Attempted** a Graphify refresh after the day's vault changes. The incremental cache worked well:

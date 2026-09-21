@@ -63,7 +63,11 @@ const bodies = new Map();
 // ---- pass 1: frontmatter, aliases, mojibake -------------------------------
 for (const file of notes) {
   const stem = file.replace(/\.md$/, '');
-  const raw = readFileSync(join(VAULT, file), 'utf8');
+  // Normalise line endings before anything else. Git checks these files out as
+  // CRLF on Windows, and a frontmatter pattern anchored to "\n" silently sees
+  // no frontmatter at all — it passed on Linux CI and failed on a Windows
+  // checkout of the same commit.
+  const raw = readFileSync(join(VAULT, file), 'utf8').replace(/\r\n/g, '\n');
   incoming.set(stem, 0);
 
   if (MOJIBAKE.test(raw)) {
