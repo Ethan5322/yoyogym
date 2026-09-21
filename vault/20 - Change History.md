@@ -15,6 +15,44 @@ occurrence is answered from notes rather than rediscovered.
 
 ---
 
+## 2026-09-21 — The vault now validates itself
+
+**Added `npm run docs:validate`** (`scripts/validate-vault.mjs`, 150 lines) and wired it into CI
+between the unit tests and the production build. **D-064.**
+
+**What it checks, and why each one is there.** Every check corresponds to a mistake actually made
+during this session, not a hypothetical:
+
+| Check | The real incident it prevents |
+|---|---|
+| Frontmatter keys present | Note 01 had no `updated` field — found on the first run |
+| Wikilinks resolve **through aliases** | The numbered-filename / titled-link split (D-006) only works if aliases resolve; a plain filename check would have reported 60+ false breaks |
+| Orphans | A note nothing links to is a note nobody finds |
+| `D-###` references exist in the Decision Log | Dangling decision references are worse than none — they look authoritative |
+| Mojibake | Encoding damage from a bad write |
+
+Code fences and inline code are stripped before links are read, because the Decision Log genuinely
+contains a `[[links]]` written as an example. A naive scanner would have flagged it forever.
+
+**Proven, not assumed.** The validator was negative-tested against a deliberately broken note —
+removed frontmatter key, link to a non-existent note, and a reference to `D-999`. All three were
+caught, exit code 1, and the note restored cleanly. A checker nobody has seen fail is a checker
+nobody should trust.
+
+**Why this existed to be built.** Stale or self-contradicting vault content was fixed **by hand five
+times** on 2026-09-21: note 11 listing answered questions as open, note 14 contradicting the routing
+decision, note 17 twice, note 07 still claiming nothing was decided after four decisions had been
+made. None of those were carelessness — they are what happens when 22 cross-linked notes and 64
+decisions move quickly. The vault is the memory of record, so drift should fail a build rather than
+wait to be noticed by whoever reads the note next.
+
+**Lesson recorded.** The pattern came from Telga (`npm run docs:validate`, D-052). **Looking at what
+the neighbouring project already solved was cheaper than inventing it** — including the two details
+that are easy to get wrong: stripping code spans before reading links, and resolving through
+aliases.
+
+---
+
 ## 2026-09-21 — Member payments removed (first code change of the project)
 
 **Implemented** [[21 - Member Payment Removal Design]] end to end. **49 tests pass** (42 + 7 new),

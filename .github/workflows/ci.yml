@@ -26,6 +26,12 @@ jobs:
       - name: Unit tests
         run: npm test
 
+      - name: Validate the Obsidian vault
+        # The vault is the project's memory of record (CLAUDE.md 26). A broken
+        # link or a stale note is how a later session reaches a confident wrong
+        # answer, so drift fails the build rather than waiting to be noticed.
+        run: npm run docs:validate
+
       - name: Production build
         run: npm run build
         env:

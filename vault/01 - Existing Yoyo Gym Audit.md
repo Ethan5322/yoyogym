@@ -4,6 +4,7 @@ tags: [audit, existing-system, source-of-truth]
 stage: "Stage 2"
 status: complete
 audited: 2026-09-21
+updated: 2026-09-21
 commit: c68c8c9
 ---
 

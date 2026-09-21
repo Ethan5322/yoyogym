@@ -10,6 +10,7 @@
     "build": "vite build",
     "preview": "vite preview",
     "test": "node --test \"tests/**/*.test.js\"",
+    "docs:validate": "node scripts/validate-vault.mjs",
     "seed:owner": "node scripts/seed-owner.js",
     "seed:catalog": "node scripts/seed-catalog.js"
   },
