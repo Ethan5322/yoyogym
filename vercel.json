@@ -40,7 +40,6 @@
       "maxDuration": 10
     }
   },
-  "_cronsNote": "The platform job is NOT a Vercel cron: Hobby allows very few and the gym already uses them. POST /api/platform/cron with Authorization: Bearer $PLATFORM_CRON_SECRET from any external scheduler, or press the button in the panel. Nothing breaks if it does not run for a day - billing is idempotent and retention only reports until PLATFORM_RETENTION_LIVE is set.",
   "crons": [
     {
       "path": "/api/cron/daily",
