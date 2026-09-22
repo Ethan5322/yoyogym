@@ -1,6 +1,7 @@
 // Root API router. Resolves the route from req.url. Logic lives in /server
 // (outside /api), so only the 6 router files count as Serverless Functions.
 import { json } from '../server/lib/http.js';
+import { withGym } from '../server/lib/gymcontext.js';
 import { captureError } from '../server/lib/observability.js';
 import health from '../server/handlers/public/health.js';
 import catalog from '../server/handlers/public/catalog.js';
@@ -18,7 +19,7 @@ export default async function handler(req, res) {
   const fn = routes[key];
   if (!fn) return json(res, 404, { error: `Not found: /api/${key}` });
   try {
-    return await fn(req, res);
+    return await withGym(req, res, () => fn(req, res), json);
   } catch (err) {
     captureError(`api/${key}`, err, { method: req.method });
     if (!res.headersSent) return json(res, 500, { error: 'Something went wrong. Please try again.' });

@@ -26,6 +26,12 @@ import {
   withLearnedTemplate,
 } from '../../lib/facematch.js';
 import { selectFaceRows, updateFaceRow } from '../../lib/facedb.js';
+import { currentGym } from '../../lib/tenancy.js';
+
+// The gym this login happened in, stamped into the token so every later
+// request carries it in a signature the client cannot edit. null in
+// single-gym mode, which leaves the token exactly as it was before.
+const gymSlug = () => currentGym()?.gym?.slug ?? null;
 
 const BASE = 'id, full_name, membership_number, status';
 
@@ -108,7 +114,7 @@ export default async function handler(req, res) {
     }
 
     return ok(res, {
-      token: signMemberToken(member),
+      token: signMemberToken(member, { gym: gymSlug() }),
       member: {
         id: member.id,
         full_name: member.full_name,

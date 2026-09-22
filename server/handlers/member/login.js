@@ -5,6 +5,12 @@ import { getSupabase } from '../../lib/supabase.js';
 import { allowMethods, readJsonBody, ok, badRequest, unauthorized, serverError } from '../../lib/http.js';
 import { signMemberToken, normalizePhone } from '../../lib/memberauth.js';
 import { rateLimit } from '../../lib/ratelimit.js';
+import { currentGym } from '../../lib/tenancy.js';
+
+// The gym this login happened in, stamped into the token so every later
+// request carries it in a signature the client cannot edit. null in
+// single-gym mode, which leaves the token exactly as it was before.
+const gymSlug = () => currentGym()?.gym?.slug ?? null;
 
 export default async function handler(req, res) {
   if (!allowMethods(req, res, ['POST'])) return;
@@ -28,7 +34,7 @@ export default async function handler(req, res) {
     }
 
     return ok(res, {
-      token: signMemberToken(member),
+      token: signMemberToken(member, { gym: gymSlug() }),
       member: {
         id: member.id,
         full_name: member.full_name,

@@ -28,19 +28,32 @@ export async function verifyPassword(plain, hash) {
   return bcrypt.compare(plain, hash);
 }
 
-/** Sign a JWT for an authenticated admin user. */
-export function signToken(adminUser) {
-  return jwt.sign(
-    {
-      sub: adminUser.id,
-      username: adminUser.username,
-      role: adminUser.role,
-      full_name: adminUser.full_name,
-      trainer_id: adminUser.trainer_id || null,
-    },
-    JWT_SECRET,
-    { expiresIn: JWT_EXPIRES_IN }
-  );
+/**
+ * Sign a JWT for an authenticated admin user.
+ *
+ * `gym` STAMPS THE TOKEN WITH ITS TENANT, and it is what stops a token from
+ * one gym working at another. All gyms share one JWT_SECRET under D-096, so a
+ * token from gym A verifies at gym B; putting the gym inside the signature is
+ * what takes that choice away from the client (see server/lib/gymcontext.js).
+ *
+ * It is OPTIONAL, and omitting it is single-gym mode. Every token already
+ * issued has no gym claim, and must keep working — requiring one would log out
+ * every signed-in staff member the moment this deploys.
+ */
+export function signToken(adminUser, { gym = null } = {}) {
+  const claims = {
+    sub: adminUser.id,
+    username: adminUser.username,
+    role: adminUser.role,
+    full_name: adminUser.full_name,
+    trainer_id: adminUser.trainer_id || null,
+  };
+
+  // Added only when there is one, so a single-gym token is byte-for-byte what
+  // it was before this change.
+  if (gym) claims.gym = String(gym).toLowerCase();
+
+  return jwt.sign(claims, JWT_SECRET, { expiresIn: JWT_EXPIRES_IN });
 }
 
 /**

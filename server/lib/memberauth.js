@@ -10,12 +10,16 @@ const AUDIENCE = 'member';
 
 if (!SECRET) throw new Error('Missing JWT_SECRET environment variable.');
 
-export function signMemberToken(member) {
-  return jwt.sign(
-    { sub: member.id, membership_number: member.membership_number },
-    SECRET,
-    { expiresIn: EXPIRES_IN, audience: AUDIENCE }
-  );
+/**
+ * `gym` stamps the token with its tenant — see signToken in ./auth.js for why.
+ * Optional, and omitting it is single-gym mode, so existing member sessions
+ * are unaffected.
+ */
+export function signMemberToken(member, { gym = null } = {}) {
+  const claims = { sub: member.id, membership_number: member.membership_number };
+  if (gym) claims.gym = String(gym).toLowerCase();
+
+  return jwt.sign(claims, SECRET, { expiresIn: EXPIRES_IN, audience: AUDIENCE });
 }
 
 export function verifyMemberToken(token) {

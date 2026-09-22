@@ -1,5 +1,6 @@
 // Cron router — /api/cron/* (daily orchestrator + individual jobs).
 import { json } from '../../server/lib/http.js';
+import { withGym } from '../../server/lib/gymcontext.js';
 import { captureError } from '../../server/lib/observability.js';
 import daily from '../../server/handlers/cron/daily.js';
 import billing from '../../server/handlers/cron/billing.js';
@@ -29,7 +30,7 @@ export default async function handler(req, res) {
   const fn = routes[seg];
   if (!fn) return json(res, 404, { error: `Not found: /api/cron/${seg || ''}` });
   try {
-    return await fn(req, res);
+    return await withGym(req, res, () => fn(req, res), json);
   } catch (err) {
     captureError(`api/cron/${seg}`, err, { method: req.method });
     if (!res.headersSent) return json(res, 500, { error: 'Cron run failed.' });

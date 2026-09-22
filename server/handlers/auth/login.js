@@ -8,6 +8,12 @@ import { getSupabase } from '../../lib/supabase.js';
 import { verifyPassword, signToken } from '../../lib/auth.js';
 import { allowMethods, readJsonBody, ok, badRequest, unauthorized, serverError } from '../../lib/http.js';
 import { rateLimit } from '../../lib/ratelimit.js';
+import { currentGym } from '../../lib/tenancy.js';
+
+// The gym this login happened in, stamped into the token so every later
+// request carries it in a signature the client cannot edit. null in
+// single-gym mode, which leaves the token exactly as it was before.
+const gymSlug = () => currentGym()?.gym?.slug ?? null;
 
 const MAX_FAILED_ATTEMPTS = 5;
 const LOCK_MINUTES = 15;
@@ -67,7 +73,7 @@ export default async function handler(req, res) {
       })
       .eq('id', user.id);
 
-    const token = signToken(user);
+    const token = signToken(user, { gym: gymSlug() });
     return ok(res, {
       token,
       user: {

@@ -197,7 +197,7 @@ numbers, more effective than the guessing mitigation D-034 assumed was primary.
 
 ---
 
-## 0.5 🔴 Q-47 — THE TENANCY SEAM IS NOT WIRED, and wiring it needs one decision
+## 0.5 ✅ Q-47 — ANSWERED AND BUILT (2026-09-22, D-137): the gym travels in the TOKEN. Wired into all five routers; backward compatible. Analysis kept below.
 
 Found 2026-09-22 while building the app shell, by following the member's path end to end.
 **Verified by grep, not assumed.**

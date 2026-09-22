@@ -14,6 +14,12 @@ import { rateLimit } from '../../lib/ratelimit.js';
 import { faceServiceConfigured, embedFace } from '../../lib/faceservice.js';
 import { ARCFACE, FACEAPI, arcfaceSimilarity, faceApiSimilarity, templatesOf, identify } from '../../lib/facematch.js';
 import { selectFaceRows } from '../../lib/facedb.js';
+import { currentGym } from '../../lib/tenancy.js';
+
+// The gym this login happened in, stamped into the token so every later
+// request carries it in a signature the client cannot edit. null in
+// single-gym mode, which leaves the token exactly as it was before.
+const gymSlug = () => currentGym()?.gym?.slug ?? null;
 
 const BASE = 'id, username, full_name, email, role, trainer_id, is_active';
 
@@ -62,7 +68,7 @@ export default async function handler(req, res) {
     const best = person.row;
 
     await supabase.from('admin_users').update({ last_login_at: new Date().toISOString() }).eq('id', best.id);
-    const token = signToken(best);
+    const token = signToken(best, { gym: gymSlug() });
     return ok(res, {
       token,
       user: { id: best.id, username: best.username, full_name: best.full_name, email: best.email, role: best.role, trainer_id: best.trainer_id },

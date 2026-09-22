@@ -1,6 +1,7 @@
 // Admin router — /api/admin/* . Resolves the route from req.url; logic lives in
 // /server/handlers/admin (outside /api, so not counted as functions).
 import { json } from '../../server/lib/http.js';
+import { withGym } from '../../server/lib/gymcontext.js';
 import { enforceEntitlement } from '../../server/lib/entitlements.js';
 import { captureError } from '../../server/lib/observability.js';
 import dashboard from '../../server/handlers/admin/dashboard.js';
@@ -92,7 +93,7 @@ export default async function handler(req, res) {
   // Enforced HERE rather than in any of the 37 handlers below it.
   if (!enforceEntitlement(seg, res, json)) return;
   try {
-    return await fn(req, res);
+    return await withGym(req, res, () => fn(req, res), json);
   } catch (err) {
     captureError(`api/admin/${seg}`, err, { method: req.method });
     if (!res.headersSent) return json(res, 500, { error: 'Something went wrong. Please try again.' });
