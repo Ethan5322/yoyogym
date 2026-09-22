@@ -50,6 +50,7 @@ function deps({ user = null, applications = [], application = null } = {}) {
   const decisions = [];
   return {
     decisions,
+    permissionsFor: async () => ['application.view', 'application.approve', 'application.reject'],
     findUserByEmail: async () => user,
     verifyPassword: async (plain) => plain === 'correct-horse',
     verifySecondFactor: async (_u, code) => code === '123456',
@@ -338,4 +339,35 @@ test('bad coordinates are dropped rather than passed on as NaN', async () => {
 
   assert.equal(got.lat, null);
   assert.equal(got.lng, null);
+});
+
+// ---------------------------------------------------------------------------
+// A session is not a permission
+// ---------------------------------------------------------------------------
+
+test('A GYM OWNER WITH A VALID SESSION CANNOT READ THE APPLICATION QUEUE', async () => {
+  // Gym owners hold platform sessions — the signup form creates their account.
+  // This page lists every gym that has applied, with its city, its plan and the
+  // free-text answer about what that business needs. Signing up as a gym owner
+  // must not be a way to read every competitor's application.
+  const d = { ...deps({ applications: [{ id: 'a1', proposed_gym_name: 'Rival Gym' }] }), permissionsFor: async () => [] };
+  const r = res();
+
+  await handlePlatform(req({ url: '/platform/applications', cookie: session() }), r, d);
+
+  assert.equal(r.statusCode, 403);
+  assert.ok(!r.body.includes('Rival Gym'), 'not one competitor name leaks');
+});
+
+test('a gym owner cannot open one application either', async () => {
+  const d = {
+    ...deps({ application: { application: { id: 'a1', proposed_gym_name: 'Rival Gym' }, documents: [{ filename: 'their-id.pdf' }], events: [] } }),
+    permissionsFor: async () => [],
+  };
+  const r = res();
+
+  await handlePlatform(req({ url: '/platform/applications/a1', cookie: session() }), r, d);
+
+  assert.equal(r.statusCode, 403);
+  assert.ok(!r.body.includes('their-id.pdf'), 'nor their documents');
 });

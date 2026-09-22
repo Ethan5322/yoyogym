@@ -321,3 +321,91 @@ test('the cron still returns its billing result when the drift report fails', as
   assert.equal(body.checked, 1, 'the billing result survived');
   assert.equal(body.drift.ok, false);
 });
+
+// ---------------------------------------------------------------------------
+// Owner activation, through the router
+// ---------------------------------------------------------------------------
+
+import { issueActivation } from '../platform/activation.js';
+
+function activationDeps() {
+  const issued = issueActivation({ userId: 'u1', gymId: 'gym-1', now: new Date() });
+  const calls = { passwords: [], used: [], gyms: [], audits: [] };
+  return {
+    issued,
+    calls,
+    activationContext: async () => ({ gymName: 'BOS GYM' }),
+    findActivation: async () => ({ ...issued.row, id: 'act-1' }),
+    setPassword: async (userId, hash) => { calls.passwords.push({ userId, hash }); },
+    markUsed: async (id) => { calls.used.push(id); },
+    setGymStatus: async (gymId, status) => { calls.gyms.push({ gymId, status }); },
+    audit: async (a) => { calls.audits.push(a); },
+  };
+}
+
+test('the activation form is public and names the gym', async () => {
+  const r = res();
+  await handlePlatform(req({ url: '/platform/activate?token=abc' }), r, activationDeps());
+
+  assert.equal(r.statusCode, 200);
+  assert.match(r.body, /BOS GYM/);
+  assert.match(r.body, /name="code"/);
+  assert.match(r.body, /value="abc"/, 'the token is carried through the form');
+});
+
+test('activating with the right code sets the password', async () => {
+  const d = activationDeps();
+  const r = res();
+
+  await handlePlatform(
+    req({
+      method: 'POST',
+      url: '/platform/activate',
+      body: `token=${d.issued.token}&code=${d.issued.code}&password=a-long-enough-password`,
+    }),
+    r,
+    d
+  );
+
+  assert.equal(r.statusCode, 200);
+  assert.equal(d.calls.passwords.length, 1);
+  assert.match(r.body, /account is active/i);
+});
+
+test('a wrong code re-renders the form and keeps the token', async () => {
+  const d = activationDeps();
+  const r = res();
+
+  await handlePlatform(
+    req({
+      method: 'POST',
+      url: '/platform/activate',
+      body: `token=${d.issued.token}&code=000000&password=a-long-enough-password`,
+    }),
+    r,
+    d
+  );
+
+  assert.equal(r.statusCode, 400);
+  assert.equal(d.calls.passwords.length, 0);
+  assert.match(r.body, new RegExp(d.issued.token), 'no need to dig the email out again');
+});
+
+test('the raw code never appears in the page after a failure', async () => {
+  // Re-rendering the submitted code would put it in the browser history and
+  // in any screenshot of the error.
+  const d = activationDeps();
+  const r = res();
+
+  await handlePlatform(
+    req({
+      method: 'POST',
+      url: '/platform/activate',
+      body: `token=${d.issued.token}&code=${d.issued.code}&password=short`,
+    }),
+    r,
+    d
+  );
+
+  assert.ok(!r.body.includes(`value="${d.issued.code}"`));
+});

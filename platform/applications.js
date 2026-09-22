@@ -106,7 +106,32 @@ export async function approveApplication(applicationId, actor, deps, options = {
     created_at: new Date().toISOString(),
   });
 
-  return { ok: true, application, gym: result.gym, dryRun };
+  // The owner needs a way in. Issued AFTER provisioning succeeds, because an
+  // activation link to a gym that does not exist is worse than no email at
+  // all — the owner clicks it, sets a password, and finds nothing.
+  //
+  // A failure here does NOT undo the approval. The gym exists and the decision
+  // stands; the owner can be sent a fresh link. Losing a provisioned gym over
+  // a failed email would be the wrong trade by a wide margin.
+  let activation = null;
+  if (!dryRun && deps.issueActivation && result.gym?.id) {
+    try {
+      activation = await deps.issueActivation({
+        userId: application.applicant_user_id,
+        gymId: result.gym.id,
+      });
+    } catch (err) {
+      await deps.appendEvent({
+        application_id: applicationId,
+        event: 'activation_failed',
+        actor_user_id: actor.id,
+        detail: { error: err?.message || String(err), gym_id: result.gym.id },
+        created_at: new Date().toISOString(),
+      });
+    }
+  }
+
+  return { ok: true, application, gym: result.gym, activation, dryRun };
 }
 
 /**

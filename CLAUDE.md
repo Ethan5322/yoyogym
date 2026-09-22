@@ -1256,6 +1256,25 @@ BUILT 2026-09-22 — STAGES 4-7, code complete, NOT DEPLOYED, NOT PUSHED.
              Stage 10 (store compliance). Application document upload
              (Supabase Storage + multipart) is still unwired.
 
+  ALSO BUILT 2026-09-22 (second pass): owner activation (link + 6-digit code,
+  hashes only), gym-owner login (password; staff still need 2FA), the owner's
+  own page at /platform/my-gym, and application document upload straight to
+  Supabase Storage via signed URL. 270 tests pass.
+
+  ARCHITECTURE REVIEW 2026-09-22 — four surfaces verified, four defects found:
+    F-1  NOT FIXED, protected surface. server/lib/auth.js verifyToken() does
+         not check the token audience, and memberauth.js signs with the SAME
+         JWT_SECRET. A MEMBER TOKEN IS A STRUCTURALLY VALID ADMIN TOKEN.
+         Reproduced. 4 handlers use bare authenticate() with no role check.
+         One-line backward-compatible fix written and awaiting approval in
+         vault/17 §0.2. DO NOT deploy the platform on a gym's domain first.
+    F-2  FIXED. platform/auth.js fell back to JWT_SECRET; combined with F-1 a
+         platform session would have been accepted by the gym API.
+    F-3  FIXED. /platform/applications needed only a session — any gym owner
+         could read every competitor's application and documents.
+    F-4  FIXED. A dependency-factory collision silently dropped the suspend
+         reason and the subscription re-sync.
+
   BLOCKING QUESTION: Q-46 — D-049 (first payment activates) and D-070 (30-day
   trial) contradict each other. A trialing gym currently cannot serve traffic.
   See vault/17 §0.1 for the three options.

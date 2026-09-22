@@ -45,6 +45,90 @@ currently flips it to `active`.
 
 ---
 
+## 0.2 🔴 F-1 — SECURITY: the gym app does not check a token's audience
+
+Found 2026-09-22 during the architecture review. **Reproduced, not theorised.**
+**NOT FIXED — this is protected surface (`CLAUDE.md` §32, "existing authentication model").**
+
+### What is wrong
+
+`server/lib/auth.js` line 49:
+
+```js
+export function verifyToken(token) {
+  try {
+    return jwt.verify(token, JWT_SECRET);   // ← no audience option
+  } catch { return null; }
+}
+```
+
+`server/lib/memberauth.js` signs member tokens with **the same `JWT_SECRET`** and sets
+`audience: 'member'`. Because the admin verifier never asks for an audience, `jwt.verify` ignores
+the claim. **A member token is therefore a structurally valid admin token.**
+
+Proof, run against the real signing code:
+
+```
+member token accepted by the ADMIN verifier:   true
+decoded as admin -> {"sub":"member-uuid","membership_number":"GYM-2026-000123","aud":"member"}
+```
+
+### What it reaches today
+
+Most admin handlers call `requireRole(req, res, ['owner', ...])`, and a member payload has no
+`role`, so they return 403. The exposure is the handlers that call **`authenticate()` with no role
+check** — currently four:
+
+| Handler | What a member token would reach |
+|---|---|
+| `server/handlers/admin/enroll-face.js` | face enrolment |
+| `server/handlers/admin/profile.js` | admin profile |
+| `server/handlers/auth/change-password.js` | password change, keyed on `payload.sub` |
+| `server/handlers/auth/me.js` | admin identity echo |
+
+Member ids and admin ids are separate UUID spaces, so a lookup by `sub` will usually miss. **That
+is luck, not a control.** The boundary is one `requireRole` away from failing at any time, and the
+audience claim that was supposed to enforce it is being set and then ignored.
+
+### The fix, for approval — NOT applied
+
+One line, backward compatible:
+
+```js
+// server/lib/auth.js
+export function verifyToken(token) {
+  try {
+    const payload = jwt.verify(token, JWT_SECRET);
+    // Tokens issued for another surface are refused. Admin tokens carry no
+    // `aud` today, so every live session keeps working.
+    if (payload.aud && payload.aud !== 'admin') return null;
+    return payload;
+  } catch { return null; }
+}
+```
+
+| | |
+|---|---|
+| **Why compatible** | Existing admin tokens have no `aud`, so they pass unchanged. **No live session is logged out.** |
+| **What it blocks** | `aud: 'member'` and `aud: 'platform'` tokens, immediately |
+| **Rollback** | Revert the three lines. No data or schema change |
+| **Tests needed** | A member token is refused by `verifyToken`; an existing admin token still passes; a platform token is refused |
+| **Later, separately** | Start signing admin tokens with `audience: 'admin'` — only after every live session has expired (8 hours), or it logs everyone out |
+
+**Do not deploy the platform to the same domain as a gym until this is decided.**
+
+---
+
+## 0.3 ✅ Fixed during the same review
+
+| | Finding | Fix |
+|---|---|---|
+| **F-2** | `platform/auth.js` fell back to `JWT_SECRET` when `PLATFORM_JWT_SECRET` was unset. Combined with F-1, a **platform session token would have been accepted by the gym API** | The fallback is gone. Signing now throws if the secret is missing **or equal to `JWT_SECRET`**. 4 tests |
+| **F-3** | `/platform/applications` and `/platform/applications/:id` required **only a session**. Gym owners hold platform sessions — the signup form creates their account — so any gym owner could read **every competitor's application**, including uploaded documents and the free-text answer about what their business needs | Both now require `application.view`. 2 tests, both of which fail against the old code |
+| **F-4** | `activationDeps()` defined its own `setGymStatus`, and being spread last it **silently replaced** the ops version that records a suspension reason and re-syncs the subscription | Duplicate removed; a test now fails on any future collision between the four dependency factories |
+
+---
+
 ## 0. ✅ Milestone — every user-decidable question is now ANSWERED
 
 As of 2026-09-21, **63 decisions** are recorded. Nothing further is waiting on a product or business

@@ -14,6 +14,8 @@ import { approveApplication, rejectApplication, requestMoreInfo } from './applic
 import { provisionGym } from './provisioning.js';
 import { schemaRunnerDeps, gymSchemaChecksum, runSql } from './schema-runner.js';
 import { runBilling } from './billing-runner.js';
+import { issueActivation, activationLookupHash } from './activation.js';
+import { DOCUMENT_BUCKET } from './documents.js';
 import { reconcileSchemas } from './reconciliation.js';
 import { GRACE_DAYS } from './billing.js';
 import { chargeAuthorization, paystackConfigured } from './paystack.js';
@@ -158,6 +160,7 @@ export function platformDeps() {
           await db.from('application_events').insert(e);
           return e;
         },
+        issueActivation: activationDeps(db).issueActivation,
         provisionGym: (application, opts) => provisionGym(application, provisioningDeps(db), { ...opts, schemaChecksum: safeChecksum() }),
         audit: (e) => audit(db, e),
       };
@@ -597,5 +600,186 @@ export function billingDeps(db = platformDb()) {
     },
 
     audit: (entry) => audit(db, entry),
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Owner activation — real wiring
+// ---------------------------------------------------------------------------
+
+/**
+ * Activation's database side.
+ *
+ * The lookup is BY HASH, never by the raw token: the raw token is not stored,
+ * so there is nothing else to look up by. That is the property the whole
+ * design rests on.
+ */
+export function activationDeps(db = platformDb()) {
+  return {
+    /** Enough to greet the owner by their gym's name — and nothing more. */
+    activationContext: async (token) => {
+      if (!token) return {};
+      const { data } = await db
+        .from('owner_activations')
+        .select('gym_id')
+        .eq('token_hash', activationLookupHash(token))
+        .is('used_at', null)
+        .maybeSingle();
+      if (!data) return {};
+
+      const { data: gym } = await db.from('gyms').select('search_name').eq('id', data.gym_id).maybeSingle();
+      return { gymName: gym?.search_name ?? '' };
+    },
+
+    findActivation: async (tokenHash) => {
+      const { data } = await db
+        .from('owner_activations')
+        .select('*')
+        .eq('token_hash', tokenHash)
+        .maybeSingle();
+      return data ?? null;
+    },
+
+    setPassword: async (userId, hash) => {
+      const { error } = await db
+        .from('platform_users')
+        .update({ password_hash: hash, is_active: true, updated_at: new Date().toISOString() })
+        .eq('id', userId);
+      // Checked: an unchecked failure here leaves the owner with a consumed
+      // link and no password — locked out of a gym they have been approved for.
+      if (error) throw new Error(`Could not set the password: ${error.message}`);
+    },
+
+    markUsed: async (id, at) => {
+      await db.from('owner_activations').update({ used_at: at }).eq('id', id);
+    },
+
+    // NOTE: deliberately no `setGymStatus` here. platformOpsDeps() already
+    // provides one, these objects are merged at the entry point, and the ops
+    // version does strictly more — it records a reason and brings the
+    // subscription back in step. A second definition would win by spread
+    // order and silently drop both.
+
+    /**
+     * Create an activation and return the link to send.
+     *
+     * The raw token and code are returned to the caller and never written
+     * anywhere. If the email is not sent, they are gone and a new activation
+     * must be issued — which is the correct behaviour, not a limitation.
+     */
+    issueActivation: async ({ userId, gymId }) => {
+      const { row, token, code } = issueActivation({ userId, gymId });
+
+      const { error } = await db.from('owner_activations').insert(row);
+      if (error) throw new Error(`Could not create the activation: ${error.message}`);
+
+      const base = process.env.PLATFORM_BASE_URL || '';
+      const link = `${base}/platform/activate?token=${encodeURIComponent(token)}`;
+
+      // Recorded WITHOUT the token or the code. An audit log that contains a
+      // working activation link is an audit log that grants access.
+      await audit(db, {
+        action: 'platform.owner.activation_issued',
+        actor_kind: 'system',
+        entity: 'gym',
+        entity_id: gymId,
+        detail: { user_id: userId, expires_in_hours: 48 },
+      });
+
+      return { link, code, expiresInHours: 48 };
+    },
+
+    audit: (entry) => audit(db, entry),
+  };
+}
+
+// ---------------------------------------------------------------------------
+// The gym owner's own page, and their documents
+// ---------------------------------------------------------------------------
+
+export function ownerDeps(db = platformDb()) {
+  return {
+    /**
+     * Everything an owner sees about their own account.
+     *
+     * Every query is filtered by the SESSION's user id. There is no code path
+     * here that can be pointed at another owner's gym, which is the property
+     * that matters in a database where every gym is a row in the same table.
+     */
+    ownerDashboard: async (userId) => {
+      const { data: application } = await db
+        .from('gym_applications')
+        .select('*')
+        .eq('applicant_user_id', userId)
+        .order('submitted_at', { ascending: false, nullsFirst: false })
+        .limit(1)
+        .maybeSingle();
+
+      const { data: gym } = await db
+        .from('gyms')
+        .select('id, slug, search_name, status, plan_key, city, country')
+        .eq('owner_user_id', userId)
+        .maybeSingle();
+
+      const [{ data: subscription }, { data: documents }] = await Promise.all([
+        gym
+          ? db.from('platform_subscriptions').select('*').eq('gym_id', gym.id).maybeSingle()
+          : Promise.resolve({ data: null }),
+        application
+          ? db.from('application_documents').select('*').eq('application_id', application.id)
+          : Promise.resolve({ data: [] }),
+      ]);
+
+      return {
+        application: application ?? null,
+        gym: gym ?? null,
+        subscription: subscription ?? null,
+        documents: documents ?? [],
+      };
+    },
+
+    /**
+     * An application, but ONLY if this user owns it.
+     *
+     * Both conditions in one query, so there is no window in which the
+     * application is loaded and the ownership check is a separate `if` that a
+     * later edit could drop.
+     */
+    findOwnApplication: async (userId, applicationId) => {
+      if (!userId || !applicationId) return null;
+      const { data } = await db
+        .from('gym_applications')
+        .select('id, applicant_user_id, status, proposed_gym_name')
+        .eq('id', applicationId)
+        .eq('applicant_user_id', userId)
+        .maybeSingle();
+      return data ?? null;
+    },
+
+    /**
+     * A one-time upload target in the PRIVATE bucket.
+     *
+     * The bucket is never public. Staff read these through a short-lived
+     * signed download URL on the review screen; nothing here grants a
+     * permanent readable link.
+     */
+    createSignedUpload: async (path) => {
+      const { data, error } = await db.storage.from(DOCUMENT_BUCKET).createSignedUploadUrl(path);
+      if (error) throw new Error(`Could not prepare the upload: ${error.message}`);
+      return { token: data.token, uploadUrl: data.signedUrl, path: data.path ?? path };
+    },
+
+    recordDocument: async (row) => {
+      const { data, error } = await db.from('application_documents').insert(row).select('*').single();
+      if (error) throw new Error(`Could not record the document: ${error.message}`);
+      return data;
+    },
+
+    /** A short-lived read link, for the reviewer only. Minutes, not days. */
+    signedDocumentUrl: async (storageRef, seconds = 300) => {
+      const { data, error } = await db.storage.from(DOCUMENT_BUCKET).createSignedUrl(storageRef, seconds);
+      if (error) return null;
+      return data?.signedUrl ?? null;
+    },
   };
 }

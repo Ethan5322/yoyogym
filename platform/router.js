@@ -20,8 +20,13 @@ import {
   gymDetailPage,
   finderPage,
   driftPage,
+  activatePage,
+  activateSuccessPage,
+  ownerDashboardPage,
 } from './views.js';
 import { eventToIntent } from './billing.js';
+import { completeActivation } from './activation.js';
+import { validateUploadRequest, pathBelongsTo, documentRow } from './documents.js';
 import { verifySignature } from './paystack.js';
 import { PLANS, planByKey, ownerFacingPlan } from './plans.js';
 import {
@@ -138,12 +143,49 @@ export async function handlePlatform(req, res, deps) {
       // Every failure takes the same path and says the same thing, so the
       // response cannot be used to discover which accounts exist.
       let ok = false;
+      let needsSetup = false;
+
       if (user && user.is_active !== false) {
         const passwordOk = await deps.verifyPassword(form.password, user.password_hash);
-        // 2FA is required here, not optional (D-077). A correct password alone
-        // must never be enough for the account that can reach every gym.
-        const secondOk = passwordOk && (await deps.verifySecondFactor(user, form.totp));
-        ok = Boolean(passwordOk && secondOk);
+
+        // WHO NEEDS A SECOND FACTOR, and why it is not "everyone".
+        //
+        // A gym owner reaches ONE gym — their own. Platform staff reach EVERY
+        // gym on the platform, which is why D-077 makes 2FA mandatory for them
+        // and why a correct password alone must never be enough.
+        //
+        // Anything that is not explicitly a gym owner is treated as staff, so
+        // a mistyped or unrecognised `kind` in the database produces the
+        // STRICTER rule, never the weaker one.
+        const isOwner = user.kind === 'gym_owner';
+
+        if (isOwner) {
+          // Optional, but not decorative: an owner who has turned 2FA on must
+          // use it, or the setting would be a lie.
+          const secondOk = user.totp_enabled
+            ? await deps.verifySecondFactor(user, form.totp)
+            : true;
+          ok = Boolean(passwordOk && secondOk);
+        } else if (!user.totp_enabled) {
+          // Staff without 2FA cannot sign in at all. Half-finished setup is
+          // the situation the rule exists for, not an exception to it.
+          needsSetup = passwordOk;
+        } else {
+          ok = Boolean(passwordOk && (await deps.verifySecondFactor(user, form.totp)));
+        }
+      }
+
+      if (needsSetup) {
+        await deps.audit({ action: 'platform.login.blocked_no_2fa', actor_user_id: user.id });
+        return html(
+          res,
+          200,
+          loginPage({
+            error:
+              'This account requires two-factor authentication before it can be used. ' +
+              'Ask a platform owner to finish setting up your authenticator app.',
+          })
+        );
       }
 
       if (!ok) {
@@ -152,7 +194,11 @@ export async function handlePlatform(req, res, deps) {
       }
 
       await deps.audit({ action: 'platform.login', actor_user_id: user.id });
-      return redirect(res, '/platform/applications', { 'Set-Cookie': sessionCookie(user) });
+
+      // An owner has no business on the review queue, and would be refused by
+      // the permission check anyway — landing there would just look broken.
+      const home = user.kind === 'gym_owner' ? '/platform/my-gym' : '/platform/applications';
+      return redirect(res, home, { 'Set-Cookie': sessionCookie(user) });
     }
   }
 
@@ -168,6 +214,15 @@ export async function handlePlatform(req, res, deps) {
     const session = requireSession(req, res);
     if (!session) return; // already redirected
 
+    // A SESSION IS NOT ENOUGH. Gym owners hold platform sessions too — their
+    // account is created by the signup form — and this page lists every gym
+    // that has applied, with the city, the plan and the free-text answer about
+    // what their business needs. Without this check, signing up as a gym owner
+    // is a way to read every competitor's application.
+    if (!(await may(deps, session, 'application.view'))) {
+      return forbid(res, 'You do not have permission to review applications.');
+    }
+
     const applications = await deps.listApplications();
     return html(res, 200, applicationsPage({ applications, user: { email: session.email } }));
   }
@@ -177,6 +232,12 @@ export async function handlePlatform(req, res, deps) {
   if (detail && method === 'GET') {
     const session = requireSession(req, res);
     if (!session) return;
+
+    // Same reasoning, and more so: this page renders the uploaded documents
+    // and the full decision history.
+    if (!(await may(deps, session, 'application.view'))) {
+      return forbid(res, 'You do not have permission to review applications.');
+    }
 
     const view = await deps.getApplicationView(detail[1]);
     if (!view) return html(res, 404, '<p>Application not found.</p>');
@@ -253,6 +314,155 @@ async function handleExtraRoutes(req, res, deps, { url, path, method }) {
   // ---- public: the member-facing gym finder -------------------------------
   if (path === 'find' && method === 'GET') {
     html(res, 200, finderPage());
+    return true;
+  }
+
+  // ---- public: owner activation --------------------------------------------
+  // No session, and deliberately no CSRF token: the owner has no account to be
+  // signed in to yet, and the link-plus-code IS the credential. A cross-site
+  // request here would need both halves, and an attacker with both does not
+  // need the victim's browser.
+  if (path === 'activate') {
+    if (method === 'GET') {
+      const token = url.searchParams.get('token') || '';
+      const context = (await deps.activationContext?.(token)) || {};
+      html(res, 200, activatePage({ token, gymName: context.gymName }));
+      return true;
+    }
+
+    if (method === 'POST') {
+      const form = await readFormBody(req);
+      const result = await completeActivation(
+        deps,
+        { token: form.token, code: form.code, password: form.password },
+        // Q-46 is unsettled, so the existing decision (D-049) is honoured:
+        // activation verifies the owner and does not open the gym. When the
+        // user answers, this becomes `activatesGym: true`.
+        { activatesGym: process.env.PLATFORM_ACTIVATION_OPENS_GYM === 'true' }
+      );
+
+      if (!result.ok) {
+        // The token is echoed back so a mistyped code can be corrected without
+        // digging the email out again. The code is not — retyping it is the
+        // point.
+        html(res, 400, activatePage({ token: form.token, error: result.reason }));
+        return true;
+      }
+
+      html(res, 200, activateSuccessPage({ gymActivated: result.gymActivated }));
+      return true;
+    }
+  }
+
+  // ---- the gym owner's own page --------------------------------------------
+  // Not where they run their gym. Members, check-ins and payments live in
+  // their own gym admin panel, which is the existing single-gym system and is
+  // untouched (§32). This is the account: application, documents, subscription.
+  if (path === 'my-gym' && method === 'GET') {
+    const session = requireSession(req, res);
+    if (!session) return true;
+
+    const view = (await deps.ownerDashboard(session.sub)) || {};
+    html(res, 200, ownerDashboardPage({
+      ...view,
+      user: { email: session.email },
+      csrfToken: issueCsrfToken(session.sub),
+      gymAdminUrl: process.env.PLATFORM_GYM_ADMIN_URL || '',
+    }));
+    return true;
+  }
+
+  // ---- ask where to put a document -----------------------------------------
+  if (path === 'my-gym/documents/request' && method === 'POST') {
+    const form = await readFormBody(req);
+
+    const session = requireSession(req, res, { csrfToken: form.csrf });
+    if (!session) return true;
+
+    // OWNERSHIP FIRST, before anything is validated or issued. The lookup is
+    // keyed on the SESSION's user id, never on anything in the form, so an
+    // application id belonging to another gym simply does not resolve.
+    const application = await deps.findOwnApplication(session.sub, form.application_id);
+    if (!application) {
+      // 404, not 403. A 403 would confirm that the application exists, which
+      // is one bit more than a stranger should learn.
+      res.writeHead(404, { 'Content-Type': 'application/json; charset=utf-8' });
+      res.end(JSON.stringify({ error: 'Not found.' }));
+      return true;
+    }
+
+    const check = validateUploadRequest({
+      applicationId: application.id,
+      docType: form.doc_type,
+      mimeType: form.mime_type,
+      sizeBytes: form.size_bytes,
+    });
+
+    if (!check.ok) {
+      res.writeHead(400, { 'Content-Type': 'application/json; charset=utf-8' });
+      res.end(JSON.stringify({ error: check.error }));
+      return true;
+    }
+
+    const signed = await deps.createSignedUpload(check.path, form.mime_type);
+
+    res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+    res.end(JSON.stringify({ path: check.path, token: signed.token, uploadUrl: signed.uploadUrl ?? null }));
+    return true;
+  }
+
+  // ---- record what was uploaded --------------------------------------------
+  if (path === 'my-gym/documents/confirm' && method === 'POST') {
+    const form = await readFormBody(req);
+
+    const session = requireSession(req, res, { csrfToken: form.csrf });
+    if (!session) return true;
+
+    const application = await deps.findOwnApplication(session.sub, form.application_id);
+    if (!application) {
+      res.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8' });
+      res.end('Not found.');
+      return true;
+    }
+
+    // The client sends the path back, so the client can lie about it. Without
+    // this the owner could attach another application's document to their own,
+    // or claim a path they were never issued.
+    if (!pathBelongsTo(form.storage_ref, application.id)) {
+      await deps.audit({
+        action: 'platform.document.rejected_path',
+        actor_kind: 'gym_owner',
+        actor_user_id: session.sub,
+        entity: 'application',
+        entity_id: application.id,
+        detail: { claimed: String(form.storage_ref || '').slice(0, 200) },
+      });
+      res.writeHead(400, { 'Content-Type': 'text/plain; charset=utf-8' });
+      res.end('That upload could not be recorded.');
+      return true;
+    }
+
+    await deps.recordDocument(
+      documentRow({
+        applicationId: application.id,
+        docType: form.doc_type,
+        storageRef: form.storage_ref,
+        filename: form.filename,
+        mimeType: form.mime_type,
+        sizeBytes: form.size_bytes,
+      })
+    );
+
+    await deps.audit({
+      action: 'platform.document.uploaded',
+      actor_kind: 'gym_owner',
+      actor_user_id: session.sub,
+      entity: 'application',
+      entity_id: application.id,
+      detail: { doc_type: form.doc_type },
+    });
+
+    redirect(res, '/platform/my-gym');
     return true;
   }
 

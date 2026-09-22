@@ -23,9 +23,37 @@ const BCRYPT_ROUNDS = parseInt(process.env.BCRYPT_ROUNDS || '12', 10);
 const SESSION_TTL = process.env.PLATFORM_JWT_EXPIRES_IN || '8h';
 const AUDIENCE = 'platform';
 
+/**
+ * The platform's signing key. It MUST NOT be the gym's.
+ *
+ * This used to fall back to JWT_SECRET, and that fallback was a cross-boundary
+ * hole. The gym app's verifier (server/lib/auth.js) calls
+ * `jwt.verify(token, JWT_SECRET)` with NO audience option, so it ignores
+ * `aud: 'platform'` entirely. Share the key and a platform session token is
+ * accepted by the gym API as an admin payload — verified by experiment, not
+ * assumed.
+ *
+ * Refused loudly rather than defaulted. A missing environment variable is a
+ * deploy that fails; a shared one is a boundary that quietly does not exist.
+ */
 function secret() {
-  const s = process.env.PLATFORM_JWT_SECRET || process.env.JWT_SECRET;
-  if (!s) throw new Error('Missing PLATFORM_JWT_SECRET.');
+  const s = process.env.PLATFORM_JWT_SECRET;
+
+  if (!s) {
+    throw new Error(
+      'Missing PLATFORM_JWT_SECRET. The platform must sign its own sessions — ' +
+        'it may not borrow JWT_SECRET from the gym app.'
+    );
+  }
+
+  if (process.env.JWT_SECRET && s === process.env.JWT_SECRET) {
+    throw new Error(
+      'PLATFORM_JWT_SECRET must not equal JWT_SECRET. The gym app verifies tokens ' +
+        'without checking the audience, so a shared key makes a platform session ' +
+        'usable against the gym API.'
+    );
+  }
+
   return s;
 }
 

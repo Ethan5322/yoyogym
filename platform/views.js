@@ -596,3 +596,228 @@ ${list(report.dangling || [], (d) => `<li><b>${h(d.gym_id)}</b> → ${h(d.schema
 </form>`,
   });
 }
+
+// ---------------------------------------------------------------------------
+// Owner activation
+// ---------------------------------------------------------------------------
+
+/**
+ * The activation form.
+ *
+ * The token arrives in the URL and is carried in a hidden field. The code is
+ * typed, because the whole purpose of the second half is that it is not in the
+ * link — putting it in the URL too would make it decoration.
+ */
+export function activatePage({ token = '', gymName = '', error = '', code = '' } = {}) {
+  return layout({
+    title: 'Activate your account',
+    body: `<h1>Activate your account</h1>
+<p class="muted">${
+      gymName
+        ? `Your gym <b>${h(gymName)}</b> has been approved.`
+        : 'Your gym has been approved.'
+    } Enter the six-digit code from your email and choose a password.</p>
+${error ? `<p class="err">${h(error)}</p>` : ''}
+
+<form class="card" method="post" action="/platform/activate">
+  <input type="hidden" name="token" value="${h(token)}">
+  <label>Six-digit code
+    <input name="code" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" required
+           autocomplete="one-time-code" value="${h(code)}">
+  </label>
+  <label>Choose a password
+    <input type="password" name="password" required minlength="10" autocomplete="new-password">
+  </label>
+  <p class="muted">At least 10 characters. You will use this to sign in from now on.</p>
+  <button type="submit">Activate</button>
+</form>`,
+  });
+}
+
+/** Activation done. Says plainly what is true, including what is not yet true. */
+export function activateSuccessPage({ gymActivated = false } = {}) {
+  return layout({
+    title: 'Account activated',
+    body: `<div class="card">
+  <h1>Your account is active</h1>
+  <p>You can now sign in with your email and the password you just chose.</p>
+  ${
+    gymActivated
+      ? '<p>Your gym is open. Your members can find it and sign in.</p>'
+      : `<p class="muted">Your gym is not open to members yet — that happens once your
+         subscription starts. We will email you when it does.</p>`
+  }
+  <p><a href="/platform/login">Sign in →</a></p>
+</div>`,
+  });
+}
+
+// ---------------------------------------------------------------------------
+// The gym owner's own page
+// ---------------------------------------------------------------------------
+
+/**
+ * What a gym owner sees after signing in to the PLATFORM.
+ *
+ * This is deliberately NOT where they run their gym. Members, check-ins,
+ * payments and classes all live in their own gym admin panel, which is the
+ * existing single-gym system and is untouched by any of this (§32). This page
+ * is only the things that are between the owner and Yoyo Gyms: the
+ * application, the documents, the subscription, and the way in.
+ */
+export function ownerDashboardPage({
+  user = null,
+  application = null,
+  gym = null,
+  subscription = null,
+  documents = [],
+  csrfToken = '',
+  gymAdminUrl = '',
+} = {}) {
+  const docRows = documents.length
+    ? `<table>
+  <thead><tr><th>Document</th><th>File</th><th>Status</th></tr></thead>
+  <tbody>
+${documents
+  .map(
+    (d) => `    <tr><td>${h(readableDocType(d.doc_type))}</td><td>${h(d.filename)}</td>
+      <td>${statusTag(d.status)}${d.reject_reason ? ` <span class="muted">${h(d.reject_reason)}</span>` : ''}</td></tr>`
+  )
+  .join('\n')}
+  </tbody>
+</table>`
+    : `<div class="empty">Nothing uploaded yet.</div>`;
+
+  // The upload form only appears while there is an application to attach to.
+  const upload = application
+    ? `<form class="card" id="doc-form">
+  <h2>Send a document</h2>
+  <input type="hidden" name="csrf" value="${h(csrfToken)}">
+  <input type="hidden" name="application_id" value="${h(application.id)}">
+  <label>What is it?
+    <select name="doc_type">
+      <option value="business_registration">Business registration</option>
+      <option value="id_document">Your ID</option>
+      <option value="proof_of_address">Proof of address</option>
+      <option value="tax_clearance">Tax clearance</option>
+      <option value="insurance">Insurance</option>
+      <option value="lease_agreement">Lease agreement</option>
+      <option value="other_supporting">Something else</option>
+    </select>
+  </label>
+  <label>File<input type="file" name="file" accept=".pdf,image/jpeg,image/png,image/webp,image/heic" required></label>
+  <p class="muted">PDF or a photo, up to 10 MB. We look at every document by hand.</p>
+  <button type="submit">Upload</button>
+  <p class="muted" id="upload-note"></p>
+</form>
+
+<script>
+(function () {
+  var form = document.getElementById('doc-form');
+  var note = document.getElementById('upload-note');
+  if (!form) return;
+
+  form.addEventListener('submit', async function (e) {
+    e.preventDefault();
+    var file = form.file.files[0];
+    if (!file) return;
+
+    note.textContent = 'Preparing…';
+    var common = new URLSearchParams({
+      csrf: form.csrf.value,
+      application_id: form.application_id.value,
+      doc_type: form.doc_type.value,
+      filename: file.name,
+      mime_type: file.type,
+      size_bytes: String(file.size)
+    });
+
+    try {
+      // 1. Ask the server WHERE to put it. The server decides the path.
+      var ask = await fetch('/platform/my-gym/documents/request', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: common.toString()
+      });
+      var target = await ask.json();
+      if (!ask.ok) { note.textContent = target.error || 'That file was not accepted.'; return; }
+
+      // 2. Send the bytes straight to storage — never through our function.
+      note.textContent = 'Uploading…';
+      var put = await fetch(target.uploadUrl, {
+        method: 'PUT',
+        headers: { 'Content-Type': file.type, Authorization: 'Bearer ' + target.token },
+        body: file
+      });
+      if (!put.ok) { note.textContent = 'The upload did not finish. Please try again.'; return; }
+
+      // 3. Tell the server it is there, so a reviewer can find it.
+      var done = document.createElement('form');
+      done.method = 'post';
+      done.action = '/platform/my-gym/documents/confirm';
+      var fields = Object.assign({}, Object.fromEntries(common), { storage_ref: target.path });
+      Object.keys(fields).forEach(function (k) {
+        var input = document.createElement('input');
+        input.type = 'hidden'; input.name = k; input.value = fields[k];
+        done.appendChild(input);
+      });
+      document.body.appendChild(done);
+      done.submit();
+    } catch (err) {
+      note.textContent = 'Something went wrong. Please try again.';
+    }
+  });
+})();
+</script>`
+    : '';
+
+  const status = gym
+    ? `<div class="card">
+  <h2>${h(gym.search_name || gym.slug)}</h2>
+  <p>${statusTag(gym.status)}${subscription ? ` · ${statusTag(subscription.status)}` : ''}</p>
+  ${
+    gym.status === 'active' && gymAdminUrl
+      ? `<p><a href="${h(gymAdminUrl)}">Open your gym admin panel →</a></p>
+         <p class="muted">That is where you manage members, check-ins, payments and classes.</p>`
+      : `<p class="muted">Your gym is not open yet. We will email you the moment it is.</p>`
+  }
+  ${
+    subscription?.trial_ends_at
+      ? `<p class="muted">Trial ends ${h(subscription.trial_ends_at)}.</p>`
+      : ''
+  }
+</div>`
+    : application
+      ? `<div class="card">
+  <h2>${h(application.proposed_gym_name)}</h2>
+  <p>${statusTag(application.status)}</p>
+  <p class="muted">A person is reading your application. We will email you when there is a decision.</p>
+</div>`
+      : `<div class="empty">No application found for this account.</div>`;
+
+  return layout({
+    title: 'Your gym',
+    user,
+    body: `<h1>Your gym</h1>
+${status}
+
+<h2>Documents</h2>
+${docRows}
+${upload}`,
+  });
+}
+
+/** Turn a stored doc_type into something a person would say. */
+function readableDocType(key) {
+  return (
+    {
+      business_registration: 'Business registration',
+      id_document: 'ID document',
+      proof_of_address: 'Proof of address',
+      tax_clearance: 'Tax clearance',
+      insurance: 'Insurance',
+      lease_agreement: 'Lease agreement',
+      other_supporting: 'Supporting document',
+    }[key] || key
+  );
+}
