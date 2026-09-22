@@ -75,6 +75,34 @@ export function readSession(req) {
   return verifyPlatformToken(raw);
 }
 
+/**
+ * The same session, over either transport.
+ *
+ * THIS IS WHAT MAKES THE APP AND THE WEBSITE ONE BACKEND. The website is a
+ * browser and carries a cookie; the mobile app has no cookie jar worth relying
+ * on and carries `Authorization: Bearer <token>`. Both present the SAME signed
+ * platform token, verified by the same function, producing the same session.
+ *
+ * Two transports, one identity — not two auth systems that must be kept in
+ * step.
+ *
+ * The cookie is tried first so a browser cannot be talked into using an
+ * attacker-supplied Authorization header, and the Bearer path is deliberately
+ * NOT subject to CSRF checks: CSRF is a browser-cookie problem, and a header
+ * the browser never attaches automatically cannot be forged cross-site.
+ */
+export function readAnySession(req) {
+  const fromCookie = readSession(req);
+  if (fromCookie) return { session: fromCookie, transport: 'cookie' };
+
+  const header = String(req.headers?.authorization || '');
+  const [scheme, token] = header.split(' ');
+  if (scheme !== 'Bearer' || !token) return { session: null, transport: null };
+
+  const session = verifyPlatformToken(token);
+  return session ? { session, transport: 'bearer' } : { session: null, transport: null };
+}
+
 // ---------------------------------------------------------------------------
 // CSRF
 // ---------------------------------------------------------------------------

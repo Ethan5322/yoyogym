@@ -1327,7 +1327,17 @@ BUILT 2026-09-22 — STAGES 4-7, code complete, NOT DEPLOYED, NOT PUSHED.
       (D-014). Raised as D-130 rather than quietly crossed.
     · Security alerts — the audit log filter is the nearest thing today.
 
-  339 tests pass.
+  SURFACES CORRECTED BY THE USER 2026-09-22 (D-133/D-134):
+    THE WEBSITE IS ONLY THE MAIN ADMIN PANEL — Yoyo staff, HTML, cookies.
+    THE APP is for gym owners and gym members — JSON, Bearer tokens.
+    ONE BACKEND: platform/api.js calls the SAME injected dependencies as the
+    HTML routes, so a rule is enforced in one place and both doors get it.
+    /apply, /activate, /my-gym, /find still render HTML, but as the WEB
+    FALLBACK §14 already requires (activation email link, scanned QR, app not
+    installed) — each has a JSON twin which is the primary path.
+    No app route approves an application or suspends a gym.
+
+  371 tests pass.
 
   SUPERSEDED BLOCKING QUESTION (kept for history): Q-46 — D-049 (first payment activates) and D-070 (30-day
   trial) contradict each other. A trialing gym currently cannot serve traffic.

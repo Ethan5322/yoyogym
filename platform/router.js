@@ -1,5 +1,28 @@
 // Platform router — the first point at which the platform is reachable.
 //
+// THREE SURFACES, ONE BACKEND (the user's architecture, 2026-09-22):
+//
+//   /platform/api/*   THE MOBILE APP. Gym owners and gym members, JSON,
+//                     Bearer tokens. See platform/api.js. There is
+//                     deliberately NO app route that approves an application
+//                     or suspends a gym — that is staff work.
+//
+//   /platform/*       THE WEBSITE = THE MAIN ADMIN PANEL, and only that.
+//                     Yoyo platform staff, server-rendered HTML, cookie
+//                     sessions: applications, registry, owners, plans,
+//                     finance, audit, documents.
+//
+//   the exceptions    /apply, /activate, /my-gym and /find also render HTML.
+//                     These are NOT "the website" — they are the WEB FALLBACK
+//                     that CLAUDE.md §14 requires: an activation email link
+//                     and a scanned QR must work for someone who has not
+//                     installed the app yet. Each has a JSON twin under
+//                     /platform/api/ which is the primary path. They are kept
+//                     out of the staff navigation for that reason.
+//
+// The surfaces share every dependency. A rule lives in one place and both
+// doors enforce it — which is the only reason a second door is safe to add.
+//
 // Everything before this file was logic with no door: auth, CSRF, views and the
 // application flow, all tested, none of them addressable. This connects them.
 //
@@ -10,6 +33,7 @@
 // Dependencies are injected, as everywhere else in this codebase, so the whole
 // router is testable with no database and no network.
 import { timingSafeEqual } from 'node:crypto';
+import { handlePlatformApi } from './api.js';
 import {
   loginPage,
   applicationsPage,
@@ -67,6 +91,17 @@ export async function handlePlatform(req, res, deps) {
   const url = new URL(req.url, 'http://localhost');
   const path = url.pathname.replace(/^\/platform\/?/, '').replace(/\/$/, '');
   const method = (req.method || 'GET').toUpperCase();
+
+  // THE MOBILE APP'S SURFACE, first.
+  //
+  // Same backend, same dependencies, same rules — a different representation.
+  // The website below renders HTML because two people use it on a laptop; the
+  // app cannot consume HTML, so it gets JSON. Neither has logic the other
+  // lacks: every route in api.js calls the same injected dependency as its
+  // HTML counterpart, so a rule can only be enforced in one place.
+  if (path.startsWith('api/')) {
+    if (await handlePlatformApi(req, res, deps, { path, method, url })) return;
+  }
 
   // ---- public: gym-owner application -------------------------------------
   // No session required: this is the front door. Anyone may apply; nobody is
