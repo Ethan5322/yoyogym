@@ -2,20 +2,38 @@
 -- YOYO GYMS — PLATFORM DATABASE SCHEMA  (Supabase / PostgreSQL)
 -- MuleSoo Digital Solutions
 -- =============================================================================
--- This is the PLATFORM database. It is a SEPARATE Supabase project from every
--- gym (D-016). It holds the registry, applications, subscriptions and audit.
+-- This is the PLATFORM's own schema: the registry, applications,
+-- subscriptions and audit.
 --
 --   >>> IT HOLDS NO MEMBER DATA. <<<
 --
 -- No member names, no health answers, no biometric templates, no member
 -- payments. That is not a convention, it is the property that keeps the POPIA
 -- position from D-014 intact: each gym remains responsible party for its own
--- members' data, in its own database.
+-- members' data, in its own schema.
+--
+-- WHERE THIS RUNS  (this changed — read it even if you have run it before)
+--
+-- D-016 originally gave every gym its own Supabase project, and this file said
+-- to create a separate project for the platform. **D-096 superseded that.**
+-- Every gym is now a SCHEMA (`gym_<slug>`) inside ONE Supabase project, and
+-- the platform is simply one more schema in that same project.
+--
+--   >>> RUN THIS IN YOUR EXISTING SUPABASE PROJECT — the one the single-gym
+--   >>> system already uses. Do NOT create a new project for it.
+--
+-- It cannot collide with what is already there: everything below is created
+-- inside the `platform` schema, and the existing gym data lives in `gym` and
+-- `public`. No existing table is read, altered or dropped by this file.
 --
 -- HOW TO USE:
---   1. Create a NEW Supabase project for the platform (not a gym's).
---   2. SQL Editor -> paste this whole file -> Run.
---   3. Seed the platform roles and the first owner account.
+--   1. Supabase dashboard -> your existing project -> SQL Editor -> New query.
+--   2. Paste this whole file -> Run. It is idempotent: running it twice is
+--      safe, because every statement is `if not exists`.
+--   3. Then paste platform/seed.sql and run that (edit the two CHANGE ME
+--      lines in it first).
+--   4. Settings -> API -> Exposed schemas: add `platform`, and add each
+--      `gym_<slug>` as gyms are provisioned. Provisioning does this itself.
 --
 -- DESIGN NOTES:
 --   • Everything lives in the `platform` schema, mirroring how a gym uses `gym`.
