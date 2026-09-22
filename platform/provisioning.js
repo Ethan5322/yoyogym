@@ -1,110 +1,101 @@
 // Gym provisioning — turning an approved application into a working gym.
 //
-// Approval is automatic-provisioning (D-078): approving an application creates
-// the Supabase project, loads the schema and seeds, writes the credentials to
-// the secrets manager, and registers the gym. Thousands of gyms are in scope
-// (D-012), so this cannot be a manual runbook.
+// Under D-096 a gym is a SCHEMA in the shared Supabase project, not a project
+// of its own. So provisioning creates a schema, loads the gym schema into it,
+// seeds it, exposes it to the API, and registers it.
 //
-// TWO THINGS THIS FILE IS BUILT AROUND
+// THREE THINGS THIS FILE IS BUILT AROUND
 //
-// 1. DRY RUN IS THE DEFAULT. Provisioning creates a real Supabase project that
-//    costs real money every month. Calling this function without explicitly
-//    asking for a live run must never spend anything.
+// 1. DRY RUN IS THE DEFAULT. Calling this without explicitly asking for a live
+//    run must never change anything.
 //
-// 2. A CREATED-BUT-UNRECORDED PROJECT IS THE EXPENSIVE FAILURE. If Supabase
-//    creates the project and a later step fails, there is now a paid project
-//    that nothing in the platform database knows about — a bill with no owner.
-//    Every failure path therefore reports `orphanedProjectRef` so it can be
-//    reconciled. **It is reported, not auto-deleted** — deleting a database
-//    because a later step failed is how you destroy a gym's data over a
-//    transient error. Cleanup is a human decision (see Q-48).
+// 2. A CREATED-BUT-UNREGISTERED SCHEMA IS THE FAILURE THAT MATTERS. If the
+//    schema is created and a later step fails, there is a schema holding a
+//    gym's tables that the registry knows nothing about. Cheaper than a stranded
+//    project was, but still invisible. Every failure path reports it as
+//    `orphanedSchema` so reconciliation can find it. **It is reported, not
+//    dropped** — dropping a schema because a later step failed is how a
+//    transient error destroys a gym's data.
 //
-// Dependencies are injected so this is testable without a Supabase account, an
-// Infisical token, or spending anything.
+// 3. EXPOSING THE SCHEMA RELOADS POSTGREST FOR EVERY GYM (D-097). It is the
+//    last mutating step, and deliberately so: everything that can fail should
+//    fail before anything touches the running system.
 
-/** The provisioning sequence, in order. Exported so the dry run can show it. */
+/** The provisioning sequence, in order. Exported so a dry run can show it. */
+import { startTrial } from './billing.js';
+
 export const PROVISION_STEPS = [
-  'createSupabaseProject',
+  'createSchema',
   'applySchema',
   'seed',
-  'storeSecret',
-  'saveSecretRef',
   'saveGym',
   'saveConnection',
   'recordMigrationBaseline',
+  'startSubscription',
+  'exposeSchema',
 ];
+
+/**
+ * A schema name must be a plain identifier — it is interpolated into DDL.
+ * Refused rather than sanitised: a slug that produces anything else is a bug
+ * upstream, and quietly rewriting it would hide that.
+ */
+const SAFE_SCHEMA = /^[a-z_][a-z0-9_]{0,50}$/;
+
+/** `iron-works` → `gym_iron_works`. Slug-based, not lettered: no 26-gym ceiling. */
+export function schemaNameFor(slug) {
+  const cleaned = String(slug || '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '_')
+    .replace(/^_+|_+$/g, '');
+  return cleaned ? `gym_${cleaned}`.slice(0, 51) : null;
+}
 
 /**
  * Provision a gym from an approved application.
  *
  * @param {object} application  the approved gym_applications row
- * @param {object} deps         injected side effects (see tests for the shape)
+ * @param {object} deps         injected side effects
  * @param {object} [options]
- * @param {boolean} [options.dryRun=true]  TRUE BY DEFAULT — nothing is created
- * @param {string}  [options.schemaVersion] migration id to record as baseline
+ * @param {boolean} [options.dryRun=true]  TRUE BY DEFAULT — nothing changes
  */
 export async function provisionGym(application, deps, options = {}) {
-  // Default to dry run. An accidental call must cost nothing.
   const dryRun = options.dryRun !== false;
+  const schema = options.schemaName || schemaNameFor(application.slug);
+
+  if (!schema || !SAFE_SCHEMA.test(schema)) {
+    return { ok: false, failedAt: 'schemaName', error: `Cannot derive a safe schema name from "${application.slug}".`, orphanedSchema: null };
+  }
 
   if (dryRun) {
     return {
       dryRun: true,
       ok: true,
       plan: [...PROVISION_STEPS],
+      schema,
       application_id: application.id,
-      slug: application.slug,
       note: 'Dry run: nothing was created. Pass { dryRun: false } to provision for real.',
     };
   }
 
-  // Tracked outside the try so a failure can still report what exists.
-  let projectRef = null;
+  let schemaCreated = false;
   let step = null;
 
   try {
-    step = 'createSupabaseProject';
-    const project = await deps.createSupabaseProject({
-      name: application.proposed_gym_name || application.slug,
-      region: application.region,
-    });
-    // From this line on, a real paid project exists.
-    projectRef = project.project_ref;
+    step = 'createSchema';
+    await deps.createSchema(schema);
+    schemaCreated = true;
 
     step = 'applySchema';
-    await deps.applySchema({ project_ref: project.project_ref, url: project.url, service_key: project.service_key });
+    await deps.applySchema(schema);
 
     step = 'seed';
-    await deps.seed({ project_ref: project.project_ref, url: project.url, service_key: project.service_key });
-
-    // The credentials go to the secrets manager FIRST, so that the platform
-    // database only ever learns the reference. One blob per gym keeps rotation
-    // atomic: one write, one version, one cache eviction.
-    step = 'storeSecret';
-    const stored = await deps.storeSecret({
-      slug: application.slug,
-      credentials: {
-        supabase_url: project.url,
-        service_key: project.service_key,
-        jwt_secret: project.jwt_secret,
-      },
-    });
-
-    step = 'saveSecretRef';
-    // Only the pointer. No secret value may appear on this row — the invariant
-    // from D-022, enforced by a test rather than by a constraint, because no
-    // constraint can express "this text is not a secret".
-    await deps.saveSecretRef({
-      key_name: 'gym_credentials',
-      secret_ref: stored.secret_ref,
-      version: stored.version ?? 1,
-    });
+    await deps.seed(schema, application);
 
     step = 'saveGym';
     const gym = await deps.saveGym({
       slug: application.slug,
       search_name: application.proposed_gym_name,
-      legal_name: application.legal_name ?? null,
       // Provisioned but NOT live: the first payment activates it (D-049).
       status: 'pending',
       owner_user_id: application.owner_user_id,
@@ -118,9 +109,10 @@ export async function provisionGym(application, deps, options = {}) {
     step = 'saveConnection';
     const connection = await deps.saveConnection({
       gym_id: gym.id,
-      supabase_project_ref: project.project_ref,
-      supabase_url: project.url,
-      schema_name: 'gym',
+      // Schema mode: no per-gym project, no per-gym credentials (D-098).
+      supabase_project_ref: options.projectRef ?? null,
+      supabase_url: null,
+      schema_name: schema,
       status: 'healthy',
     });
 
@@ -133,17 +125,32 @@ export async function provisionGym(application, deps, options = {}) {
       applied_by: 'orchestrator',
     });
 
+    // A gym with no subscription row is refused by accessFor() with a 402
+    // (platform/billing.js), so the trial is opened here, as part of
+    // provisioning, rather than waiting for the first billing run.
+    //
+    // NOTE the gym itself stays 'pending' above: the trial is a subscription
+    // state, and what makes a gym LIVE is the owner completing activation.
+    step = 'startSubscription';
+    const subscription = await deps.startSubscription({
+      ...startTrial({ gymId: gym.id, plan: options.plan ?? null, now: new Date() }),
+      plan_id: options.plan?.id ?? null,
+    });
+
+    // LAST, because it reloads PostgREST for every gym on the project (D-097).
+    // Everything that can fail has already failed by this point.
+    step = 'exposeSchema';
+    await deps.exposeSchema(schema);
+
     await deps.audit({
       action: 'gym.provisioned',
       entity: 'gym',
       entity_id: gym.id,
-      detail: { slug: gym.slug, project_ref: project.project_ref },
+      detail: { slug: gym.slug, schema },
     });
 
-    return { ok: true, dryRun: false, gym, connection, projectRef };
+    return { ok: true, dryRun: false, gym, connection, subscription, schema };
   } catch (err) {
-    // Report, do not clean up. If a project was created, say so loudly: that is
-    // a monthly charge nobody is tracking until someone acts on this.
     await deps.audit({
       action: 'gym.provision.failed',
       entity: 'application',
@@ -151,7 +158,7 @@ export async function provisionGym(application, deps, options = {}) {
       detail: {
         failed_at: step,
         error: err.message,
-        orphaned_project_ref: projectRef,
+        orphaned_schema: schemaCreated ? schema : null,
         slug: application.slug,
       },
     });
@@ -161,8 +168,8 @@ export async function provisionGym(application, deps, options = {}) {
       dryRun: false,
       failedAt: step,
       error: err.message,
-      // null when nothing was created; a ref when a paid project is stranded.
-      orphanedProjectRef: projectRef,
+      // Reported, never dropped. Reconciliation decides what happens next.
+      orphanedSchema: schemaCreated ? schema : null,
     };
   }
 }

@@ -101,3 +101,25 @@ test('applications render with the detail a reviewer needs to triage', () => {
   assert.ok(html.includes('Cape Town'));
   assert.ok(html.includes('/platform/applications/a1'), 'each row links to its review page');
 });
+
+test('the decision form carries the CSRF token — without it every decision is refused', () => {
+  const html = applicationDetailPage({
+    application: { id: 'a1', proposed_gym_name: 'Iron Works', status: 'submitted' },
+    documents: [],
+    events: [],
+    csrfToken: 'tok-123',
+  });
+
+  assert.match(html, /name="csrf" value="tok-123"/);
+});
+
+test('a CSRF token containing quotes cannot break out of the attribute', () => {
+  const html = applicationDetailPage({
+    application: { id: 'a1', proposed_gym_name: 'G', status: 'submitted' },
+    documents: [],
+    events: [],
+    csrfToken: '"><script>x()</script>',
+  });
+
+  assert.ok(!html.includes('<script>x()'));
+});

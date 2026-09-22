@@ -1,12 +1,11 @@
-// Provisioning orchestrator tests, written before the orchestrator.
+// Provisioning tests, for schema-per-gym.
 //
-// Provisioning creates a REAL Supabase project that costs real money every
-// month. The failure that matters is not "it errored" — it is **a project
-// created but not recorded**, which is a bill nobody knows about. These tests
-// exist mostly to pin that down.
+// A gym is a SCHEMA in the shared project (D-096). The failure that matters is
+// a schema created but never registered: a gym's tables sitting in a database
+// that the registry knows nothing about.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { provisionGym, PROVISION_STEPS } from '../platform/provisioning.js';
+import { provisionGym, PROVISION_STEPS, schemaNameFor } from '../platform/provisioning.js';
 
 const application = {
   id: 'app-1',
@@ -19,7 +18,6 @@ const application = {
   owner_user_id: 'user-1',
 };
 
-/** Records every side effect so a test can assert what really happened. */
 function deps({ failAt = null } = {}) {
   const calls = [];
   const record = (name, payload) => {
@@ -28,109 +26,126 @@ function deps({ failAt = null } = {}) {
   };
   return {
     calls,
-    createSupabaseProject: async (opts) => {
-      record('createSupabaseProject', opts);
-      return { project_ref: 'abcdef123456', url: 'https://abcdef123456.supabase.co', service_key: 'svc-secret-value' };
-    },
-    applySchema: async (opts) => { record('applySchema', opts); return { applied: true }; },
-    seed: async (opts) => { record('seed', opts); return { seeded: true }; },
-    storeSecret: async (opts) => { record('storeSecret', opts); return { secret_ref: 'infisical://gyms/iron-works/credentials', version: 1 }; },
+    createSchema: async (s) => record('createSchema', s),
+    applySchema: async (s) => record('applySchema', s),
+    seed: async (s, a) => record('seed', { schema: s, app: a.id }),
     saveGym: async (row) => { record('saveGym', row); return { ...row, id: 'gym-1' }; },
+    startSubscription: async (row) => { record('startSubscription', row); return { ...row, id: 'sub-1' }; },
     saveConnection: async (row) => { record('saveConnection', row); return { ...row, id: 'conn-1' }; },
-    saveSecretRef: async (row) => { record('saveSecretRef', row); return row; },
-    recordMigrationBaseline: async (row) => { record('recordMigrationBaseline', row); return row; },
-    audit: async (entry) => { record('audit', entry); },
+    recordMigrationBaseline: async (row) => record('recordMigrationBaseline', row),
+    exposeSchema: async (s) => record('exposeSchema', s),
+    audit: async (e) => record('audit', e),
   };
 }
 
-test('a dry run makes NO external calls and returns the plan', async () => {
-  const d = deps();
-  const result = await provisionGym(application, d, { dryRun: true });
+test('a slug becomes a safe schema name, with no 26-gym ceiling', () => {
+  assert.equal(schemaNameFor('iron-works'), 'gym_iron_works');
+  assert.equal(schemaNameFor('BOS GYM'), 'gym_bos_gym');
+  assert.equal(schemaNameFor('flex--house!!'), 'gym_flex_house');
+  assert.equal(schemaNameFor(''), null);
+  assert.equal(schemaNameFor('!!!'), null);
+});
 
-  assert.equal(result.dryRun, true);
-  assert.deepEqual(result.plan, PROVISION_STEPS, 'the plan is the real step list, not a summary');
-  assert.equal(d.calls.length, 0, 'a dry run must not touch anything, least of all create a paid project');
+test('a dry run makes NO changes and returns the plan', async () => {
+  const d = deps();
+  const r = await provisionGym(application, d, { dryRun: true });
+
+  assert.equal(r.dryRun, true);
+  assert.equal(r.schema, 'gym_iron_works');
+  assert.deepEqual(r.plan, PROVISION_STEPS);
+  assert.equal(d.calls.length, 0);
 });
 
 test('dry run is the DEFAULT — provisioning never happens by accident', async () => {
   const d = deps();
-  const result = await provisionGym(application, d);   // no options at all
-
-  assert.equal(result.dryRun, true);
+  const r = await provisionGym(application, d); // no options
+  assert.equal(r.dryRun, true);
   assert.equal(d.calls.length, 0);
 });
 
 test('a live run executes every step in order', async () => {
   const d = deps();
-  const result = await provisionGym(application, d, { dryRun: false });
+  const r = await provisionGym(application, d, { dryRun: false });
 
-  assert.equal(result.ok, true);
-  assert.equal(result.gym.id, 'gym-1');
+  assert.equal(r.ok, true);
+  assert.equal(r.schema, 'gym_iron_works');
   const order = d.calls.map((c) => c.name).filter((n) => n !== 'audit');
-  assert.deepEqual(order, [
-    'createSupabaseProject',
-    'applySchema',
-    'seed',
-    'storeSecret',
-    'saveSecretRef',
-    'saveGym',
-    'saveConnection',
-    'recordMigrationBaseline',
-  ]);
+  assert.deepEqual(order, PROVISION_STEPS);
 });
 
-test('the secret VALUE never reaches the database — only a reference', async () => {
-  const d = deps({});
+test('exposing the schema is LAST — it reloads PostgREST for every gym', async () => {
+  const d = deps();
   await provisionGym(application, d, { dryRun: false });
 
-  const saved = d.calls.find((c) => c.name === 'saveSecretRef').payload;
-  const serialised = JSON.stringify(saved);
-
-  assert.ok(saved.secret_ref, 'a reference is stored');
-  assert.ok(!serialised.includes('svc-secret-value'), 'the service key must NEVER be written to the platform database');
-  assert.ok(!('service_key' in saved), 'no secret-value field may exist on the row');
+  const names = d.calls.map((c) => c.name).filter((n) => n !== 'audit');
+  assert.equal(names.at(-1), 'exposeSchema', 'everything that can fail must fail before this');
 });
 
-test('a failure AFTER the project exists still records it — no orphaned bill', async () => {
-  // This is the expensive failure: Supabase has created a project we are being
-  // charged for, and the step that would have recorded it blew up.
+test('a failure AFTER the schema exists reports it — no invisible schema', async () => {
   const d = deps({ failAt: 'saveGym' });
+  const r = await provisionGym(application, d, { dryRun: false });
 
-  const result = await provisionGym(application, d, { dryRun: false });
-
-  assert.equal(result.ok, false);
-  assert.equal(result.failedAt, 'saveGym');
-  assert.equal(result.orphanedProjectRef, 'abcdef123456',
-    'a created-but-unrecorded project MUST be reported so it can be reconciled or deleted');
-
-  const audited = d.calls.filter((c) => c.name === 'audit').map((c) => c.payload.action);
-  assert.ok(audited.includes('gym.provision.failed'), 'the failure is audited');
+  assert.equal(r.ok, false);
+  assert.equal(r.failedAt, 'saveGym');
+  assert.equal(r.orphanedSchema, 'gym_iron_works', 'a created-but-unregistered schema must be reported');
+  assert.ok(d.calls.some((c) => c.name === 'audit' && c.payload.action === 'gym.provision.failed'));
 });
 
-test('it stops at the first failure and does not continue', async () => {
+test('a failure before the schema exists reports no orphan', async () => {
+  const d = deps({ failAt: 'createSchema' });
+  const r = await provisionGym(application, d, { dryRun: false });
+
+  assert.equal(r.ok, false);
+  assert.equal(r.orphanedSchema, null);
+});
+
+test('it stops at the first failure', async () => {
   const d = deps({ failAt: 'applySchema' });
-  const result = await provisionGym(application, d, { dryRun: false });
+  const r = await provisionGym(application, d, { dryRun: false });
 
-  assert.equal(result.ok, false);
+  assert.equal(r.ok, false);
   const names = d.calls.map((c) => c.name);
-  assert.ok(!names.includes('seed'), 'must not seed a database whose schema failed');
-  assert.ok(!names.includes('saveGym'), 'must not register a gym that was never built');
+  assert.ok(!names.includes('seed'), 'never seed a schema whose tables failed');
+  assert.ok(!names.includes('exposeSchema'), 'never expose a broken schema to the API');
 });
 
-test('a failure before the project exists reports no orphan', async () => {
-  const d = deps({ failAt: 'createSupabaseProject' });
-  const result = await provisionGym(application, d, { dryRun: false });
+test('a slug that cannot make a safe schema name is refused before anything runs', async () => {
+  const d = deps();
+  const r = await provisionGym({ ...application, slug: '!!!' }, d, { dryRun: false });
 
-  assert.equal(result.ok, false);
-  assert.equal(result.orphanedProjectRef, null, 'nothing was created, so nothing is orphaned');
+  assert.equal(r.ok, false);
+  assert.equal(r.failedAt, 'schemaName');
+  assert.equal(d.calls.length, 0);
 });
 
-test('the gym is registered as pending, not active — payment comes first', async () => {
+test('the gym is registered as pending — payment activates it', async () => {
   const d = deps();
   await provisionGym(application, d, { dryRun: false });
 
   const gym = d.calls.find((c) => c.name === 'saveGym').payload;
-  assert.equal(gym.status, 'pending', 'D-049: provisioned, but not live until the first payment');
-  assert.equal(gym.slug, 'iron-works');
+  assert.equal(gym.status, 'pending');
   assert.equal(gym.latitude, -33.9249, 'coordinates carry through for app search');
+
+  const conn = d.calls.find((c) => c.name === 'saveConnection').payload;
+  assert.equal(conn.schema_name, 'gym_iron_works');
+  assert.equal(conn.supabase_url, null, 'schema mode: no per-gym project');
+});
+
+test('provisioning opens the trial, or the gym would be refused for payment on day one', async () => {
+  // A gym with no subscription row fails accessFor() with a 402. Provisioning
+  // is the only moment at which that row can be created before anybody tries
+  // to use the gym.
+  const d = deps();
+  const r = await provisionGym(application, d, { dryRun: false, plan: { id: 'plan-basic' } });
+
+  const sub = d.calls.find((c) => c.name === 'startSubscription').payload;
+  assert.equal(sub.status, 'trialing');
+  assert.equal(sub.gym_id, 'gym-1');
+  assert.equal(sub.plan_id, 'plan-basic');
+  assert.ok(sub.trial_ends_at, 'a trial with no end date never ends');
+
+  // The gym itself is still pending: a trial is a subscription state, not a
+  // live gym. Activation is what opens the doors.
+  assert.equal(d.calls.find((c) => c.name === 'saveGym').payload.status, 'pending');
+  assert.equal(r.ok, true);
 });

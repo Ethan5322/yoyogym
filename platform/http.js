@@ -144,3 +144,45 @@ export function requireSession(req, res, { csrfToken = null } = {}) {
 
 /** Re-exported so callers need only this module. */
 export { signPlatformToken, verifyPlatformToken, jwt };
+
+// ---------------------------------------------------------------------------
+// Form bodies
+// ---------------------------------------------------------------------------
+
+/**
+ * Read an `application/x-www-form-urlencoded` body.
+ *
+ * Server-rendered pages POST forms, not JSON, so the gym app's readJsonBody is
+ * the wrong tool here. Capped at 64 KB: a decision form carries a reason, not
+ * an upload, and an unbounded read is a denial-of-service waiting to happen.
+ */
+export async function readFormBody(req, { maxBytes = 64 * 1024 } = {}) {
+  let size = 0;
+  const chunks = [];
+  for await (const chunk of req) {
+    size += chunk.length;
+    if (size > maxBytes) throw new Error('Request body too large.');
+    chunks.push(chunk);
+  }
+  const text = Buffer.concat(chunks).toString('utf8');
+  return Object.fromEntries(new URLSearchParams(text));
+}
+
+/**
+ * Read a body as RAW BYTES, for webhooks.
+ *
+ * A webhook signature is computed over the exact bytes the sender sent.
+ * Parsing and re-serialising does not reproduce them — key order, unicode
+ * escaping and whitespace all change — so the signature would never match and
+ * every real webhook would be rejected as a forgery.
+ */
+export async function readRawBody(req, { maxBytes = 256 * 1024 } = {}) {
+  let size = 0;
+  const chunks = [];
+  for await (const chunk of req) {
+    size += chunk.length;
+    if (size > maxBytes) throw new Error('Request body too large.');
+    chunks.push(chunk);
+  }
+  return Buffer.concat(chunks);
+}

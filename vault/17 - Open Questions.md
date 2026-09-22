@@ -17,6 +17,34 @@ When one is answered it moves to [[18 - Decision Log]] and is struck from the op
 
 ---
 
+## 0.1 ⚠️ Q-46 — REOPENED: D-049 and D-070 contradict each other
+
+Found on 2026-09-22 while wiring billing. **Not resolved here — this is a product decision.**
+
+| | |
+|---|---|
+| **D-049** | A gym is provisioned `pending`; **the first payment activates it** |
+| **D-070** | Every gym gets a **30-day free trial** |
+
+Both cannot be true. Under D-049 a trialing gym never reaches `active`, so `server/lib/tenancy.js`
+refuses every request to it with a 402 — the trial is real in the database and **unusable in
+practice**. The gym owner signs up, is told they have 30 days free, and finds a gym that will not
+open.
+
+**What was built, pending your answer:** the trial subscription row is created during provisioning
+(otherwise `accessFor()` 402s on day one), and the gym is still saved as `pending`. Nothing
+currently flips it to `active`.
+
+**The three ways out:**
+
+| | Option | Consequence |
+|---|---|---|
+| **A** | **Owner activation activates the gym** (the `owner_activations` table already exists for the link-and-code step). Payment is not what opens the doors — verifying your email is | The trial works as advertised. D-049 is superseded. **Recommended:** it is the only option where "30 days free" is a true statement |
+| **B** | Keep D-049; **drop the trial**. Card required at signup | Honest, but a harder sell against competitors who all offer a trial |
+| **C** | Keep both; the trial runs but the gym stays `pending` until payment | The trial becomes a demo the owner cannot show anyone. Do not pick this |
+
+---
+
 ## 0. ✅ Milestone — every user-decidable question is now ANSWERED
 
 As of 2026-09-21, **63 decisions** are recorded. Nothing further is waiting on a product or business

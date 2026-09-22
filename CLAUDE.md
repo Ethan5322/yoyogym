@@ -1231,6 +1231,35 @@ decision exists to be recorded.
 ## 35. Stage status
 
 ```text
+BUILT 2026-09-22 — STAGES 4-7, code complete, NOT DEPLOYED, NOT PUSHED.
+  222 tests pass. Vault validates. No SQL has been run against any database.
+
+  Stage 4  boundary + resolution ....... platform/ imports nothing from server/
+                                         or src/ (verified); AsyncLocalStorage
+                                         resolution at getSupabase()
+  Stage 5  platform admin panel ........ login (2FA required), application
+                                         queue, decisions, GYM REGISTRY,
+                                         suspend/reactivate, drift report
+  Stage 6  onboarding + provisioning ... public /platform/apply, 7-step
+                                         provisioner (schema-per-gym), trial
+                                         opened as part of provisioning
+  Stage 7  subscriptions ............... plans as data, entitlement gating,
+                                         trial -> charge -> grace -> suspend,
+                                         Paystack webhook, nightly cron
+  Also     member-facing gym finder at /platform/find; public gym search API
+
+  DEFAULTS THAT MATTER: provisioning is a DRY RUN unless
+  PLATFORM_PROVISION_LIVE=true; billing is a DRY RUN unless
+  PLATFORM_BILLING_LIVE=true. Neither moves without an explicit env var.
+
+  NOT BUILT: Stage 8 (Capacitor mobile app), Stage 9 (deep links),
+             Stage 10 (store compliance). Application document upload
+             (Supabase Storage + multipart) is still unwired.
+
+  BLOCKING QUESTION: Q-46 — D-049 (first payment activates) and D-070 (30-day
+  trial) contradict each other. A trialing gym currently cannot serve traffic.
+  See vault/17 §0.1 for the three options.
+
 STAGE 1 DECIDED (D-016, 2026-09-21) — TENANCY MODEL:
   One shared application deployment + one Supabase project per gym.
   Gym resolution injected at getSupabase(). Per-gym secrets store.
@@ -1265,7 +1294,7 @@ VAULT:        vault/ at the repository root. All 21 notes (00-20) created and
 OPEN IN S2:   Q-23 — are vault notes committed to git? .obsidian/, .smart-env/,
               CLAUDE.md and vault/ are all still untracked.
 NEXT:         Evaluate tenancy options, then open Stage 1.
-LAST UPDATED: 2026-09-21
+LAST UPDATED: 2026-09-22
 ```
 
 Claude updates this block when a gate is passed, and only after the user has approved the pass.

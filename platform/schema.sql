@@ -54,6 +54,9 @@ create table if not exists platform.platform_users (
   -- reaches every gym's secrets, so it is not optional here as it is for gyms.
   totp_secret    text,
   totp_enabled   boolean not null default false,
+  -- SHA-256 hashes of single-use recovery codes (D-088/D-089). Shown once at
+  -- setup, stored only as hashes, consumed on use.
+  recovery_code_hashes jsonb not null default '[]'::jsonb,
   last_login_at  timestamptz,
   created_at     timestamptz not null default now(),
   updated_at     timestamptz not null default now()
@@ -105,6 +108,14 @@ create table if not exists platform.gym_applications (
   applicant_user_id  uuid not null references platform.platform_users(id) on delete restrict,
   status             text not null default 'draft',
   proposed_gym_name  text,
+  -- The routing key derived from the gym name: "BOS GYM" -> "bos-gym".
+  -- Becomes gyms.slug, and gym_<slug> becomes the schema.
+  slug               citext,
+  -- The plan the owner picked while applying (D-099).
+  requested_plan_key citext,
+  -- "Is there anything your gym needs that this does not do?" (D-104).
+  -- Demand evidence, read against the gap list in CLAUDE.md 18.5.
+  owner_needs        text,
   country            text,                    -- ISO-3166 alpha-2
   city               text,
   -- Captured at application because app search needs it and the four required
@@ -123,6 +134,7 @@ create table if not exists platform.gym_applications (
 create index if not exists gym_applications_status_idx    on platform.gym_applications(status);
 create index if not exists gym_applications_applicant_idx on platform.gym_applications(applicant_user_id);
 create index if not exists gym_applications_submitted_idx on platform.gym_applications(submitted_at desc);
+create unique index if not exists gym_applications_slug_idx on platform.gym_applications(slug) where slug is not null;
 
 -- -----------------------------------------------------------------------------
 -- application_documents — the four required documents (D-047):
@@ -188,6 +200,9 @@ create table if not exists platform.gyms (
   legal_name     text,
   trading_name   text,
   status         text not null default 'pending',
+  -- The gym's current plan. Entitlements are resolved from this server-side;
+  -- a client never states its own plan.
+  plan_key       citext,
   owner_user_id  uuid not null references platform.platform_users(id) on delete restrict,
   application_id uuid references platform.gym_applications(id) on delete set null,
   country        text,
@@ -350,12 +365,21 @@ create table if not exists platform.platform_invoices (
   paid_at         timestamptz,
   provider        text,                   -- 'paystack'
   provider_ref    text,
+  -- The billing period this invoice covers. THE DOUBLE-CHARGE GUARD KEYS ON
+  -- THIS: one invoice per gym per period, enforced by the unique index below,
+  -- so a cron that fires twice cannot bill twice.
+  period_end      timestamptz,
   created_at      timestamptz not null default now(),
   updated_at      timestamptz not null default now()
 );
 create index if not exists platform_invoices_gym_idx    on platform.platform_invoices(gym_id);
 create index if not exists platform_invoices_status_idx on platform.platform_invoices(status);
 create index if not exists platform_invoices_due_idx    on platform.platform_invoices(due_at);
+-- The guard itself. A second run for the same period is rejected by the
+-- database, not merely by the application remembering to check.
+create unique index if not exists platform_invoices_one_per_period_idx
+  on platform.platform_invoices(gym_id, period_end)
+  where period_end is not null;
 
 -- -----------------------------------------------------------------------------
 -- platform_audit_log — APPEND-ONLY.
