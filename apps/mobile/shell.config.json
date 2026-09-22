@@ -1,0 +1,50 @@
+{
+  "_comment": [
+    "Where the Yoyo Gyms app is allowed to navigate.",
+    "",
+    "THE SINGLE SOURCE OF TRUTH for two things that must never drift apart:",
+    "Capacitor's `allowNavigation` (what the WebView may open inside the app)",
+    "and the entry screen's own validation (where it may send someone). If the",
+    "screen sent a member somewhere the WebView would not open, the app would",
+    "hand them to the system browser mid-registration — typing personal details",
+    "into a plain tab with none of the app's chrome around it.",
+    "",
+    "`npm run mobile:configure` regenerates www/config.js from this file, and",
+    "capacitor.config.ts reads the same list. Edit here and nowhere else.",
+    "",
+    "WHY THERE IS NO 'enter your server address' SCREEN, unlike some shells:",
+    "Yoyo Gyms is ONE deployment serving every gym, each as a schema in the",
+    "same project (D-096). The address does not vary per gym and must not be",
+    "typed by a member. What varies is WHICH GYM, and that is resolved by slug",
+    "through search or a scanned QR (D-036). A shell that asked a gym member",
+    "for a server address would be asking a question they cannot answer.",
+    "",
+    "⚠️ THE STAFF PANEL MUST NOT BE REACHABLE FROM THIS APP.",
+    "",
+    "`adminHost` below is recorded and DELIBERATELY ABSENT from allowedHosts.",
+    "The Yoyo Gyms admin panel is for platform staff — different people,",
+    "different permissions, and the screens that approve gyms and read the",
+    "audit log. Staff reach it in a browser, never through this app.",
+    "",
+    "Right now the panel shares a host with the member screens, so this list",
+    "CANNOT exclude it by host alone. Two defences stand today:",
+    "  1. every staff route requires a permission a gym owner does not have,",
+    "     and refuses with 403 (D-128, and the tests that cover it);",
+    "  2. the entry screen never links there.",
+    "That is defence in depth, not host isolation. Serving the panel from its",
+    "own hostname is recorded as the intended fix — see ASSUMPTIONS below.",
+    "",
+    "PLACEHOLDER DOMAINS. yoyogyms.com is NOT registered as of 2026-09-22. An",
+    "unregistered domain in an allow list is a name somebody else can buy, and",
+    "this list decides where a member may type their ID number. Replace both",
+    "entries with the real address before any build leaves this machine."
+  ],
+
+  "allowedHosts": [],
+
+  "defaultServer": "",
+
+  "adminHost": "",
+
+  "supportContact": "MuleSoo Digital Solutions"
+}

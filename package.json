@@ -5,6 +5,8 @@
   "type": "module",
   "description": "Premium AI Gym Membership & Booking Automation System — MuleSoo Digital Solutions",
   "scripts": {
+    "mobile:configure": "node scripts/mobile/configure-shell.mjs",
+    "mobile:sync": "npm run mobile:configure && cd apps/mobile && npx cap sync",
     "dev": "vite",
     "dev:api": "node scripts/dev-server.js",
     "build": "vite build",

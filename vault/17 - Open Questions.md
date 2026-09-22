@@ -197,6 +197,53 @@ numbers, more effective than the guessing mitigation D-034 assumed was primary.
 
 ---
 
+## 0.5 🔴 Q-47 — THE TENANCY SEAM IS NOT WIRED, and wiring it needs one decision
+
+Found 2026-09-22 while building the app shell, by following the member's path end to end.
+**Verified by grep, not assumed.**
+
+### What is true today
+
+| | |
+|---|---|
+| `server/lib/tenancy.js` | `resolveGym()` and `runWithGym()` exist and are **fully tested** (`tests/isolation.test.js`) |
+| `server/lib/supabase.js` | `getSupabase()` checks `currentGym()` first — the seam is correct |
+| **Anything that calls them** | **NOTHING.** Zero call sites outside the module itself |
+| `/g/:slug` | **Does not exist.** `src/App.jsx` has no such route |
+
+So `currentGym()` always returns null, every request falls through to single-gym mode, and a
+member who picks "BOS GYM" in the app has nowhere to go. **The multi-gym mechanism is built,
+proven and inert.**
+
+### The decision that has to come first
+
+How does a request say which gym it is for? The obvious answer — a header or a path segment — is
+**unsafe here**, and the reason is D-096.
+
+Under the original D-016 each gym had its own Supabase project *and its own secrets*. Under D-096
+every gym is a schema in **one** project, which means **one shared `JWT_SECRET`**. So a member
+token minted by gym A verifies perfectly against gym B.
+
+If the gym travels in a client-supplied header, a member of gym A sends `X-Gym-Slug: gym-b`, their
+token verifies, and they are inside gym B's data. **That is precisely the failure Stage 5's gate
+forbids**, and no amount of testing the resolver catches it, because the resolver did its job.
+
+### Recommendation — the gym belongs in the TOKEN
+
+| Request kind | Where the gym comes from | Why |
+|---|---|---|
+| **Authenticated** (member portal, admin) | **The signed token.** A client cannot change it without re-signing | The token already proves who you are; it should also fix *where* you are |
+| **Public** (register, catalog, gym profile) | Path or header | Nothing private is exposed, and these are gym-scoped by nature |
+
+A client-supplied slug on an authenticated request is then either **ignored**, or required to
+**match the token** and rejected if it does not — the second is better, because a mismatch is a
+bug or an attack and should be visible rather than silently overridden.
+
+**This changes `signToken`/`signMemberToken` (protected surface, §32) to carry a gym claim, and it
+is a security decision. Not implemented. Awaiting a decision.**
+
+---
+
 ## 0. ✅ Milestone — every user-decidable question is now ANSWERED
 
 As of 2026-09-21, **63 decisions** are recorded. Nothing further is waiting on a product or business

@@ -1,0 +1,163 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>Yoyo Gyms</title>
+    <!--
+      The screen the app opens on.
+
+      Yoyo Gyms' screens are rendered by the Yoyo Gyms server, so this shell
+      has none of them. What it has is the one thing the server cannot give a
+      freshly installed app: a way to say WHICH GYM (D-036).
+
+      Why this exists rather than opening straight at the server: the first
+      question is "which gym are you?", and answering it needs the camera for a
+      QR code — which a browser tab handles badly and an app handles well. The
+      alternative is an app that opens on a web page asking the same question
+      with fewer tools, which is every badly-wrapped web app.
+
+      Written inline and with no dependencies: this page runs before the app
+      has reached a server, so it cannot fetch anything. It uses the app's own
+      config.js, which is generated from shell.config.json.
+    -->
+    <style>
+      :root {
+        --ink: #14181a;
+        --ground: #0e1416;
+        --card: #ffffff;
+        --line: #d6dee0;
+        --muted: #5b6a6d;
+        --accent: #e63946;
+        --accent-ink: #ffffff;
+        --bad: #8c2f22;
+      }
+      * { box-sizing: border-box; }
+      html, body { margin: 0; padding: 0; }
+      body {
+        background: var(--ground);
+        color: var(--ink);
+        font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+        font-size: 16px;
+        line-height: 1.5;
+        min-height: 100dvh;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        /* Clear of the notch and the gesture bar. */
+        padding: max(1.25rem, env(safe-area-inset-top)) 1.25rem
+                 max(1.25rem, env(safe-area-inset-bottom));
+      }
+      .brand {
+        text-align: center;
+        color: #fff;
+        margin-bottom: 1.5rem;
+      }
+      .brand h1 {
+        font-size: 1.75rem;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        margin: 0 0 0.25rem;
+      }
+      .brand p { color: #9fb0b3; margin: 0; font-size: 0.95rem; }
+      .card {
+        background: var(--card);
+        border-radius: 18px;
+        padding: 1.25rem;
+        box-shadow: 0 12px 32px rgba(0, 0, 0, 0.35);
+      }
+      label { display: block; font-weight: 600; margin-bottom: 0.4rem; }
+      input {
+        width: 100%;
+        font-size: 1.05rem;
+        padding: 0.9rem 1rem;
+        border: 1px solid var(--line);
+        border-radius: 12px;
+        background: #fff;
+        color: var(--ink);
+      }
+      button {
+        width: 100%;
+        /* 52px: comfortably past the 44px minimum touch target, and reachable
+           one-handed on a phone held at the bottom. */
+        min-height: 52px;
+        font-size: 1.05rem;
+        font-weight: 600;
+        border: 0;
+        border-radius: 12px;
+        background: var(--accent);
+        color: var(--accent-ink);
+        margin-top: 0.75rem;
+      }
+      button.secondary {
+        background: #eef2f3;
+        color: var(--ink);
+      }
+      button:disabled { opacity: 0.55; }
+      .results { margin-top: 0.75rem; }
+      .gym {
+        display: block;
+        width: 100%;
+        text-align: left;
+        background: #f7f9f9;
+        border: 1px solid var(--line);
+        border-radius: 12px;
+        padding: 0.9rem 1rem;
+        margin-top: 0.5rem;
+        color: var(--ink);
+        font: inherit;
+        min-height: 52px;
+      }
+      .gym b { display: block; font-size: 1.05rem; }
+      .gym span { color: var(--muted); font-size: 0.9rem; }
+      .note { color: var(--muted); font-size: 0.9rem; margin: 0.75rem 0 0; }
+      .err { color: var(--bad); font-weight: 600; margin: 0.75rem 0 0; }
+      .owner {
+        text-align: center;
+        margin-top: 1.25rem;
+        color: #9fb0b3;
+        font-size: 0.95rem;
+      }
+      .owner button {
+        background: transparent;
+        color: #fff;
+        text-decoration: underline;
+        min-height: 44px;
+        margin-top: 0.25rem;
+      }
+      .empty { color: var(--muted); padding: 0.75rem 0; }
+    </style>
+  </head>
+  <body>
+    <div class="brand">
+      <h1>Yoyo Gyms</h1>
+      <p>Find your gym and get started</p>
+    </div>
+
+    <div class="card">
+      <label for="q">Your gym's name</label>
+      <input
+        id="q"
+        type="search"
+        inputmode="search"
+        autocomplete="off"
+        autocapitalize="characters"
+        placeholder="e.g. BOS GYM"
+        enterkeyhint="search"
+      />
+      <button id="near" class="secondary" type="button">Use my location</button>
+      <button id="scan" type="button">Scan my gym's QR code</button>
+
+      <p class="note" id="note"></p>
+      <div class="results" id="results"></div>
+    </div>
+
+    <div class="owner">
+      <div>Do you own a gym?</div>
+      <button id="owner" type="button">List your gym on Yoyo Gyms</button>
+    </div>
+
+    <script src="config.js"></script>
+    <script src="app.js"></script>
+  </body>
+</html>
