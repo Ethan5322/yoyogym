@@ -360,13 +360,19 @@ export function platformOpsDeps(db = platformDb()) {
     /** Read per request. Revoking a role must take effect now, not in 8 hours. */
     permissionsFor: (session) => permissionsFor(db, session.sub),
 
-    listGyms: async () => {
-      const { data } = await db
+    listGyms: async ({ query = '', status = '', limit = 200 } = {}) => {
+      let q = db
         .from('gyms')
         .select('id, slug, search_name, city, country, status, plan_key, created_at')
         .order('created_at', { ascending: false })
-        .limit(500);
+        .limit(Math.min(Number(limit) || 200, 500));
 
+      // A list capped at 500 with no search is not a registry at ten thousand
+      // gyms — it is the newest 500 gyms.
+      if (query) q = q.or(`search_name.ilike.%${query}%,slug.ilike.%${query}%,city.ilike.%${query}%`);
+      if (status) q = q.eq('status', status);
+
+      const { data } = await q;
       const gyms = data ?? [];
       if (!gyms.length) return gyms;
 
@@ -824,6 +830,153 @@ export function ownerDeps(db = platformDb()) {
       const { data, error } = await db.storage.from(DOCUMENT_BUCKET).createSignedUrl(storageRef, seconds);
       if (error) return null;
       return data?.signedUrl ?? null;
+    },
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Running the platform: plans, the audit log, owners, money
+// ---------------------------------------------------------------------------
+
+export function platformControlDeps(db = platformDb()) {
+  return {
+    // ---- plans and prices -------------------------------------------------
+    listPlans: async () => {
+      const { data } = await db.from('platform_plans').select('*').order('max_active_members', { ascending: true });
+      return data ?? [];
+    },
+
+    updatePlan: async (key, patch) => {
+      const { error } = await db
+        .from('platform_plans')
+        .update({ ...patch, updated_at: new Date().toISOString() })
+        .eq('key', key);
+      // Checked: a silently failed price change means every gym on that plan
+      // carries on being billed the old amount, or nothing at all.
+      if (error) throw new Error(`Could not save that plan: ${error.message}`);
+    },
+
+    // ---- the audit log ----------------------------------------------------
+    listAuditLog: async ({ action = '', entityId = '', limit = 200 } = {}) => {
+      let q = db
+        .from('platform_audit_log')
+        .select('id, action, actor_kind, actor_user_id, entity, entity_id, detail, created_at')
+        .order('created_at', { ascending: false })
+        .limit(Math.min(Number(limit) || 200, 500));
+
+      if (action) q = q.ilike('action', `%${action}%`);
+      if (entityId) q = q.eq('entity_id', entityId);
+
+      const { data } = await q;
+      return data ?? [];
+    },
+
+    // ---- gym owners -------------------------------------------------------
+    listOwners: async ({ query = '', limit = 100 } = {}) => {
+      let q = db
+        .from('platform_users')
+        .select('id, email, full_name, is_active, created_at')
+        .eq('kind', 'gym_owner')
+        .order('created_at', { ascending: false })
+        .limit(Math.min(Number(limit) || 100, 200));
+
+      // `or` rather than two queries: a search that only matched email would
+      // fail every time someone typed a name, which is what people type.
+      if (query) q = q.or(`email.ilike.%${query}%,full_name.ilike.%${query}%`);
+
+      const { data: owners } = await q;
+      if (!owners?.length) return [];
+
+      const { data: gyms } = await db
+        .from('gyms')
+        .select('owner_user_id')
+        .in('owner_user_id', owners.map((o) => o.id));
+
+      const counts = new Map();
+      for (const g of gyms ?? []) counts.set(g.owner_user_id, (counts.get(g.owner_user_id) ?? 0) + 1);
+
+      return owners.map((o) => ({ ...o, gym_count: counts.get(o.id) ?? 0 }));
+    },
+
+    /**
+     * Switch an owner account on or off.
+     *
+     * This stops them SIGNING IN. It does not close their gym and deletes
+     * nothing — "this account is compromised" and "this gym stopped paying"
+     * are different problems and want different buttons.
+     */
+    setOwnerActive: async (userId, active) => {
+      const { error } = await db
+        .from('platform_users')
+        .update({ is_active: active, updated_at: new Date().toISOString() })
+        .eq('id', userId)
+        // Guarded: this screen manages gym owners. A bug that let it disable a
+        // platform_staff row could lock every administrator out at once.
+        .eq('kind', 'gym_owner');
+      if (error) throw new Error(`Could not change that account: ${error.message}`);
+    },
+
+    /**
+     * Move a gym to another plan.
+     *
+     * The plan is written to BOTH `gyms.plan_key` (which entitlement
+     * resolution reads on every request) and the live subscription (which
+     * billing reads). Writing only one would give a gym the features of one
+     * plan and the invoice of another.
+     */
+    changeGymPlan: async (gymId, planKey) => {
+      const { data: plan } = await db.from('platform_plans').select('id').eq('key', planKey).maybeSingle();
+      if (!plan) throw new Error(`No such plan: ${planKey}`);
+
+      const now = new Date().toISOString();
+      const { error } = await db.from('gyms').update({ plan_key: planKey, updated_at: now }).eq('id', gymId);
+      if (error) throw new Error(`Could not change the plan: ${error.message}`);
+
+      await db
+        .from('platform_subscriptions')
+        .update({ plan_id: plan.id, updated_at: now })
+        .eq('gym_id', gymId)
+        .in('status', ['trialing', 'active', 'past_due']);
+    },
+
+    // ---- money ------------------------------------------------------------
+    /**
+     * What the platform has been paid and what it is owed.
+     *
+     * Deliberately computed from `platform_invoices` only. A member's payment
+     * to their gym never appears here and never can — the platform does not
+     * hold it (D-013).
+     */
+    financeSummary: async () => {
+      const [{ data: invoices }, { data: subs }, { data: plans }] = await Promise.all([
+        db.from('platform_invoices').select('status, amount_cents, currency').limit(5000),
+        db.from('platform_subscriptions').select('status'),
+        db.from('platform_plans').select('key, price_cents, is_enabled'),
+      ]);
+
+      let paid = 0;
+      let outstanding = 0;
+      for (const i of invoices ?? []) {
+        if (i.status === 'paid') paid += Number(i.amount_cents) || 0;
+        else if (i.status === 'issued' || i.status === 'overdue') outstanding += Number(i.amount_cents) || 0;
+      }
+
+      const byStatus = {};
+      for (const s of subs ?? []) byStatus[s.status] = (byStatus[s.status] ?? 0) + 1;
+
+      // The most expensive thing that can quietly be true here: gyms using the
+      // platform on a plan with no price, so no invoice is ever raised.
+      const unpriced = (plans ?? [])
+        .filter((p) => p.is_enabled !== false && (!Number.isInteger(p.price_cents) || p.price_cents <= 0))
+        .map((p) => p.key);
+
+      return {
+        currency: invoices?.[0]?.currency || 'ZAR',
+        paid_cents: paid,
+        outstanding_cents: outstanding,
+        gyms_by_status: byStatus,
+        unpriced_plans: unpriced,
+      };
     },
   };
 }

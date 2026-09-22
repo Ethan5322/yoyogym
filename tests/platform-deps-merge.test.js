@@ -14,13 +14,13 @@ import assert from 'node:assert/strict';
 process.env.SUPABASE_URL ||= 'http://localhost:54321';
 process.env.SUPABASE_SERVICE_ROLE_KEY ||= 'test-only-service-key';
 
-const { platformDeps, platformOpsDeps, activationDeps, ownerDeps } = await import('../platform/deps.js');
+const { platformDeps, platformOpsDeps, activationDeps, ownerDeps, platformControlDeps } = await import('../platform/deps.js');
 
 /** The one key all three share on purpose: the same audit writer. */
 const INTENTIONAL = new Set(['audit']);
 
 test('no dependency factory silently overwrites another', () => {
-  const sets = [platformDeps(), platformOpsDeps(), activationDeps(), ownerDeps()].map(Object.keys);
+  const sets = [platformDeps(), platformOpsDeps(), activationDeps(), ownerDeps(), platformControlDeps()].map(Object.keys);
   const seen = new Map();
 
   for (const [i, keys] of sets.entries()) {
@@ -38,7 +38,7 @@ test('no dependency factory silently overwrites another', () => {
 });
 
 test('the router gets every dependency its routes call for', () => {
-  const merged = { ...platformDeps(), ...platformOpsDeps(), ...activationDeps(), ...ownerDeps() };
+  const merged = { ...platformDeps(), ...platformOpsDeps(), ...activationDeps(), ...ownerDeps(), ...platformControlDeps() };
 
   // Each of these is called by a route. A missing one is a 500 on a path no
   // test happens to cover.
@@ -52,6 +52,7 @@ test('the router gets every dependency its routes call for', () => {
     'audit',
     'ownerDashboard', 'findOwnApplication', 'createSignedUpload', 'recordDocument',
     'getDocument', 'reviewDocument', 'signedDocumentUrl',
+    'listPlans', 'updatePlan', 'changeGymPlan', 'listAuditLog', 'listOwners', 'setOwnerActive', 'financeSummary',
   ]) {
     assert.equal(typeof merged[name], 'function', `missing dependency: ${name}`);
   }

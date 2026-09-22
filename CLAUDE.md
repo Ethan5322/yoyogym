@@ -1312,7 +1312,22 @@ BUILT 2026-09-22 — STAGES 4-7, code complete, NOT DEPLOYED, NOT PUSHED.
   strict ID format check, because the SA ID is the only one this codebase can
   validate. §5 and §30 below are updated accordingly.
 
-  319 tests pass.
+  PLATFORM PANEL COMPLETED 2026-09-22 (D-128/D-129), after the user asked
+  whether it was really built. It was half built. Added: plans and prices
+  (price_cents was NULL and nothing could set it — BILLING WAS CHARGING
+  NOBODY), the audit log reader (everything wrote, nothing read), gym and
+  owner search, owner deactivation, a finance summary, and moving one gym to
+  another plan. §16 is now covered except the three items below.
+
+  STILL NOT BUILT, stated plainly:
+    · Monitor gym activity — no activity feed.
+    · Per-gym member statistics — NOT an oversight. §16 asks for them and
+      D-044 says support must never see member data; counting means reaching
+      into a gym's schema, which is the boundary the POPIA position rests on
+      (D-014). Raised as D-130 rather than quietly crossed.
+    · Security alerts — the audit log filter is the nearest thing today.
+
+  339 tests pass.
 
   SUPERSEDED BLOCKING QUESTION (kept for history): Q-46 — D-049 (first payment activates) and D-070 (30-day
   trial) contradict each other. A trialing gym currently cannot serve traffic.

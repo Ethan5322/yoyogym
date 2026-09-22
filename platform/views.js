@@ -86,6 +86,18 @@ export function layout({ title = 'Yoyo Gyms', body = '', user = null, indexable 
 <body>
 <header>
   <b>Yoyo Gyms</b>
+  ${
+    user
+      ? `<nav class="row">
+    <a href="/platform/applications">Applications</a>
+    <a href="/platform/registry">Gyms</a>
+    <a href="/platform/owners">Owners</a>
+    <a href="/platform/plans">Plans</a>
+    <a href="/platform/finance">Finances</a>
+    <a href="/platform/audit">Audit</a>
+  </nav>`
+      : ''
+  }
   <span class="muted">${user ? h(user.email) : ''}</span>
 </header>
 <main>
@@ -366,7 +378,7 @@ ask for your documents, and again once a decision is made.</p>
  * need to see that a gym is broken without being able to read anybody's
  * personal data (D-044), and the way to guarantee that is not to render it.
  */
-export function registryPage({ gyms = [], user = null, canSuspend = false } = {}) {
+export function registryPage({ gyms = [], user = null, canSuspend = false, filter = {} } = {}) {
   const body = gyms.length
     ? `<table>
   <thead><tr><th>Gym</th><th>City</th><th>Plan</th><th>Status</th><th>Billing</th></tr></thead>
@@ -394,6 +406,19 @@ ${gyms
       canSuspend ? '' : ' You have read-only access.'
     }</p>
 <p><a href="/platform/reconcile">Check for drift →</a></p>
+
+<form class="card row" method="get" action="/platform/registry">
+  <label>Search<input name="q" value="${h(filter.query)}" placeholder="gym name or slug"></label>
+  <label>Status
+    <select name="status">
+      <option value="">Any</option>
+      ${['pending', 'active', 'suspended', 'cancelled']
+        .map((v) => `<option value="${v}"${filter.status === v ? ' selected' : ''}>${v}</option>`)
+        .join('')}
+    </select>
+  </label>
+  <button type="submit">Search</button>
+</form>
 ${body}`,
   });
 }
@@ -406,6 +431,8 @@ export function gymDetailPage({
   user = null,
   csrfToken = '',
   canSuspend = false,
+  canBill = false,
+  plans = [],
 }) {
   const suspended = gym.status === 'suspended';
 
@@ -460,6 +487,28 @@ ${invoices
       : `<p class="muted">No subscription record.</p>`
   }
 </div>
+
+${
+  canBill && plans.length
+    ? `<form class="card" method="post" action="/platform/registry/${h(gym.id)}/plan">
+  <input type="hidden" name="csrf" value="${h(csrfToken)}">
+  <h2>Move to another plan</h2>
+  <label>Plan
+    <select name="plan_key">
+      ${plans
+        .map(
+          (p) => `<option value="${h(p.key)}"${p.key === gym.plan_key ? ' selected' : ''}>${h(p.label)}</option>`
+        )
+        .join('')}
+    </select>
+  </label>
+  <p class="muted"><b>A downgrade never deletes members.</b> Existing members stay; only new
+  registrations stop once the gym is over the new plan's limit. The change applies from the next
+  billing date — nobody is re-billed for this month.</p>
+  <button type="submit">Change plan</button>
+</form>`
+    : ''
+}
 
 <h2>Invoices</h2>
 ${bills}
@@ -831,4 +880,226 @@ function readableDocType(key) {
       other_supporting: 'Supporting document',
     }[key] || key
   );
+}
+
+// ---------------------------------------------------------------------------
+// Plans and prices
+// ---------------------------------------------------------------------------
+
+/** Cents to rands, for a form field. Never rounds to whole rands. */
+const rands = (cents) => (Number.isFinite(Number(cents)) ? (Number(cents) / 100).toFixed(2) : '');
+
+/**
+ * Plans and their prices.
+ *
+ * The form is in RANDS because that is what a person thinks in; everything
+ * below this screen is in cents. An unpriced plan is called out in words,
+ * because a blank box looks like a plan that is free and is actually a plan
+ * that nobody is being charged for.
+ */
+export function plansPage({ plans = [], user = null, csrfToken = '', error = '' } = {}) {
+  const unpriced = plans.filter((p) => !Number.isInteger(p.price_cents) || p.price_cents <= 0);
+
+  return layout({
+    title: 'Plans and prices',
+    user,
+    body: `<h1>Plans and prices</h1>
+${error ? `<p class="err">${h(error)}</p>` : ''}
+${
+  unpriced.length
+    ? `<div class="card"><b>⚠️ ${unpriced.length} plan${unpriced.length === 1 ? ' has' : 's have'} no price.</b>
+  <p class="muted">Billing skips a plan with no price — those gyms are <b>not being billed at all</b>.
+  Nothing is charged until a price is set here.</p></div>`
+    : ''
+}
+
+${plans
+  .map(
+    (p) => `<form class="card" method="post" action="/platform/plans/${h(p.key)}">
+  <input type="hidden" name="csrf" value="${h(csrfToken)}">
+  <h2>${h(p.label)} <span class="muted">${h(p.key)}</span></h2>
+  <p>${
+    Number.isInteger(p.price_cents) && p.price_cents > 0
+      ? `Currently <b>${h(p.currency || 'ZAR')} ${rands(p.price_cents)}</b> per month`
+      : '<b>No price set</b> — this plan bills nobody.'
+  }</p>
+  <div class="two">
+    <label>Price per month (${h(p.currency || 'ZAR')})
+      <input name="price" inputmode="decimal" value="${h(rands(p.price_cents))}" placeholder="e.g. 499.00">
+    </label>
+    <label>Maximum active members
+      <input name="max_active_members" inputmode="numeric" value="${h(p.max_active_members)}">
+    </label>
+  </div>
+  <label class="row"><input type="checkbox" name="is_enabled" value="1" ${
+    p.is_enabled === false ? '' : 'checked'
+  }> Offered to new gyms</label>
+  <button type="submit">Save ${h(p.label)}</button>
+</form>`
+  )
+  .join('\n')}
+
+<p class="muted">Changing a price does not re-bill anyone. It applies from each gym's next
+billing date. Every change here is written to the audit log.</p>`,
+  });
+}
+
+// ---------------------------------------------------------------------------
+// The audit log
+// ---------------------------------------------------------------------------
+
+/**
+ * The platform audit log.
+ *
+ * Everything on the platform writes here — every approval, suspension, price
+ * change and document view — and until now nothing could read it. It is also
+ * the POPIA record of who looked at whose identity document.
+ *
+ * Filtered rather than paged: after a year this table is the largest thing on
+ * the platform, and "show me everything" stops being a useful question.
+ */
+export function auditPage({ entries = [], user = null, filter = {} } = {}) {
+  const rows = entries.length
+    ? `<table>
+  <thead><tr><th>When</th><th>Action</th><th>Who</th><th>What</th><th>Detail</th></tr></thead>
+  <tbody>
+${entries
+  .map(
+    (e) => `    <tr>
+      <td class="muted">${h(e.created_at)}</td>
+      <td><b>${h(e.action)}</b></td>
+      <td>${h(e.actor_kind || '')}${e.actor_user_id ? `<br><span class="muted">${h(e.actor_user_id)}</span>` : ''}</td>
+      <td>${h(e.entity || '')}${e.entity_id ? `<br><span class="muted">${h(e.entity_id)}</span>` : ''}</td>
+      <td class="muted">${h(detailText(e.detail))}</td>
+    </tr>`
+  )
+  .join('\n')}
+  </tbody>
+</table>`
+    : `<div class="empty">Nothing matches that filter.</div>`;
+
+  return layout({
+    title: 'Audit log',
+    user,
+    body: `<h1>Audit log</h1>
+<p class="muted">Append-only. Every approval, suspension, price change and document view.</p>
+
+<form class="card row" method="get" action="/platform/audit">
+  <label>Action contains<input name="action" value="${h(filter.action)}" placeholder="e.g. suspend"></label>
+  <label>Entity id<input name="entity_id" value="${h(filter.entityId)}" placeholder="a gym or document id"></label>
+  <button type="submit">Filter</button>
+</form>
+
+${rows}`,
+  });
+}
+
+/**
+ * Render a detail blob as text.
+ *
+ * Stringified and then escaped by the caller. It is written by us, but it
+ * CONTAINS text people typed — a rejection reason, a gym name — so it is
+ * treated as untrusted.
+ */
+function detailText(detail) {
+  if (!detail) return '';
+  try {
+    return typeof detail === 'string' ? detail : JSON.stringify(detail);
+  } catch {
+    return '';
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Owners
+// ---------------------------------------------------------------------------
+
+/** Gym owners, and the switch that stops one. */
+export function ownersPage({ owners = [], user = null, csrfToken = '', filter = {} } = {}) {
+  const rows = owners.length
+    ? `<table>
+  <thead><tr><th>Owner</th><th>Email</th><th>Gyms</th><th>Status</th><th></th></tr></thead>
+  <tbody>
+${owners
+  .map(
+    (o) => `    <tr>
+      <td>${h(o.full_name || '—')}</td>
+      <td>${h(o.email)}</td>
+      <td>${h(o.gym_count ?? 0)}</td>
+      <td>${statusTag(o.is_active === false ? 'suspended' : 'active')}</td>
+      <td><form method="post" action="/platform/owners/${h(o.id)}/${
+        o.is_active === false ? 'reactivate' : 'deactivate'
+      }">
+        <input type="hidden" name="csrf" value="${h(csrfToken)}">
+        <button type="submit">${o.is_active === false ? 'Switch on' : 'Switch off'}</button>
+      </form></td>
+    </tr>`
+  )
+  .join('\n')}
+  </tbody>
+</table>`
+    : `<div class="empty">No owners match that search.</div>`;
+
+  return layout({
+    title: 'Gym owners',
+    user,
+    body: `<h1>Gym owners</h1>
+<p class="muted">Switching an owner off stops them signing in. <b>It does not close their gym</b>
+and it deletes nothing — suspend the gym itself if that is what you mean.</p>
+
+<form class="card row" method="get" action="/platform/owners">
+  <label>Search<input name="q" value="${h(filter.query)}" placeholder="name or email"></label>
+  <button type="submit">Search</button>
+</form>
+
+${rows}`,
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Money
+// ---------------------------------------------------------------------------
+
+/** What the platform is owed and what it has been paid. */
+export function financePage({ summary = {}, user = null } = {}) {
+  const byStatus = summary.gyms_by_status || {};
+  const unpriced = summary.unpriced_plans || [];
+
+  return layout({
+    title: 'Finances',
+    user,
+    body: `<h1>Finances</h1>
+
+${
+  unpriced.length
+    ? `<div class="card"><b>⚠️ Gyms on ${unpriced.map((k) => h(k)).join(', ')} are not being billed.</b>
+  <p class="muted">Those plans have <b>no price</b>, so billing skips them entirely.
+  <a href="/platform/plans">Set a price →</a></p></div>`
+    : ''
+}
+
+<div class="card">
+  <h2>Paid</h2>
+  <p><b>${h(summary.currency || 'ZAR')} ${((Number(summary.paid_cents) || 0) / 100).toFixed(2)}</b></p>
+</div>
+
+<div class="card">
+  <h2>Outstanding</h2>
+  <p><b>${h(summary.currency || 'ZAR')} ${((Number(summary.outstanding_cents) || 0) / 100).toFixed(2)}</b></p>
+  <p class="muted">Invoices issued and not yet paid.</p>
+</div>
+
+<h2>Gyms by subscription state</h2>
+<table>
+  <thead><tr><th>State</th><th>Gyms</th></tr></thead>
+  <tbody>
+${Object.entries(byStatus)
+  .map(([state, count]) => `    <tr><td>${statusTag(state)}</td><td>${h(count)}</td></tr>`)
+  .join('\n')}
+  </tbody>
+</table>
+
+<p class="muted">Figures come from <code>platform_invoices</code>. Money the platform is owed by
+gyms — <b>never a member's payment to their gym</b>, which the platform does not see (D-013).</p>`,
+  });
 }

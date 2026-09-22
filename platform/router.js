@@ -23,6 +23,10 @@ import {
   activatePage,
   activateSuccessPage,
   ownerDashboardPage,
+  plansPage,
+  auditPage,
+  ownersPage,
+  financePage,
 } from './views.js';
 import { eventToIntent } from './billing.js';
 import { completeActivation } from './activation.js';
@@ -466,6 +470,176 @@ async function handleExtraRoutes(req, res, deps, { url, path, method }) {
     return true;
   }
 
+  // ---- plans and prices ----------------------------------------------------
+  // The screen the platform cannot be run without: billing skips any plan with
+  // no price, so until a price is set here, nobody is charged anything.
+  if (path === 'plans' && method === 'GET') {
+    const session = requireSession(req, res);
+    if (!session) return true;
+
+    if (!(await may(deps, session, 'subscription.manage'))) {
+      forbid(res, 'You do not have permission to manage plans and prices.');
+      return true;
+    }
+
+    html(res, 200, plansPage({
+      plans: await deps.listPlans(),
+      user: { email: session.email },
+      csrfToken: issueCsrfToken(session.sub),
+    }));
+    return true;
+  }
+
+  const planUpdate = /^plans\/([A-Za-z0-9_-]+)$/.exec(path);
+  if (planUpdate && method === 'POST') {
+    const form = await readFormBody(req);
+
+    const session = requireSession(req, res, { csrfToken: form.csrf });
+    if (!session) return true;
+
+    if (!(await may(deps, session, 'subscription.manage'))) {
+      forbid(res, 'You do not have permission to manage plans and prices.');
+      return true;
+    }
+
+    // THE FORM IS IN RANDS. EVERYTHING BELOW IS IN CENTS. Getting this wrong
+    // by a factor of 100 is the classic billing bug, so the conversion happens
+    // exactly here and nowhere else.
+    const price = Number(String(form.price || '').trim());
+
+    if (!Number.isFinite(price) || price <= 0) {
+      // Refused rather than stored as null or zero. "Free" is not what an
+      // empty box means — it means every gym on this plan stops being billed,
+      // silently, and that should never be a typo away.
+      const bad = plansPage({
+        plans: await deps.listPlans(),
+        user: { email: session.email },
+        csrfToken: issueCsrfToken(session.sub),
+        error: 'Enter a price greater than zero, like 499.00. To stop offering a plan, untick "Offered to new gyms".',
+      });
+      html(res, 400, bad);
+      return true;
+    }
+
+    const priceCents = Math.round(price * 100);
+    const maxMembers = Number.parseInt(form.max_active_members, 10);
+
+    await deps.updatePlan(planUpdate[1], {
+      price_cents: priceCents,
+      max_active_members: Number.isInteger(maxMembers) && maxMembers > 0 ? maxMembers : null,
+      is_enabled: form.is_enabled === '1',
+    });
+
+    // Audited because this single number decides what every gym on the plan
+    // pays, and "who changed the price, and when" is the first question after
+    // a billing complaint.
+    await deps.audit({
+      action: 'platform.plan.updated',
+      actor_user_id: session.sub,
+      entity: 'plan',
+      entity_id: planUpdate[1],
+      detail: { price_cents: priceCents, max_active_members: maxMembers, is_enabled: form.is_enabled === '1' },
+    });
+
+    redirect(res, '/platform/plans');
+    return true;
+  }
+
+  // ---- the audit log -------------------------------------------------------
+  if (path === 'audit' && method === 'GET') {
+    const session = requireSession(req, res);
+    if (!session) return true;
+
+    if (!(await may(deps, session, 'audit.view'))) {
+      forbid(res, 'You do not have permission to read the audit log.');
+      return true;
+    }
+
+    // Filtered rather than paged: after a year this is the largest table on
+    // the platform and "show me everything" stops being a useful question.
+    const filter = {
+      action: (url.searchParams.get('action') || '').trim(),
+      entityId: (url.searchParams.get('entity_id') || '').trim(),
+      limit: 200,
+    };
+
+    html(res, 200, auditPage({
+      entries: await deps.listAuditLog(filter),
+      filter,
+      user: { email: session.email },
+    }));
+    return true;
+  }
+
+  // ---- gym owners ----------------------------------------------------------
+  if (path === 'owners' && method === 'GET') {
+    const session = requireSession(req, res);
+    if (!session) return true;
+
+    if (!(await may(deps, session, 'platform.manage'))) {
+      forbid(res, 'You do not have permission to manage gym owners.');
+      return true;
+    }
+
+    const filter = { query: (url.searchParams.get('q') || '').trim(), limit: 100 };
+
+    html(res, 200, ownersPage({
+      owners: await deps.listOwners(filter),
+      filter,
+      user: { email: session.email },
+      csrfToken: issueCsrfToken(session.sub),
+    }));
+    return true;
+  }
+
+  const ownerToggle = /^owners\/([A-Za-z0-9-]+)\/(deactivate|reactivate)$/.exec(path);
+  if (ownerToggle && method === 'POST') {
+    const form = await readFormBody(req);
+
+    const session = requireSession(req, res, { csrfToken: form.csrf });
+    if (!session) return true;
+
+    if (!(await may(deps, session, 'platform.manage'))) {
+      forbid(res, 'You do not have permission to manage gym owners.');
+      return true;
+    }
+
+    const [, ownerId, action] = ownerToggle;
+    const active = action === 'reactivate';
+
+    // Switching an owner off stops them SIGNING IN. It does not close their
+    // gym and it deletes nothing — the two are separate on purpose, because
+    // "this account is compromised" and "this gym has stopped paying" call for
+    // different actions.
+    await deps.setOwnerActive(ownerId, active);
+    await deps.audit({
+      action: active ? 'platform.owner.reactivated' : 'platform.owner.deactivated',
+      actor_user_id: session.sub,
+      entity: 'platform_user',
+      entity_id: ownerId,
+    });
+
+    redirect(res, '/platform/owners');
+    return true;
+  }
+
+  // ---- finances ------------------------------------------------------------
+  if (path === 'finance' && method === 'GET') {
+    const session = requireSession(req, res);
+    if (!session) return true;
+
+    if (!(await may(deps, session, 'subscription.manage'))) {
+      forbid(res, 'You do not have permission to see platform finances.');
+      return true;
+    }
+
+    html(res, 200, financePage({
+      summary: await deps.financeSummary(),
+      user: { email: session.email },
+    }));
+    return true;
+  }
+
   // ---- open a document -----------------------------------------------------
   // The most sensitive thing on the platform: a scan of somebody's ID, their
   // business registration, their lease.
@@ -582,9 +756,18 @@ async function handleExtraRoutes(req, res, deps, { url, path, method }) {
       return true;
     }
 
-    const gyms = await deps.listGyms();
+    // Searchable, because a list capped at 500 is not a registry at ten
+    // thousand gyms — it is the first 500 gyms alphabetically.
+    const filter = {
+      query: (url.searchParams.get('q') || '').trim(),
+      status: (url.searchParams.get('status') || '').trim(),
+      limit: 200,
+    };
+
+    const gyms = await deps.listGyms(filter);
     html(res, 200, registryPage({
       gyms,
+      filter,
       user: { email: session.email },
       canSuspend: await may(deps, session, 'gym.suspend'),
     }));
@@ -607,11 +790,16 @@ async function handleExtraRoutes(req, res, deps, { url, path, method }) {
       return true;
     }
 
+    const canBill = await may(deps, session, 'subscription.manage');
+
     html(res, 200, gymDetailPage({
       ...view,
       user: { email: session.email },
       csrfToken: issueCsrfToken(session.sub),
       canSuspend: await may(deps, session, 'gym.suspend'),
+      canBill,
+      // Only fetched for someone who may act on it.
+      plans: canBill ? PLANS.map((p) => ({ key: p.key, label: p.label })) : [],
     }));
     return true;
   }
@@ -671,6 +859,44 @@ async function handleExtraRoutes(req, res, deps, { url, path, method }) {
     }
 
     html(res, 200, driftPage({ report, user: { email: session.email }, csrfToken: issueCsrfToken(session.sub) }));
+    return true;
+  }
+
+  // ---- move one gym to another plan ----------------------------------------
+  // The request every gym eventually makes. Without it, an upgrade means
+  // editing the database by hand.
+  const planChange = /^registry\/([A-Za-z0-9-]+)\/plan$/.exec(path);
+  if (planChange && method === 'POST') {
+    const form = await readFormBody(req);
+
+    const session = requireSession(req, res, { csrfToken: form.csrf });
+    if (!session) return true;
+
+    if (!(await may(deps, session, 'subscription.manage'))) {
+      forbid(res, 'You do not have permission to change a gym plan.');
+      return true;
+    }
+
+    // The key must be one we actually sell. Writing an unknown plan_key would
+    // leave the gym with no entitlements at all — gating fails closed, so
+    // every feature would switch off at once and nobody would know why.
+    if (!planByKey(form.plan_key)) {
+      res.writeHead(400, { 'Content-Type': 'text/plain; charset=utf-8' });
+      res.end('That is not a plan we offer.');
+      return true;
+    }
+
+    await deps.changeGymPlan(planChange[1], form.plan_key);
+    await deps.audit({
+      action: 'platform.gym.plan_changed',
+      actor_user_id: session.sub,
+      entity: 'gym',
+      entity_id: planChange[1],
+      // A downgrade never deletes members (D-102); only new registrations stop.
+      detail: { plan_key: form.plan_key },
+    });
+
+    redirect(res, `/platform/registry/${planChange[1]}`);
     return true;
   }
 

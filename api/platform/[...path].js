@@ -5,7 +5,7 @@
 // reaches into server/ or src/, and nothing in the gym app reaches in here.
 // This file exists only because Vercel requires an entry point under api/.
 import { handlePlatform } from '../../platform/router.js';
-import { platformDeps, platformOpsDeps, activationDeps, ownerDeps } from '../../platform/deps.js';
+import { platformDeps, platformOpsDeps, activationDeps, ownerDeps, platformControlDeps } from '../../platform/deps.js';
 
 export default async function handler(req, res) {
   try {
@@ -16,6 +16,7 @@ export default async function handler(req, res) {
       ...platformOpsDeps(),
       ...activationDeps(),
       ...ownerDeps(),
+      ...platformControlDeps(),
     });
   } catch (err) {
     console.error('platform error:', err?.message);
