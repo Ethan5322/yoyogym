@@ -92,6 +92,12 @@ export function platformDeps() {
 
     verifyPassword: (plain, hash) => (hash ? verifyPassword(plain, hash) : Promise.resolve(false)),
 
+    /** First run only. Guarded upstream by the setup token AND by having no password. */
+    finishSetup: async (userId, patch) => {
+      const { error } = await db.from('platform_users').update(patch).eq('id', userId);
+      if (error) throw new Error(`Could not finish setup: ${error.message}`);
+    },
+
     /**
      * The second factor. A recovery code is accepted in place of a TOTP code,
      * because losing a phone must not mean losing the platform — and a used

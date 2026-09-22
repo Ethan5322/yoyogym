@@ -3,7 +3,7 @@
   "private": true,
   "version": "0.1.0",
   "type": "module",
-  "description": "Premium AI Gym Membership & Booking Automation System — MuleSoo Digital Solutions",
+  "description": "Premium AI Gym Membership & Booking Automation System \u2014 MuleSoo Digital Solutions",
   "scripts": {
     "mobile:configure": "node scripts/mobile/configure-shell.mjs",
     "mobile:sync": "npm run mobile:configure && cd apps/mobile && npx cap sync",
@@ -14,7 +14,8 @@
     "test": "node --test \"tests/**/*.test.js\"",
     "docs:validate": "node scripts/validate-vault.mjs",
     "seed:owner": "node scripts/seed-owner.js",
-    "seed:catalog": "node scripts/seed-catalog.js"
+    "seed:catalog": "node scripts/seed-catalog.js",
+    "sql:bundle": "node -e \"const f=require('fs');const h=f.readFileSync('platform/RUN-THIS.sql','utf8').split('-- =============================================================================')[1];f.writeFileSync('platform/RUN-THIS.sql','-- ============================================================================='+h+'-- =============================================================================\n\n'+f.readFileSync('platform/schema.sql','utf8')+'\n\n'+f.readFileSync('platform/seed.sql','utf8'))\""
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.45.4",

@@ -43,7 +43,7 @@ test('the router gets every dependency its routes call for', () => {
   // Each of these is called by a route. A missing one is a 500 on a path no
   // test happens to cover.
   for (const name of [
-    'findUserByEmail', 'verifyPassword', 'verifySecondFactor',
+    'findUserByEmail', 'verifyPassword', 'verifySecondFactor', 'finishSetup',
     'listApplications', 'getApplicationView', 'decide',
     'createApplication', 'searchGyms',
     'permissionsFor', 'listGyms', 'getGymDetail', 'setGymStatus',

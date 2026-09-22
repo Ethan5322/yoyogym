@@ -1396,3 +1396,81 @@ function auditFilterFor(code) {
   );
 }
 
+// ---------------------------------------------------------------------------
+// First run
+// ---------------------------------------------------------------------------
+
+/**
+ * Claim the seeded owner account.
+ *
+ * The secret is carried in a hidden field rather than stored anywhere between
+ * the two requests: there is no session yet, and a half-finished setup should
+ * leave nothing behind. Reloading simply mints a new one.
+ */
+export function setupPage({ token = '', email = '', secret = '', otpauth = '', error = '' } = {}) {
+  return layout({
+    title: 'Set up your account',
+    body: `<h1>Set up your platform account</h1>
+<p class="muted">Your account exists but has no password yet. This page sets one, and turns on
+two-factor authentication at the same time — a platform account reaches every gym, so it is
+not optional here.</p>
+${error ? `<p class="err">${h(error)}</p>` : ''}
+
+<div class="card">
+  <h2>1. Add this to your authenticator app</h2>
+  <p class="muted">Google Authenticator, 1Password, Authy — any of them.</p>
+  <p>Scan this, or type the key in by hand:</p>
+  <p style="font-family:monospace;font-size:1.1rem;letter-spacing:2px;word-break:break-all">${h(secret)}</p>
+  <p class="muted"><a href="${h(otpauth)}">Open in your authenticator app →</a></p>
+</div>
+
+<form class="card" method="post" action="/platform/setup">
+  <input type="hidden" name="token" value="${h(token)}">
+  <input type="hidden" name="secret" value="${h(secret)}">
+  <h2>2. Choose a password</h2>
+  <label>Email<input value="${h(email)}" disabled></label>
+  <label>Password
+    <input type="password" name="password" required minlength="12" autocomplete="new-password">
+  </label>
+  <p class="muted">At least 12 characters.</p>
+
+  <h2>3. Prove the app works</h2>
+  <label>The six-digit code showing now
+    <input name="totp" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" required
+           autocomplete="one-time-code">
+  </label>
+  <p class="muted">Checked before two-factor is switched on. If it were not, a wrong setup would
+  lock you out of your own platform with no second account to fix it from.</p>
+
+  <button type="submit">Finish setup</button>
+</form>`,
+  });
+}
+
+/** The recovery codes, shown once and never again. */
+export function setupDonePage({ recoveryCodes = [] } = {}) {
+  return layout({
+    title: 'Account ready',
+    body: `<h1>Your account is ready</h1>
+
+<div class="card">
+  <h2>⚠️ Save these recovery codes now</h2>
+  <p class="muted">Each one signs you in once if you lose your phone. <b>This is the only time
+  they are shown</b> — only their hashes are stored, so nobody, including us, can show them
+  to you again.</p>
+  <p style="font-family:monospace;font-size:1.15rem;line-height:2;letter-spacing:2px">
+    ${recoveryCodes.map((c) => h(c)).join('<br>')}
+  </p>
+  <p class="muted">Print them, or put them somewhere that is not the phone with your
+  authenticator on it.</p>
+</div>
+
+<div class="card">
+  <p><a href="/platform/login">Sign in →</a></p>
+  <p class="muted">Remove <code>PLATFORM_SETUP_TOKEN</code> from your environment now.
+  It is no longer needed — this account already has a password, so the setup page
+  would refuse it anyway, but a secret nobody needs is a secret not worth keeping.</p>
+</div>`,
+  });
+}
+

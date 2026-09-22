@@ -54,9 +54,12 @@ import {
   activationHandoverPage,
   documentReviewPage,
   securityPage,
+  setupPage,
+  setupDonePage,
 } from './views.js';
 import { eventToIntent } from './billing.js';
 import { findAlerts, DEFAULT_WINDOW_HOURS } from './alerts.js';
+import { setupAllowed, beginSetup, completeSetup } from './setup.js';
 import { completeActivation } from './activation.js';
 import { validateUploadRequest, pathBelongsTo, documentRow } from './documents.js';
 import { verifySignature } from './paystack.js';
@@ -376,6 +379,56 @@ async function handleExtraRoutes(req, res, deps, { url, path, method }) {
   // ---- public: the member-facing gym finder -------------------------------
   if (path === 'find' && method === 'GET') {
     html(res, 200, finderPage());
+    return true;
+  }
+
+  // ---- first run: claim the seeded owner account ---------------------------
+  // No session, because there is no account to sign in to yet. Guarded by a
+  // token from the environment AND by the account having no password — the
+  // second is what makes this a one-time act rather than a standing reset.
+  if (path === 'setup') {
+    const form = method === 'POST' ? await readFormBody(req) : {};
+    const token = method === 'POST' ? form.token : url.searchParams.get('token') || '';
+
+    const allowed = setupAllowed(token);
+    if (!allowed.ok) {
+      html(res, 403, `<p>${allowed.reason}</p>`);
+      return true;
+    }
+
+    const email = (method === 'POST' ? form.email : url.searchParams.get('email')) || '';
+    const user = await deps.findUserByEmail(String(email).trim().toLowerCase());
+
+    if (method === 'GET') {
+      const begun = beginSetup(user);
+      if (!begun.ok) {
+        html(res, 400, `<p>${begun.reason}</p>`);
+        return true;
+      }
+      html(res, 200, setupPage({
+        token, email: user.email, secret: begun.secret, otpauth: begun.otpauth,
+      }));
+      return true;
+    }
+
+    const result = await completeSetup(deps, {
+      user,
+      secret: form.secret,
+      password: form.password,
+      totp: form.totp,
+    });
+
+    if (!result.ok) {
+      // The same secret is carried back, so a mistyped code does not mean
+      // re-adding the account to the authenticator app.
+      html(res, 400, setupPage({
+        token, email: user?.email ?? email, secret: form.secret,
+        otpauth: '', error: result.reason,
+      }));
+      return true;
+    }
+
+    html(res, 200, setupDonePage({ recoveryCodes: result.recoveryCodes }));
     return true;
   }
 
