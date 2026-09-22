@@ -466,6 +466,110 @@ async function handleExtraRoutes(req, res, deps, { url, path, method }) {
     return true;
   }
 
+  // ---- open a document -----------------------------------------------------
+  // The most sensitive thing on the platform: a scan of somebody's ID, their
+  // business registration, their lease.
+  const docOpen = /^documents\/([A-Za-z0-9-]+)$/.exec(path);
+  if (docOpen && method === 'GET') {
+    const session = requireSession(req, res);
+    if (!session) return true;
+
+    if (!(await may(deps, session, 'application.view'))) {
+      forbid(res, 'You do not have permission to open application documents.');
+      return true;
+    }
+
+    const doc = await deps.getDocument(docOpen[1]);
+    if (!doc) {
+      html(res, 404, '<p>Document not found.</p>');
+      return true;
+    }
+
+    // Five minutes. Long enough to open a PDF, short enough that a URL left in
+    // a chat message or a browser history is useless by the time anyone finds
+    // it. The bucket itself is private; this is the only way in.
+    const url = await deps.signedDocumentUrl(doc.storage_ref, 300);
+
+    if (!url) {
+      // Not a redirect to nowhere. A broken link here looks like a missing
+      // document, and a reviewer would reasonably reject an application over it.
+      res.writeHead(502, { 'Content-Type': 'text/plain; charset=utf-8' });
+      res.end('That document could not be opened just now. Please try again.');
+      return true;
+    }
+
+    // WHO looked at WHOSE identity document, and when. This is the only record
+    // of it, and under POPIA it is the record that matters.
+    await deps.audit({
+      action: 'platform.document.viewed',
+      actor_user_id: session.sub,
+      entity: 'document',
+      entity_id: doc.id,
+      detail: { application_id: doc.application_id, doc_type: doc.doc_type },
+    });
+
+    // Redirected, never rendered. Putting the signed URL in HTML would leave
+    // it in the page source, the browser cache and any screenshot.
+    redirect(res, url);
+    return true;
+  }
+
+  // ---- accept or reject a document -----------------------------------------
+  const docDecide = /^documents\/([A-Za-z0-9-]+)\/decide$/.exec(path);
+  if (docDecide && method === 'POST') {
+    const form = await readFormBody(req);
+
+    const session = requireSession(req, res, { csrfToken: form.csrf });
+    if (!session) return true;
+
+    // Deciding on a document is part of deciding on the application, so it
+    // takes the same permission. Someone who may only look, may only look.
+    if (!(await may(deps, session, 'application.approve'))) {
+      forbid(res, 'You do not have permission to decide on documents.');
+      return true;
+    }
+
+    const reason = (form.reason || '').trim();
+
+    if (form.action !== 'accept' && form.action !== 'reject') {
+      res.writeHead(400, { 'Content-Type': 'text/plain; charset=utf-8' });
+      res.end('Unknown action.');
+      return true;
+    }
+
+    if (form.action === 'reject' && !reason) {
+      // "Rejected" with no reason tells the owner nothing, and they resubmit
+      // the same file.
+      res.writeHead(400, { 'Content-Type': 'text/plain; charset=utf-8' });
+      res.end('A rejection needs a reason the owner can act on.');
+      return true;
+    }
+
+    const doc = await deps.getDocument(docDecide[1]);
+    if (!doc) {
+      html(res, 404, '<p>Document not found.</p>');
+      return true;
+    }
+
+    await deps.reviewDocument(doc.id, {
+      status: form.action === 'accept' ? 'accepted' : 'rejected',
+      reviewed_by: session.sub,
+      reviewed_at: new Date().toISOString(),
+      reject_reason: form.action === 'reject' ? reason : null,
+    });
+
+    await deps.audit({
+      action: `platform.document.${form.action}ed`,
+      actor_user_id: session.sub,
+      entity: 'document',
+      entity_id: doc.id,
+      detail: { application_id: doc.application_id, reason: reason || null },
+    });
+
+    redirect(res, `/platform/applications/${doc.application_id}`);
+    return true;
+  }
+
   // ---- the gym registry ----------------------------------------------------
   if (path === 'registry' && method === 'GET') {
     const session = requireSession(req, res);
@@ -632,8 +736,20 @@ async function handleExtraRoutes(req, res, deps, { url, path, method }) {
       drift = { ok: false, error: err?.message || 'Reconciliation failed.' };
     }
 
+    // Retention deletes, so it gets its own switch rather than riding on the
+    // billing one. PLATFORM_BILLING_LIVE is about money; this is about
+    // personal data, and conflating them would mean turning on billing
+    // silently started deleting identity documents.
+    let retention = null;
+    try {
+      retention =
+        (await deps.purgeDocuments?.({ dryRun: process.env.PLATFORM_RETENTION_LIVE !== 'true' })) ?? null;
+    } catch (err) {
+      retention = { ok: false, error: err?.message || 'Retention run failed.' };
+    }
+
     res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
-    res.end(JSON.stringify({ ...report, drift }));
+    res.end(JSON.stringify({ ...report, drift, retention }));
     return true;
   }
 

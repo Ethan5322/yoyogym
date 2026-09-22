@@ -19,6 +19,8 @@
 //    mistake.
 
 /** Only an application awaiting a decision can be decided. */
+import { retentionDateFor } from './retention.js';
+
 const DECIDABLE = new Set(['submitted', 'under_review', 'info_requested']);
 
 function can(actor, permission) {
@@ -162,6 +164,14 @@ export async function rejectApplication(applicationId, actor, reason, deps) {
     decision_reason: String(reason).trim(),
     updated_at: now,
   });
+
+  // The retention clock starts at the rejection, not at the purge run (D-054).
+  // Two of the documents we asked for are identity documents, and the appeal
+  // window is the only reason we are still holding them.
+  if (deps.setDocumentRetention) {
+    const until = retentionDateFor({ status: 'rejected', decided_at: now }, new Date(now));
+    await deps.setDocumentRetention(applicationId, until);
+  }
 
   await deps.appendEvent({
     application_id: applicationId,

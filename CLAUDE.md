@@ -1275,6 +1275,23 @@ BUILT 2026-09-22 — STAGES 4-7, code complete, NOT DEPLOYED, NOT PUSHED.
     F-4  FIXED. A dependency-factory collision silently dropped the suspend
          reason and the subscription re-sync.
 
+  THIRD PASS 2026-09-22: document review loop (open a document via a 5-minute
+  signed URL, audited; accept/reject with a reason), retention purge (D-054,
+  own switch PLATFORM_RETENTION_LIVE), and the Stage 6 gate review of
+  /api/document. 292 tests pass.
+
+  STAGE 6 GATE ITEM DONE — /api/document re-reviewed (D-123). D-034 assumed
+  the risk was GUESSING; measurement says otherwise. The code is 40 bits
+  (1.1e12), ~35 years at 1000 req/s, so brute force is not the threat. The
+  threat is select('*'), which returns id_number (SA ID) and the biometric
+  face templates, plus PAR-Q health data, to anyone holding a permanent
+  reusable code, with NO rate limiting. Recommended and NOT APPLIED (protected
+  surface): (1) explicit column list, (2) per-gym rate limit — neither breaks
+  anything; (3) session-binding is the real fix and is your decision.
+
+  VAULT CORRECTED (D-122): vault/14 claimed admin/member token separation
+  "rests entirely on the audience claim". It rests on nothing — see F-1.
+
   BLOCKING QUESTION: Q-46 — D-049 (first payment activates) and D-070 (30-day
   trial) contradict each other. A trialing gym currently cannot serve traffic.
   See vault/17 §0.1 for the three options.

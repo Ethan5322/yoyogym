@@ -155,19 +155,30 @@ ${body}`,
 export function applicationDetailPage({ application, documents = [], events = [], user = null, csrfToken = '' }) {
   const docs = documents.length
     ? `<table>
-  <thead><tr><th>Document</th><th>File</th><th>Status</th></tr></thead>
+  <thead><tr><th>Document</th><th>File</th><th>Status</th><th>Decide</th></tr></thead>
   <tbody>
 ${documents
   .map(
     (d) => `    <tr>
       <td>${h(d.doc_type)}</td>
-      <td><a href="/platform/documents/${h(d.id)}">${h(d.filename || 'download')}</a></td>
-      <td>${statusTag(d.status)}</td>
+      <td><a href="/platform/documents/${h(d.id)}" target="_blank" rel="noopener">${h(d.filename || 'open')}</a></td>
+      <td>${statusTag(d.status)}${d.reject_reason ? `<br><span class="muted">${h(d.reject_reason)}</span>` : ''}</td>
+      <td>${
+        d.status === 'pending'
+          ? `<form method="post" action="/platform/documents/${h(d.id)}/decide" class="row">
+        <input type="hidden" name="csrf" value="${h(csrfToken)}">
+        <button type="submit" name="action" value="accept">Accept</button>
+        <input name="reason" placeholder="Reason, if rejecting">
+        <button type="submit" name="action" value="reject">Reject</button>
+      </form>`
+          : '<span class="muted">decided</span>'
+      }</td>
     </tr>`
   )
   .join('\n')}
   </tbody>
-</table>`
+</table>
+<p class="muted">Opening a document is recorded in the audit log: who opened it, and when.</p>`
     : `<div class="empty">No documents uploaded.</div>`;
 
   const history = events.length

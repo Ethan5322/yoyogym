@@ -16,6 +16,7 @@ import { schemaRunnerDeps, gymSchemaChecksum, runSql } from './schema-runner.js'
 import { runBilling } from './billing-runner.js';
 import { issueActivation, activationLookupHash } from './activation.js';
 import { DOCUMENT_BUCKET } from './documents.js';
+import { purgeExpiredDocuments } from './retention.js';
 import { reconcileSchemas } from './reconciliation.js';
 import { GRACE_DAYS } from './billing.js';
 import { chargeAuthorization, paystackConfigured } from './paystack.js';
@@ -161,6 +162,9 @@ export function platformDeps() {
           return e;
         },
         issueActivation: activationDeps(db).issueActivation,
+        setDocumentRetention: async (applicationId, until) => {
+          await db.from('application_documents').update({ retention_until: until }).eq('application_id', applicationId);
+        },
         provisionGym: (application, opts) => provisionGym(application, provisioningDeps(db), { ...opts, schemaChecksum: safeChecksum() }),
         audit: (e) => audit(db, e),
       };
@@ -476,6 +480,36 @@ export function platformOpsDeps(db = platformDb()) {
       return { ok: true, ignored: true };
     },
 
+    /**
+     * The retention purge (D-054). The one job here that deletes, which is
+     * why it is handed a storage remover and a row deleter and nothing else —
+     * it cannot touch a gym, a member or an invoice.
+     */
+    purgeDocuments: (options) =>
+      purgeExpiredDocuments(
+        {
+          listExpiredDocuments: async (today) => {
+            const { data } = await db
+              .from('application_documents')
+              .select('id, storage_ref, application_id')
+              .not('retention_until', 'is', null)
+              .lte('retention_until', today)
+              .limit(500);
+            return data ?? [];
+          },
+          removeStorageObject: async (ref) => {
+            const { error } = await db.storage.from(DOCUMENT_BUCKET).remove([ref]);
+            if (error) throw new Error(`Could not delete ${ref}: ${error.message}`);
+          },
+          deleteDocumentRow: async (id) => {
+            const { error } = await db.from('application_documents').delete().eq('id', id);
+            if (error) throw new Error(`Could not delete document row ${id}: ${error.message}`);
+          },
+          audit: (e) => audit(db, e),
+        },
+        options
+      ),
+
     /** The nightly job: billing, then a drift report. */
     runBilling: (options) => runBilling(billingDeps(db), options),
 
@@ -773,6 +807,16 @@ export function ownerDeps(db = platformDb()) {
       const { data, error } = await db.from('application_documents').insert(row).select('*').single();
       if (error) throw new Error(`Could not record the document: ${error.message}`);
       return data;
+    },
+
+    getDocument: async (id) => {
+      const { data } = await db.from('application_documents').select('*').eq('id', id).maybeSingle();
+      return data ?? null;
+    },
+
+    reviewDocument: async (id, patch) => {
+      const { error } = await db.from('application_documents').update(patch).eq('id', id);
+      if (error) throw new Error(`Could not record that decision: ${error.message}`);
     },
 
     /** A short-lived read link, for the reviewer only. Minutes, not days. */

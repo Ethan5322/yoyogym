@@ -3,7 +3,7 @@ aliases: ["Security and Privacy", "Security Requirements"]
 tags: [security, privacy, popia, existing-system]
 stage: "Stage 2"
 status: mixed
-updated: 2026-09-21
+updated: 2026-09-22
 ---
 
 # 14 — Security and Privacy
@@ -45,10 +45,22 @@ policies first** (Q-20). This is the single most consequential security fact in 
    any gym**, so the guessing surface multiplies by the number of gyms. Must be session-bound,
    per-gym rate-limited, or both, **before launch**. The verification code is also effectively a
    **reusable secret**, which constrains what a member-ID QR may carry → [[09 - QR-Code Architecture]].
-2. **Shared `JWT_SECRET`** across admin and member tokens **within one gym** **[C]**. Separation
-   rests entirely on the `audience` claim. **Improved by D-016:** each gym gets its own secret, so a
-   token from gym A cannot verify against gym B — the audience claim now separates roles, and the
-   per-gym secret separates tenants.
+2. 🔴 **Shared `JWT_SECRET` across admin and member tokens — and THE AUDIENCE CLAIM IS NOT
+   CHECKED** **[C]**. **This entry was wrong until 2026-09-22 and is corrected here.**
+
+   It previously said separation "rests entirely on the `audience` claim". It does not rest on
+   anything: `server/lib/auth.js` `verifyToken()` calls `jwt.verify(token, JWT_SECRET)` with **no
+   audience option**, so the `aud: 'member'` that `memberauth.js` sets is read and ignored. **A
+   member token is a structurally valid admin token.** Reproduced against the real signing code,
+   not inferred — see [[17 - Open Questions]] §0.2 (F-1).
+
+   The exposure is the 4 handlers that call `authenticate()` with no role check; the other 71
+   call sites go through `requireRole`, which refuses a payload with no `role`. That is luck, not
+   a control. **A one-line backward-compatible fix is written up and awaiting approval.**
+
+   D-016's per-gym secret was also superseded by D-096 (schema-per-gym, one project, one secret),
+   so the tenant separation that entry claimed no longer comes from the key either — it comes from
+   the resolver, which is what `tests/isolation.test.js` exists to defend.
 3. **Biometric data in Postgres** **[C]**. Face templates are `jsonb` in `members` — no object
    store, no separate encryption at rest beyond the database's own. **No retention policy exists**
    (Q-16), and data is already held. **D-042 bounds the exposure:** 1:N matching stays server-side,

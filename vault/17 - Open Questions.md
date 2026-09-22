@@ -129,6 +129,74 @@ export function verifyToken(token) {
 
 ---
 
+## 0.4 📋 `/api/document` re-review — the Stage 6 gate item (D-034)
+
+Carried out 2026-09-22. **Every number below was read from the code or computed, not recalled.**
+Cross-checked against the AST graph (`verifyToken` has 2 referencing nodes, `requireRole` 71,
+bare `authenticate` 4) so the call surface is verified twice by different means.
+
+**Nothing was changed. `/api/document` is protected surface (`CLAUDE.md` §32.)**
+
+### What it does today
+
+`server/handlers/public/document.js` — `POST /api/document`, no session:
+
+```js
+.from('members').select('*')
+.eq('membership_number', membership_number)
+.eq('verification_code', verification_code)
+```
+
+| Measured | Value |
+|---|---|
+| Verification code alphabet | 32 chars (`ABCDEFGHJKLMNPQRSTUVWXYZ23456789`) |
+| Code length | 8 |
+| **Keyspace / entropy** | **1.10 × 10¹² / 40.0 bits** |
+| **Rate limiting on this route** | **NONE.** `register.js` is the only public handler that rate-limits |
+| Code expiry | none — it is reusable and permanent until an admin regenerates it |
+
+### The correction to D-034
+
+D-034 frames the risk as **guessing**, multiplied by the number of gyms. Having measured it, that
+framing is **not the sharp end**. 40 bits against a single member is roughly 35 years at 1,000
+requests per second, and multi-gym routing multiplies the number of valid pairs but multiplies the
+search space by more. **Brute force is not the practical threat.**
+
+**The practical threat is `select('*')`.** That returns the entire `members` row, which per
+`db/schema.sql` includes:
+
+| Column | What it is |
+|---|---|
+| `id_number` | South African ID number |
+| `face_descriptor` | biometric template (face-api 128-D) |
+| `arcface_embedding`, `arcface_templates` | biometric templates (ArcFace 512-D) |
+
+…and the response separately includes the PAR-Q record, which is **health data**.
+
+So: a permanent, reusable, non-expiring secret that appears on the member's success screen —
+and on anything a member-ID QR might carry — returns that member's **biometric templates, SA ID
+number and health answers**, to anyone holding it, forever, with no session and no rate limit.
+Anyone who has ever seen the code (a staff member over a shoulder, a screenshot, a shared phone,
+a forwarded PDF) has that access permanently.
+
+### Recommended order — smallest risk reduction per unit of change first
+
+| # | Change | Effort | Breaks anything? |
+|---|---|---|---|
+| **1** | **Stop returning what the PDF does not need.** Replace `select('*')` with an explicit column list. The membership card needs a name, a number, a plan and dates — **not a face template, not an ID number**. | ~1 line | No. The PDF generators do not read those fields |
+| **2** | **Rate-limit the route per gym**, as `register.js` already does. Turns an undetectable probe into a visible one | small, pattern already in the repo | No |
+| **3** | **Expire or rotate the code** after first use for document download, or bind it to a member session | larger | Yes — changes the member flow |
+
+**1 and 2 together remove most of the exposure and break nothing.** 3 is the real fix and is a
+product decision, which is why it sits behind the gate rather than in this list as a foregone
+conclusion.
+
+**Recommendation: do 1 and 2 before the platform is deployed anywhere.** They are within the spirit
+of D-034 ("session-bound, per-gym rate-limited, or both") while being cheaper and, per the measured
+numbers, more effective than the guessing mitigation D-034 assumed was primary.
+
+---
+
 ## 0. ✅ Milestone — every user-decidable question is now ANSWERED
 
 As of 2026-09-21, **63 decisions** are recorded. Nothing further is waiting on a product or business
