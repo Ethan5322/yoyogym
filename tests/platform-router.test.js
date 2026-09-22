@@ -371,3 +371,88 @@ test('a gym owner cannot open one application either', async () => {
   assert.equal(r.statusCode, 403);
   assert.ok(!r.body.includes('their-id.pdf'), 'nor their documents');
 });
+
+// ---------------------------------------------------------------------------
+// The activation link must never vanish
+// ---------------------------------------------------------------------------
+
+test('when the activation email fails, the reviewer is HANDED the link', async () => {
+  // The bug: approving provisioned a real database, generated a link, and then
+  // nothing sent it and nothing showed it. The gym could never open.
+  const d = {
+    ...deps({ application: { application: { id: 'a1', status: 'submitted' }, documents: [], events: [] } }),
+    decide: async () => ({
+      ok: true,
+      gym: { search_name: 'BOS GYM' },
+      activation: {
+        emailed: false,
+        emailReason: 'email_not_configured',
+        link: 'https://yoyogyms.com/platform/activate?token=abc123',
+        code: '481920',
+        to: 'ann@bos.co',
+        expiresInHours: 48,
+      },
+    }),
+  };
+  const r = res();
+
+  await handlePlatform(
+    req({
+      method: 'POST',
+      url: '/platform/applications/a1/decide',
+      cookie: session(),
+      body: `action=approve&csrf=${encodeURIComponent(issueCsrfToken('staff-1'))}`,
+    }),
+    r,
+    d
+  );
+
+  assert.equal(r.statusCode, 200, 'not a redirect — the link would be lost');
+  assert.match(r.body, /abc123/, 'the link is handed over');
+  assert.match(r.body, /481920/, 'and the code');
+  assert.match(r.body, /shown once/i, 'and it says so, because only hashes are stored');
+});
+
+test('a successful activation email still redirects, and leaks nothing', async () => {
+  const d = {
+    ...deps({ application: { application: { id: 'a1', status: 'submitted' }, documents: [], events: [] } }),
+    decide: async () => ({
+      ok: true,
+      activation: { emailed: true, link: 'https://x?token=secret', code: '111111' },
+    }),
+  };
+  const r = res();
+
+  await handlePlatform(
+    req({
+      method: 'POST',
+      url: '/platform/applications/a1/decide',
+      cookie: session(),
+      body: `action=approve&csrf=${encodeURIComponent(issueCsrfToken('staff-1'))}`,
+    }),
+    r,
+    d
+  );
+
+  assert.equal(r.statusCode, 302);
+  assert.ok(!String(r.headers.location).includes('secret'), 'never in a URL — logs, history, referer');
+  assert.ok(!r.body.includes('111111'));
+});
+
+test('a rejection still redirects as before', async () => {
+  const d = deps({ application: { application: { id: 'a1', status: 'submitted' }, documents: [], events: [] } });
+  const r = res();
+
+  await handlePlatform(
+    req({
+      method: 'POST',
+      url: '/platform/applications/a1/decide',
+      cookie: session(),
+      body: `action=reject&reason=no&csrf=${encodeURIComponent(issueCsrfToken('staff-1'))}`,
+    }),
+    r,
+    d
+  );
+
+  assert.equal(r.statusCode, 302);
+});

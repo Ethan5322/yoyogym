@@ -1103,3 +1103,52 @@ ${Object.entries(byStatus)
 gyms — <b>never a member's payment to their gym</b>, which the platform does not see (D-013).</p>`,
   });
 }
+
+// ---------------------------------------------------------------------------
+// When the activation email could not be sent
+// ---------------------------------------------------------------------------
+
+/**
+ * Hand the activation details to the reviewer, once.
+ *
+ * The bug this closes: approving a gym provisioned a real database, generated
+ * an activation link, and then nothing sent it and nothing showed it. The
+ * owner could never activate and the gym never opened.
+ *
+ * Shown ONCE and never stored — only hashes of these values exist in the
+ * database, and that is the property the whole activation design rests on. If
+ * the reviewer navigates away without copying them, a new activation must be
+ * issued, which is correct rather than inconvenient.
+ */
+export function activationHandoverPage({ activation = {}, gymName = '', applicationId = '', user = null }) {
+  return layout({
+    title: 'Send this to the owner',
+    user,
+    body: `<h1>Approved — now send this to the owner</h1>
+
+<div class="card">
+  <p><b>⚠️ The activation email could not be sent${
+    activation.emailReason ? ` (${h(activation.emailReason)})` : ''
+  }.</b></p>
+  <p class="muted">The gym <b>${h(gymName)}</b> is provisioned and waiting. The owner cannot open
+  it until they use the link and the code below, so please send these to them yourself.</p>
+</div>
+
+<div class="card">
+  <h2>Send to ${h(activation.to || 'the owner')}</h2>
+  <p><b>Link</b></p>
+  <p><input readonly value="${h(activation.link)}" style="width:100%" onclick="this.select()"></p>
+  <p><b>Code</b></p>
+  <p style="font-size:28px;letter-spacing:6px"><b>${h(activation.code)}</b></p>
+  <p class="muted">Both are needed. The link alone is not enough, and it expires in
+  ${h(activation.expiresInHours || 48)} hours.</p>
+</div>
+
+<div class="card">
+  <p><b>This is shown once.</b> Only hashes are stored, so this page is the only
+  place these values exist. If you navigate away without copying them, issue a new
+  activation instead — nothing is lost, the owner simply gets a fresh link.</p>
+  <p><a href="/platform/applications/${h(applicationId)}">Back to the application →</a></p>
+</div>`,
+  });
+}

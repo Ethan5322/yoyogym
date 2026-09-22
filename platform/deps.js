@@ -16,6 +16,7 @@ import { schemaRunnerDeps, gymSchemaChecksum, runSql } from './schema-runner.js'
 import { runBilling } from './billing-runner.js';
 import { issueActivation, activationLookupHash } from './activation.js';
 import { DOCUMENT_BUCKET } from './documents.js';
+import { sendEmail, activationEmail, billingEmail, emailConfigured } from './email.js';
 import { purgeExpiredDocuments } from './retention.js';
 import { reconcileSchemas } from './reconciliation.js';
 import { GRACE_DAYS } from './billing.js';
@@ -630,12 +631,35 @@ export function billingDeps(db = platformDb()) {
      * up yet, and a silent failure would be worse than a visible queue.
      */
     notify: async (payload) => {
+      // Sent AND recorded. Recorded even when sending fails, so an owner who
+      // says "I was never told" can be answered from the log.
+      const { data: gym } = await db
+        .from('gyms')
+        .select('search_name, owner_user_id')
+        .eq('id', payload.gym_id)
+        .maybeSingle();
+
+      let sent = { ok: false, reason: 'no_gym' };
+      if (gym) {
+        const { data: owner } = await db
+          .from('platform_users')
+          .select('email')
+          .eq('id', gym.owner_user_id)
+          .maybeSingle();
+
+        const mail = billingEmail(payload.kind, {
+          gymName: gym.search_name,
+          amountCents: payload.amount_cents,
+        });
+        sent = mail ? await sendEmail({ to: owner?.email, ...mail }) : { ok: false, reason: 'no_template' };
+      }
+
       await audit(db, {
         action: `platform.notify.${payload.kind}`,
         actor_kind: 'system',
         entity: 'gym',
         entity_id: payload.gym_id,
-        detail: payload,
+        detail: { ...payload, emailed: sent.ok, email_reason: sent.reason ?? null },
       });
     },
 
@@ -726,7 +750,28 @@ export function activationDeps(db = platformDb()) {
         detail: { user_id: userId, expires_in_hours: 48 },
       });
 
-      return { link, code, expiresInHours: 48 };
+      // Send it. A failure here does NOT undo the approval — the gym is
+      // already provisioned — so the result is reported and the raw link is
+      // returned to the caller, which shows it to the reviewer. That way the
+      // chain completes even with no mail provider configured at all.
+      const { data: owner } = await db.from('platform_users').select('email').eq('id', userId).maybeSingle();
+      const { data: gym } = await db.from('gyms').select('search_name').eq('id', gymId).maybeSingle();
+
+      const mail = activationEmail({ gymName: gym?.search_name, link, code });
+      const sent = await sendEmail({ to: owner?.email, ...mail });
+
+      if (!sent.ok) {
+        await audit(db, {
+          action: 'platform.owner.activation_email_failed',
+          actor_kind: 'system',
+          entity: 'gym',
+          entity_id: gymId,
+          // Never the link or the code — this log is readable in the panel.
+          detail: { reason: sent.reason },
+        });
+      }
+
+      return { link, code, expiresInHours: 48, emailed: sent.ok, emailReason: sent.reason ?? null, to: owner?.email ?? null };
     },
 
     audit: (entry) => audit(db, entry),

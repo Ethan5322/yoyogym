@@ -27,6 +27,7 @@ import {
   auditPage,
   ownersPage,
   financePage,
+  activationHandoverPage,
 } from './views.js';
 import { eventToIntent } from './billing.js';
 import { completeActivation } from './activation.js';
@@ -274,7 +275,26 @@ export async function handlePlatform(req, res, deps) {
       return res.end('Unknown action.');
     }
 
-    await deps.decide(decide[1], session, form.action, form.reason ?? '');
+    const outcome = await deps.decide(decide[1], session, form.action, form.reason ?? '');
+
+    // If the activation email could not be sent, the link must not vanish —
+    // that was the bug that broke onboarding at the last step. It is handed
+    // straight back to the reviewer, once, to send by hand.
+    //
+    // NOT put in the redirect URL: a link in a query string lands in server
+    // logs, browser history and the referer header of the next request.
+    if (outcome?.activation && outcome.activation.emailed === false) {
+      return html(
+        res,
+        200,
+        activationHandoverPage({
+          activation: outcome.activation,
+          gymName: outcome.gym?.search_name || outcome.application?.proposed_gym_name || '',
+          applicationId: decide[1],
+          user: { email: session.email },
+        })
+      );
+    }
 
     // Redirect after POST, so refreshing the page cannot decide twice —
     // which for "approve" would mean provisioning twice.
