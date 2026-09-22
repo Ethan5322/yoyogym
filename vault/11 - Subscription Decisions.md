@@ -143,6 +143,31 @@ every gym that does convert**. A 14-day trial would have halved the first part.
   control.
 - Nothing else in the stack comes close to this line item.
 
+## ⚠️ The cost analysis below is SUPERSEDED (D-100)
+
+Everything in the section above about a **$10/gym/month floor is obsolete**. It assumed a Supabase
+project per gym. Under **D-096** all gyms share one free project with a schema each, so the marginal
+infrastructure cost of a gym is **approximately zero** and **there is no pricing floor**.
+
+The analysis is kept because the reasoning still holds *if* the architecture ever returns to a
+project per gym — see [[22 - Storage Migration Assessment]].
+
+## ✅ The three plans are now DEFINED — in `CLAUDE.md` §18 (D-099)
+
+Written from the feature inventory in [[02 - Confirmed Existing Features]] plus market research.
+`CLAUDE.md` §18 is authoritative; the summary here is for orientation only.
+
+- **Every tier** gets core gym operation — registration, members, check-in, payments, catalog,
+  branding, staff, QR, PDFs. Crippling those would make bad software, not upgrades.
+- **Medium** adds classes and bookings, trainers and PT, announcements and messaging, standard
+  reporting, progress tracking, CSV import/export.
+- **Prime** adds face recognition and the door scanner, visitors and incidents, advanced analytics,
+  bulk email, referrals, and the audit log. **Prime is the complete system.**
+
+**Why gating is light:** the market's loudest complaint is add-on gouging, and the leading
+competitor sells on *not* doing it. Member count is the primary lever because it scales with the
+gym's own revenue.
+
 ## Provisional tiers (user discussion, unratified)
 
 | Tier | Active members | Locations | Feature set |

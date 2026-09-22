@@ -552,26 +552,105 @@ The following remain decisions **[undecided]**:
 
 Do not invent final answers.
 
-## 18. Subscription planning status
+## 18. Subscription plans
 
-Subscription plans are not finalized.
+Three tiers, gated on **active member count** plus a small number of genuinely premium features.
+Written 2026-09-22 from the feature inventory in `vault/02` and from market research, replacing the
+earlier placeholder. **Prices remain data, never constants** (see the end of this section).
 
-Do not implement subscription billing yet.
+### 18.1 What the market actually does — evidence, not assumption
 
-The current provisional discussion is **[provisional — not a decision]**:
+Two models dominate gym-management software:
 
-- Basic: approximately 40 active members.
-- Medium: approximately 150 active members.
-- Prime: approximately 500 active members.
-- One location for every plan.
-- Prime may include the complete existing system plus approved additional functions.
-- Medium may include fewer functions.
-- Basic may include the smallest permitted feature set.
+| Model | Who | Shape |
+|---|---|---|
+| **By member count, everything included** | Gymdesk, Mindbody, Zen Planner | $75 ≤50 members → $200 ≤400 |
+| **By feature tier** | PushPress, TeamUp | Free / $159 / $229, then paid add-ons |
 
-These are not final until the existing feature inventory and technical architecture have been evaluated.
+**The market's loudest complaint is add-on gouging** — a "$159/month" plan reaching $500–664/month
+once the necessary modules are bought, and Gymdesk competes explicitly on *not* doing that.
 
-Do not hard-code these limits or prices. When implemented, tier limits and prices must be data,
-not constants in code.
+Features the market consistently treats as **premium**: access control and hardware, marketing and
+CRM ($20–329/mo), branded mobile apps ($39–100/mo), advanced analytics, multi-location.
+Features it treats as **entry-level**: billing, scheduling, check-in, simple reporting.
+
+**Consequence for Yoyo Gyms:** member count is the primary lever, because that is what this market
+understands and it scales with the gym's own revenue. Feature gating is kept **deliberately light** —
+enough to make upgrading worthwhile, not so much that the product feels crippled. **Yoyo's face
+recognition maps exactly onto the market's "access control" premium category**, which makes it the
+natural flagship of the top tier.
+
+### 18.2 The three plans
+
+**Every tier includes the whole of "core gym operation".** A gym that cannot register, check in,
+charge and manage its members is not running; crippling that would produce bad software, not
+upgrades.
+
+| | **BASIC** | **MEDIUM** | **PRIME** |
+|---|---|---|---|
+| **Active members** | up to ~40 | up to ~150 | up to ~500 |
+| **Locations** | 1 | 1 | 1 |
+| Member registration (38-step flow, PAR-Q, agreements) | ✅ | ✅ | ✅ |
+| Member list, 360 profile, quick actions | ✅ | ✅ | ✅ |
+| Member portal (status, check-in, history, profile) | ✅ | ✅ | ✅ |
+| Check-in — self, staff verification, today's overview | ✅ | ✅ | ✅ |
+| Payment recording, receipts, arrears and aging | ✅ | ✅ | ✅ |
+| Plans and add-ons catalog | ✅ | ✅ | ✅ |
+| Gym settings, branding, logo | ✅ | ✅ | ✅ |
+| Staff accounts and roles | ✅ | ✅ | ✅ |
+| QR codes (gym and per-member) | ✅ | ✅ | ✅ |
+| Membership card and ID card PDFs | ✅ | ✅ | ✅ |
+| Automated member emails and reminders | ✅ | ✅ | ✅ |
+| **Classes, bookings, waitlists, calendar** | ❌ | ✅ | ✅ |
+| **Trainers and PT session logging** | ❌ | ✅ | ✅ |
+| **Announcements and member messaging (inbox)** | ❌ | ✅ | ✅ |
+| **Standard reporting** — attendance, revenue trend | ❌ | ✅ | ✅ |
+| **Member progress tracking** | ❌ | ✅ | ✅ |
+| **CSV import and export** | ❌ | ✅ | ✅ |
+| **🔒 Face recognition — enrolment, face login, door scanner** | ❌ | ❌ | ✅ |
+| **🔒 Visitors, incidents, access control** | ❌ | ❌ | ✅ |
+| **🔒 Advanced analytics — churn, retention, peak hours, board PDF** | ❌ | ❌ | ✅ |
+| **🔒 Bulk email broadcast (marketing)** | ❌ | ❌ | ✅ |
+| **🔒 Referral programme** | ❌ | ❌ | ✅ |
+| **🔒 Audit log** | ❌ | ❌ | ✅ |
+
+**PRIME is the complete existing system.** Nothing is held back from it, and future premium
+additions land there.
+
+### 18.3 Pricing
+
+**Prices are NOT set here and must never be hard-coded.** They live in
+`platform_plans.price_cents`, as data.
+
+Two facts for whoever sets them:
+
+1. **There is no cost floor any more.** Since D-096 (schema-per-gym in one free Supabase project),
+   the marginal infrastructure cost of a gym is **approximately zero**. The earlier "$10/gym/month
+   floor" no longer applies. Pricing is a pure market decision.
+2. **International rates are $75–200/month (≈R1,400–3,800).** South African independent gyms — the
+   stated target market — are materially more price-sensitive than that. Pricing at international
+   rates would be a strategic error; pricing is a market test, not a calculation.
+
+### 18.4 Enforcement — where, and how it behaves
+
+**Block, and offer the upgrade.** A refused action explains what the higher plan unlocks. A limit
+nobody enforces is not a limit.
+
+| What | Where it is enforced | Why there |
+|---|---|---|
+| **Feature access** | The **API routers** (`api/*/[...path].js`) | One fixed key map per router. 42 admin routes gated in ONE file — never a permission check added to 76 handlers |
+| **Member limit** | `public/register.js` and `admin/members-import.js` | The only two places a member is created |
+| **Navigation** | Client-side, from the gym's plan | **UX only.** Hiding a screen is tidiness; the router is the security |
+
+**Rules:**
+
+- The plan is resolved **server-side** from the gym registry, never sent by the client
+  (`CLAUDE.md` §21).
+- A blocked feature returns **402 Payment Required**, not 403 — it is a billing state, not a
+  permission error, and the distinction matters for what the UI says.
+- A gym **downgrading** below its current member count keeps its members. Existing data is never
+  deleted by a plan change; only *new* registrations are blocked.
+- Limits and feature maps are **data** in `platform_plans`, editable without a deploy.
 
 ## 19. Mobile-store compliance
 
