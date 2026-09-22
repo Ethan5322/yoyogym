@@ -3,17 +3,35 @@
   "buildCommand": "npm run build",
   "outputDirectory": "dist",
   "rewrites": [
-    { "source": "/((?!api/).*)", "destination": "/index.html" }
+    {
+      "source": "/((?!api/).*)",
+      "destination": "/index.html"
+    }
   ],
   "headers": [
     {
       "source": "/(.*)",
       "headers": [
-        { "key": "X-Content-Type-Options", "value": "nosniff" },
-        { "key": "X-Frame-Options", "value": "SAMEORIGIN" },
-        { "key": "Referrer-Policy", "value": "strict-origin-when-cross-origin" },
-        { "key": "Permissions-Policy", "value": "geolocation=(), microphone=(), camera=(self)" },
-        { "key": "Strict-Transport-Security", "value": "max-age=31536000; includeSubDomains" }
+        {
+          "key": "X-Content-Type-Options",
+          "value": "nosniff"
+        },
+        {
+          "key": "X-Frame-Options",
+          "value": "SAMEORIGIN"
+        },
+        {
+          "key": "Referrer-Policy",
+          "value": "strict-origin-when-cross-origin"
+        },
+        {
+          "key": "Permissions-Policy",
+          "value": "geolocation=(), microphone=(), camera=(self)"
+        },
+        {
+          "key": "Strict-Transport-Security",
+          "value": "max-age=31536000; includeSubDomains"
+        }
       ]
     }
   ],
@@ -22,10 +40,19 @@
       "maxDuration": 10
     }
   },
+  "_cronsNote": "The platform job is NOT a Vercel cron: Hobby allows very few and the gym already uses them. POST /api/platform/cron with Authorization: Bearer $PLATFORM_CRON_SECRET from any external scheduler, or press the button in the panel. Nothing breaks if it does not run for a day - billing is idempotent and retention only reports until PLATFORM_RETENTION_LIVE is set.",
   "crons": [
-    { "path": "/api/cron/daily", "schedule": "0 6 * * *" },
-    { "path": "/api/cron/daily-summary", "schedule": "0 20 * * *" },
-    { "path": "/api/cron/weekly-schedule", "schedule": "0 7 * * 1" },
-    { "path": "/api/platform/cron", "schedule": "0 3 * * *" }
+    {
+      "path": "/api/cron/daily",
+      "schedule": "0 6 * * *"
+    },
+    {
+      "path": "/api/cron/daily-summary",
+      "schedule": "0 20 * * *"
+    },
+    {
+      "path": "/api/cron/weekly-schedule",
+      "schedule": "0 7 * * 1"
+    }
   ]
 }
