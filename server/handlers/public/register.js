@@ -16,7 +16,7 @@ import { faceServiceConfigured, embedEnrolmentImages } from '../../lib/faceservi
 import { enrolmentGallery } from '../../lib/facematch.js';
 import { insertFaceRow } from '../../lib/facedb.js';
 import { computeMembership, addonsTotal, totalDueToday, DURATION_MONTHS } from '../../../shared/pricing.js';
-import { currencyForCountry, HOME_COUNTRY } from '../../../shared/countries.js';
+import { currencyForCountry, homeCountryFor } from '../../../shared/countries.js';
 import { onNewMember } from '../../lib/notify/index.js';
 import { rateLimit } from '../../lib/ratelimit.js';
 import { allowsMemberRegistration } from '../../lib/entitlements.js';
@@ -108,6 +108,16 @@ export default async function handler(req, res) {
       .select('value')
       .eq('key', 'contract_discounts')
       .maybeSingle();
+
+    // Where this GYM is. Yoyo Gyms is worldwide (D-125): "local" is a property
+    // of the gym, not of the software. A gym that has not recorded a country
+    // falls back to ZA, so the existing deployment is unchanged.
+    const { data: profileSetting } = await supabase
+      .from('settings')
+      .select('value')
+      .eq('key', 'gym_profile')
+      .maybeSingle();
+    const gymHomeCountry = homeCountryFor(profileSetting?.value?.country);
     const discounts = discSetting?.value && Object.keys(discSetting.value).length ? discSetting.value : undefined;
 
     const membership = computeMembership(plan, a.membership.contract_duration, discounts);
@@ -149,8 +159,8 @@ export default async function handler(req, res) {
     const residenceCountry = /^[A-Za-z]{2}$/.test(a.residence_country || '')
       ? a.residence_country.toUpperCase()
       : null;
-    const isHomeNational = nationality ? nationality === HOME_COUNTRY : a.id_type !== 'passport';
-    const displayCurrency = currencyForCountry(residenceCountry || nationality || HOME_COUNTRY);
+    const isHomeNational = nationality ? nationality === gymHomeCountry : a.id_type !== 'passport';
+    const displayCurrency = currencyForCountry(residenceCountry || nationality || gymHomeCountry);
 
     // ---- insert member ----
     const memberRow = {

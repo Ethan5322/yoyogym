@@ -17,7 +17,7 @@ When one is answered it moves to [[18 - Decision Log]] and is struck from the op
 
 ---
 
-## 0.1 ⚠️ Q-46 — REOPENED: D-049 and D-070 contradict each other
+## 0.1 ✅ Q-46 — ANSWERED (user, 2026-09-22): option A. Verifying the owner's email opens the gym; D-049 is superseded (D-124). Applied and tested. Original analysis kept below.
 
 Found on 2026-09-22 while wiring billing. **Not resolved here — this is a product decision.**
 
@@ -45,7 +45,7 @@ currently flips it to `active`.
 
 ---
 
-## 0.2 🔴 F-1 — SECURITY: the gym app does not check a token's audience
+## 0.2 ✅ F-1 — FIXED (user-approved, 2026-09-22, D-126). Analysis kept below; the fix is the one proposed here, and no live session was logged out.
 
 Found 2026-09-22 during the architecture review. **Reproduced, not theorised.**
 **NOT FIXED — this is protected surface (`CLAUDE.md` §32, "existing authentication model").**
@@ -129,7 +129,7 @@ export function verifyToken(token) {
 
 ---
 
-## 0.4 📋 `/api/document` re-review — the Stage 6 gate item (D-034)
+## 0.4 ✅ `/api/document` re-review — fixes 1 and 2 APPLIED (user, 2026-09-22, D-127). Option 3 (session-binding) is still open. Analysis kept below.
 
 Carried out 2026-09-22. **Every number below was read from the code or computed, not recalled.**
 Cross-checked against the AST graph (`verifyToken` has 2 referencing nodes, `requireRole` 71,

@@ -17,7 +17,7 @@
 //   when(a)     optional predicate; step is skipped when it returns false
 //   validate(v, a)  returns null or an error string
 import { greeting, firstName } from './messages.js';
-import { countryByCode, dialForCountry, HOME_COUNTRY } from '../../shared/countries.js';
+import { countryByCode, dialForCountry, homeCountryFor, nationalIdRuleFor } from '../../shared/countries.js';
 import {
   validateName,
   validateDOB,
@@ -37,8 +37,25 @@ import {
 // medical-aid options and the currency prices are shown in. So an Ethiopian
 // national living in South Africa is asked for a passport (nationality) but a
 // South African address (residence).
-const isHomeNational = (a) => a.nationality === HOME_COUNTRY;
-const isHomeResident = (a) => (a.residence_country || a.nationality) === HOME_COUNTRY;
+// WHERE THIS GYM IS. Yoyo Gyms is worldwide (D-125): "local" belongs to the
+// gym, not to the software. Set once from the gym profile the app already
+// loads; until then it is the ZA default, so the existing gym is unchanged.
+//
+// A module-level value rather than a FLOW factory on purpose: FLOW is a
+// 38-step array that half the registration UI reads directly, and rebuilding
+// it per gym would be a large change to protected surface for no gain.
+let homeCountry = homeCountryFor(null);
+
+/** Tell the flow where the gym is. Call it once, before registration starts. */
+export function setHomeCountry(code) {
+  homeCountry = homeCountryFor(code);
+  return homeCountry;
+}
+
+export const getHomeCountry = () => homeCountry;
+
+const isHomeNational = (a) => a.nationality === homeCountry;
+const isHomeResident = (a) => (a.residence_country || a.nationality) === homeCountry;
 const countryName = (code) => countryByCode(code)?.name || 'your country';
 
 // Titles for the 11 registration sections (progress: "Step X of 11").
@@ -119,17 +136,31 @@ export const FLOW = [
       { label: 'Prefer not to say', value: 'prefer_not_to_say' },
     ],
   },
-  // ID document is chosen automatically from nationality — South Africans give
-  // an SA ID, everyone else a passport. No extra "which document?" question.
+  // The ID document is chosen automatically from nationality — a national of
+  // the gym's own country gives their national ID, everyone else a passport.
+  // No extra "which document?" question, in any country.
   {
     id: 'id_number',
     section: 2,
     type: 'text',
     field: 'id_number',
     when: (a) => isHomeNational(a),
-    prompt: () =>
-      `For identity verification (a standard requirement at SA gyms), please enter your 13-digit South African ID number.`,
-    validate: (v) => validateSAID(v),
+    prompt: () => {
+      const rule = nationalIdRuleFor(homeCountry);
+      return `For identity verification (a standard requirement at gyms), please enter your ${
+        rule.label
+      }${rule.hint ? ` (${rule.hint})` : ''}.`;
+    },
+    // Only South Africa gets a format check, because the SA ID is the only one
+    // this codebase knows how to validate. Rejecting a real Kenyan ID for not
+    // being 13 digits would make the gym unusable in Kenya.
+    validate: (v) => {
+      const rule = nationalIdRuleFor(homeCountry);
+      if (rule.strict) return validateSAID(v);
+      const value = String(v || '').trim();
+      if (value.length < 4) return 'Please enter your ID number as it appears on the document.';
+      return null;
+    },
   },
   {
     id: 'passport_number',

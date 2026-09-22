@@ -148,9 +148,13 @@ Additional verified facts not previously recorded **[verified]**:
 - `face-service/` contains an **unused** Python/FastAPI InsightFace (ArcFace) microservice. It is
   deliberately **deferred** — `FACE_SERVICE_URL` is intentionally unset and the app runs on the
   in-browser face-api engine. Do not activate it without a decision.
-- The system is **South-Africa scoped**: POPIA consent fields, SA ID numbers, ZAR charging, CPA
-  compliance. International members are partially supported (`nationality`, `residence_country`,
-  `display_currency`) but charging is in ZAR. Multi-jurisdiction is **[undecided]**.
+- The system **was** South-Africa scoped. **DECIDED 2026-09-22 (D-125): Yoyo Gyms is worldwide.**
+  "Local" is a property of each GYM, not of the software — `homeCountryFor(gym.country)` decides
+  which identity document is asked for, and phone codes and display currency already followed the
+  country. `HOME_COUNTRY = 'ZA'` remains only as the fallback for a gym that has not said where it
+  is, so the existing deployment is unchanged. **Only South Africa keeps a strict ID format check**,
+  because the SA ID is the only document this codebase knows how to validate. POPIA still applies
+  to South African gyms; other jurisdictions bring their own rules and are **[undecided]** per gym.
 
 Do not assume this architecture is final for the multi-tenant platform. Treat it as the confirmed current single-gym architecture.
 
@@ -1117,7 +1121,8 @@ The following are not finalized **[undecided]**:
 - Whether vault notes are committed to Git.
 - Provisioning model for 10,000 gyms.
 - Whether platform code lives in this repository, a sibling repository, or a monorepo.
-- Jurisdictions beyond South Africa.
+- ~~Jurisdictions beyond South Africa.~~ **DECIDED 2026-09-22 (D-125): worldwide.** What remains
+  open is per-jurisdiction *data-protection law*, not whether the product serves them.
 - Object storage strategy for photos and biometric templates.
 
 Do not make these decisions without explicit approval.
@@ -1292,7 +1297,24 @@ BUILT 2026-09-22 — STAGES 4-7, code complete, NOT DEPLOYED, NOT PUSHED.
   VAULT CORRECTED (D-122): vault/14 claimed admin/member token separation
   "rests entirely on the audience claim". It rests on nothing — see F-1.
 
-  BLOCKING QUESTION: Q-46 — D-049 (first payment activates) and D-070 (30-day
+  ALL THREE OPEN DECISIONS ANSWERED BY THE USER 2026-09-22, AND APPLIED:
+    Q-46 (D-124) — verifying the owner's email OPENS THE GYM. D-049 superseded.
+    F-1  (D-126) — verifyToken() now refuses a foreign audience. Written as
+                   "reject foreign aud", not "require aud===admin", so NO LIVE
+                   SESSION IS LOGGED OUT. 8 tests.
+    D-123 (D-127) — /api/document returns an explicit 18-column list (no ID
+                   number, no biometric templates) and is rate limited 10/min.
+                   Option 3, session-binding, is still open.
+
+  WORLDWIDE (D-125, user 2026-09-22) — resolves the §30 open item on
+  jurisdictions. "Local" belongs to the GYM, not the software: HOME_COUNTRY is
+  now a FALLBACK, homeCountryFor(gym.country) is the answer. Only ZA keeps a
+  strict ID format check, because the SA ID is the only one this codebase can
+  validate. §5 and §30 below are updated accordingly.
+
+  319 tests pass.
+
+  SUPERSEDED BLOCKING QUESTION (kept for history): Q-46 — D-049 (first payment activates) and D-070 (30-day
   trial) contradict each other. A trialing gym currently cannot serve traffic.
   See vault/17 §0.1 for the three options.
 

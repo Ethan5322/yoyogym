@@ -80,5 +80,48 @@ export function dialForCountry(code) {
   return countryByCode(code)?.dial || '';
 }
 
-/** The gym's home country — drives the SA-specific fields (ID, postal, medical aid). */
+/**
+ * The DEFAULT home country, used when a gym has not said where it is.
+ *
+ * It is 'ZA' because that is where the first gym is, and changing the default
+ * would silently change how that gym's existing registration behaves. It is
+ * NOT a statement that the platform is South African — see homeCountryFor().
+ */
 export const HOME_COUNTRY = 'ZA';
+
+/**
+ * A gym's home country, from its own profile.
+ *
+ * Yoyo Gyms is worldwide (D-125). "Local" is a property of the GYM, not of the
+ * software: a gym in Addis Ababa asks Ethiopians for their national ID and
+ * everyone else for a passport, exactly as a gym in Cape Town asks South
+ * Africans for an SA ID.
+ *
+ * Falls back to HOME_COUNTRY for a gym that has not recorded a country, so the
+ * existing single-gym deployment behaves exactly as it always has.
+ */
+export function homeCountryFor(code) {
+  const value = String(code || '').trim().toUpperCase();
+  if (!/^[A-Z]{2}$/.test(value)) return HOME_COUNTRY;
+  // An unknown-but-well-formed code is honoured rather than discarded: the
+  // 50-country list is a convenience, not a statement about which countries
+  // are allowed to have gyms.
+  return value;
+}
+
+/**
+ * What to call the local identity document, and how hard to check it.
+ *
+ * Only South Africa gets a format check, because the SA ID number is the only
+ * one this codebase knows how to validate. Everywhere else the number is
+ * recorded as given — a loose check that accepts a real document beats a
+ * strict one that rejects it.
+ */
+export function nationalIdRuleFor(code) {
+  const home = homeCountryFor(code);
+  if (home === 'ZA') {
+    return { label: 'South African ID number', hint: '13 digits', strict: true, country: home };
+  }
+  const name = countryByCode(home)?.name || home;
+  return { label: `${name} national ID number`, hint: '', strict: false, country: home };
+}

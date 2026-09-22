@@ -654,9 +654,9 @@ export function activateSuccessPage({ gymActivated = false } = {}) {
   <p>You can now sign in with your email and the password you just chose.</p>
   ${
     gymActivated
-      ? '<p>Your gym is open. Your members can find it and sign in.</p>'
-      : `<p class="muted">Your gym is not open to members yet — that happens once your
-         subscription starts. We will email you when it does.</p>`
+      ? `<p><b>Your gym is open.</b> Your members can find it and sign in from now on.</p>
+         <p class="muted">Your free trial has started. We will email you before it ends.</p>`
+      : `<p class="muted">Your gym is not open to members yet. We will email you when it is.</p>`
   }
   <p><a href="/platform/login">Sign in →</a></p>
 </div>`,

@@ -167,13 +167,13 @@ test('a wrong code sets no password and consumes nothing', async () => {
 });
 
 // ---------------------------------------------------------------------------
-// Q-46 — the part that is NOT decided
+// Q-46 — ANSWERED (D-124): verifying your email opens the gym
 // ---------------------------------------------------------------------------
 
-test('by default activation does NOT open the gym — D-049 still stands', async () => {
-  // D-049 says the first payment activates a gym; D-070 promises a 30-day
-  // trial. Until the user settles Q-46, the existing decision is honoured and
-  // activation does not touch the gym's status.
+test('activation OPENS THE GYM — that is what makes "30 days free" true', async () => {
+  // D-049 (first payment opens the gym) is superseded. Under it a trialing gym
+  // was refused by tenancy resolution, so the owner was promised 30 free days
+  // and handed a gym that would not open.
   const d = deps();
   const result = await completeActivation(
     d,
@@ -181,19 +181,32 @@ test('by default activation does NOT open the gym — D-049 still stands', async
     { now: hours(1) }
   );
 
-  assert.equal(d.calls.gyms.length, 0, 'no gym status is written');
-  assert.equal(result.gymActivated, false);
+  assert.deepEqual(d.calls.gyms[0], { gymId: 'g1', status: 'active' });
+  assert.equal(result.gymActivated, true);
 });
 
-test('opting in to Q-46 option A opens the gym, in one argument', async () => {
-  // Proof that answering Q-46 is a one-line change, not a rewrite.
+test('a caller with a reason can still activate the owner WITHOUT opening the gym', async () => {
+  // Reactivating a suspended owner's account, for one. A constant would have
+  // taken that choice away.
   const d = deps();
   const result = await completeActivation(
     d,
     { token: d.issued.token, code: d.issued.code, password: 'a-long-enough-password' },
-    { now: hours(1), activatesGym: true }
+    { now: hours(1), activatesGym: false }
   );
 
-  assert.deepEqual(d.calls.gyms[0], { gymId: 'g1', status: 'active' });
-  assert.equal(result.gymActivated, true);
+  assert.equal(d.calls.gyms.length, 0);
+  assert.equal(result.gymActivated, false);
+  assert.equal(result.ok, true, 'the owner is still activated');
+});
+
+test('a failed activation never opens the gym', async () => {
+  const d = deps();
+  await completeActivation(
+    d,
+    { token: d.issued.token, code: '000000', password: 'a-long-enough-password' },
+    { now: hours(1) }
+  );
+
+  assert.equal(d.calls.gyms.length, 0);
 });

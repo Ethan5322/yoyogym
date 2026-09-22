@@ -1,14 +1,65 @@
-// POST /api/members/document  { membership_number, verification_code }
-//   -> full data needed to render the membership PDF (card + confirmation).
+// POST /api/document  { membership_number, verification_code }
+//   -> the data needed to render the membership PDF (card + confirmation).
 //
 // Lightweight auth: the caller must present BOTH the membership number and the
 // matching verification code (the member has these from their success screen).
 // No admin session required — this is the member downloading their own card.
+//
+// ⚠️ THIS ENDPOINT IS UNAUTHENTICATED AND ITS CREDENTIAL NEVER EXPIRES.
+//
+// It used to `select('*')`, which returned the whole members row: the member's
+// national ID number and their biometric face templates, to anyone holding a
+// permanent, reusable code, with no rate limit (D-123). The columns below are
+// exactly what the PDF reads — verified against generateMembershipPdf.js and
+// idcard.js — and nothing else. ADD A COLUMN HERE ONLY IF THE PDF NEEDS IT.
 import { getSupabase } from '../../lib/supabase.js';
 import { allowMethods, readJsonBody, ok, badRequest, serverError } from '../../lib/http.js';
+import { rateLimit } from '../../lib/ratelimit.js';
+
+/**
+ * The only member columns this endpoint may return.
+ *
+ * Exported so a test can assert that no identity or biometric column ever
+ * creeps back in — the failure would be silent and permanent otherwise.
+ */
+export const PDF_MEMBER_COLUMNS = [
+  'id',
+  'membership_number',
+  'verification_code',
+  'full_name',
+  'date_of_birth',
+  'email',
+  'phone',
+  'address_street',
+  'address_suburb',
+  'address_city',
+  'address_postal_code',
+  'emergency_name',
+  'emergency_phone',
+  'experience_level',
+  'fitness_goals',
+  'injuries_notes',
+  'medical_aid_provider',
+  'created_at',
+];
+
+/** Columns that must NEVER be returned here, named so the intent is explicit. */
+export const FORBIDDEN_MEMBER_COLUMNS = [
+  'id_number',
+  'passport_number',
+  'face_descriptor',
+  'arcface_embedding',
+  'arcface_templates',
+  'photo_url',
+];
 
 export default async function handler(req, res) {
   if (!allowMethods(req, res, ['POST'])) return;
+
+  // Per-gym rate limiting (D-123). The code is 40 bits, so this is not really
+  // about brute force — it is about making a probe visible instead of silent.
+  if (!(await rateLimit(req, res, { key: 'document', limit: 10, windowMs: 60_000 }))) return;
+
   try {
     const { membership_number, verification_code } = await readJsonBody(req);
     if (!membership_number || !verification_code) {
@@ -19,7 +70,7 @@ export default async function handler(req, res) {
 
     const { data: member, error } = await supabase
       .from('members')
-      .select('*')
+      .select(PDF_MEMBER_COLUMNS.join(', '))
       .eq('membership_number', membership_number)
       .eq('verification_code', verification_code)
       .maybeSingle();

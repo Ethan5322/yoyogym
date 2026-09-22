@@ -332,13 +332,13 @@ async function handleExtraRoutes(req, res, deps, { url, path, method }) {
 
     if (method === 'POST') {
       const form = await readFormBody(req);
+      // Q-46 ANSWERED (D-124, user, 2026-09-22): verifying your email is what
+      // opens the gym, not paying. D-049 is superseded. This is the only way
+      // "30 days free" is a true sentence.
       const result = await completeActivation(
         deps,
         { token: form.token, code: form.code, password: form.password },
-        // Q-46 is unsettled, so the existing decision (D-049) is honoured:
-        // activation verifies the owner and does not open the gym. When the
-        // user answers, this becomes `activatesGym: true`.
-        { activatesGym: process.env.PLATFORM_ACTIVATION_OPENS_GYM === 'true' }
+        { activatesGym: true }
       );
 
       if (!result.ok) {

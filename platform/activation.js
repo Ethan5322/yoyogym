@@ -106,20 +106,21 @@ export function checkActivation(record, { token, code } = {}, now = new Date()) 
  * @param {object} deps    { findActivation, setPassword, markUsed, setGymStatus, audit }
  * @param {object} input   { token, code, password }
  * @param {object} [opts]
- * @param {boolean} [opts.activatesGym=false]  ⚠️ See Q-46 below.
+ * @param {boolean} [opts.activatesGym=true]  Opening the gym is the point (D-124);
+ *   pass false only when the caller has a reason not to.
  */
 export async function completeActivation(deps, { token, code, password } = {}, opts = {}) {
   const now = opts.now ?? new Date();
 
-  // ⚠️ Q-46 IS NOT SETTLED. D-049 says the FIRST PAYMENT activates a gym;
-  // D-070 promises a 30-day free trial. Both cannot be true — under D-049 a
-  // trialing gym is refused by tenancy resolution, so the owner is told they
-  // have 30 days free and finds a gym that will not open.
+  // Q-46 ANSWERED (D-124): verifying the owner's email opens the gym. Paying
+  // is not what opens the doors — D-049 is superseded, because under it a
+  // trialing gym was refused by tenancy resolution and "30 days free" was a
+  // promise the system could not keep.
   //
-  // The default here HONOURS THE EXISTING DECISION (D-049): activation
-  // verifies the owner and does not touch the gym. Choosing option A is this
-  // one argument, and the test above proves that branch works.
-  const activatesGym = opts.activatesGym === true;
+  // Still an argument rather than a constant, because the caller sometimes
+  // has a reason not to open a gym on activation — reactivating a suspended
+  // owner's account, for one — and a constant would take that choice away.
+  const activatesGym = opts.activatesGym !== false;
 
   if (typeof password !== 'string' || password.length < MIN_PASSWORD_LENGTH) {
     return { ok: false, reason: `Choose a password of at least ${MIN_PASSWORD_LENGTH} characters.` };

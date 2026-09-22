@@ -43,10 +43,30 @@ export function signToken(adminUser) {
   );
 }
 
-/** Verify a token string. Returns the decoded payload or null. */
+/**
+ * Verify a token string. Returns the decoded payload or null.
+ *
+ * A TOKEN ISSUED FOR ANOTHER SURFACE IS REFUSED (F-1, approved 2026-09-22).
+ *
+ * `server/lib/memberauth.js` signs member tokens with this same JWT_SECRET and
+ * sets `audience: 'member'`. This function used to call `jwt.verify` with no
+ * audience option, so that claim was written and never read — which made a
+ * member token a structurally valid admin token. Most handlers were saved only
+ * by `requireRole` finding no `role` on the payload; the four that call
+ * `authenticate()` without a role were not.
+ *
+ * The check is deliberately "reject a FOREIGN audience" rather than "require
+ * `aud === 'admin'`". Admin tokens in the wild carry no `aud` at all, so
+ * requiring one would log out every signed-in staff member the moment this
+ * deploys, in the middle of a working day. Once every live session has expired
+ * (8 hours), `signToken` can start setting `audience: 'admin'` and this can
+ * become a positive check — that is a separate, later change.
+ */
 export function verifyToken(token) {
   try {
-    return jwt.verify(token, JWT_SECRET);
+    const payload = jwt.verify(token, JWT_SECRET);
+    if (payload.aud && payload.aud !== 'admin') return null;
+    return payload;
   } catch {
     return null;
   }
