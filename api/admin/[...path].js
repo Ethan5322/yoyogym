@@ -1,6 +1,7 @@
 // Admin router — /api/admin/* . Resolves the route from req.url; logic lives in
 // /server/handlers/admin (outside /api, so not counted as functions).
 import { json } from '../../server/lib/http.js';
+import { enforceEntitlement } from '../../server/lib/entitlements.js';
 import { captureError } from '../../server/lib/observability.js';
 import dashboard from '../../server/handlers/admin/dashboard.js';
 import verify from '../../server/handlers/admin/verify.js';
@@ -85,6 +86,11 @@ export default async function handler(req, res) {
   const seg = parts[2];
   const fn = routes[seg];
   if (!fn) return json(res, 404, { error: `Not found: /api/admin/${seg || ''}` });
+
+  // Plan gating. Inert for a single-gym deployment (no resolved gym); for a
+  // platform gym it refuses a route the plan does not include, with 402.
+  // Enforced HERE rather than in any of the 37 handlers below it.
+  if (!enforceEntitlement(seg, res, json)) return;
   try {
     return await fn(req, res);
   } catch (err) {

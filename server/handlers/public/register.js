@@ -10,7 +10,7 @@
 // status 'new' (awaiting activation). The membership number + verification
 // code are issued now so the success screen + PDF (Phase 4) can use them.
 import { getSupabase } from '../../lib/supabase.js';
-import { allowMethods, readJsonBody, ok, badRequest, serverError } from '../../lib/http.js';
+import { allowMethods, readJsonBody, ok, badRequest, serverError, json } from '../../lib/http.js';
 import { generateMembershipNumber, generateVerificationCode } from '../../lib/identifiers.js';
 import { faceServiceConfigured, embedEnrolmentImages } from '../../lib/faceservice.js';
 import { enrolmentGallery } from '../../lib/facematch.js';
@@ -19,6 +19,8 @@ import { computeMembership, addonsTotal, totalDueToday, DURATION_MONTHS } from '
 import { currencyForCountry, HOME_COUNTRY } from '../../../shared/countries.js';
 import { onNewMember } from '../../lib/notify/index.js';
 import { rateLimit } from '../../lib/ratelimit.js';
+import { allowsMemberRegistration } from '../../lib/entitlements.js';
+import { currentGym } from '../../lib/tenancy.js';
 
 const PARQ_KEYS = [
   'q1_heart_condition',
@@ -74,6 +76,22 @@ export default async function handler(req, res) {
       return badRequest(res, 'A membership selection is required.');
     if (!a.agreement || !a.agreement.indemnity_accepted || !a.agreement.contract_accepted || !a.agreement.signature)
       return badRequest(res, 'Both agreements must be accepted and signed.');
+
+    // ---- plan member limit (platform only) ----
+    // Inert for a single-gym deployment: no resolved gym means no plan and no
+    // limit, and the count query below is not even run. A gym that downgraded
+    // below its member count keeps everyone — only NEW registrations stop.
+    const resolvedGym = currentGym();
+    if (resolvedGym) {
+      const { count } = await supabase
+        .from('members')
+        .select('id', { count: 'exact', head: true })
+        .neq('status', 'deleted');
+      const limit = allowsMemberRegistration(count ?? 0);
+      if (!limit.allowed) {
+        return json(res, limit.status, { error: limit.message, limit: limit.limit });
+      }
+    }
 
     // ---- recompute pricing from the DB (authoritative) ----
     const { data: plan, error: planErr } = await supabase

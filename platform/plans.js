@@ -18,35 +18,12 @@
 // Prices are NOT here. They are data in `platform_plans.price_cents`, set per
 // deployment and changeable without a release.
 
-/**
- * Feature keys. A route maps to one of these; a plan holds a list of them.
- * Keeping them coarse is deliberate — a gym owner should be able to read the
- * plan table and know what they are buying.
- */
-export const FEATURES = {
-  // Core — in every tier
-  MEMBERS: 'members',
-  CHECKIN: 'checkin',
-  PAYMENTS: 'payments',
-  CATALOG: 'catalog',
-  SETTINGS: 'settings',
-  STAFF: 'staff',
-  QR: 'qr',
-  // Medium
-  CLASSES: 'classes',
-  TRAINERS: 'trainers',
-  MESSAGING: 'messaging',
-  REPORTING: 'reporting',
-  PROGRESS: 'progress',
-  DATA_IO: 'data_io',
-  // Prime
-  FACE: 'face',
-  ACCESS_CONTROL: 'access_control',
-  ADVANCED_ANALYTICS: 'advanced_analytics',
-  MARKETING: 'marketing',
-  REFERRALS: 'referrals',
-  AUDIT: 'audit',
-};
+// Feature keys and the route map live in shared/, because the gym app's routers
+// enforce what this file defines and neither side may import the other (D-081).
+// One definition, two readers.
+export { FEATURES, featureForRoute } from '../shared/features.js';
+import { FEATURES, featureForRoute } from '../shared/features.js';
+
 
 const CORE = [
   FEATURES.MEMBERS,
@@ -131,60 +108,6 @@ export const planByKey = (key) => PLANS.find((p) => p.key === key) ?? null;
 
 export const hasFeature = (plan, feature) => Boolean(plan?.features?.includes(feature));
 
-/**
- * Route → feature. Every admin route appears here.
- *
- * An unmapped route is REFUSED, not allowed: a new route added without a
- * mapping must fail closed rather than become silently available to every tier.
- */
-const ROUTE_FEATURES = {
-  // Core
-  dashboard: FEATURES.MEMBERS,
-  members: FEATURES.MEMBERS,
-  member: FEATURES.MEMBERS,
-  'member-action': FEATURES.MEMBERS,
-  verify: FEATURES.CHECKIN,
-  today: FEATURES.CHECKIN,
-  'resolve-member': FEATURES.CHECKIN,
-  payments: FEATURES.PAYMENTS,
-  finance: FEATURES.PAYMENTS,
-  plans: FEATURES.CATALOG,
-  addons: FEATURES.CATALOG,
-  settings: FEATURES.SETTINGS,
-  staff: FEATURES.STAFF,
-  profile: FEATURES.STAFF,
-  'qr-stats': FEATURES.QR,
-
-  // Medium
-  classes: FEATURES.CLASSES,
-  'class-bookings': FEATURES.CLASSES,
-  events: FEATURES.CLASSES,
-  trainers: FEATURES.TRAINERS,
-  clients: FEATURES.TRAINERS,
-  'training-session': FEATURES.TRAINERS,
-  inbox: FEATURES.MESSAGING,
-  message: FEATURES.MESSAGING,
-  announcements: FEATURES.MESSAGING,
-  notifications: FEATURES.MESSAGING,
-  'attendance-live': FEATURES.REPORTING,
-  progress: FEATURES.PROGRESS,
-  'members-import': FEATURES.DATA_IO,
-
-  // Prime
-  'face-descriptors': FEATURES.FACE,
-  'enroll-face': FEATURES.FACE,
-  'access-card': FEATURES.ACCESS_CONTROL,
-  'access-action': FEATURES.ACCESS_CONTROL,
-  visitor: FEATURES.ACCESS_CONTROL,
-  incident: FEATURES.ACCESS_CONTROL,
-  analytics: FEATURES.ADVANCED_ANALYTICS,
-  'attendance-report': FEATURES.ADVANCED_ANALYTICS,
-  broadcast: FEATURES.MARKETING,
-  referrals: FEATURES.REFERRALS,
-  audit: FEATURES.AUDIT,
-};
-
-export const featureForRoute = (route) => ROUTE_FEATURES[route] ?? null;
 
 /** The cheapest plan that includes a feature — what an upgrade prompt names. */
 function cheapestPlanWith(feature) {
