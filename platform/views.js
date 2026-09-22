@@ -1152,3 +1152,159 @@ export function activationHandoverPage({ activation = {}, gymName = '', applicat
 </div>`,
   });
 }
+
+// ---------------------------------------------------------------------------
+// Reviewing one document — the screen where a forgery is caught or missed
+// ---------------------------------------------------------------------------
+
+/**
+ * A document, shown properly.
+ *
+ * It used to redirect to a signed storage URL: the reviewer left the panel,
+ * downloaded a file, opened it in another application, and had nothing beside
+ * it to compare against. Whether a registration certificate is forged is a
+ * judgement made by comparing the document to what the applicant CLAIMED, and
+ * that comparison is impossible on two separate screens.
+ *
+ * So: the document is rendered inline, and everything needed to judge it sits
+ * next to it — the applicant's own claims, the facts about the bytes, and
+ * anywhere else this exact file has been seen before.
+ *
+ * The file itself is loaded from /platform/documents/<id>/file, which issues a
+ * short-lived signed URL. The URL never appears in this page's source.
+ */
+export function documentReviewPage({
+  doc,
+  application = null,
+  facts = null,
+  duplicates = [],
+  user = null,
+  csrfToken = '',
+  canDecide = false,
+}) {
+  const isImage = String(doc.mime_type || '').startsWith('image/');
+  const src = `/platform/documents/${h(doc.id)}/file`;
+
+  // The document itself. An <object> for PDFs because it falls back cleanly
+  // when the browser has no viewer, which is exactly when a reviewer needs to
+  // be told rather than shown a blank rectangle.
+  const viewer = isImage
+    ? `<img src="${src}" alt="${h(doc.filename)}" style="max-width:100%;border:1px solid var(--line);border-radius:8px">`
+    : `<object data="${src}" type="application/pdf" style="width:100%;height:78vh;border:1px solid var(--line);border-radius:8px">
+  <div class="empty">
+    <p>Your browser cannot display this file inline.</p>
+    <p><a href="${src}" target="_blank" rel="noopener">Open it in a new tab →</a></p>
+  </div>
+</object>`;
+
+  // Flags are facts, phrased as facts. None of them is a verdict.
+  const flagList = (facts?.flags || []).length
+    ? `<div class="card" style="border-left:4px solid var(--bad)">
+  <h2>⚠️ Worth a closer look</h2>
+  <ul>${facts.flags
+    .map((f) => `<li><b>${h(f.severity)}</b> — ${h(f.detail)}</li>`)
+    .join('')}</ul>
+  <p class="muted">These are observations, not conclusions. A genuine document can
+  trip them, and a convincing forgery can pass all of them.</p>
+</div>`
+    : '';
+
+  // The strongest signal available, and the one a human would never spot
+  // unaided: this exact file on somebody else's application.
+  const dupeList = duplicates.length
+    ? `<div class="card" style="border-left:4px solid var(--bad)">
+  <h2>⚠️ This exact file appears on ${duplicates.length} other application${
+        duplicates.length === 1 ? '' : 's'
+      }</h2>
+  <ul>${duplicates
+    .map(
+      (d) => `<li><a href="/platform/applications/${h(d.application_id)}">${h(
+        d.proposed_gym_name || d.application_id
+      )}</a> <span class="muted">${h(d.uploaded_at)}</span></li>`
+    )
+    .join('')}</ul>
+  <p class="muted">Byte-for-byte identical. The same person applying twice is
+  ordinary; two different gyms sending one file is not.</p>
+</div>`
+    : '';
+
+  const claims = application
+    ? `<div class="card">
+  <h2>What the applicant says</h2>
+  <table>
+    <tbody>
+      <tr><td class="muted">Gym</td><td><b>${h(application.proposed_gym_name)}</b></td></tr>
+      <tr><td class="muted">City</td><td>${h(application.city)} ${h(application.country)}</td></tr>
+      <tr><td class="muted">Document type</td><td>${h(doc.doc_type)}</td></tr>
+      <tr><td class="muted">Applied</td><td>${h(application.submitted_at)}</td></tr>
+    </tbody>
+  </table>
+  <p class="muted">Compare these against the document. A name or an address that
+  does not match is the thing to look for.</p>
+</div>`
+    : '';
+
+  const controls =
+    canDecide && doc.status === 'pending'
+      ? `<form class="card" method="post" action="/platform/documents/${h(doc.id)}/decide">
+  <input type="hidden" name="csrf" value="${h(csrfToken)}">
+  <h2>Decision</h2>
+  <label>Reason (required to reject)
+    <input name="reason" placeholder="e.g. the name does not match the application">
+  </label>
+  <div class="row">
+    <button type="submit" name="action" value="accept">Accept</button>
+    <button type="submit" name="action" value="reject">Reject</button>
+  </div>
+</form>`
+      : `<div class="card"><p class="muted">${
+          doc.status === 'pending' ? 'You have read-only access.' : `Already ${h(doc.status)}.`
+        }${doc.reject_reason ? ` ${h(doc.reject_reason)}` : ''}</p></div>`;
+
+  return layout({
+    title: doc.filename || 'Document',
+    user,
+    body: `<p><a href="/platform/applications/${h(doc.application_id)}">← Back to the application</a></p>
+<h1>${h(doc.filename || 'Document')}</h1>
+
+${dupeList}
+${flagList}
+
+${viewer}
+
+${claims}
+
+<div class="card">
+  <h2>The file itself</h2>
+  <table>
+    <tbody>
+      <tr><td class="muted">Uploaded as</td><td>${h(doc.mime_type || '—')}</td></tr>
+      <tr><td class="muted">Actually is</td><td>${
+        facts?.actualType ? h(facts.actualType) : '<span class="muted">not recognised</span>'
+      }</td></tr>
+      <tr><td class="muted">Size</td><td>${h(readableSizeLabel(facts?.bytes ?? doc.size_bytes))}</td></tr>
+      <tr><td class="muted">Uploaded</td><td>${h(doc.uploaded_at)}</td></tr>
+      <tr><td class="muted">SHA-256</td><td style="word-break:break-all;font-family:monospace;font-size:0.8rem">${h(
+        facts?.sha256 || doc.sha256 || '—'
+      )}</td></tr>
+    </tbody>
+  </table>
+  <p class="muted">The hash is computed from the bytes actually in storage, not from
+  anything the uploader told us. It is what makes the duplicate check above possible.</p>
+</div>
+
+${controls}
+
+<p class="muted">Opening this document has been recorded in the audit log, with your
+name and the time.</p>`,
+  });
+}
+
+/** Bytes as a person reads them. Mirrors readableSize in platform/forensics.js. */
+function readableSizeLabel(bytes) {
+  const n = Number(bytes);
+  if (!Number.isFinite(n) || n <= 0) return '—';
+  if (n < 1024) return `${n} B`;
+  if (n < 1024 * 1024) return `${(n / 1024).toFixed(0)} KB`;
+  return `${(n / 1024 / 1024).toFixed(1)} MB`;
+}

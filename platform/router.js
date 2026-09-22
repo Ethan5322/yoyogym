@@ -52,6 +52,7 @@ import {
   ownersPage,
   financePage,
   activationHandoverPage,
+  documentReviewPage,
 } from './views.js';
 import { eventToIntent } from './billing.js';
 import { completeActivation } from './activation.js';
@@ -714,19 +715,6 @@ async function handleExtraRoutes(req, res, deps, { url, path, method }) {
       return true;
     }
 
-    // Five minutes. Long enough to open a PDF, short enough that a URL left in
-    // a chat message or a browser history is useless by the time anyone finds
-    // it. The bucket itself is private; this is the only way in.
-    const url = await deps.signedDocumentUrl(doc.storage_ref, 300);
-
-    if (!url) {
-      // Not a redirect to nowhere. A broken link here looks like a missing
-      // document, and a reviewer would reasonably reject an application over it.
-      res.writeHead(502, { 'Content-Type': 'text/plain; charset=utf-8' });
-      res.end('That document could not be opened just now. Please try again.');
-      return true;
-    }
-
     // WHO looked at WHOSE identity document, and when. This is the only record
     // of it, and under POPIA it is the record that matters.
     await deps.audit({
@@ -737,8 +725,66 @@ async function handleExtraRoutes(req, res, deps, { url, path, method }) {
       detail: { application_id: doc.application_id, doc_type: doc.doc_type },
     });
 
-    // Redirected, never rendered. Putting the signed URL in HTML would leave
-    // it in the page source, the browser cache and any screenshot.
+    // The facts about the bytes, and anywhere else this exact file has been
+    // seen. Both are best-effort: a storage hiccup must not stop a reviewer
+    // seeing the document, it only means they see it with less around it.
+    let facts = null;
+    let duplicates = [];
+    try {
+      facts = await deps.documentFacts(doc);
+      if (facts?.sha256) duplicates = await deps.findDuplicateDocuments(facts.sha256, doc.id);
+    } catch (err) {
+      console.error('document forensics failed:', err?.message);
+    }
+
+    const [application, canDecide] = await Promise.all([
+      deps.getApplicationSummary?.(doc.application_id) ?? null,
+      may(deps, session, 'application.approve'),
+    ]);
+
+    html(res, 200, documentReviewPage({
+      doc,
+      application,
+      facts,
+      duplicates,
+      user: { email: session.email },
+      csrfToken: issueCsrfToken(session.sub),
+      canDecide,
+    }));
+    return true;
+  }
+
+  // ---- the document's bytes ------------------------------------------------
+  // Split from the page on purpose: the viewer needs a URL it can load, and a
+  // signed storage URL must never appear in the page source, the browser cache
+  // or a screenshot of the review screen.
+  const docFile = /^documents\/([A-Za-z0-9-]+)\/file$/.exec(path);
+  if (docFile && method === 'GET') {
+    const session = requireSession(req, res);
+    if (!session) return true;
+
+    if (!(await may(deps, session, 'application.view'))) {
+      forbid(res, 'You do not have permission to open application documents.');
+      return true;
+    }
+
+    const doc = await deps.getDocument(docFile[1]);
+    if (!doc) {
+      html(res, 404, '<p>Document not found.</p>');
+      return true;
+    }
+
+    // Five minutes. Long enough to read a document, short enough that a URL
+    // left anywhere is useless by the time somebody finds it.
+    const url = await deps.signedDocumentUrl(doc.storage_ref, 300);
+    if (!url) {
+      // Not a redirect to nowhere. A broken link here looks like a missing
+      // document, and a reviewer might reject an application over it.
+      res.writeHead(502, { 'Content-Type': 'text/plain; charset=utf-8' });
+      res.end('That document could not be opened just now. Please try again.');
+      return true;
+    }
+
     redirect(res, url);
     return true;
   }

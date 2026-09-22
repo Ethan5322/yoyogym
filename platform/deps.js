@@ -19,6 +19,7 @@ import { DOCUMENT_BUCKET } from './documents.js';
 import { sendEmail, activationEmail, billingEmail, emailConfigured } from './email.js';
 import { purgeExpiredDocuments } from './retention.js';
 import { directoryRow } from './member-directory.js';
+import { fileFacts } from './forensics.js';
 import { reconcileSchemas } from './reconciliation.js';
 import { GRACE_DAYS } from './billing.js';
 import { chargeAuthorization, paystackConfigured } from './paystack.js';
@@ -915,6 +916,87 @@ export function ownerDeps(db = platformDb()) {
     reviewDocument: async (id, patch) => {
       const { error } = await db.from('application_documents').update(patch).eq('id', id);
       if (error) throw new Error(`Could not record that decision: ${error.message}`);
+    },
+
+    /**
+     * The facts about a document's bytes.
+     *
+     * DOWNLOADED AND HASHED SERVER-SIDE, never taken from the uploader. A
+     * client-supplied hash would be worth nothing for the duplicate check —
+     * anyone reusing a document would simply send a different number.
+     *
+     * The result is cached on the row, so a document is fetched once however
+     * many times it is reviewed. The cost is bounded by review volume, not by
+     * upload volume.
+     */
+    documentFacts: async (doc) => {
+      if (doc.sha256 && doc.size_bytes) {
+        // Already computed. The flags are recomputed from the stored facts
+        // rather than re-downloading, which is why they are cheap to show.
+        return {
+          sha256: doc.sha256,
+          bytes: Number(doc.size_bytes),
+          actualType: doc.mime_type,
+          declaredType: doc.mime_type,
+          flags: [],
+        };
+      }
+
+      const { data, error } = await db.storage.from(DOCUMENT_BUCKET).download(doc.storage_ref);
+      if (error || !data) throw new Error(`Could not read the document: ${error?.message}`);
+
+      const buffer = Buffer.from(await data.arrayBuffer());
+      const facts = fileFacts(buffer, {
+        declaredType: doc.mime_type,
+        declaredSize: doc.size_bytes,
+      });
+
+      // Written back so the next reviewer does not pay for it, and so the
+      // duplicate check can be a plain indexed lookup.
+      await db
+        .from('application_documents')
+        .update({ sha256: facts.sha256, size_bytes: facts.bytes })
+        .eq('id', doc.id);
+
+      return facts;
+    },
+
+    /**
+     * Anywhere else this exact file has been uploaded.
+     *
+     * The strongest fraud signal available and one no reviewer could spot
+     * unaided — the same person applying twice is ordinary, two different gyms
+     * sending one byte-for-byte identical file is not.
+     */
+    findDuplicateDocuments: async (sha256, exceptId) => {
+      if (!sha256) return [];
+
+      const { data: docs } = await db
+        .from('application_documents')
+        .select('id, application_id, uploaded_at')
+        .eq('sha256', sha256)
+        .neq('id', exceptId)
+        .limit(10);
+
+      if (!docs?.length) return [];
+
+      const { data: apps } = await db
+        .from('gym_applications')
+        .select('id, proposed_gym_name')
+        .in('id', docs.map((d) => d.application_id));
+
+      const names = new Map((apps ?? []).map((a) => [a.id, a.proposed_gym_name]));
+      return docs.map((d) => ({ ...d, proposed_gym_name: names.get(d.application_id) ?? null }));
+    },
+
+    /** Just enough of the application to compare a document against. */
+    getApplicationSummary: async (applicationId) => {
+      const { data } = await db
+        .from('gym_applications')
+        .select('id, proposed_gym_name, city, country, submitted_at, status')
+        .eq('id', applicationId)
+        .maybeSingle();
+      return data ?? null;
     },
 
     /** A short-lived read link, for the reviewer only. Minutes, not days. */

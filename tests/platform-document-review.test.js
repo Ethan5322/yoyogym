@@ -64,6 +64,9 @@ function deps({ permissions = ['application.view'] } = {}) {
       return `https://storage.example/signed?path=${encodeURIComponent(ref)}`;
     },
     reviewDocument: async (id, patch) => { calls.reviewed.push({ id, ...patch }); },
+    documentFacts: async () => ({ sha256: 'a'.repeat(64), bytes: 240000, actualType: 'application/pdf', declaredType: 'application/pdf', flags: [] }),
+    findDuplicateDocuments: async () => [],
+    getApplicationSummary: async () => ({ id: 'app-1', proposed_gym_name: 'BOS GYM', city: 'Cape Town', country: 'ZA', submitted_at: '2026-09-01' }),
   };
 }
 
@@ -90,11 +93,27 @@ test('A SIGNED-IN USER WITHOUT application.view CANNOT OPEN SOMEONE\'S ID DOCUME
   assert.equal(d.calls.signed.length, 0, 'no URL is ever minted');
 });
 
-test('a reviewer is redirected to a short-lived signed URL', async () => {
+test('the reviewer gets a PAGE, with the document shown in it', async () => {
+  // It used to redirect straight to storage: the reviewer left the panel,
+  // downloaded a file, and had nothing beside it to compare against. Judging
+  // a forgery means comparing the document to what the applicant CLAIMED, and
+  // that is impossible on two separate screens.
   const d = deps();
   const r = res();
 
   await handlePlatform(req({ url: '/platform/documents/doc-1', cookie: session() }), r, d);
+
+  assert.equal(r.statusCode, 200);
+  assert.match(r.body, /documents\/doc-1\/file/, 'the document is embedded');
+  assert.match(r.body, /BOS GYM/, 'next to what the applicant said');
+  assert.match(r.body, /SHA-256/, 'and the facts about the bytes');
+});
+
+test('the bytes come from a separate route, with a short-lived signed URL', async () => {
+  const d = deps();
+  const r = res();
+
+  await handlePlatform(req({ url: '/platform/documents/doc-1/file', cookie: session() }), r, d);
 
   assert.equal(r.statusCode, 302);
   assert.match(r.headers.location, /^https:\/\/storage\.example\/signed/);
@@ -114,15 +133,17 @@ test('opening a document is written to the audit log', async () => {
   assert.equal(entry.entity_id, 'doc-1');
 });
 
-test('the signed URL is never rendered into a page', async () => {
-  // A redirect leaves it in one place. Putting it in HTML would leave it in
-  // the page source, the browser cache and any screenshot of the screen.
+test('THE SIGNED URL IS NEVER RENDERED INTO THE REVIEW PAGE', async () => {
+  // The page embeds /platform/documents/<id>/file, not the storage URL. In
+  // the HTML it would survive in the page source, the browser cache and any
+  // screenshot of the review screen.
   const d = deps();
   const r = res();
 
   await handlePlatform(req({ url: '/platform/documents/doc-1', cookie: session() }), r, d);
 
-  assert.equal(r.body, '', 'nothing is rendered at all');
+  assert.ok(!r.body.includes('storage.example'), 'no storage URL in the page');
+  assert.equal(d.calls.signed.length, 0, 'and none is even minted to render it');
 });
 
 test('an unknown document is 404, and mints nothing', async () => {
@@ -139,9 +160,68 @@ test('a storage failure does not hand the reviewer a broken redirect', async () 
   const d = { ...deps(), signedDocumentUrl: async () => null };
   const r = res();
 
-  await handlePlatform(req({ url: '/platform/documents/doc-1', cookie: session() }), r, d);
+  await handlePlatform(req({ url: '/platform/documents/doc-1/file', cookie: session() }), r, d);
 
   assert.equal(r.statusCode, 502);
+});
+
+// ---------------------------------------------------------------------------
+// Spotting a forgery
+// ---------------------------------------------------------------------------
+
+test('A FILE PRETENDING TO BE A PDF IS FLAGGED ON THE SCREEN', async () => {
+  const d = {
+    ...deps(),
+    documentFacts: async () => ({
+      sha256: 'b'.repeat(64), bytes: 4096, actualType: 'application/x-msdownload',
+      declaredType: 'application/pdf',
+      flags: [{ code: 'type_mismatch', severity: 'high', detail: 'Uploaded as application/pdf, but the file is actually application/x-msdownload.' }],
+    }),
+  };
+  const r = res();
+
+  await handlePlatform(req({ url: '/platform/documents/doc-1', cookie: session() }), r, d);
+
+  assert.match(r.body, /closer look/i);
+  assert.match(r.body, /actually application\/x-msdownload/);
+});
+
+test('THE SAME FILE ON ANOTHER APPLICATION IS SHOWN PROMINENTLY', async () => {
+  // The strongest signal available, and one no reviewer could spot unaided.
+  const d = {
+    ...deps(),
+    findDuplicateDocuments: async () => [
+      { id: 'd9', application_id: 'app-9', proposed_gym_name: 'Rival Gym', uploaded_at: '2026-08-01' },
+    ],
+  };
+  const r = res();
+
+  await handlePlatform(req({ url: '/platform/documents/doc-1', cookie: session() }), r, d);
+
+  assert.match(r.body, /appears on 1 other application/i);
+  assert.match(r.body, /Rival Gym/);
+  assert.match(r.body, /applications\/app-9/, 'and links to it');
+});
+
+test('a clean document shows no warnings at all', async () => {
+  const d = deps();
+  const r = res();
+
+  await handlePlatform(req({ url: '/platform/documents/doc-1', cookie: session() }), r, d);
+
+  assert.ok(!/closer look/i.test(r.body), 'a normal document must not cry wolf');
+  assert.ok(!/appears on/i.test(r.body));
+});
+
+test('forensics failing still shows the reviewer the document', async () => {
+  // Less around it is acceptable. Not seeing it at all is not.
+  const d = { ...deps(), documentFacts: async () => { throw new Error('storage down'); } };
+  const r = res();
+
+  await handlePlatform(req({ url: '/platform/documents/doc-1', cookie: session() }), r, d);
+
+  assert.equal(r.statusCode, 200);
+  assert.match(r.body, /documents\/doc-1\/file/);
 });
 
 // ---------------------------------------------------------------------------
