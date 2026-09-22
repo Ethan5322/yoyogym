@@ -345,3 +345,60 @@ test('changing a plan without a CSRF token is refused', async () => {
   assert.equal(r.statusCode, 403);
   assert.equal(changes.length, 0);
 });
+
+// ---------------------------------------------------------------------------
+// Platform security (§16)
+// ---------------------------------------------------------------------------
+
+test('the security screen needs audit.view', async () => {
+  const r = res();
+  await handlePlatform(req({ url: '/platform/security', cookie: session() }), r, deps({ permissions: ['gym.view'] }));
+  assert.equal(r.statusCode, 403);
+});
+
+test('a quiet platform says so, rather than showing an empty page', async () => {
+  const d = { ...deps({ permissions: ['audit.view'] }), listAuditLog: async () => [] };
+  const r = res();
+
+  await handlePlatform(req({ url: '/platform/security', cookie: session() }), r, d);
+
+  assert.equal(r.statusCode, 200);
+  assert.match(r.body, /Nothing needs attention/i);
+});
+
+test('repeated failed sign-ins surface on the security screen', async () => {
+  const now = new Date().toISOString();
+  const d = {
+    ...deps({ permissions: ['audit.view'] }),
+    listAuditLog: async () => Array.from({ length: 6 }, () => ({
+      action: 'platform.login.failed', detail: { email: 'ann@bos.co' }, created_at: now,
+    })),
+  };
+  const r = res();
+
+  await handlePlatform(req({ url: '/platform/security', cookie: session() }), r, d);
+
+  assert.match(r.body, /failed sign-in attempts/i);
+  assert.match(r.body, /ann@bos\.co/);
+  assert.match(r.body, /forgotten their password/i, 'the innocent explanation is shown too');
+});
+
+test('THE SECURITY SCREEN SAYS IT NEVER ACTS ON ITS OWN', async () => {
+  // Every pattern it reports has an ordinary explanation. A screen that looked
+  // like it might lock an account would be read as an accusation.
+  const d = { ...deps({ permissions: ['audit.view'] }), listAuditLog: async () => [] };
+  const r = res();
+
+  await handlePlatform(req({ url: '/platform/security', cookie: session() }), r, d);
+
+  assert.match(r.body, /Nothing here acts on its own/i);
+});
+
+test('the security screen is about the PLATFORM, not a gym members', async () => {
+  const d = { ...deps({ permissions: ['audit.view'] }), listAuditLog: async () => [] };
+  const r = res();
+
+  await handlePlatform(req({ url: '/platform/security', cookie: session() }), r, d);
+
+  assert.match(r.body, /never a gym's own members/i);
+});

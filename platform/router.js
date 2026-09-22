@@ -53,8 +53,10 @@ import {
   financePage,
   activationHandoverPage,
   documentReviewPage,
+  securityPage,
 } from './views.js';
 import { eventToIntent } from './billing.js';
+import { findAlerts, DEFAULT_WINDOW_HOURS } from './alerts.js';
 import { completeActivation } from './activation.js';
 import { validateUploadRequest, pathBelongsTo, documentRow } from './documents.js';
 import { verifySignature } from './paystack.js';
@@ -622,6 +624,30 @@ async function handleExtraRoutes(req, res, deps, { url, path, method }) {
     html(res, 200, auditPage({
       entries: await deps.listAuditLog(filter),
       filter,
+      user: { email: session.email },
+    }));
+    return true;
+  }
+
+  // ---- platform security ---------------------------------------------------
+  if (path === 'security' && method === 'GET') {
+    const session = requireSession(req, res);
+    if (!session) return true;
+
+    // The same permission as the audit log: this is a reading of it.
+    if (!(await may(deps, session, 'audit.view'))) {
+      forbid(res, 'You do not have permission to see platform security.');
+      return true;
+    }
+
+    // Read once, analysed in memory. The alternative is six queries asking the
+    // same table six slightly different questions.
+    const entries = await deps.listAuditLog({ limit: 500 });
+    const alerts = findAlerts(entries, { now: new Date(), windowHours: DEFAULT_WINDOW_HOURS });
+
+    html(res, 200, securityPage({
+      alerts,
+      windowHours: DEFAULT_WINDOW_HOURS,
       user: { email: session.email },
     }));
     return true;

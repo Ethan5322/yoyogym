@@ -94,6 +94,7 @@ export function layout({ title = 'Yoyo Gyms', body = '', user = null, indexable 
     <a href="/platform/owners">Owners</a>
     <a href="/platform/plans">Plans</a>
     <a href="/platform/finance">Finances</a>
+    <a href="/platform/security">Security</a>
     <a href="/platform/audit">Audit</a>
   </nav>`
       : ''
@@ -1308,3 +1309,68 @@ function readableSizeLabel(bytes) {
   if (n < 1024 * 1024) return `${(n / 1024).toFixed(0)} KB`;
   return `${(n / 1024 / 1024).toFixed(1)} MB`;
 }
+
+// ---------------------------------------------------------------------------
+// Platform security (CLAUDE.md §16)
+// ---------------------------------------------------------------------------
+
+/**
+ * What is worth a person's attention today.
+ *
+ * PLATFORM security, not a gym's. Nothing here concerns a gym's members, its
+ * check-ins or its takings — those belong to that gym's own admin panel and
+ * the platform never sees them (D-044).
+ *
+ * Every alert states its innocent explanation next to it, deliberately. Most
+ * of these patterns usually ARE innocent, and a screen that does not say so
+ * trains people first to panic and then to stop reading it.
+ */
+export function securityPage({ alerts = [], windowHours = 24, user = null }) {
+  const body = alerts.length
+    ? alerts
+        .map(
+          (a) => `<div class="card" style="border-left:4px solid ${
+            a.severity === 'high' ? 'var(--bad)' : '#b7791f'
+          }">
+  <h2>${h(a.detail)}</h2>
+  <p class="muted">${h(a.innocent)}</p>
+  <p class="muted"><a href="/platform/audit?action=${h(auditFilterFor(a.code))}">
+    See the entries →</a></p>
+</div>`
+        )
+        .join('\n')
+    : `<div class="card">
+  <h2>✅ Nothing needs attention</h2>
+  <p class="muted">No unusual activity in the last ${h(windowHours)} hours.</p>
+</div>`;
+
+  return layout({
+    title: 'Security',
+    user,
+    body: `<h1>Security</h1>
+<p class="muted">The last ${h(windowHours)} hours on the platform. This watches sign-ins,
+access to applicants' identity documents, and gyms that failed to be created —
+<b>never a gym's own members</b>, which the platform does not see.</p>
+
+${body}
+
+<p class="muted"><b>Nothing here acts on its own.</b> No account is locked and no gym is
+suspended by this screen. Every pattern above has an ordinary explanation, and
+deciding which one applies is a person's job.</p>`,
+  });
+}
+
+/** Map an alert back to the audit filter that shows its entries. */
+function auditFilterFor(code) {
+  return (
+    {
+      repeated_failed_logins: 'login.failed',
+      staff_blocked_no_2fa: 'blocked_no_2fa',
+      unusual_document_access: 'document.viewed',
+      document_path_rejected: 'rejected_path',
+      unmatched_payment: 'webhook.unmatched',
+      provisioning_failed: 'provision.failed',
+    }[code] || ''
+  );
+}
+
