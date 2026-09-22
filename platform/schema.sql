@@ -494,3 +494,4 @@ alter table platform.platform_subscriptions    enable row level security;
 alter table platform.platform_invoices         enable row level security;
 alter table platform.platform_audit_log        enable row level security;
 alter table platform.migration_runs            enable row level security;
+alter table platform.member_directory          enable row level security;
