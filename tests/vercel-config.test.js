@@ -66,3 +66,24 @@ test('the /g/ gym entry paths reach the SPA', () => {
   assert.ok(pattern.test('/g/bos-gym/register'), '/g/ must reach the SPA');
   assert.ok(!pattern.test('/api/platform/cron'), 'but /api must not');
 });
+
+test('THE PANEL IS REACHABLE — /platform/* is rewritten to the handler', () => {
+  // Without this the catch-all sends /platform/login to index.html and the
+  // whole admin panel renders the gym app instead. It looks like "the old
+  // site opens", not like an error.
+  const platform = config.rewrites.find((r) => r.source.startsWith('/platform/'));
+
+  assert.ok(platform, '/platform/* must be rewritten to /api/platform/*');
+  assert.match(platform.destination, /^\/api\/platform/);
+});
+
+test('the platform rewrite comes BEFORE the SPA catch-all', () => {
+  // Rewrites are evaluated top to bottom. Behind the catch-all this rule
+  // never runs.
+  const platformAt = config.rewrites.findIndex((r) => r.source.startsWith('/platform'));
+  const catchAllAt = config.rewrites.findIndex((r) => r.destination === '/index.html');
+
+  assert.ok(platformAt > -1 && catchAllAt > -1);
+  assert.ok(platformAt < catchAllAt, 'the catch-all would swallow it');
+});
+

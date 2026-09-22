@@ -97,7 +97,19 @@ const INVALID = 'Invalid email, password or authentication code.';
  */
 export async function handlePlatform(req, res, deps) {
   const url = new URL(req.url, 'http://localhost');
-  const path = url.pathname.replace(/^\/platform\/?/, '').replace(/\/$/, '');
+  // BOTH PREFIXES, on purpose.
+  //
+  // Vercel serves this handler at /api/platform/*, while every link in the
+  // panel points at /platform/* and a rewrite maps one to the other. Which of
+  // the two a rewrite actually presents in req.url is not something to bet a
+  // working panel on, so the router accepts either and stops caring.
+  //
+  // The /api/ form is stripped first: otherwise "/api/platform/login" would
+  // lose only its "/platform/" middle and arrive as "/api/login".
+  const path = url.pathname
+    .replace(/^\/api\/platform\/?/, '')
+    .replace(/^\/platform\/?/, '')
+    .replace(/\/$/, '');
   const method = (req.method || 'GET').toUpperCase();
 
   // THE MOBILE APP'S SURFACE, first.

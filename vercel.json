@@ -4,6 +4,14 @@
   "outputDirectory": "dist",
   "rewrites": [
     {
+      "source": "/platform",
+      "destination": "/api/platform"
+    },
+    {
+      "source": "/platform/:path*",
+      "destination": "/api/platform/:path*"
+    },
+    {
       "source": "/((?!api/).*)",
       "destination": "/index.html"
     }
