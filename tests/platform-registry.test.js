@@ -409,3 +409,53 @@ test('the raw code never appears in the page after a failure', async () => {
 
   assert.ok(!r.body.includes(`value="${d.issued.code}"`));
 });
+
+// ---------------------------------------------------------------------------
+// Per-gym counts (D-130) — counts only, never names
+// ---------------------------------------------------------------------------
+
+test('the gym page shows counts, and says they are only counts', async () => {
+  const d = {
+    ...deps({ permissions: ['gym.view'] }),
+    gymStatsFor: async () => ({
+      activeMembers: 87, checkinsThisMonth: 412,
+      lastActivityAt: '2026-09-21T18:00:00Z', reachable: true,
+    }),
+  };
+  const r = res();
+
+  await handlePlatform(req({ url: '/platform/registry/gym-1', cookie: session() }), r, d);
+
+  assert.match(r.body, /87/, 'the count is shown');
+  assert.match(r.body, /Counts only/i, 'and the page says what it is');
+  assert.match(r.body, /never reads a member's name/i);
+});
+
+test('an unreachable gym says so rather than showing zero', async () => {
+  // Zero members and "we could not reach this gym" are completely different
+  // facts, and only one of them is true.
+  const d = {
+    ...deps({ permissions: ['gym.view'] }),
+    gymStatsFor: async () => ({ activeMembers: null, checkinsThisMonth: null, lastActivityAt: null, reachable: false }),
+  };
+  const r = res();
+
+  await handlePlatform(req({ url: '/platform/registry/gym-1', cookie: session() }), r, d);
+
+  assert.match(r.body, /could not be reached/i);
+  assert.ok(!/<b>0<\/b>/.test(r.body), 'never presented as zero members');
+});
+
+test('stats failing does not hide the whole gym', async () => {
+  const d = {
+    ...deps({ permissions: ['gym.view'] }),
+    gymStatsFor: async () => { throw new Error('schema gone'); },
+  };
+  const r = res();
+
+  await handlePlatform(req({ url: '/platform/registry/gym-1', cookie: session() }), r, d);
+
+  assert.equal(r.statusCode, 200);
+  assert.match(r.body, /BOS GYM/);
+});
+

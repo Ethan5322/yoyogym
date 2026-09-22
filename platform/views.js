@@ -434,6 +434,7 @@ export function gymDetailPage({
   canSuspend = false,
   canBill = false,
   plans = [],
+  stats = null,
 }) {
   const suspended = gym.status === 'suspended';
 
@@ -476,6 +477,27 @@ ${invoices
     body: `<p><a href="/platform/registry">← All gyms</a></p>
 <h1>${h(gym.search_name || gym.slug)}</h1>
 <p class="muted">${h(gym.city)}${gym.country ? `, ${h(gym.country)}` : ''} · ${statusTag(gym.status)}</p>
+
+${
+  stats
+    ? `<div class="card">
+  <h2>Activity</h2>
+  ${
+    stats.reachable
+      ? `<table><tbody>
+    <tr><td class="muted">Active members</td><td><b>${h(stats.activeMembers ?? '—')}</b></td></tr>
+    <tr><td class="muted">Check-ins this month</td><td>${h(stats.checkinsThisMonth ?? '—')}</td></tr>
+    <tr><td class="muted">Last check-in</td><td>${h(stats.lastActivityAt) || '<span class="muted">none yet</span>'}</td></tr>
+  </tbody></table>
+  <p class="muted"><b>Counts only.</b> The platform never reads a member's name, phone,
+  ID or health answers — only how many there are. Every one of these reads is
+  written to the audit log with your name on it.</p>`
+      : `<p class="muted">⚠️ This gym's data could not be reached, so there are no counts.
+         That is worth looking into — it usually means the gym is not serving traffic either.</p>`
+  }
+</div>`
+    : ''
+}
 
 <div class="card">
   <h2>Subscription</h2>

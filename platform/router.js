@@ -919,8 +919,18 @@ async function handleExtraRoutes(req, res, deps, { url, path, method }) {
 
     const canBill = await may(deps, session, 'subscription.manage');
 
+    // Counts only (D-130). Best-effort: a gym whose schema cannot be reached
+    // is a fact the page shows, not an error that hides the whole gym.
+    let stats = null;
+    try {
+      stats = (await deps.gymStatsFor?.(view.gym, session.sub)) ?? null;
+    } catch (err) {
+      console.error('gym stats failed:', err?.message);
+    }
+
     html(res, 200, gymDetailPage({
       ...view,
+      stats,
       user: { email: session.email },
       csrfToken: issueCsrfToken(session.sub),
       canSuspend: await may(deps, session, 'gym.suspend'),

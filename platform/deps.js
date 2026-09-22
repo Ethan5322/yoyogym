@@ -20,6 +20,7 @@ import { sendEmail, activationEmail, billingEmail, emailConfigured } from './ema
 import { purgeExpiredDocuments } from './retention.js';
 import { directoryRow } from './member-directory.js';
 import { fileFacts } from './forensics.js';
+import { gymStats } from './stats.js';
 import { reconcileSchemas } from './reconciliation.js';
 import { GRACE_DAYS } from './billing.js';
 import { chargeAuthorization, paystackConfigured } from './paystack.js';
@@ -1088,6 +1089,51 @@ export function platformControlDeps(db = platformDb()) {
         // platform_staff row could lock every administrator out at once.
         .eq('kind', 'gym_owner');
       if (error) throw new Error(`Could not change that account: ${error.message}`);
+    },
+
+    /**
+     * Counts for one gym (D-130). COUNTS ONLY, NEVER NAMES.
+     *
+     * The client is scoped to that gym's schema and handed straight to
+     * gymStats(), which uses `head: true` so no member row is ever sent back.
+     * The safety is in how the queries are built, not in what this function
+     * remembers to do with the results afterwards.
+     *
+     * EVERY READ IS AUDITED. Reaching into a gym's own schema is something the
+     * platform should have to account for, even when all it takes is a number.
+     */
+    gymStatsFor: async (gym, actorUserId = null) => {
+      const { data: connection } = await db
+        .from('gym_connections')
+        .select('schema_name, supabase_url')
+        .eq('gym_id', gym.id)
+        .maybeSingle();
+
+      if (!connection?.schema_name) {
+        return { activeMembers: null, checkinsThisMonth: null, lastActivityAt: null, reachable: false };
+      }
+
+      const client = createClient(
+        connection.supabase_url || process.env.SUPABASE_URL,
+        process.env.SUPABASE_SERVICE_ROLE_KEY,
+        {
+          auth: { persistSession: false, autoRefreshToken: false },
+          db: { schema: connection.schema_name },
+        }
+      );
+
+      const stats = await gymStats(client);
+
+      await audit(db, {
+        action: 'platform.gym.stats_read',
+        actor_user_id: actorUserId,
+        entity: 'gym',
+        entity_id: gym.id,
+        // The numbers, never anything they were counted from.
+        detail: { active_members: stats.activeMembers, reachable: stats.reachable },
+      });
+
+      return stats;
     },
 
     /**

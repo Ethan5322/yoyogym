@@ -53,7 +53,7 @@ test('the router gets every dependency its routes call for', () => {
     'ownerDashboard', 'findOwnApplication', 'createSignedUpload', 'recordDocument',
     'getDocument', 'reviewDocument', 'signedDocumentUrl',
     'documentFacts', 'findDuplicateDocuments', 'getApplicationSummary',
-    'listPlans', 'updatePlan', 'changeGymPlan', 'findGymsForMember', 'indexMember', 'listAuditLog', 'listOwners', 'setOwnerActive', 'financeSummary',
+    'listPlans', 'updatePlan', 'changeGymPlan', 'findGymsForMember', 'indexMember', 'gymStatsFor', 'listAuditLog', 'listOwners', 'setOwnerActive', 'financeSummary',
   ]) {
     assert.equal(typeof merged[name], 'function', `missing dependency: ${name}`);
   }
