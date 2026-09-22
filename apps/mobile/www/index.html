@@ -5,21 +5,27 @@
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
     <title>Yoyo Gyms</title>
     <!--
-      The screen the app opens on.
+      The app's own screens — the only ones it has.
+      Everything after this point is rendered by the Yoyo Gyms server.
 
-      Yoyo Gyms' screens are rendered by the Yoyo Gyms server, so this shell
-      has none of them. What it has is the one thing the server cannot give a
-      freshly installed app: a way to say WHICH GYM (D-036).
+      The shape, as the product describes it:
 
-      Why this exists rather than opening straight at the server: the first
-      question is "which gym are you?", and answering it needs the camera for a
-      QR code — which a browser tab handles badly and an app handles well. The
-      alternative is an app that opens on a web page asking the same question
-      with fewer tools, which is every badly-wrapped web app.
+        Yoyo app
+        ├── Gym owner
+        │     ├── Register as gym owner
+        │     └── Sign in as gym owner  -> owner panel
+        └── Gym member
+              ├── Register as member    -> pick a gym -> that gym's signup
+              └── Sign in as member     -> pick a gym -> that gym's sign-in
+                                        -> or "I don't remember my gym"
 
-      Written inline and with no dependencies: this page runs before the app
-      has reached a server, so it cannot fetch anything. It uses the app's own
-      config.js, which is generated from shell.config.json.
+      A MEMBER PICKS THEIR GYM FIRST (D-041). Many gyms live inside this one
+      app, so "which gym" is the first question on the member side, and the
+      gym's own screens handle everything after it. The "I don't remember"
+      path is a recovery route, not the front door.
+
+      Inline and dependency-free: this runs before the app has reached a
+      server, so it cannot fetch anything but its own generated config.
     -->
     <style>
       :root {
@@ -43,118 +49,125 @@
         min-height: 100dvh;
         display: flex;
         flex-direction: column;
-        justify-content: center;
-        /* Clear of the notch and the gesture bar. */
         padding: max(1.25rem, env(safe-area-inset-top)) 1.25rem
                  max(1.25rem, env(safe-area-inset-bottom));
       }
-      .brand {
-        text-align: center;
-        color: #fff;
-        margin-bottom: 1.5rem;
-      }
+      .brand { text-align: center; color: #fff; margin: 1rem 0 1.5rem; }
       .brand h1 {
-        font-size: 1.75rem;
-        letter-spacing: 0.08em;
-        text-transform: uppercase;
-        margin: 0 0 0.25rem;
+        font-size: 1.75rem; letter-spacing: 0.08em;
+        text-transform: uppercase; margin: 0 0 0.25rem;
       }
       .brand p { color: #9fb0b3; margin: 0; font-size: 0.95rem; }
+
       .card {
         background: var(--card);
         border-radius: 18px;
         padding: 1.25rem;
+        margin-bottom: 1rem;
         box-shadow: 0 12px 32px rgba(0, 0, 0, 0.35);
       }
+      .card h2 { margin: 0 0 0.25rem; font-size: 1.15rem; }
+      .card .sub { color: var(--muted); font-size: 0.92rem; margin: 0 0 0.9rem; }
+
       label { display: block; font-weight: 600; margin-bottom: 0.4rem; }
       input {
-        width: 100%;
-        font-size: 1.05rem;
-        padding: 0.9rem 1rem;
-        border: 1px solid var(--line);
-        border-radius: 12px;
-        background: #fff;
-        color: var(--ink);
+        width: 100%; font-size: 1.05rem; padding: 0.9rem 1rem;
+        border: 1px solid var(--line); border-radius: 12px;
+        background: #fff; color: var(--ink);
       }
       button {
         width: 100%;
-        /* 52px: comfortably past the 44px minimum touch target, and reachable
-           one-handed on a phone held at the bottom. */
-        min-height: 52px;
-        font-size: 1.05rem;
-        font-weight: 600;
-        border: 0;
-        border-radius: 12px;
-        background: var(--accent);
-        color: var(--accent-ink);
-        margin-top: 0.75rem;
+        /* 52px — past the 44px minimum, and reachable one-handed. */
+        min-height: 52px; font-size: 1.05rem; font-weight: 600;
+        border: 0; border-radius: 12px;
+        background: var(--accent); color: var(--accent-ink);
+        margin-top: 0.6rem;
       }
-      button.secondary {
-        background: #eef2f3;
-        color: var(--ink);
+      button.secondary { background: #eef2f3; color: var(--ink); }
+      button.link {
+        background: transparent; color: var(--muted);
+        text-decoration: underline; min-height: 44px; font-weight: 500;
       }
-      button:disabled { opacity: 0.55; }
-      .results { margin-top: 0.75rem; }
       .gym {
-        display: block;
-        width: 100%;
-        text-align: left;
-        background: #f7f9f9;
-        border: 1px solid var(--line);
-        border-radius: 12px;
-        padding: 0.9rem 1rem;
-        margin-top: 0.5rem;
-        color: var(--ink);
-        font: inherit;
-        min-height: 52px;
+        display: block; width: 100%; text-align: left;
+        background: #f7f9f9; border: 1px solid var(--line);
+        border-radius: 12px; padding: 0.9rem 1rem; margin-top: 0.5rem;
+        color: var(--ink); font: inherit; min-height: 52px;
       }
       .gym b { display: block; font-size: 1.05rem; }
       .gym span { color: var(--muted); font-size: 0.9rem; }
       .note { color: var(--muted); font-size: 0.9rem; margin: 0.75rem 0 0; }
       .err { color: var(--bad); font-weight: 600; margin: 0.75rem 0 0; }
-      .owner {
-        text-align: center;
-        margin-top: 1.25rem;
-        color: #9fb0b3;
-        font-size: 0.95rem;
-      }
-      .owner button {
-        background: transparent;
-        color: #fff;
-        text-decoration: underline;
-        min-height: 44px;
-        margin-top: 0.25rem;
-      }
       .empty { color: var(--muted); padding: 0.75rem 0; }
+      .hidden { display: none; }
+      .back { color: #9fb0b3; background: none; text-align: left; width: auto;
+              min-height: 44px; padding: 0; margin: 0 0 0.5rem; text-decoration: underline; }
     </style>
   </head>
   <body>
     <div class="brand">
       <h1>Yoyo Gyms</h1>
-      <p>Find your gym and get started</p>
+      <p id="tagline">Many gyms, one app</p>
     </div>
 
-    <div class="card">
-      <label for="q">Your gym's name</label>
-      <input
-        id="q"
-        type="search"
-        inputmode="search"
-        autocomplete="off"
-        autocapitalize="characters"
-        placeholder="e.g. BOS GYM"
-        enterkeyhint="search"
-      />
-      <button id="near" class="secondary" type="button">Use my location</button>
-      <button id="scan" type="button">Scan my gym's QR code</button>
+    <!-- ============ 1. Which side are you on? ============ -->
+    <div id="home">
+      <div class="card">
+        <h2>I'm a gym member</h2>
+        <p class="sub">Join a gym, or sign in to the one you already belong to.</p>
+        <button type="button" data-go="member-register">Register as a member</button>
+        <button type="button" class="secondary" data-go="member-signin">Sign in as a member</button>
+      </div>
 
-      <p class="note" id="note"></p>
-      <div class="results" id="results"></div>
+      <div class="card">
+        <h2>I own a gym</h2>
+        <p class="sub">List your gym on Yoyo Gyms, or open your gym's admin panel.</p>
+        <button type="button" data-go="owner-register">Register as a gym owner</button>
+        <button type="button" class="secondary" data-go="owner-signin">Sign in as a gym owner</button>
+      </div>
     </div>
 
-    <div class="owner">
-      <div>Do you own a gym?</div>
-      <button id="owner" type="button">List your gym on Yoyo Gyms</button>
+    <!-- ============ 2. Pick your gym (both member paths) ============ -->
+    <div id="pick" class="hidden">
+      <button type="button" class="back" data-go="home">← Back</button>
+      <div class="card">
+        <h2 id="pick-title">Find your gym</h2>
+        <p class="sub" id="pick-sub">Search by name, or use your location.</p>
+
+        <label for="q">Gym name</label>
+        <input id="q" type="search" inputmode="search" autocomplete="off"
+               autocapitalize="characters" placeholder="e.g. BOS GYM" enterkeyhint="search" />
+        <button id="near" type="button" class="secondary">Use my location</button>
+        <button id="scan" type="button">Scan the gym's QR code</button>
+
+        <p class="note" id="note"></p>
+        <div id="results"></div>
+
+        <button id="forgot" type="button" class="link hidden">
+          I don't remember which gym I joined
+        </button>
+      </div>
+    </div>
+
+    <!-- ============ 3. Recovery: which gym am I in? ============ -->
+    <div id="forgot-panel" class="hidden">
+      <button type="button" class="back" data-go="member-signin">← Back</button>
+      <div class="card">
+        <h2>Which gym did you join?</h2>
+        <p class="sub">Enter your membership number and phone number and we'll tell you
+          which gym they belong to. This does not sign you in.</p>
+
+        <label for="mn">Membership number</label>
+        <input id="mn" type="text" autocapitalize="characters" autocomplete="off"
+               placeholder="GYM-2026-000123" />
+
+        <label for="ph" style="margin-top:0.75rem">Phone number</label>
+        <input id="ph" type="tel" inputmode="tel" autocomplete="tel" placeholder="082 123 4567" />
+
+        <button id="find" type="button">Find my gym</button>
+        <p class="note" id="find-note"></p>
+        <div id="find-results"></div>
+      </div>
     </div>
 
     <script src="config.js"></script>

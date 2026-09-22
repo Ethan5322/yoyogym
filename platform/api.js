@@ -20,6 +20,7 @@ import { readAnySession, signPlatformToken } from './http.js';
 import { PLANS, ownerFacingPlan, planByKey } from './plans.js';
 import { completeActivation } from './activation.js';
 import { validateUploadRequest, pathBelongsTo, documentRow } from './documents.js';
+import { lookupHash, routeMember } from './member-directory.js';
 
 const json = (res, status, body) => {
   res.writeHead(status, {
@@ -130,6 +131,54 @@ export async function handlePlatformApi(req, res, deps, { path, method, url }) {
     });
 
     return json(res, 200, { gyms }), true;
+  }
+
+  // ---- "I don't remember which gym I joined" ------------------------------
+  //
+  // THE BACKUP PATH, NOT THE FRONT DOOR. D-041 stands: a member normally picks
+  // their gym first and signs in exactly as they always have. This exists for
+  // the person who cannot remember which gym they joined, and it does one
+  // thing — names the gym. It never signs anybody in, and it returns no member
+  // data at all.
+  if (path === 'api/member/find-gym' && method === 'POST') {
+    const body = await readJson(req);
+    if (!body) return json(res, 400, { error: 'Malformed request.' }), true;
+
+    const hash = lookupHash({
+      membershipNumber: body.membership_number,
+      phone: body.phone,
+    });
+
+    // Rate limited hard: this endpoint takes two guessable values and answers
+    // a question about a real person. Without a limit it is an oracle for
+    // "which gym does this phone number attend".
+    const allowed = await deps.rateLimitFindGym?.(req);
+    if (allowed === false) {
+      return json(res, 429, { error: 'Too many attempts. Please wait a minute and try again.' }), true;
+    }
+
+    const matches = hash ? await deps.findGymsForMember(hash) : [];
+    const routed = routeMember(matches);
+
+    if (!routed.ok) {
+      await deps.audit({ action: 'platform.member.find_gym.miss', actor_kind: 'system' });
+      // One message for every failure. Distinguishing "no such number" from
+      // "wrong phone" would let anyone test whether a given person is a member
+      // of any gym on the platform.
+      return json(res, 404, { error: routed.reason }), true;
+    }
+
+    // Only ever a gym's public identity — the same fields a stranger already
+    // gets from search. Never a name, never a membership status.
+    const shape = (g) => ({ slug: g.slug, name: g.search_name, city: g.city });
+
+    if (routed.choose) {
+      // The same person at more than one gym. Asked, never guessed — picking
+      // one would send them to the wrong gym's sign-in.
+      return json(res, 200, { gyms: routed.choose.map(shape) }), true;
+    }
+
+    return json(res, 200, { gyms: [shape(routed.gym)] }), true;
   }
 
   // ---- the plans, for the signup screen -----------------------------------

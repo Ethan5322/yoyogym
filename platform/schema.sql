@@ -400,6 +400,32 @@ create unique index if not exists platform_invoices_one_per_period_idx
   where period_end is not null;
 
 -- -----------------------------------------------------------------------------
+-- member_directory — "I don't remember which gym I joined".
+--
+-- D-041 stands: the member normally PICKS THEIR GYM FIRST and signs in exactly
+-- as they always have. This table serves only the recovery path, for someone
+-- who cannot remember.
+--
+--   >>> IT HOLDS NO MEMBER DATA. <<<
+--
+-- One keyed digest and one gym id. No name, no readable phone, no membership
+-- number, nothing anybody could be identified from. The gym remains the
+-- responsible party for its own members (D-014), and a routing index must
+-- never become a shadow copy of every gym's membership (D-044).
+--
+-- The digest is an HMAC with a server-side key, NOT a plain hash. A membership
+-- number is about a million possibilities and a phone number is knowable, so a
+-- plain-hash table plus somebody's phone would reveal which gym they attend in
+-- seconds. The key lives in the environment and never in this table.
+-- -----------------------------------------------------------------------------
+create table if not exists platform.member_directory (
+  lookup_hash text primary key,
+  gym_id      uuid not null references platform.gyms(id) on delete cascade,
+  created_at  timestamptz not null default now()
+);
+create index if not exists member_directory_gym_idx on platform.member_directory(gym_id);
+
+-- -----------------------------------------------------------------------------
 -- platform_audit_log — APPEND-ONLY.
 -- The only record of approvals, suspensions, secret access and deletions. No
 -- handler may offer an update or delete path.

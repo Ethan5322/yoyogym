@@ -52,7 +52,7 @@ test('the router gets every dependency its routes call for', () => {
     'audit',
     'ownerDashboard', 'findOwnApplication', 'createSignedUpload', 'recordDocument',
     'getDocument', 'reviewDocument', 'signedDocumentUrl',
-    'listPlans', 'updatePlan', 'changeGymPlan', 'listAuditLog', 'listOwners', 'setOwnerActive', 'financeSummary',
+    'listPlans', 'updatePlan', 'changeGymPlan', 'findGymsForMember', 'indexMember', 'listAuditLog', 'listOwners', 'setOwnerActive', 'financeSummary',
   ]) {
     assert.equal(typeof merged[name], 'function', `missing dependency: ${name}`);
   }

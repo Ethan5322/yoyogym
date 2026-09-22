@@ -18,6 +18,7 @@ import { issueActivation, activationLookupHash } from './activation.js';
 import { DOCUMENT_BUCKET } from './documents.js';
 import { sendEmail, activationEmail, billingEmail, emailConfigured } from './email.js';
 import { purgeExpiredDocuments } from './retention.js';
+import { directoryRow } from './member-directory.js';
 import { reconcileSchemas } from './reconciliation.js';
 import { GRACE_DAYS } from './billing.js';
 import { chargeAuthorization, paystackConfigured } from './paystack.js';
@@ -516,6 +517,52 @@ export function platformOpsDeps(db = platformDb()) {
         },
         options
       ),
+
+    /**
+     * The recovery lookup — which gym does this digest belong to?
+     *
+     * Returns only a gym's PUBLIC identity, and only for gyms that could
+     * actually be signed in to. Naming a suspended gym here would tell a
+     * stranger something the gym would rather keep to itself.
+     */
+    findGymsForMember: async (lookupHashValue) => {
+      const { data: rows } = await db
+        .from('member_directory')
+        .select('gym_id')
+        .eq('lookup_hash', lookupHashValue)
+        .limit(5);
+
+      if (!rows?.length) return [];
+
+      const { data: gyms } = await db
+        .from('gyms')
+        .select('id, slug, search_name, city, status')
+        .in('id', rows.map((r) => r.gym_id))
+        .eq('status', 'active');
+
+      return gyms ?? [];
+    },
+
+    /**
+     * Record a member in the routing index.
+     *
+     * Called when a member registers. A failure is logged and swallowed: the
+     * member IS registered at their gym, and losing the recovery shortcut must
+     * never fail a registration that otherwise succeeded.
+     */
+    indexMember: async ({ membershipNumber, phone, gymId }) => {
+      try {
+        const row = directoryRow({ membershipNumber, phone, gymId });
+        if (!row) return { ok: false, reason: 'incomplete' };
+
+        // Upsert: re-registering the same details must not fail on the key.
+        await db.from('member_directory').upsert(row, { onConflict: 'lookup_hash' });
+        return { ok: true };
+      } catch (err) {
+        console.error('member directory index failed:', err?.message);
+        return { ok: false, reason: err?.message };
+      }
+    },
 
     /** The nightly job: billing, then a drift report. */
     runBilling: (options) => runBilling(billingDeps(db), options),
