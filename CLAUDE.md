@@ -652,6 +652,58 @@ nobody enforces is not a limit.
   deleted by a plan change; only *new* registrations are blocked.
 - Limits and feature maps are **data** in `platform_plans`, editable without a deploy.
 
+### 18.5 Gap analysis — what this market sells that we have NOT built
+
+Measured against the feature inventory in `vault/02` and the market research in §18.1. The market's
+own "five core features" are member management, scheduling and booking, a member app, reporting, and
+marketing automation.
+
+**Where Yoyo GYM is already strong, and competitors charge extra:**
+
+| Capability | Note |
+|---|---|
+| **Face recognition / biometric door** | Sold as "access control" add-on elsewhere. This is the differentiator |
+| Digital waivers with signature | Indemnity + contract + signature, built in |
+| PAR-Q health screening | Built in. Rare in this market |
+| Per-gym branding | Name, logo, colour at runtime |
+| Member 360 profile | Bookings, incidents, activity, receipts in one place |
+| POPIA compliance posture | Consent, cascade erasure, deletion requests |
+
+**Gaps — market-standard, NOT built:**
+
+| # | Missing | Market position | Assessment |
+|---|---|---|---|
+| G-1 | **Automated recurring billing** | Treated as *standard* — "automated recurring billing, failed payment retry, clear financial reporting should be standard" | ⚠️ **Deliberately removed** (D-015/D-018). Members pay their gym directly. This is a conscious divergence from the market, not an oversight — but gyms **will** ask for it |
+| G-2 | **Lead management / CRM / prospects** | Standard; a headline feature at Gymdesk and OfferingTree | **Not built.** No concept of a prospect who has not joined yet. The clearest genuine gap |
+| G-3 | **Member app** | Standard; $39–100/mo add-on elsewhere | Planned — Capacitor, Stage 8 (D-053) |
+| G-4 | **Marketing automation** | One of the five core features; $20–329/mo elsewhere | Partial. Bulk email exists; no sequences, triggers or campaigns |
+| G-5 | **POS / retail** | "Sell apparel and supplements without a separate POS" | **Not built.** `addon_services` is adjacent but is not retail |
+| G-6 | **Member SMS** | Common | **Not built.** Owner gets WhatsApp/Telegram; members get email only |
+| G-7 | **Website builder** | Included by Gymdesk, $99/mo at Zen Planner | **Not built.** Only a public profile page per gym |
+| G-8 | **Workout programming** | $79+/mo elsewhere (PushPress Train) | Partial. Trainers log workout *notes*; no programmed workouts |
+| G-9 | **Multi-location** | Standard at higher tiers | **Not built.** One location per plan, by design for now |
+| G-10 | **Staff payroll / commission** | Common | **Not built** |
+
+**How to read this list.** It is a menu, not a backlog. Most gyms will never ask for most of it. The
+two worth watching are **G-1** (because the market assumes it and we removed it on purpose) and
+**G-2** (because converting prospects is how a gym grows, and we have no concept of a prospect at
+all).
+
+**Rule: nothing here is built speculatively.** These are recorded so that when a gym owner asks for
+one, we already know where it sits in the market and what it is worth. That is what the "anything
+else you need?" question at §18.6 is for.
+
+### 18.6 Asking the owner what else they need
+
+Gym-owner registration asks, in plain words, **what else the gym needs that the system does not do**.
+Free text, optional, stored on the application and surfaced in the platform panel.
+
+It is not a feature request form. It is **demand evidence**: three gyms asking for the same thing is
+worth more than any amount of speculation about what to build next, and it costs one text box.
+
+Answers are read against §18.5 — if a request matches a known gap, that gap gains a real customer
+attached to it.
+
 ## 19. Mobile-store compliance
 
 Future Android and iPhone releases must meet current Google Play and Apple App Store requirements.
