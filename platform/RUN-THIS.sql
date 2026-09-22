@@ -1,22 +1,20 @@
 -- =============================================================================
 -- YOYO GYMS — RUN THIS ONE FILE
 -- =============================================================================
--- platform/schema.sql + platform/seed.sql, in the right order.
--- Generated from those two files — edit THEM, not this, then regenerate with
+-- Generated from platform/schema.sql + platform/seed.sql by
 --   npm run sql:bundle
+-- Edit THOSE files, never this one.
 --
 -- WHERE:  your EXISTING Supabase project (the one the gym already uses).
---         NOT a new project — every gym is a schema in one project (D-096).
+--         Every gym is a schema in one project (D-096) — do NOT make a new one.
 --
 -- SAFE:   creates only the `platform` schema. Your gym's 24 tables live in
 --         `gym` and are never named, altered, dropped or read by this file.
 --         Every statement is `if not exists`, so running it twice is safe.
 --
--- ⚠️ BEFORE YOU RUN: replace BOTH copies of CHANGE-ME@example.com near the
---    bottom with your own email address. Search for "CHANGE-ME".
---
--- ⚠️ AFTER YOU RUN: Settings → API → Exposed schemas → ADD `platform` to the
---    list. Do not replace the list — removing `gym` stops your gym serving.
+-- BEFORE: replace BOTH copies of CHANGE-ME@example.com near the bottom.
+-- AFTER:  Settings → API → Exposed schemas → ADD `platform` to the list.
+--         Do not replace the list — removing `gym` stops your gym serving.
 -- =============================================================================
 
 -- =============================================================================
@@ -375,6 +373,17 @@ create table if not exists platform.platform_subscriptions (
   grace_ends_at        timestamptz,   -- the 2-day warning window (D-026), as DATA
   cancel_at            timestamptz,
   cancelled_at         timestamptz,
+  -- HOW A RENEWAL IS CHARGED WITHOUT ASKING THE OWNER AGAIN.
+  --
+  -- Paystack's authorization code, returned after the FIRST successful card
+  -- payment. It authorises future charges on that card; it is NOT a card
+  -- number and cannot be used to read one. Without it stored here there is no
+  -- recurring subscription at all — only a first payment and then silence.
+  paystack_auth_code   text,
+  paystack_customer    text,
+  -- For the owner's own screen: "Visa ending 4242". Display only.
+  card_brand           text,
+  card_last4           text,
   created_at           timestamptz not null default now(),
   updated_at           timestamptz not null default now()
 );
@@ -517,10 +526,6 @@ alter table platform.platform_audit_log        enable row level security;
 alter table platform.migration_runs            enable row level security;
 alter table platform.member_directory          enable row level security;
 
-
--- ==========================================================================
--- SEED — roles, permissions, plans, and your owner account
--- ==========================================================================
 
 -- =============================================================================
 -- YOYO GYMS — PLATFORM SEED

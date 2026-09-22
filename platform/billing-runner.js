@@ -161,6 +161,9 @@ async function charge(sub, plan, review, deps, { now, dryRun, report }) {
     email: gym?.owner_email,
     amountCents: review.amount_cents,
     reference,
+    // The card the owner authorised when they paid on the web. No code, no
+    // renewal — and the runner reports that rather than pretending.
+    authorizationCode: sub.paystack_auth_code ?? null,
   });
 
   const { patch, notify } = applyChargeResult(sub, result, now);

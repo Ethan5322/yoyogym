@@ -354,6 +354,17 @@ create table if not exists platform.platform_subscriptions (
   grace_ends_at        timestamptz,   -- the 2-day warning window (D-026), as DATA
   cancel_at            timestamptz,
   cancelled_at         timestamptz,
+  -- HOW A RENEWAL IS CHARGED WITHOUT ASKING THE OWNER AGAIN.
+  --
+  -- Paystack's authorization code, returned after the FIRST successful card
+  -- payment. It authorises future charges on that card; it is NOT a card
+  -- number and cannot be used to read one. Without it stored here there is no
+  -- recurring subscription at all — only a first payment and then silence.
+  paystack_auth_code   text,
+  paystack_customer    text,
+  -- For the owner's own screen: "Visa ending 4242". Display only.
+  card_brand           text,
+  card_last4           text,
   created_at           timestamptz not null default now(),
   updated_at           timestamptz not null default now()
 );

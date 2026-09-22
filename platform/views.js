@@ -869,6 +869,21 @@ ${documents
       ? `<p class="muted">Trial ends ${h(subscription.trial_ends_at)}.</p>`
       : ''
   }
+  ${
+    subscription && ['trialing', 'past_due', 'suspended'].includes(subscription.status)
+      ? `<form method="post" action="/platform/my-gym/pay">
+      <input type="hidden" name="csrf" value="${h(csrfToken)}">
+      <button type="submit">${subscription.status === 'suspended' ? 'Pay and reopen my gym' : 'Pay now'}</button>
+      <p class="muted">You will be taken to Paystack. We never see or store your card —
+      only a token that lets us take the same amount next month.</p>
+    </form>`
+      : ''
+  }
+  ${
+    subscription?.card_last4
+      ? `<p class="muted">Saved card: ${h(subscription.card_brand || 'card')} ending ${h(subscription.card_last4)}.</p>`
+      : ''
+  }
 </div>`
     : application
       ? `<div class="card">
@@ -1470,6 +1485,49 @@ export function setupDonePage({ recoveryCodes = [] } = {}) {
   <p class="muted">Remove <code>PLATFORM_SETUP_TOKEN</code> from your environment now.
   It is no longer needed — this account already has a password, so the setup page
   would refuse it anyway, but a secret nobody needs is a secret not worth keeping.</p>
+</div>`,
+  });
+}
+
+// ---------------------------------------------------------------------------
+// After Paystack sends the owner back
+// ---------------------------------------------------------------------------
+
+/**
+ * What happened to the payment.
+ *
+ * Says whether renewals will work, because that is the difference between a
+ * subscription and a single payment, and the owner should not discover it next
+ * month when their gym is suspended.
+ */
+export function paymentResultPage({ ok = false, reason = '', alreadyPaid = false, recurring = false } = {}) {
+  if (!ok) {
+    return layout({
+      title: 'Payment not completed',
+      body: `<div class="card">
+  <h1>That payment did not go through</h1>
+  <p>${h(reason) || 'Nothing has been charged.'}</p>
+  <p class="muted"><b>Nothing has been charged.</b> Your gym is unaffected — you can try again
+  whenever you are ready.</p>
+  <p><a href="/platform/my-gym">Back to your gym →</a></p>
+</div>`,
+    });
+  }
+
+  return layout({
+    title: 'Payment received',
+    body: `<div class="card">
+  <h1>Thank you — payment received</h1>
+  ${alreadyPaid ? '<p class="muted">This one was already recorded. You have not been charged twice.</p>' : ''}
+  <p>Your gym is active and your members can use it.</p>
+  ${
+    recurring
+      ? `<p class="muted">Your card is saved, so next month is taken automatically. We will email you
+         before each payment, and you can stop it whenever you want.</p>`
+      : `<p class="muted"><b>This payment was one-off.</b> Your card could not be saved for next
+         month, so we will email you when the next one is due and you will pay the same way again.</p>`
+  }
+  <p><a href="/platform/my-gym">Back to your gym →</a></p>
 </div>`,
   });
 }

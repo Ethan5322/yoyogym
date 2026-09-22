@@ -56,10 +56,12 @@ import {
   securityPage,
   setupPage,
   setupDonePage,
+  paymentResultPage,
 } from './views.js';
 import { eventToIntent } from './billing.js';
 import { findAlerts, DEFAULT_WINDOW_HOURS } from './alerts.js';
 import { setupAllowed, beginSetup, completeSetup } from './setup.js';
+import { startCheckout, completeCheckout } from './checkout.js';
 import { completeActivation } from './activation.js';
 import { validateUploadRequest, pathBelongsTo, documentRow } from './documents.js';
 import { verifySignature } from './paystack.js';
@@ -483,6 +485,54 @@ async function handleExtraRoutes(req, res, deps, { url, path, method }) {
       user: { email: session.email },
       csrfToken: issueCsrfToken(session.sub),
       gymAdminUrl: process.env.PLATFORM_GYM_ADMIN_URL || '',
+    }));
+    return true;
+  }
+
+  // ---- the owner pays their subscription ------------------------------------
+  // ON THE WEB, NEVER IN THE APP (D-060). Apple and Google take 15-30% of a
+  // digital subscription bought inside an app; Paystack takes about 3%. The
+  // app has no purchase route at all, which is also what the stores'
+  // anti-steering rules require.
+  if (path === 'my-gym/pay' && method === 'POST') {
+    const form = await readFormBody(req);
+
+    const session = requireSession(req, res, { csrfToken: form.csrf });
+    if (!session) return true;
+
+    // The gym comes from the SESSION, never from the form. An owner pays for
+    // their own gym or for nothing.
+    const view = (await deps.ownerDashboard(session.sub)) || {};
+    if (!view.gym) {
+      html(res, 404, '<p>No gym found for this account.</p>');
+      return true;
+    }
+
+    const result = await startCheckout(deps, { gymId: view.gym.id, userId: session.sub });
+
+    if (!result.ok) {
+      html(res, 400, `<p>${result.reason}</p><p><a href="/platform/my-gym">Back</a></p>`);
+      return true;
+    }
+
+    // Off to Paystack. Nothing is charged here; this is a redirect to their
+    // hosted page, which is where the card is entered and where it stays.
+    redirect(res, result.url);
+    return true;
+  }
+
+  // ---- Paystack sends the owner back ----------------------------------------
+  if (path === 'pay/callback' && method === 'GET') {
+    // NO SESSION REQUIRED, and none is trusted if present. The reference in
+    // this URL is a claim made by whoever opened it; completeCheckout settles
+    // it by asking Paystack directly, server to server.
+    const result = await completeCheckout(deps, { reference: url.searchParams.get('reference') });
+
+    html(res, result.ok ? 200 : 400, paymentResultPage({
+      ok: result.ok,
+      reason: result.reason,
+      alreadyPaid: result.alreadyPaid,
+      recurring: result.recurring,
     }));
     return true;
   }
