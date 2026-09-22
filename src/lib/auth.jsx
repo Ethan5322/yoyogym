@@ -2,6 +2,7 @@
 // on load via /api/auth/me, and exposes login/logout + role helpers (RBAC).
 import { createContext, useContext, useEffect, useState, useCallback } from 'react';
 import { apiFetch, setToken, clearToken, getToken } from './api.js';
+import { clearGym } from './gym.js';
 
 // Permission map mirrors spec Part 4.1 server-side roles. The server is the
 // source of truth; this is for UI gating only.
@@ -60,6 +61,12 @@ export function AuthProvider({ children }) {
 
   const logout = useCallback(() => {
     clearToken();
+    // Forget the gym too. A reception computer is shared, and leaving one
+    // gym selected would have the next person working against it.
+    //
+    // NOT done on an expired token above: that person is still standing in
+    // the same gym, they just need to sign in again.
+    clearGym();
     setUser(null);
   }, []);
 

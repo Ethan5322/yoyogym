@@ -5,6 +5,7 @@ import { Suspense, lazy, useEffect } from 'react';
 import ProtectedRoute from './components/ProtectedRoute.jsx';
 import Splash from './pages/Splash.jsx';
 import { loadBranding } from './lib/branding.js';
+import { captureGym } from './lib/gym.js';
 
 // Public (member-facing)
 const Register = lazy(() => import('./pages/Register.jsx'));
@@ -52,6 +53,11 @@ const guard = (roles, el) => <ProtectedRoute roles={roles}>{el}</ProtectedRoute>
 export default function App() {
   // Apply each gym's accent colour + title at runtime (no per-gym code).
   useEffect(() => {
+    // WHICH GYM, BEFORE ANYTHING ELSE IS FETCHED. A member arrives at
+    // /g/<slug>/register from the app or a scanned QR, and loadBranding() is
+    // itself a gym-scoped request — capturing after it would fetch the wrong
+    // gym's name and colours, or none at all.
+    captureGym();
     loadBranding();
   }, []);
 
@@ -63,6 +69,15 @@ export default function App() {
         <Route path="/register" element={<Register />} />
         <Route path="/member" element={<MemberPortal />} />
         <Route path="/p/:type/:key" element={<PublicProfile />} />
+
+        {/* Entering a specific gym — from the app, or a scanned QR (D-036).
+            The slug is captured by captureGym() above and then travels on
+            every API call; these routes render the SAME screens, so there is
+            one registration flow and one member portal, not two. */}
+        <Route path="/g/:slug" element={<Splash />} />
+        <Route path="/g/:slug/register" element={<Register />} />
+        <Route path="/g/:slug/member" element={<MemberPortal />} />
+        <Route path="/g/:slug/p/:type/:key" element={<PublicProfile />} />
 
         {/* Admin */}
         <Route path="/admin/login" element={<AdminLogin />} />

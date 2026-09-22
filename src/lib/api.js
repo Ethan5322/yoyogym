@@ -3,6 +3,8 @@
 //
 // Attaches the admin JWT (when present) and normalises error handling.
 
+import { currentGymSlug } from './gym.js';
+
 const TOKEN_KEY = 'gym_admin_token';
 
 export function getToken() {
@@ -25,6 +27,17 @@ export async function apiFetch(path, { method = 'GET', body, auth = true } = {})
     const token = getToken();
     if (token) headers.Authorization = `Bearer ${token}`;
   }
+
+  // WHICH GYM. Sent on every request so the server can resolve the tenant;
+  // omitted entirely in single-gym mode, which is what an existing deployment
+  // does and why nothing there changes.
+  //
+  // It is a hint, not a credential. For an authenticated request the server
+  // takes the gym from the SIGNED TOKEN and refuses a header that disagrees
+  // with it, so editing this value reaches nobody else's data — at worst it
+  // produces an error. See server/lib/gymcontext.js.
+  const gym = currentGymSlug();
+  if (gym) headers['X-Gym-Slug'] = gym;
 
   const res = await fetch(`/api${path}`, {
     method,
