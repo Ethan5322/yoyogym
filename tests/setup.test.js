@@ -187,3 +187,32 @@ test('a WRONG token still says nothing specific — that one is attacker-facing'
   assert.equal(result.fix, undefined, 'no hint for someone guessing');
   assert.match(result.reason, /not valid/i);
 });
+
+// ---------------------------------------------------------------------------
+// The form has to carry what the server needs
+// ---------------------------------------------------------------------------
+
+test('THE SETUP FORM SUBMITS THE EMAIL', async () => {
+  // It was rendered `disabled` and with no name. A browser submits neither,
+  // so the POST arrived with no email, no account was found, and the page
+  // reported an invalid setup link when the link was perfectly good.
+  const { setupPage } = await import('../platform/views.js');
+  const html = setupPage({ token: 't', email: 'me@yoyogyms.com', secret: 'ABC', otpauth: 'otpauth://x' });
+
+  assert.match(html, /name="email"/, 'the email must be a submitted field');
+  assert.match(html, /name="token"/);
+  assert.match(html, /name="secret"/);
+  assert.match(html, /name="password"/);
+  assert.match(html, /name="totp"/);
+});
+
+test('every field the POST handler reads is present in the form', async () => {
+  const { setupPage } = await import('../platform/views.js');
+  const html = setupPage({ token: 't', email: 'me@yoyogyms.com', secret: 'ABC', otpauth: 'x' });
+
+  // Whatever the handler destructures from the body has to be submittable,
+  // or setup fails with a message about something else entirely.
+  for (const field of ['token', 'email', 'secret', 'password', 'totp']) {
+    assert.match(html, new RegExp(`name="${field}"`), `the form must submit ${field}`);
+  }
+});

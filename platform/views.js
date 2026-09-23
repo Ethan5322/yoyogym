@@ -1443,6 +1443,12 @@ ${error ? `<p class="err">${h(error)}</p>` : ''}
   <input type="hidden" name="token" value="${h(token)}">
   <input type="hidden" name="secret" value="${h(secret)}">
   <h2>2. Choose a password</h2>
+  <!-- The visible field is disabled so it cannot be edited, and a DISABLED
+       INPUT IS NEVER SUBMITTED — nor is one without a name. Both were true
+       here, so the server received no email, found no account, and reported
+       an invalid link when the link was fine. The hidden field is what
+       actually travels. -->
+  <input type="hidden" name="email" value="${h(email)}">
   <label>Email<input value="${h(email)}" disabled></label>
   <label>Password
     <input type="password" name="password" required minlength="12" autocomplete="new-password">
