@@ -85,6 +85,15 @@ export function platformDeps() {
 
   return {
     // ---- authentication ------------------------------------------------
+    /** For the health check: does the app see ANY platform user? */
+    countUsers: async () => {
+      const { count, error } = await db
+        .from('platform_users')
+        .select('*', { count: 'exact', head: true });
+      if (error) throw new Error(error.message);
+      return count ?? 0;
+    },
+
     findUserByEmail: async (email) => {
       const { data, error } = await db.from('platform_users').select('*').eq('email', email).maybeSingle();
 

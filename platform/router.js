@@ -62,6 +62,7 @@ import {
 import { eventToIntent } from './billing.js';
 import { findAlerts, DEFAULT_WINDOW_HOURS } from './alerts.js';
 import { setupAllowed, beginSetup, completeSetup } from './setup.js';
+import { platformHealth } from './health.js';
 import { startCheckout, completeCheckout } from './checkout.js';
 import { completeActivation } from './activation.js';
 import { validateUploadRequest, pathBelongsTo, documentRow } from './documents.js';
@@ -394,6 +395,25 @@ async function handleExtraRoutes(req, res, deps, { url, path, method }) {
   // ---- public: the member-facing gym finder -------------------------------
   if (path === 'find' && method === 'GET') {
     html(res, 200, finderPage());
+    return true;
+  }
+
+  // ---- why can the app not see what SQL Editor can see? ---------------------
+  // Guarded by the setup token: this describes the deployment, so it is not
+  // public. It returns no key and no part of one — only the `role` claim
+  // inside the key, which is the single fact that tells an anon key from a
+  // service key.
+  if (path === 'health' && method === 'GET') {
+    const allowed = setupAllowed(url.searchParams.get('token'));
+    if (!allowed.ok) {
+      html(res, 403, problemPage({ title: 'Not available', message: allowed.reason, fix: allowed.fix }));
+      return true;
+    }
+
+    const report = await platformHealth(deps);
+
+    res.writeHead(report.ok ? 200 : 503, { 'Content-Type': 'application/json; charset=utf-8' });
+    res.end(JSON.stringify(report, null, 2));
     return true;
   }
 
