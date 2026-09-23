@@ -61,5 +61,12 @@
       "path": "/api/cron/weekly-schedule",
       "schedule": "0 7 * * 1"
     }
+  ],
+  "redirects": [
+    {
+      "source": "/",
+      "destination": "/platform/login",
+      "permanent": false
+    }
   ]
 }

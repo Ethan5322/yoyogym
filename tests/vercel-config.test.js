@@ -87,3 +87,29 @@ test('the platform rewrite comes BEFORE the SPA catch-all', () => {
   assert.ok(platformAt < catchAllAt, 'the catch-all would swallow it');
 });
 
+
+test('the website root is the PLATFORM, not one gym', () => {
+  // Typing the domain used to land on the gym's own splash — one gym's
+  // registration form as the company's front door.
+  const root = config.redirects?.find((r) => r.source === '/');
+
+  assert.ok(root, 'the root must go somewhere deliberate');
+  assert.match(root.destination, /^\/platform/);
+});
+
+test('the root redirect is TEMPORARY, not permanent', () => {
+  // A 301 is cached by browsers forever and is painful to undo. Until the
+  // front door is settled, this stays a 307.
+  const root = config.redirects.find((r) => r.source === '/');
+  assert.equal(root.permanent, false);
+});
+
+test('the redirect does not swallow the gym entry paths', () => {
+  // /g/<slug>/register comes from the app and a scanned QR. If the root
+  // redirect caught those, every member entering a gym would land on a staff
+  // login page.
+  for (const r of config.redirects) {
+    assert.notEqual(r.source, '/(.*)', 'a catch-all redirect would break gym entry');
+    assert.ok(!r.source.startsWith('/g/'), 'gym entry must not be redirected');
+  }
+});
