@@ -267,8 +267,18 @@ create index if not exists owner_activations_expires_idx on platform.owner_activ
 create table if not exists platform.gym_connections (
   id                   uuid primary key default gen_random_uuid(),
   gym_id               uuid not null references platform.gyms(id) on delete cascade,
-  supabase_project_ref text not null,          -- the project ref, NOT a key
-  supabase_url         text not null,
+  -- NULLABLE under D-096, and that is the normal case.
+  --
+  -- These were written for project-per-gym (D-016), where every gym had its
+  -- own Supabase project. Under schema-per-gym a gym has no project and no URL
+  -- of its own — it is a schema in the shared one — so provisioning writes
+  -- null here and a NOT NULL constraint would fail every real provision.
+  --
+  -- They stay in the table because a gym can still be moved to its own project
+  -- later: filling these two in is what switches that gym to project mode,
+  -- which server/lib/tenancy.js already reads.
+  supabase_project_ref text,
+  supabase_url         text,
   db_region            text,
   schema_name          text not null default 'gym',
   app_base_url         text,
@@ -354,6 +364,17 @@ create table if not exists platform.platform_subscriptions (
   grace_ends_at        timestamptz,   -- the 2-day warning window (D-026), as DATA
   cancel_at            timestamptz,
   cancelled_at         timestamptz,
+  -- HOW A RENEWAL IS CHARGED WITHOUT ASKING THE OWNER AGAIN.
+  --
+  -- Paystack's authorization code, returned after the FIRST successful card
+  -- payment. It authorises future charges on that card; it is NOT a card
+  -- number and cannot be used to read one. Without it stored here there is no
+  -- recurring subscription at all — only a first payment and then silence.
+  paystack_auth_code   text,
+  paystack_customer    text,
+  -- For the owner's own screen: "Visa ending 4242". Display only.
+  card_brand           text,
+  card_last4           text,
   created_at           timestamptz not null default now(),
   updated_at           timestamptz not null default now()
 );

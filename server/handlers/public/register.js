@@ -21,6 +21,7 @@ import { onNewMember } from '../../lib/notify/index.js';
 import { rateLimit } from '../../lib/ratelimit.js';
 import { allowsMemberRegistration } from '../../lib/entitlements.js';
 import { currentGym } from '../../lib/tenancy.js';
+import { indexMember } from '../../lib/member-index.js';
 
 const PARQ_KEYS = [
   'q1_heart_condition',
@@ -332,6 +333,21 @@ export default async function handler(req, res) {
       amount: dueToday,
       recurring: membership.recurring_amount,
       parqFlag: anyYes,
+    });
+
+    // File this member in the platform's routing index, so "I do not remember
+    // which gym I joined" can find them later.
+    //
+    // AWAITED BUT NEVER ALLOWED TO FAIL THE REGISTRATION. The member has just
+    // finished a long signup and had their membership created; a convenience
+    // index that could not be written must not turn that into an error on
+    // their screen. indexMember() swallows its own failures and returns a
+    // reason. In single-gym mode there is no gym in scope, so it writes
+    // nothing and this deployment behaves exactly as it always has.
+    await indexMember({
+      membershipNumber,
+      phone: a.phone,
+      gymSlug: currentGym()?.gym?.slug ?? null,
     });
 
     return ok(res, {

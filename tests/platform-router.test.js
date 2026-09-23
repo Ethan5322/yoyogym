@@ -456,3 +456,38 @@ test('a rejection still redirects as before', async () => {
 
   assert.equal(r.statusCode, 302);
 });
+
+// ---------------------------------------------------------------------------
+// The two prefixes
+// ---------------------------------------------------------------------------
+
+test('THE PANEL WORKS AT /platform/* AND AT /api/platform/*', async () => {
+  // Vercel serves this handler at /api/platform/*, every link points at
+  // /platform/*, and a rewrite maps one to the other. Which form a rewrite
+  // presents in req.url is not worth betting a working panel on.
+  for (const url of ['/platform/login', '/api/platform/login']) {
+    const r = res();
+    await handlePlatform(req({ url }), r, deps());
+
+    assert.equal(r.statusCode, 200, `${url} should render the sign-in page`);
+    assert.match(r.body, /Sign in/, `${url} rendered something else`);
+  }
+});
+
+test('the /api/ prefix is stripped whole, not in pieces', async () => {
+  // "/api/platform/gyms" must not become "/api/gyms" by having only its
+  // middle removed — that would 404 every route under the API form.
+  const d = { ...deps(), searchGyms: async () => [] };
+  const r = res();
+
+  await handlePlatform(req({ url: '/api/platform/gyms?q=x' }), r, d);
+
+  assert.equal(r.statusCode, 200);
+  assert.match(r.headers['content-type'], /json/);
+});
+
+test('a trailing slash does not break a route', async () => {
+  const r = res();
+  await handlePlatform(req({ url: '/platform/login/' }), r, deps());
+  assert.equal(r.statusCode, 200);
+});

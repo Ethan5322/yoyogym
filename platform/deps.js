@@ -23,7 +23,7 @@ import { fileFacts } from './forensics.js';
 import { gymStats } from './stats.js';
 import { reconcileSchemas } from './reconciliation.js';
 import { GRACE_DAYS } from './billing.js';
-import { chargeAuthorization, paystackConfigured } from './paystack.js';
+import { chargeAuthorization, paystackConfigured, initializeSubscriptionPayment, verifyTransaction } from './paystack.js';
 
 let _db = null;
 
@@ -85,8 +85,73 @@ export function platformDeps() {
 
   return {
     // ---- authentication ------------------------------------------------
+    /** For the health check: does the app see ANY platform user? */
+    countUsers: async () => {
+      // NOT `head: true`, and that is the whole point.
+      //
+      // A HEAD request returns no body, so when PostgREST refuses one there is
+      // no body to carry the reason — the error arrives as {"message":""} and
+      // the diagnostic that exists to explain the failure cannot. Asking for
+      // one column of one row costs nothing and comes back with a readable
+      // error when it fails.
+      //
+      // `id` only: a uuid from the platform's own table, never a name or an
+      // email.
+      const { count, error } = await db
+        .from('platform_users')
+        .select('id', { count: 'exact' })
+        .limit(1);
+
+      // THE WHOLE ERROR, not just `.message`.
+      //
+      // A PostgREST error carries message, details, hint and code, and the
+      // useful one varies by failure. Taking only `.message` produced the
+      // word "Error" and nothing else on a real diagnostic run — which is
+      // exactly the situation this endpoint exists to end.
+      if (error) {
+        const parts = [
+          error.message,
+          error.code && `code=${error.code}`,
+          error.status && `status=${error.status}`,
+          error.details,
+          error.hint,
+        ]
+          .filter(Boolean)
+          .join(' | ');
+
+        throw new Error(parts || `Empty error object: ${JSON.stringify(error)}`);
+      }
+
+      return count ?? 0;
+    },
+
+    saveRecoveryCodes: async (userId, hashes) => {
+      const { error } = await db
+        .from('platform_users')
+        .update({ recovery_code_hashes: hashes, updated_at: new Date().toISOString() })
+        .eq('id', userId);
+      if (error) throw new Error(`Could not save the new codes: ${error.message}`);
+    },
+
     findUserByEmail: async (email) => {
-      const { data } = await db.from('platform_users').select('*').eq('email', email).maybeSingle();
+      const { data, error } = await db.from('platform_users').select('*').eq('email', email).maybeSingle();
+
+      // THE ERROR IS NOT SWALLOWED, and this cost real time on 2026-09-22.
+      //
+      // Destructuring only `data` made two completely different situations
+      // identical: "no account with that email" and "the platform schema is
+      // not exposed to the API, so this query could not run at all". Both
+      // arrived as null, and the setup screen confidently reported the first
+      // when the truth was the second.
+      //
+      // A query that could not run is not an empty result.
+      if (error) {
+        throw new Error(
+          `Could not read platform_users: ${error.message}. ` +
+            'If this says the schema is not exposed, add `platform` to Settings -> API -> Exposed schemas in Supabase.'
+        );
+      }
+
       return data ?? null;
     },
 
@@ -572,6 +637,57 @@ export function platformOpsDeps(db = platformDb()) {
       }
     },
 
+    // ---- the owner paying their subscription ------------------------------
+    getSubscription: async (gymId) => {
+      const { data } = await db.from('platform_subscriptions').select('*').eq('gym_id', gymId).maybeSingle();
+      return data ?? null;
+    },
+
+    findOpenInvoice: async (gymId, periodEnd) => {
+      let q = db.from('platform_invoices').select('*').eq('gym_id', gymId).in('status', ['issued', 'overdue']);
+      q = periodEnd ? q.eq('period_end', periodEnd) : q.is('period_end', null);
+      const { data } = await q.maybeSingle();
+      return data ?? null;
+    },
+
+    findInvoiceByRef: async (reference) => {
+      const { data } = await db.from('platform_invoices').select('*').eq('provider_ref', reference).maybeSingle();
+      return data ?? null;
+    },
+
+    initializePayment: ({ email, amountCents, reference, metadata }) =>
+      initializeSubscriptionPayment({
+        email,
+        amountCents,
+        reference,
+        metadata,
+        callbackUrl: `${process.env.PLATFORM_BASE_URL || ''}/platform/pay/callback`,
+      }),
+
+    /** Asked of Paystack directly. The browser's word is not evidence. */
+    verifyPayment: (reference) => verifyTransaction(reference),
+
+    markInvoicePaid: async (id, at) => {
+      const { error } = await db
+        .from('platform_invoices')
+        .update({ status: 'paid', paid_at: at, updated_at: at })
+        .eq('id', id);
+      if (error) throw new Error(`Could not record the payment: ${error.message}`);
+    },
+
+    /** Paid: the subscription goes active and the card is remembered. */
+    activateSubscription: async (gymId, patch) => {
+      const { error } = await db.from('platform_subscriptions').update(patch).eq('gym_id', gymId);
+      if (error) throw new Error(`Could not activate the subscription: ${error.message}`);
+
+      // A gym suspended for non-payment reopens the moment it pays.
+      await db
+        .from('gyms')
+        .update({ status: 'active', suspended_at: null, updated_at: patch.updated_at })
+        .eq('id', gymId)
+        .in('status', ['suspended', 'pending']);
+    },
+
     /** The nightly job: billing, then a drift report. */
     runBilling: (options) => runBilling(billingDeps(db), options),
 
@@ -654,7 +770,15 @@ export function billingDeps(db = platformDb()) {
       await db.from('platform_invoices').update({ ...patch, updated_at: new Date().toISOString() }).eq('id', id);
     },
 
-    charge: async ({ email, amountCents, reference, gymId }) => {
+    charge: async ({ email, amountCents, reference, gymId, authorizationCode = null }) => {
+      // THE BUG THIS FIXES: this used to pass authorizationCode: null to
+      // Paystack unconditionally, so every renewal failed. There was a first
+      // payment and then silence. The code now comes from the subscription,
+      // and its absence is reported honestly instead of being sent to Paystack
+      // to be rejected.
+      if (!authorizationCode) {
+        return { ok: false, reason: 'No saved card. The owner must pay once on the web first.' };
+      }
       if (!paystackConfigured()) {
         // Not an error: it means nobody has connected the platform's Paystack
         // account yet. Reported as an unpaid attempt rather than a crash that
@@ -664,7 +788,7 @@ export function billingDeps(db = platformDb()) {
       if (!email) return { ok: false, reason: `Gym ${gymId} has no owner email to charge.` };
 
       try {
-        const result = await chargeAuthorization({ email, amountCents, authorizationCode: null, reference });
+        const result = await chargeAuthorization({ email, amountCents, authorizationCode, reference });
         return { ok: result?.status === 'success', reference, raw: result?.status };
       } catch (err) {
         return { ok: false, reason: err?.message || 'Charge failed.' };

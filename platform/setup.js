@@ -43,7 +43,21 @@ export function setupAllowed(token) {
 
   // No token configured means no setup route. Failing closed here is the
   // difference between a first-run flow and an open password reset.
-  if (!expected) return { ok: false, reason: 'Setup is not enabled.' };
+  //
+  // The message names the missing variable ON PURPOSE. This is a first-run
+  // screen read by the person who owns the deployment, and "Setup is not
+  // enabled" told them nothing — it cost a round trip to work out that an
+  // environment variable was missing. Nothing is leaked by naming it: an
+  // attacker learns only that a variable they cannot set is unset.
+  if (!expected) {
+    return {
+      ok: false,
+      reason: 'Setup is not enabled.',
+      fix: 'PLATFORM_SETUP_TOKEN is not set on this deployment. Add it in your hosting environment variables, then REDEPLOY — variables only apply to builds made after they are set.',
+    };
+  }
+
+  // A wrong token says nothing specific, because that IS attacker-facing.
   if (!sameToken(token, expected)) return { ok: false, reason: REFUSED };
 
   return { ok: true };

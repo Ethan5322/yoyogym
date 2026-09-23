@@ -44,6 +44,7 @@ test('the router gets every dependency its routes call for', () => {
   // test happens to cover.
   for (const name of [
     'findUserByEmail', 'verifyPassword', 'verifySecondFactor', 'finishSetup',
+    'saveRecoveryCodes', 'countUsers',
     'listApplications', 'getApplicationView', 'decide',
     'createApplication', 'searchGyms',
     'permissionsFor', 'listGyms', 'getGymDetail', 'setGymStatus',
@@ -53,7 +54,9 @@ test('the router gets every dependency its routes call for', () => {
     'ownerDashboard', 'findOwnApplication', 'createSignedUpload', 'recordDocument',
     'getDocument', 'reviewDocument', 'signedDocumentUrl',
     'documentFacts', 'findDuplicateDocuments', 'getApplicationSummary',
-    'listPlans', 'updatePlan', 'changeGymPlan', 'findGymsForMember', 'indexMember', 'gymStatsFor', 'listAuditLog', 'listOwners', 'setOwnerActive', 'financeSummary',
+    'listPlans', 'updatePlan', 'changeGymPlan', 'findGymsForMember', 'indexMember', 'gymStatsFor',
+    'getSubscription', 'findOpenInvoice', 'findInvoiceByRef', 'initializePayment',
+    'verifyPayment', 'markInvoicePaid', 'activateSubscription', 'listAuditLog', 'listOwners', 'setOwnerActive', 'financeSummary',
   ]) {
     assert.equal(typeof merged[name], 'function', `missing dependency: ${name}`);
   }

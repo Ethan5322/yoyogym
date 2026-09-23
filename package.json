@@ -15,7 +15,7 @@
     "docs:validate": "node scripts/validate-vault.mjs",
     "seed:owner": "node scripts/seed-owner.js",
     "seed:catalog": "node scripts/seed-catalog.js",
-    "sql:bundle": "node -e \"const f=require('fs');const h=f.readFileSync('platform/RUN-THIS.sql','utf8').split('-- =============================================================================')[1];f.writeFileSync('platform/RUN-THIS.sql','-- ============================================================================='+h+'-- =============================================================================\n\n'+f.readFileSync('platform/schema.sql','utf8')+'\n\n'+f.readFileSync('platform/seed.sql','utf8'))\""
+    "sql:bundle": "node scripts/sql-bundle.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.45.4",

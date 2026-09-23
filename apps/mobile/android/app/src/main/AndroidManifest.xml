@@ -1,0 +1,67 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <!--
+      allowBackup="false" ON PURPOSE.
+
+      The shell holds no data of its own: everything lives on the server and in
+      the session. What the WebView DOES hold is a live session, and a device
+      backup that copies it puts a signed-in gym owner or member on whatever
+      device the backup is later restored to.
+
+      The cost is real and small: nothing here is worth restoring, because
+      there is nothing here. Signing in again is the whole recovery.
+    -->
+    <application
+        android:allowBackup="false"
+        android:fullBackupContent="false"
+        android:icon="@mipmap/ic_launcher"
+        android:label="@string/app_name"
+        android:roundIcon="@mipmap/ic_launcher_round"
+        android:supportsRtl="true"
+        android:theme="@style/AppTheme">
+
+        <activity
+            android:configChanges="orientation|keyboardHidden|keyboard|screenSize|locale|smallestScreenSize|screenLayout|uiMode|navigation|density"
+            android:name=".MainActivity"
+            android:label="@string/title_activity_main"
+            android:theme="@style/AppTheme.NoActionBarLaunch"
+            android:launchMode="singleTask"
+            android:exported="true">
+
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+
+        </activity>
+
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.fileprovider"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/file_paths"></meta-data>
+        </provider>
+    </application>
+
+    <!-- Permissions -->
+
+    <uses-permission android:name="android.permission.INTERNET" />
+
+    <!--
+      The camera, for scanning a gym's QR code — the one thing an app can do
+      that a browser tab does badly.
+
+      Declared here rather than relied on from the plugin, because a permission
+      that is merely assumed fails at the gym door rather than at build time.
+      The app asks for it only when somebody presses Scan, and refusing is
+      handled as a normal answer: search by name still works.
+    -->
+    <uses-permission android:name="android.permission.CAMERA" />
+
+    <!-- The app is useful without a camera, so this must not filter devices. -->
+    <uses-feature android:name="android.hardware.camera" android:required="false" />
+</manifest>

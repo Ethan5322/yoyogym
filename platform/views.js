@@ -96,6 +96,7 @@ export function layout({ title = 'Yoyo Gyms', body = '', user = null, indexable 
     <a href="/platform/finance">Finances</a>
     <a href="/platform/security">Security</a>
     <a href="/platform/audit">Audit</a>
+    <a href="/platform/account">Account</a>
   </nav>`
       : ''
   }
@@ -869,6 +870,21 @@ ${documents
       ? `<p class="muted">Trial ends ${h(subscription.trial_ends_at)}.</p>`
       : ''
   }
+  ${
+    subscription && ['trialing', 'past_due', 'suspended'].includes(subscription.status)
+      ? `<form method="post" action="/platform/my-gym/pay">
+      <input type="hidden" name="csrf" value="${h(csrfToken)}">
+      <button type="submit">${subscription.status === 'suspended' ? 'Pay and reopen my gym' : 'Pay now'}</button>
+      <p class="muted">You will be taken to Paystack. We never see or store your card —
+      only a token that lets us take the same amount next month.</p>
+    </form>`
+      : ''
+  }
+  ${
+    subscription?.card_last4
+      ? `<p class="muted">Saved card: ${h(subscription.card_brand || 'card')} ending ${h(subscription.card_last4)}.</p>`
+      : ''
+  }
 </div>`
     : application
       ? `<div class="card">
@@ -1428,6 +1444,12 @@ ${error ? `<p class="err">${h(error)}</p>` : ''}
   <input type="hidden" name="token" value="${h(token)}">
   <input type="hidden" name="secret" value="${h(secret)}">
   <h2>2. Choose a password</h2>
+  <!-- The visible field is disabled so it cannot be edited, and a DISABLED
+       INPUT IS NEVER SUBMITTED — nor is one without a name. Both were true
+       here, so the server received no email, found no account, and reported
+       an invalid link when the link was fine. The hidden field is what
+       actually travels. -->
+  <input type="hidden" name="email" value="${h(email)}">
   <label>Email<input value="${h(email)}" disabled></label>
   <label>Password
     <input type="password" name="password" required minlength="12" autocomplete="new-password">
@@ -1471,6 +1493,135 @@ export function setupDonePage({ recoveryCodes = [] } = {}) {
   It is no longer needed — this account already has a password, so the setup page
   would refuse it anyway, but a secret nobody needs is a secret not worth keeping.</p>
 </div>`,
+  });
+}
+
+// ---------------------------------------------------------------------------
+// After Paystack sends the owner back
+// ---------------------------------------------------------------------------
+
+/**
+ * What happened to the payment.
+ *
+ * Says whether renewals will work, because that is the difference between a
+ * subscription and a single payment, and the owner should not discover it next
+ * month when their gym is suspended.
+ */
+export function paymentResultPage({ ok = false, reason = '', alreadyPaid = false, recurring = false } = {}) {
+  if (!ok) {
+    return layout({
+      title: 'Payment not completed',
+      body: `<div class="card">
+  <h1>That payment did not go through</h1>
+  <p>${h(reason) || 'Nothing has been charged.'}</p>
+  <p class="muted"><b>Nothing has been charged.</b> Your gym is unaffected — you can try again
+  whenever you are ready.</p>
+  <p><a href="/platform/my-gym">Back to your gym →</a></p>
+</div>`,
+    });
+  }
+
+  return layout({
+    title: 'Payment received',
+    body: `<div class="card">
+  <h1>Thank you — payment received</h1>
+  ${alreadyPaid ? '<p class="muted">This one was already recorded. You have not been charged twice.</p>' : ''}
+  <p>Your gym is active and your members can use it.</p>
+  ${
+    recurring
+      ? `<p class="muted">Your card is saved, so next month is taken automatically. We will email you
+         before each payment, and you can stop it whenever you want.</p>`
+      : `<p class="muted"><b>This payment was one-off.</b> Your card could not be saved for next
+         month, so we will email you when the next one is due and you will pay the same way again.</p>`
+  }
+  <p><a href="/platform/my-gym">Back to your gym →</a></p>
+</div>`,
+  });
+}
+
+/**
+ * Something went wrong, said usefully.
+ *
+ * Replaces the bare `<p>error</p>` these paths used to render — a white page
+ * with four words on it, which is the least helpful thing a first-run screen
+ * can do to the person setting the system up.
+ *
+ * `fix` is only ever set for operator-facing problems (a missing environment
+ * variable, a seed that has not been run). Attacker-facing refusals still say
+ * one generic thing and no more.
+ */
+export function problemPage({ title = 'Something went wrong', message = '', fix = null } = {}) {
+  return layout({
+    title,
+    body: `<div class="card">
+  <h1>${h(title)}</h1>
+  <p>${h(message)}</p>
+  ${fix ? `<div class="card" style="border-left:4px solid #b7791f"><b>How to fix it</b><p>${h(fix)}</p></div>` : ''}
+</div>`,
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Your own account
+// ---------------------------------------------------------------------------
+
+/** Where you replace recovery codes you did not keep. */
+export function accountPage({ user = null, remaining = 0, csrfToken = '', error = '', codes = null }) {
+  if (codes) {
+    return layout({
+      title: 'New recovery codes',
+      user,
+      body: `<h1>Your new recovery codes</h1>
+<div class="card">
+  <h2>⚠️ Save these now</h2>
+  <p class="muted"><b>Your previous codes no longer work.</b> Each of these signs you in once if
+  you lose your phone, and <b>this is the only time they are shown</b> — only their hashes are
+  stored.</p>
+  <p style="font-family:monospace;font-size:1.15rem;line-height:2;letter-spacing:2px">
+    ${codes.map((c) => h(c)).join('<br>')}
+  </p>
+  <p class="muted">Put them somewhere that is not the phone your authenticator is on.</p>
+</div>`,
+    });
+  }
+
+  return layout({
+    title: 'Your account',
+    user,
+    body: `<h1>Your account</h1>
+
+<div class="card">
+  <h2>Recovery codes</h2>
+  <p>${
+    remaining > 0
+      ? `You have <b>${h(remaining)}</b> unused code${remaining === 1 ? '' : 's'}.`
+      : '<b>You have no recovery codes left.</b>'
+  }</p>
+  <p class="muted">These are what let you back in if you lose the phone with your authenticator
+  on it. Yours is the only account that reaches every gym — there is no second owner to let you
+  back in, so this matters more here than it would anywhere else.</p>
+</div>
+
+${error ? `<p class="err">${h(error)}</p>` : ''}
+
+<form class="card" method="post" action="/platform/account/recovery-codes">
+  <input type="hidden" name="csrf" value="${h(csrfToken)}">
+  <h2>Issue a new set</h2>
+  <p class="muted"><b>Your current codes will stop working.</b> Only do this if you have lost
+  them, or think somebody else has seen them.</p>
+
+  <label>Your password
+    <input type="password" name="password" required autocomplete="current-password">
+  </label>
+  <label>Code from your authenticator
+    <input name="totp" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" required
+           autocomplete="one-time-code">
+  </label>
+  <p class="muted">Asked for again on purpose: recovery codes bypass two-factor authentication,
+  so a borrowed browser tab must not be enough to mint a new set.</p>
+
+  <button type="submit">Issue new codes</button>
+</form>`,
   });
 }
 

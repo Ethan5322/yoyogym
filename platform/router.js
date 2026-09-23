@@ -56,10 +56,16 @@ import {
   securityPage,
   setupPage,
   setupDonePage,
+  paymentResultPage,
+  problemPage,
+  accountPage,
 } from './views.js';
 import { eventToIntent } from './billing.js';
 import { findAlerts, DEFAULT_WINDOW_HOURS } from './alerts.js';
 import { setupAllowed, beginSetup, completeSetup } from './setup.js';
+import { platformHealth } from './health.js';
+import { regenerateRecoveryCodes, remainingCodes } from './account.js';
+import { startCheckout, completeCheckout } from './checkout.js';
 import { completeActivation } from './activation.js';
 import { validateUploadRequest, pathBelongsTo, documentRow } from './documents.js';
 import { verifySignature } from './paystack.js';
@@ -95,7 +101,19 @@ const INVALID = 'Invalid email, password or authentication code.';
  */
 export async function handlePlatform(req, res, deps) {
   const url = new URL(req.url, 'http://localhost');
-  const path = url.pathname.replace(/^\/platform\/?/, '').replace(/\/$/, '');
+  // BOTH PREFIXES, on purpose.
+  //
+  // Vercel serves this handler at /api/platform/*, while every link in the
+  // panel points at /platform/* and a rewrite maps one to the other. Which of
+  // the two a rewrite actually presents in req.url is not something to bet a
+  // working panel on, so the router accepts either and stops caring.
+  //
+  // The /api/ form is stripped first: otherwise "/api/platform/login" would
+  // lose only its "/platform/" middle and arrive as "/api/login".
+  const path = url.pathname
+    .replace(/^\/api\/platform\/?/, '')
+    .replace(/^\/platform\/?/, '')
+    .replace(/\/$/, '');
   const method = (req.method || 'GET').toUpperCase();
 
   // THE MOBILE APP'S SURFACE, first.
@@ -382,6 +400,25 @@ async function handleExtraRoutes(req, res, deps, { url, path, method }) {
     return true;
   }
 
+  // ---- why can the app not see what SQL Editor can see? ---------------------
+  // Guarded by the setup token: this describes the deployment, so it is not
+  // public. It returns no key and no part of one — only the `role` claim
+  // inside the key, which is the single fact that tells an anon key from a
+  // service key.
+  if (path === 'health' && method === 'GET') {
+    const allowed = setupAllowed(url.searchParams.get('token'));
+    if (!allowed.ok) {
+      html(res, 403, problemPage({ title: 'Not available', message: allowed.reason, fix: allowed.fix }));
+      return true;
+    }
+
+    const report = await platformHealth(deps);
+
+    res.writeHead(report.ok ? 200 : 503, { 'Content-Type': 'application/json; charset=utf-8' });
+    res.end(JSON.stringify(report, null, 2));
+    return true;
+  }
+
   // ---- first run: claim the seeded owner account ---------------------------
   // No session, because there is no account to sign in to yet. Guarded by a
   // token from the environment AND by the account having no password — the
@@ -392,7 +429,7 @@ async function handleExtraRoutes(req, res, deps, { url, path, method }) {
 
     const allowed = setupAllowed(token);
     if (!allowed.ok) {
-      html(res, 403, `<p>${allowed.reason}</p>`);
+      html(res, 403, problemPage({ title: 'Setup is not available', message: allowed.reason, fix: allowed.fix }));
       return true;
     }
 
@@ -402,7 +439,11 @@ async function handleExtraRoutes(req, res, deps, { url, path, method }) {
     if (method === 'GET') {
       const begun = beginSetup(user);
       if (!begun.ok) {
-        html(res, 400, `<p>${begun.reason}</p>`);
+        html(res, 400, problemPage({
+          title: 'Cannot set up this account',
+          message: begun.reason,
+          fix: user ? null : `No platform account exists for that email address. Check the email in the link, or re-run platform/seed.sql with your address in it.`,
+        }));
         return true;
       }
       html(res, 200, setupPage({
@@ -483,6 +524,54 @@ async function handleExtraRoutes(req, res, deps, { url, path, method }) {
       user: { email: session.email },
       csrfToken: issueCsrfToken(session.sub),
       gymAdminUrl: process.env.PLATFORM_GYM_ADMIN_URL || '',
+    }));
+    return true;
+  }
+
+  // ---- the owner pays their subscription ------------------------------------
+  // ON THE WEB, NEVER IN THE APP (D-060). Apple and Google take 15-30% of a
+  // digital subscription bought inside an app; Paystack takes about 3%. The
+  // app has no purchase route at all, which is also what the stores'
+  // anti-steering rules require.
+  if (path === 'my-gym/pay' && method === 'POST') {
+    const form = await readFormBody(req);
+
+    const session = requireSession(req, res, { csrfToken: form.csrf });
+    if (!session) return true;
+
+    // The gym comes from the SESSION, never from the form. An owner pays for
+    // their own gym or for nothing.
+    const view = (await deps.ownerDashboard(session.sub)) || {};
+    if (!view.gym) {
+      html(res, 404, '<p>No gym found for this account.</p>');
+      return true;
+    }
+
+    const result = await startCheckout(deps, { gymId: view.gym.id, userId: session.sub });
+
+    if (!result.ok) {
+      html(res, 400, `<p>${result.reason}</p><p><a href="/platform/my-gym">Back</a></p>`);
+      return true;
+    }
+
+    // Off to Paystack. Nothing is charged here; this is a redirect to their
+    // hosted page, which is where the card is entered and where it stays.
+    redirect(res, result.url);
+    return true;
+  }
+
+  // ---- Paystack sends the owner back ----------------------------------------
+  if (path === 'pay/callback' && method === 'GET') {
+    // NO SESSION REQUIRED, and none is trusted if present. The reference in
+    // this URL is a claim made by whoever opened it; completeCheckout settles
+    // it by asking Paystack directly, server to server.
+    const result = await completeCheckout(deps, { reference: url.searchParams.get('reference') });
+
+    html(res, result.ok ? 200 : 400, paymentResultPage({
+      ok: result.ok,
+      reason: result.reason,
+      alreadyPaid: result.alreadyPaid,
+      recurring: result.recurring,
     }));
     return true;
   }
@@ -678,6 +767,43 @@ async function handleExtraRoutes(req, res, deps, { url, path, method }) {
       entries: await deps.listAuditLog(filter),
       filter,
       user: { email: session.email },
+    }));
+    return true;
+  }
+
+  // ---- your own account ----------------------------------------------------
+  if (path === 'account' && method === 'GET') {
+    const session = requireSession(req, res);
+    if (!session) return true;
+
+    const user = await deps.findUserByEmail(session.email);
+    html(res, 200, accountPage({
+      user: { email: session.email },
+      remaining: remainingCodes(user),
+      csrfToken: issueCsrfToken(session.sub),
+    }));
+    return true;
+  }
+
+  if (path === 'account/recovery-codes' && method === 'POST') {
+    const form = await readFormBody(req);
+
+    const session = requireSession(req, res, { csrfToken: form.csrf });
+    if (!session) return true;
+
+    const user = await deps.findUserByEmail(session.email);
+    const result = await regenerateRecoveryCodes(deps, {
+      user,
+      password: form.password,
+      totp: form.totp,
+    });
+
+    html(res, result.ok ? 200 : 400, accountPage({
+      user: { email: session.email },
+      remaining: remainingCodes(user),
+      csrfToken: issueCsrfToken(session.sub),
+      error: result.ok ? '' : result.reason,
+      codes: result.ok ? result.codes : null,
     }));
     return true;
   }

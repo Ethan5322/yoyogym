@@ -72,3 +72,21 @@ test('EVERY platform table has row level security enabled', () => {
 test('it creates its own schema and does not assume one exists', () => {
   assert.match(schema, /create schema if not exists platform;/i);
 });
+
+test('THE CONNECTION TABLE MATCHES WHAT PROVISIONING WRITES', () => {
+  // supabase_url was `not null` while schema-per-gym provisioning writes null
+  // to it. Every real provision would have failed on a constraint, and only
+  // against a live database — the dry run never inserts anything.
+  const block = /create table if not exists platform\.gym_connections \(([\s\S]*?)\n\);/.exec(schema)[1];
+
+  for (const column of ['supabase_project_ref', 'supabase_url']) {
+    const line = block.split('\n').find((l) => l.trim().startsWith(column));
+    assert.ok(line, `${column} should exist`);
+    assert.ok(!/not null/i.test(line), `${column} must be nullable — a gym has no project of its own under D-096`);
+  }
+
+  // schema_name is the opposite: it IS the isolation boundary, so it must
+  // never be absent.
+  const schemaLine = block.split('\n').find((l) => l.trim().startsWith('schema_name'));
+  assert.match(schemaLine, /not null/i, 'schema_name is the isolation boundary');
+});

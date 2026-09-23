@@ -200,11 +200,99 @@
     );
   });
 
-  document.getElementById('scan').addEventListener('click', function () {
-    // The camera is why this is an app rather than a page. Wired when the
-    // scanner plugin is added; saying so beats a button that does nothing.
-    note.className = 'note';
-    note.textContent = 'QR scanning is not enabled in this build yet. Search by name for now.';
+  // -------------------------------------------------------------------------
+  // Scanning a gym's QR code
+  // -------------------------------------------------------------------------
+  //
+  // The camera is the reason this is an app rather than a page. Capacitor
+  // renders the preview BEHIND the WebView, so the scanner screen is
+  // transparent and the body gets a class that hides everything else.
+  //
+  // Four states, all designed: scanning, permission refused, a code that is
+  // not ours, and a code carrying something it should not. The last two read
+  // differently on purpose — one is a mistake, the other is a warning.
+
+  var scanPanel = document.getElementById('scan-panel');
+  var scanError = document.getElementById('scan-error');
+  var scanHint = document.getElementById('scan-hint');
+  var scanRetry = document.getElementById('scan-retry');
+
+  function scanning(on) {
+    document.body.classList.toggle('scanning', on);
+    scanPanel.classList.toggle('hidden', !on);
+  }
+
+  function scanFailed(message, retryable) {
+    scanError.textContent = message;
+    scanError.classList.remove('hidden');
+    scanHint.classList.add('hidden');
+    scanRetry.classList.toggle('hidden', !retryable);
+  }
+
+  function stopScanner() {
+    scanning(false);
+    scanError.classList.add('hidden');
+    scanHint.classList.remove('hidden');
+    scanRetry.classList.add('hidden');
+    try {
+      if (window.Capacitor?.Plugins?.BarcodeScanner) {
+        window.Capacitor.Plugins.BarcodeScanner.stopScan();
+      }
+    } catch (e) {
+      /* already stopped */
+    }
+  }
+
+  async function startScanner() {
+    var plugin = window.Capacitor?.Plugins?.BarcodeScanner;
+
+    if (!plugin) {
+      // A browser, or a build without the plugin. Said plainly rather than
+      // opening a camera screen that can never see anything.
+      note.className = 'note';
+      note.textContent = 'Scanning needs the Yoyo Gyms app. Search by name here instead.';
+      return;
+    }
+
+    scanning(true);
+
+    try {
+      var permission = await plugin.checkPermissions();
+      if (permission.camera !== 'granted') {
+        permission = await plugin.requestPermissions();
+      }
+
+      if (permission.camera !== 'granted') {
+        // Refusing the camera is a normal answer, and the app must still be
+        // usable afterwards — which is why searching by name is offered right
+        // there rather than being somewhere they have to go and find.
+        scanFailed('Yoyo Gyms cannot use the camera. You can allow it in your phone settings, or search by name.', false);
+        return;
+      }
+
+      var result = await plugin.scan();
+      var text = result?.barcodes?.[0]?.rawValue || result?.ScanResult || '';
+
+      var payload = window.YOYO_QR.readQrPayload(text);
+      if (payload.kind === 'unknown') {
+        scanFailed(payload.reason, true);
+        return;
+      }
+
+      stopScanner();
+      go(window.YOYO_QR.pathForPayload(payload));
+    } catch (err) {
+      scanFailed('The camera could not start. Search by name instead.', true);
+    }
+  }
+
+  document.getElementById('scan').addEventListener('click', startScanner);
+  document.getElementById('scan-cancel').addEventListener('click', stopScanner);
+  scanRetry.addEventListener('click', function () {
+    scanError.classList.add('hidden');
+    scanHint.classList.remove('hidden');
+    scanRetry.classList.add('hidden');
+    startScanner();
   });
 
   // -------------------------------------------------------------------------

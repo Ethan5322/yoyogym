@@ -1337,7 +1337,18 @@ BUILT 2026-09-22 — STAGES 4-7, code complete, NOT DEPLOYED, NOT PUSHED.
     installed) — each has a JSON twin which is the primary path.
     No app route approves an application or suspends a gym.
 
-  371 tests pass.
+  LIVE 2026-09-23 — THE ARCHITECTURE IS PROVEN ON REAL DATA.
+    SQL run in the existing Supabase project. Owner account claimed with 2FA.
+    The panel works: applications, registry, owners, plans, finances,
+    security, audit, account.
+    KOM is tenant #1 — the existing gym, WITHOUT MOVING ANY DATA. Its
+    gym_connections.schema_name is simply 'gym', the schema the records were
+    already in (D-146). /platform/registry shows it with a live member count;
+    /g/kom/member resolves through gymcontext -> resolveGym -> runWithGym ->
+    getSupabase and serves the real member portal.
+    The website root now redirects to /platform/login.
+
+  536 tests pass.
 
   SUPERSEDED BLOCKING QUESTION (kept for history): Q-46 — D-049 (first payment activates) and D-070 (30-day
   trial) contradict each other. A trialing gym currently cannot serve traffic.
