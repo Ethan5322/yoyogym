@@ -133,7 +133,8 @@ test('a correct password and second factor issues a session and redirects', asyn
   );
 
   assert.equal(r.statusCode, 302);
-  assert.equal(r.headers.location, '/platform/applications');
+  // Staff land on the front page, not on one list (D-154).
+  assert.equal(r.headers.location, '/platform/home');
   assert.match(String(r.getHeader('set-cookie')), /HttpOnly/i);
 });
 

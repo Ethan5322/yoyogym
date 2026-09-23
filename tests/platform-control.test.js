@@ -402,3 +402,94 @@ test('the security screen is about the PLATFORM, not a gym members', async () =>
 
   assert.match(r.body, /never a gym's own members/i);
 });
+
+// ---------------------------------------------------------------------------
+// The front page
+// ---------------------------------------------------------------------------
+
+function dashDeps(over = {}) {
+  return {
+    ...deps({ permissions: ['gym.view'] }),
+    listApplications: async () => [{ id: 'a1', status: 'submitted' }],
+    listGyms: async () => [{ id: 'g1', status: 'active' }, { id: 'g2', status: 'suspended' }],
+    financeSummary: async () => ({ currency: 'ZAR', outstanding_cents: 49900, unpriced_plans: [] }),
+    listAuditLog: async () => [],
+    ...over,
+  };
+}
+
+test('the front page needs a session', async () => {
+  const r = res();
+  await handlePlatform(req({ url: '/platform/home' }), r, dashDeps());
+  assert.equal(r.statusCode, 302);
+});
+
+test('it opens on WHAT NEEDS YOU, not on a list', async () => {
+  const r = res();
+  await handlePlatform(req({ url: '/platform/home', cookie: session() }), r, dashDeps());
+
+  assert.equal(r.statusCode, 200);
+  assert.match(r.body, /Today/);
+  assert.match(r.body, /waiting for a decision/i, 'the application is surfaced');
+  assert.match(r.body, /Review/, 'with something to do about it');
+});
+
+test('AN UNPRICED PLAN IS THE MOST URGENT THING ON THE PAGE', async () => {
+  // A plan with no price bills nobody, silently. It costs more to ignore than
+  // anything else the panel can tell you.
+  const r = res();
+  await handlePlatform(
+    req({ url: '/platform/home', cookie: session() }),
+    r,
+    dashDeps({ financeSummary: async () => ({ unpriced_plans: ['basic'], outstanding_cents: 0 }) })
+  );
+
+  assert.match(r.body, /bills nobody/i);
+  assert.match(r.body, /Set a price/);
+});
+
+test('a quiet day says so rather than showing an empty page', async () => {
+  const r = res();
+  await handlePlatform(
+    req({ url: '/platform/home', cookie: session() }),
+    r,
+    dashDeps({
+      listApplications: async () => [],
+      financeSummary: async () => ({ unpriced_plans: [], outstanding_cents: 0 }),
+    })
+  );
+
+  assert.match(r.body, /Nothing needs you/i);
+});
+
+test('ONE FAILING FIGURE DOES NOT TAKE THE PAGE DOWN', async () => {
+  // A dashboard showing four numbers out of five is far better than one
+  // showing an error.
+  const r = res();
+  await handlePlatform(
+    req({ url: '/platform/home', cookie: session() }),
+    r,
+    dashDeps({ financeSummary: async () => { throw new Error('database busy'); } })
+  );
+
+  assert.equal(r.statusCode, 200);
+  assert.match(r.body, /Today/);
+});
+
+test('every number on it is a link to the thing it counts', async () => {
+  const r = res();
+  await handlePlatform(req({ url: '/platform/home', cookie: session() }), r, dashDeps());
+
+  // A figure nobody can act on is decoration, and decoration on an operations
+  // screen reads as information.
+  for (const href of ['/platform/registry', '/platform/finance', '/platform/owners', '/platform/audit']) {
+    assert.ok(r.body.includes(href), `${href} should be reachable from the front page`);
+  }
+});
+
+test('NO RAW TIMESTAMP APPEARS ANYWHERE ON IT', async () => {
+  const r = res();
+  await handlePlatform(req({ url: '/platform/home', cookie: session() }), r, dashDeps());
+
+  assert.ok(!/\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/.test(r.body), 'dates are for people to read');
+});

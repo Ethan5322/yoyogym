@@ -59,6 +59,7 @@ import {
   paymentResultPage,
   problemPage,
   accountPage,
+  dashboardPage,
 } from './views.js';
 import { eventToIntent } from './billing.js';
 import { findAlerts, DEFAULT_WINDOW_HOURS } from './alerts.js';
@@ -261,7 +262,7 @@ export async function handlePlatform(req, res, deps) {
 
       // An owner has no business on the review queue, and would be refused by
       // the permission check anyway — landing there would just look broken.
-      const home = user.kind === 'gym_owner' ? '/platform/my-gym' : '/platform/applications';
+      const home = user.kind === 'gym_owner' ? '/platform/my-gym' : '/platform/home';
       return redirect(res, home, { 'Set-Cookie': sessionCookie(user) });
     }
   }
@@ -767,6 +768,49 @@ async function handleExtraRoutes(req, res, deps, { url, path, method }) {
       entries: await deps.listAuditLog(filter),
       filter,
       user: { email: session.email },
+    }));
+    return true;
+  }
+
+  // ---- the front page ------------------------------------------------------
+  // Signing in used to land on the applications queue — one list, chosen
+  // because it was built first. A panel for running a business opens on what
+  // is waiting for a decision.
+  if ((path === '' || path === 'home') && method === 'GET') {
+    const session = requireSession(req, res);
+    if (!session) return true;
+
+    // Everything is best-effort and independent. A dashboard that fails
+    // entirely because one figure could not be fetched is worse than one
+    // showing four numbers out of five.
+    const safe = async (fn, fallback) => {
+      try {
+        return (await fn()) ?? fallback;
+      } catch {
+        return fallback;
+      }
+    };
+
+    const [applications, allGyms, finance, entries] = await Promise.all([
+      safe(() => deps.listApplications(), []),
+      safe(() => deps.listGyms({ limit: 500 }), []),
+      safe(() => deps.financeSummary(), {}),
+      safe(() => deps.listAuditLog({ limit: 500 }), []),
+    ]);
+
+    const waiting = applications.filter((a) =>
+      ['submitted', 'under_review', 'info_requested'].includes(a.status)
+    ).length;
+
+    html(res, 200, dashboardPage({
+      user: { email: session.email },
+      waiting,
+      gyms: allGyms.length,
+      activeGyms: allGyms.filter((g) => g.status === 'active').length,
+      alerts: findAlerts(entries, { now: new Date() }).length,
+      unpricedPlans: finance.unpriced_plans || [],
+      outstandingCents: finance.outstanding_cents ?? 0,
+      currency: finance.currency || 'ZAR',
     }));
     return true;
   }

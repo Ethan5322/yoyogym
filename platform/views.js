@@ -15,6 +15,8 @@
 // components (D-081 forbids cross-imports), and duplicating a design system for
 // an internal panel would be work with no return.
 
+import { when, exact, until, money as fmtMoney, count } from './format.js';
+
 /** Escape text for safe interpolation into markup or an attribute. */
 export function escapeHtml(value) {
   if (value === null || value === undefined) return '';
@@ -89,6 +91,7 @@ export function layout({ title = 'Yoyo Gyms', body = '', user = null, indexable 
   ${
     user
       ? `<nav class="row">
+    <a href="/platform/home">Today</a>
     <a href="/platform/applications">Applications</a>
     <a href="/platform/registry">Gyms</a>
     <a href="/platform/owners">Owners</a>
@@ -148,7 +151,7 @@ ${applications
       <td><a href="/platform/applications/${h(a.id)}">${h(a.proposed_gym_name || 'Unnamed')}</a></td>
       <td>${h(a.city)}</td>
       <td>${statusTag(a.status)}</td>
-      <td class="muted">${h(a.submitted_at)}</td>
+      <td class="muted">${h(when(a.submitted_at))}</td>
     </tr>`
   )
   .join('\n')}
@@ -199,7 +202,7 @@ ${documents
     ? `<ul class="events">
 ${events
   .map(
-    (e) => `  <li><b>${h(e.event)}</b> <span class="muted">${h(e.created_at)}</span>${
+    (e) => `  <li><b>${h(e.event)}</b> <span class="muted">${h(exact(e.created_at))}</span>${
       e.reason ? `<br>${h(e.reason)}` : ''
     }</li>`
   )
@@ -464,8 +467,8 @@ export function gymDetailPage({
   <tbody>
 ${invoices
   .map(
-    (i) => `    <tr><td>${h(i.number)}</td><td>${money(i.amount_cents, i.currency)}</td>
-      <td>${statusTag(i.status)}</td><td class="muted">${h(i.issued_at)}</td></tr>`
+    (i) => `    <tr><td>${h(i.number)}</td><td>${fmtMoney(i.amount_cents, i.currency)}</td>
+      <td>${statusTag(i.status)}</td><td class="muted">${h(when(i.issued_at))}</td></tr>`
   )
   .join('\n')}
   </tbody>
@@ -867,7 +870,7 @@ ${documents
   }
   ${
     subscription?.trial_ends_at
-      ? `<p class="muted">Trial ends ${h(subscription.trial_ends_at)}.</p>`
+      ? `<p class="muted">Trial ends ${h(until(subscription.trial_ends_at))}.</p>`
       : ''
   }
   ${
@@ -1005,7 +1008,7 @@ export function auditPage({ entries = [], user = null, filter = {} } = {}) {
 ${entries
   .map(
     (e) => `    <tr>
-      <td class="muted">${h(e.created_at)}</td>
+      <td class="muted">${h(exact(e.created_at))}</td>
       <td><b>${h(e.action)}</b></td>
       <td>${h(e.actor_kind || '')}${e.actor_user_id ? `<br><span class="muted">${h(e.actor_user_id)}</span>` : ''}</td>
       <td>${h(e.entity || '')}${e.entity_id ? `<br><span class="muted">${h(e.entity_id)}</span>` : ''}</td>
@@ -1259,7 +1262,7 @@ export function documentReviewPage({
     .map(
       (d) => `<li><a href="/platform/applications/${h(d.application_id)}">${h(
         d.proposed_gym_name || d.application_id
-      )}</a> <span class="muted">${h(d.uploaded_at)}</span></li>`
+      )}</a> <span class="muted">${h(when(d.uploaded_at))}</span></li>`
     )
     .join('')}</ul>
   <p class="muted">Byte-for-byte identical. The same person applying twice is
@@ -1275,7 +1278,7 @@ export function documentReviewPage({
       <tr><td class="muted">Gym</td><td><b>${h(application.proposed_gym_name)}</b></td></tr>
       <tr><td class="muted">City</td><td>${h(application.city)} ${h(application.country)}</td></tr>
       <tr><td class="muted">Document type</td><td>${h(doc.doc_type)}</td></tr>
-      <tr><td class="muted">Applied</td><td>${h(application.submitted_at)}</td></tr>
+      <tr><td class="muted">Applied</td><td>${h(when(application.submitted_at))}</td></tr>
     </tbody>
   </table>
   <p class="muted">Compare these against the document. A name or an address that
@@ -1322,7 +1325,7 @@ ${claims}
         facts?.actualType ? h(facts.actualType) : '<span class="muted">not recognised</span>'
       }</td></tr>
       <tr><td class="muted">Size</td><td>${h(readableSizeLabel(facts?.bytes ?? doc.size_bytes))}</td></tr>
-      <tr><td class="muted">Uploaded</td><td>${h(doc.uploaded_at)}</td></tr>
+      <tr><td class="muted">Uploaded</td><td>${h(exact(doc.uploaded_at))}</td></tr>
       <tr><td class="muted">SHA-256</td><td style="word-break:break-all;font-family:monospace;font-size:0.8rem">${h(
         facts?.sha256 || doc.sha256 || '—'
       )}</td></tr>
@@ -1625,3 +1628,134 @@ ${error ? `<p class="err">${h(error)}</p>` : ''}
   });
 }
 
+
+// ---------------------------------------------------------------------------
+// The front page
+// ---------------------------------------------------------------------------
+
+/**
+ * What needs you today.
+ *
+ * Signing in used to land on the applications queue — one list, chosen because
+ * it was built first. A panel for running a business should open on the things
+ * waiting for a decision, and say plainly when there are none.
+ *
+ * Every number here is a link. A figure a person cannot act on is decoration,
+ * and decoration on an operations screen is worse than a blank space because
+ * it looks like information.
+ */
+export function dashboardPage({
+  user = null,
+  waiting = 0,
+  gyms = 0,
+  activeGyms = 0,
+  alerts = 0,
+  unpricedPlans = [],
+  outstandingCents = 0,
+  currency = 'ZAR',
+  trialsEndingSoon = [],
+  driftFindings = null,
+} = {}) {
+  // Ordered by what it costs to ignore, not by what is interesting.
+  const needsYou = [];
+
+  if (unpricedPlans.length) {
+    needsYou.push({
+      urgency: 'high',
+      text: `${unpricedPlans.map((k) => h(k)).join(', ')} ${
+        unpricedPlans.length === 1 ? 'has' : 'have'
+      } no price, so ${unpricedPlans.length === 1 ? 'that plan bills' : 'those plans bill'} nobody.`,
+      href: '/platform/plans',
+      action: 'Set a price',
+    });
+  }
+
+  if (waiting) {
+    needsYou.push({
+      urgency: 'normal',
+      text: `${count(waiting, 'gym')} waiting for a decision.`,
+      href: '/platform/applications',
+      action: 'Review',
+    });
+  }
+
+  if (alerts) {
+    needsYou.push({
+      urgency: 'high',
+      text: `${count(alerts, 'security item')} worth a look in the last day.`,
+      href: '/platform/security',
+      action: 'Look',
+    });
+  }
+
+  if (driftFindings) {
+    needsYou.push({
+      urgency: 'high',
+      text: `${count(driftFindings, 'gym')} out of step between the registry and the database.`,
+      href: '/platform/reconcile',
+      action: 'See the report',
+    });
+  }
+
+  for (const t of trialsEndingSoon) {
+    needsYou.push({
+      urgency: 'normal',
+      text: `${h(t.name)}'s trial ends ${h(until(t.trial_ends_at))}.`,
+      href: `/platform/registry/${h(t.gym_id)}`,
+      action: 'Open',
+    });
+  }
+
+  const todo = needsYou.length
+    ? needsYou
+        .map(
+          (item) => `<div class="card" style="border-left:4px solid ${
+            item.urgency === 'high' ? 'var(--bad)' : '#b7791f'
+          }">
+  <p style="margin:0 0 0.6rem">${item.text}</p>
+  <p style="margin:0"><a href="${item.href}">${h(item.action)} →</a></p>
+</div>`
+        )
+        .join('\n')
+    : `<div class="card">
+  <h2>✅ Nothing needs you</h2>
+  <p class="muted">No applications waiting, no security items, no plan billing nobody,
+  and nothing out of step. Come back tomorrow.</p>
+</div>`;
+
+  return layout({
+    title: 'Yoyo Gyms',
+    user,
+    body: `<h1>Today</h1>
+
+${todo}
+
+<h2>The platform</h2>
+<div class="card">
+  <table>
+    <tbody>
+      <tr>
+        <td><a href="/platform/registry">Gyms</a></td>
+        <td><b>${h(gyms)}</b> ${gyms ? `<span class="muted">· ${h(activeGyms)} active</span>` : ''}</td>
+      </tr>
+      <tr>
+        <td><a href="/platform/finance">Outstanding</a></td>
+        <td><b>${h(fmtMoney(outstandingCents, currency))}</b>
+            <span class="muted">invoiced, not yet paid</span></td>
+      </tr>
+      <tr>
+        <td><a href="/platform/owners">Gym owners</a></td>
+        <td><a href="/platform/owners">Manage →</a></td>
+      </tr>
+      <tr>
+        <td><a href="/platform/audit">Audit log</a></td>
+        <td><a href="/platform/audit">Everything that happened →</a></td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+
+<p class="muted">Counts only — the platform never reads a gym member's name,
+phone, ID or health answers.</p>`,
+  });
+}

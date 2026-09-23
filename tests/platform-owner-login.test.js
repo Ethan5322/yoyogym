@@ -110,7 +110,8 @@ test('platform staff with 2FA sign in as before', async () => {
   );
 
   assert.equal(r.statusCode, 302);
-  assert.equal(r.headers.location, '/platform/applications');
+  // Staff land on the front page, not on one list (D-154).
+  assert.equal(r.headers.location, '/platform/home');
 });
 
 test('an unknown kind is treated as staff, so a bad row cannot create a weak account', async () => {
