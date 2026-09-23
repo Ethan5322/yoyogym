@@ -6,17 +6,38 @@ import { useEffect, useRef, useState } from 'react';
 import QRCode from 'qrcode';
 import AdminShell from '../../components/AdminShell.jsx';
 import { apiFetch } from '../../lib/api.js';
+import { currentGymSlug } from '../../lib/gym.js';
 
 const origin = typeof window !== 'undefined' ? window.location.origin : '';
 
-const CODES = [
-  { key: 'company', title: 'Company QR (Type A)', subtitle: 'Register or log in', url: `${origin}/?src=qr` },
-  { key: 'new', title: 'New Member', subtitle: 'Join / Register', url: `${origin}/register?src=qr` },
-  { key: 'existing', title: 'Existing Member', subtitle: 'Check-in / Book', url: `${origin}/member?src=qr` },
-  { key: 'admin', title: 'Admin QR (Type C)', subtitle: 'Secure admin gate', url: `${origin}/admin/login` },
-];
+/**
+ * These codes have to name the gym, or the Yoyo Gyms app refuses them.
+ *
+ * The app only recognises /g/<slug>/… — that is how many gyms live in one app
+ * (D-036). Every code this page produced was gym-less, so a gym printed its
+ * own poster, a member scanned it, and the app answered "That is not a Yoyo
+ * Gyms code."
+ *
+ * In single-gym mode there is no slug and the old URLs are produced unchanged,
+ * which is what the existing deployment keeps using. Codes already printed on
+ * paper keep working in a browser either way: /register and /member are still
+ * routes, and always will be.
+ */
+function codesFor(slug) {
+  const base = slug ? `${origin}/g/${encodeURIComponent(slug)}` : origin;
+  const home = slug ? base : `${origin}/`;
+
+  return [
+    { key: 'company', title: 'Company QR (Type A)', subtitle: 'Register or log in', url: `${home}?src=qr` },
+    { key: 'new', title: 'New Member', subtitle: 'Join / Register', url: `${base}/register?src=qr` },
+    { key: 'existing', title: 'Existing Member', subtitle: 'Check-in / Book', url: `${base}/member?src=qr` },
+    { key: 'admin', title: 'Admin QR (Type C)', subtitle: 'Secure admin gate', url: `${base}/admin/login` },
+  ];
+}
 
 export default function QrCodes() {
+  const codes = codesFor(currentGymSlug());
+
   return (
     <AdminShell>
       <h1 className="text-2xl font-bold uppercase text-body">QR Codes</h1>
@@ -24,7 +45,7 @@ export default function QrCodes() {
       <p className="mt-1 text-xs text-muted">Type B (personal QR) is per-person — members get theirs in the member portal; staff find member/trainer QRs on each record.</p>
 
       <div className="mt-6 grid gap-6 sm:grid-cols-2">
-        {CODES.map((c) => (
+        {codes.map((c) => (
           <QrCard key={c.key} {...c} />
         ))}
       </div>

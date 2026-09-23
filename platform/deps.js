@@ -21,6 +21,7 @@ import { purgeExpiredDocuments } from './retention.js';
 import { directoryRow } from './member-directory.js';
 import { fileFacts } from './forensics.js';
 import { gymStats } from './stats.js';
+import { gymOwnerAccount } from './gym-admin.js';
 import { reconcileSchemas } from './reconciliation.js';
 import { GRACE_DAYS } from './billing.js';
 import { chargeAuthorization, paystackConfigured, initializeSubscriptionPayment, verifyTransaction } from './paystack.js';
@@ -903,6 +904,68 @@ export function activationDeps(db = platformDb()) {
 
     markUsed: async (id, at) => {
       await db.from('owner_activations').update({ used_at: at }).eq('id', id);
+    },
+
+    /**
+     * Create the owner's account INSIDE their own gym.
+     *
+     * This is the step that was missing. Without it onboarding finished with
+     * an owner holding a platform login, a provisioned gym, and no way into
+     * it — the gym admin panel had no account to sign into and the only way
+     * to make one was a script run by hand on somebody's laptop.
+     *
+     * Returns false rather than throwing on a foreseeable failure, so the
+     * caller can keep the owner's activation link alive and let them retry.
+     */
+    createGymAdmin: async ({ gymId, userId, password }) => {
+      const [{ data: owner }, { data: connection }] = await Promise.all([
+        db.from('platform_users').select('email, full_name').eq('id', userId).maybeSingle(),
+        db.from('gym_connections').select('schema_name, supabase_url').eq('gym_id', gymId).maybeSingle(),
+      ]);
+
+      // No schema means the gym was never provisioned. That is not something
+      // the owner can fix by trying again, and pretending it worked would
+      // hide it until they tried to sign in.
+      if (!connection?.schema_name) return false;
+
+      const account = await gymOwnerAccount({
+        email: owner?.email,
+        fullName: owner?.full_name,
+        password,
+      });
+
+      const client = createClient(
+        connection.supabase_url || process.env.SUPABASE_URL,
+        process.env.SUPABASE_SERVICE_ROLE_KEY,
+        {
+          auth: { persistSession: false, autoRefreshToken: false },
+          db: { schema: connection.schema_name },
+        }
+      );
+
+      // ON CONFLICT ON THE USERNAME, so a retried activation sets the password
+      // again instead of failing on a unique constraint. An owner who clicks
+      // their link twice gets the password from the second attempt, which is
+      // the one they can remember.
+      const { error } = await client
+        .from('admin_users')
+        .upsert(account, { onConflict: 'username' });
+
+      if (error) return false;
+
+      // The gym's own audit log is written by the gym's own system. This one
+      // records that the PLATFORM reached in — WITHOUT the password, and
+      // without the hash.
+      await audit(db, {
+        action: 'platform.gym.owner_account_created',
+        actor_kind: 'gym_owner',
+        actor_user_id: userId,
+        entity: 'gym',
+        entity_id: gymId,
+        detail: { username: account.username, role: account.role },
+      });
+
+      return true;
     },
 
     // NOTE: deliberately no `setGymStatus` here. platformOpsDeps() already

@@ -12,6 +12,7 @@
 // reason passwords are not stored in plaintext.
 import { createHash, randomBytes, timingSafeEqual } from 'node:crypto';
 import { hashPassword } from './auth.js';
+import { OWNER_USERNAME } from './gym-admin.js';
 
 /** How long an activation link lives. Long enough to find the email; not a week. */
 export const ACTIVATION_TTL_HOURS = 48;
@@ -103,7 +104,8 @@ export function checkActivation(record, { token, code } = {}, now = new Date()) 
  * marked used, so a typo does not burn the owner's only link and leave them
  * asking support for a new one.
  *
- * @param {object} deps    { findActivation, setPassword, markUsed, setGymStatus, audit }
+ * @param {object} deps    { findActivation, setPassword, markUsed, setGymStatus,
+ *                           createGymAdmin, audit }
  * @param {object} input   { token, code, password }
  * @param {object} [opts]
  * @param {boolean} [opts.activatesGym=true]  Opening the gym is the point (D-124);
@@ -134,6 +136,32 @@ export async function completeActivation(deps, { token, code, password } = {}, o
   // a working link.
   const hash = await hashPassword(password);
 
+  // THE OWNER'S ACCOUNT INSIDE THEIR OWN GYM, created here because this is the
+  // only moment the system holds a password they chose.
+  //
+  // Before the link is consumed, deliberately. If this write fails the owner
+  // still has a working link and can try again — whereas failing AFTER would
+  // leave them activated, unable to get into their gym, and out of links.
+  // The owner's name and email are looked up by the dep rather than passed
+  // through here: this module knows about tokens and codes, not about where a
+  // gym's schema lives or what a platform user row looks like.
+  let gymAdminCreated = false;
+  if (typeof deps.createGymAdmin === 'function') {
+    const seeded = await deps.createGymAdmin({
+      gymId: check.gymId,
+      userId: check.userId,
+      password,
+    });
+
+    if (seeded === false) {
+      return {
+        ok: false,
+        reason: 'We could not finish setting up your gym. Please try that link again in a minute.',
+      };
+    }
+    gymAdminCreated = true;
+  }
+
   await deps.setPassword(check.userId, hash);
   await deps.markUsed(record.id, now.toISOString());
 
@@ -149,10 +177,22 @@ export async function completeActivation(deps, { token, code, password } = {}, o
     actor_user_id: check.userId,
     entity: 'gym',
     entity_id: check.gymId,
-    detail: { gym_activated: gymActivated },
+    // Recorded rather than assumed: if the gym account was NOT created, that
+    // is the fact somebody needs when the owner writes in saying they cannot
+    // sign in to their own gym.
+    detail: { gym_activated: gymActivated, gym_admin_created: gymAdminCreated },
   });
 
-  return { ok: true, userId: check.userId, gymId: check.gymId, gymActivated };
+  return {
+    ok: true,
+    userId: check.userId,
+    gymId: check.gymId,
+    gymActivated,
+    gymAdminCreated,
+    // Handed back so the success page can TELL the owner how to sign in. A
+    // credential created and never mentioned is a credential nobody uses.
+    gymUsername: gymAdminCreated ? OWNER_USERNAME : null,
+  };
 }
 
 /** The hash a lookup keys on, so the caller never has to know how it is derived. */

@@ -79,6 +79,17 @@ export default function App() {
         <Route path="/g/:slug/member" element={<MemberPortal />} />
         <Route path="/g/:slug/p/:type/:key" element={<PublicProfile />} />
 
+        {/* The gym's OWN admin panel, entered by slug.
+            This is where an owner lands from the platform ("Open your gym
+            admin panel"), and it is the only gym-scoped admin route that
+            needs to exist: captureGym() stores the slug on arrival, and from
+            sign-in onwards the gym travels inside the signed token, which the
+            server trusts over anything the browser says. Duplicating the other
+            23 guarded routes under /g/ would add no isolation and 23 chances
+            to fall out of step. */}
+        <Route path="/g/:slug/admin/login" element={<AdminLogin />} />
+        <Route path="/g/:slug/admin/*" element={<Navigate to="/admin" replace />} />
+
         {/* Admin */}
         <Route path="/admin/login" element={<AdminLogin />} />
         <Route path="/admin" element={guard(mgr, <Dashboard />)} />

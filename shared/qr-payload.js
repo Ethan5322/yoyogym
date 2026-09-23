@@ -34,17 +34,38 @@
 /** A slug is a routing key: a plain identifier and nothing else. */
 const SAFE_SLUG = /^[a-z0-9][a-z0-9-]{0,47}$/;
 
+/**
+ * The first path segment of every gym-less code this system used to print.
+ *
+ * Kept as a closed set rather than "anything on our host", so a link to the
+ * platform panel or a marketing page is still an unknown code rather than a
+ * confusing half-answer.
+ */
+const LEGACY_PATHS = new Set(['', 'register', 'member', 'p', 'admin']);
+
+/** Was this scanned from a host the app already trusts? */
+function knownHost(url, hosts) {
+  return (hosts || []).some((host) =>
+    host.indexOf('*.') === 0 ? url.hostname.endsWith(host.slice(1)) : url.hostname === host
+  );
+}
+
 /** Parameters that must never appear in a scanned payload. */
 const FORBIDDEN_PARAMS = ['code', 'verification_code', 'token', 'password', 'secret', 'key', 'pin'];
 
 /**
  * Read a scanned QR payload.
  *
+ * @param {string} raw            what the camera read
+ * @param {string[]} [knownHosts]   hosts this app already talks to, so a code
+ *                                  printed before gym slugs existed can be
+ *                                  recognised as ours rather than dismissed
  * @returns {{kind: 'gym', slug: string}
  *          |{kind: 'member', slug: string, membershipNumber: string}
+ *          |{kind: 'gymless', reason: string}
  *          |{kind: 'unknown', reason: string}}
  */
-export function readQrPayload(raw) {
+export function readQrPayload(raw, knownHosts = []) {
   const text = String(raw ?? '').trim();
   if (!text) return { kind: 'unknown', reason: 'Nothing was scanned.' };
 
@@ -86,6 +107,23 @@ export function readQrPayload(raw) {
     }
 
     return { kind: 'gym', slug };
+  }
+
+  // A YOYO CODE THAT PREDATES GYM SLUGS.
+  //
+  // Every code this system printed before today was gym-less: /register,
+  // /member, /p/m/<number>, /admin/login. Those are on real paper, on real
+  // walls, and the vault is explicit that a new scheme must be additive rather
+  // than orphan them (09 - QR-Code Architecture).
+  //
+  // The app cannot tell which gym one belongs to — nothing in it says — so it
+  // cannot route. What it CAN do is stop calling the gym's own poster a fake,
+  // and say the one useful thing instead.
+  if (knownHost(url, knownHosts) && LEGACY_PATHS.has(parts[0] || '')) {
+    return {
+      kind: 'gymless',
+      reason: 'That code was made before this app and does not say which gym it belongs to. Search for your gym by name instead.',
+    };
   }
 
   return { kind: 'unknown', reason: 'That is not a Yoyo Gyms code.' };

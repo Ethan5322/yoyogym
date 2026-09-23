@@ -273,7 +273,30 @@
       var result = await plugin.scan();
       var text = result?.barcodes?.[0]?.rawValue || result?.ScanResult || '';
 
-      var payload = window.YOYO_QR.readQrPayload(text);
+      // The allowed hosts are handed in so a code printed BEFORE gym slugs
+      // existed can be recognised as ours. Every code this system made until
+      // today was gym-less, and they are on real walls.
+      var payload = window.YOYO_QR.readQrPayload(text, shell.allowedHosts);
+
+      if (payload.kind === 'gymless') {
+        // Our code, but it does not say which gym. Not a failure to retry —
+        // scanning it again produces the same answer — so the way out is the
+        // gym picker, opened right here.
+        stopScanner();
+        intent = 'signin';
+        pickTitle.textContent = 'Which gym are you a member of?';
+        pickSub.textContent = 'Search by name, or use your location to see the closest gyms first.';
+        forgotBtn.classList.remove('hidden');
+        out.innerHTML = '';
+        q.value = '';
+        show('pick');
+        // AFTER show(), which clears the note — saying it before would be
+        // saying nothing.
+        note.className = 'note';
+        note.textContent = payload.reason;
+        return;
+      }
+
       if (payload.kind === 'unknown') {
         scanFailed(payload.reason, true);
         return;

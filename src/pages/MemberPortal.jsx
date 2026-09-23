@@ -4,9 +4,25 @@ import { useState, useEffect, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import { memberFetch, getMemberToken, setMemberToken, clearMemberToken } from '../lib/memberApi.js';
 import { logQrScan } from '../lib/scan.js';
+import { currentGymSlug } from '../lib/gym.js';
 import PersonalQr from '../components/PersonalQr.jsx';
 import IdCardButton from '../components/IdCardButton.jsx';
 import FaceCapture from '../chatbot/components/FaceCapture.jsx';
+
+/**
+ * The URL a member's own QR card should contain.
+ *
+ * With the gym in it where there is one, and without where there is not —
+ * which is single-gym mode, and is exactly what the existing deployment is.
+ * Old printed cards keep working either way: /p/m/<number> is still a route.
+ */
+function memberCardUrl(number) {
+  const slug = currentGymSlug();
+  const base = window.location.origin;
+  return slug
+    ? `${base}/g/${encodeURIComponent(slug)}/p/m/${encodeURIComponent(number)}`
+    : `${base}/p/m/${encodeURIComponent(number)}`;
+}
 
 export default function MemberPortal() {
   const [token, setTok] = useState(getMemberToken());
@@ -71,8 +87,30 @@ export default function MemberPortal() {
 }
 
 // ---------------------------------------------------------------- login
+/**
+ * The membership number a scanned card carries.
+ *
+ * A member-ID QR points at /g/<slug>/member?member=<number>, and qr-payload.js
+ * promises in as many words that the app "opens that gym's sign-in with the
+ * number filled in". This screen ignored the parameter entirely, so scanning
+ * your own card landed you on an empty form — the promise made and not kept.
+ *
+ * It fills in a NUMBER, never a session (CLAUDE.md section 14). The member
+ * still proves who they are with their phone number.
+ */
+function scannedNumber() {
+  try {
+    const raw = new URLSearchParams(window.location.search).get('member') || '';
+    // A membership number is GYM-YYYY-XXXXXX. Anything else came from
+    // somewhere else and is not put into the form.
+    return /^[A-Za-z0-9-]{1,32}$/.test(raw) ? raw : '';
+  } catch {
+    return '';
+  }
+}
+
 function MemberLogin({ onLoggedIn }) {
-  const [membership_number, setNum] = useState('');
+  const [membership_number, setNum] = useState(scannedNumber);
   const [phone, setPhone] = useState('');
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
@@ -427,7 +465,9 @@ function StatusTab() {
       {data.member?.membership_number && (
         <div className="card">
           <PersonalQr
-            url={`${window.location.origin}/p/m/${data.member.membership_number}`}
+            // GYM-SCOPED, or the Yoyo Gyms app rejects the member's own
+            // card as "not a Yoyo Gyms code" — it only recognises /g/<slug>/…
+            url={memberCardUrl(data.member.membership_number)}
             name={data.member.full_name || data.member.membership_number}
             label="My Member QR — show this to verify your membership"
           />

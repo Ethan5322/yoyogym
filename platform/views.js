@@ -17,6 +17,7 @@
 
 import { when, exact, until, money as fmtMoney, count } from './format.js';
 import { pageLink } from './paging.js';
+import { gymAdminPath, OWNER_USERNAME } from './gym-admin.js';
 
 /** Escape text for safe interpolation into markup or an attribute. */
 export function escapeHtml(value) {
@@ -760,7 +761,24 @@ ${error ? `<p class="err">${h(error)}</p>` : ''}
 }
 
 /** Activation done. Says plainly what is true, including what is not yet true. */
-export function activateSuccessPage({ gymActivated = false } = {}) {
+export function activateSuccessPage({ gymActivated = false, gymSlug = '', gymUsername = '' } = {}) {
+  // THE TWO ACCOUNTS, SAID PLAINLY.
+  //
+  // An owner now has a platform login (their email — billing, documents, the
+  // subscription) and a gym login (a username — members, check-ins, classes).
+  // Two logins nobody explained is two support emails, so this page names
+  // both, here, at the one moment the owner is looking.
+  const gymLogin =
+    gymActivated && gymSlug && gymUsername
+      ? `<div class="card">
+  <h2>Running your gym</h2>
+  <p>Your gym's own panel is where you add members, take check-ins and record payments.</p>
+  <p>Sign in there as <b>${h(gymUsername)}</b>, with the same password you just chose.</p>
+  <p><a href="${h(gymAdminPath(gymSlug))}">Open your gym admin panel →</a></p>
+  <p class="muted">You can change that password, and add staff, from Settings inside the panel.</p>
+</div>`
+      : '';
+
   return layout({
     title: 'Account activated',
     body: `<div class="card">
@@ -773,7 +791,8 @@ export function activateSuccessPage({ gymActivated = false } = {}) {
       : `<p class="muted">Your gym is not open to members yet. We will email you when it is.</p>`
   }
   <p><a href="/platform/login">Sign in →</a></p>
-</div>`,
+</div>
+${gymLogin}`,
   });
 }
 
@@ -797,7 +816,6 @@ export function ownerDashboardPage({
   subscription = null,
   documents = [],
   csrfToken = '',
-  gymAdminUrl = '',
 } = {}) {
   const docRows = documents.length
     ? `<table>
@@ -901,9 +919,10 @@ ${documents
   <h2>${h(gym.search_name || gym.slug)}</h2>
   <p>${statusTag(gym.status)}${subscription ? ` · ${statusTag(subscription.status)}` : ''}</p>
   ${
-    gym.status === 'active' && gymAdminUrl
-      ? `<p><a href="${h(gymAdminUrl)}">Open your gym admin panel →</a></p>
-         <p class="muted">That is where you manage members, check-ins, payments and classes.</p>`
+    gym.status === 'active'
+      ? `<p><a href="${h(gymAdminPath(gym.slug))}">Open your gym admin panel →</a></p>
+         <p class="muted">That is where you manage members, check-ins, payments and classes.
+         Sign in as <b>${h(OWNER_USERNAME)}</b> with the password you chose when you activated.</p>`
       : `<p class="muted">Your gym is not open yet. We will email you the moment it is.</p>`
   }
   ${

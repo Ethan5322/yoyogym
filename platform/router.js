@@ -507,7 +507,15 @@ async function handleExtraRoutes(req, res, deps, { url, path, method }) {
         return true;
       }
 
-      html(res, 200, activateSuccessPage({ gymActivated: result.gymActivated }));
+      // The gym's slug, so the page can hand the owner a working link into
+      // their own panel rather than leaving them to find it.
+      const activated = (await deps.getGym?.(result.gymId)) || {};
+
+      html(res, 200, activateSuccessPage({
+        gymActivated: result.gymActivated,
+        gymSlug: activated.slug || '',
+        gymUsername: result.gymUsername || '',
+      }));
       return true;
     }
   }
@@ -525,7 +533,6 @@ async function handleExtraRoutes(req, res, deps, { url, path, method }) {
       ...view,
       user: { email: session.email },
       csrfToken: issueCsrfToken(session.sub),
-      gymAdminUrl: process.env.PLATFORM_GYM_ADMIN_URL || '',
     }));
     return true;
   }
