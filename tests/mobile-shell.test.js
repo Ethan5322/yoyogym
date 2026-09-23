@@ -9,7 +9,7 @@
 // what it must refuse.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { readFileSync, existsSync } from 'node:fs';
 
 import { validateShellConfig, generate } from '../scripts/mobile/configure-shell.mjs';
 
@@ -178,13 +178,22 @@ test('a phone with no camera can still install the app', () => {
   assert.match(manifest, /android\.hardware\.camera"\s+android:required="false"/);
 });
 
-test('THE ALLOW LIST REACHED THE NATIVE PROJECT', () => {
+test('THE ALLOW LIST REACHED THE NATIVE PROJECT', (t) => {
   // shell.config.json is the source of truth, capacitor.config.ts reads it,
   // and `cap sync` copies the result into the app. If that chain breaks, the
   // app can navigate nowhere and nothing says so until it is installed.
-  const native = JSON.parse(
-    readFileSync('apps/mobile/android/app/src/main/assets/capacitor.config.json', 'utf8')
-  );
+  //
+  // The native file is a BUILD ARTEFACT and is gitignored — `cap sync`
+  // regenerates it. So on a fresh clone, or in CI, it does not exist yet, and
+  // a hard failure there would be this test complaining that a generated file
+  // has not been generated. Skipped instead, with the reason stated.
+  const NATIVE = 'apps/mobile/android/app/src/main/assets/capacitor.config.json';
+
+  if (!existsSync(NATIVE)) {
+    return t.skip('not generated yet — run `npm run mobile:sync` in apps/mobile');
+  }
+
+  const native = JSON.parse(readFileSync(NATIVE, 'utf8'));
   const shell = JSON.parse(readFileSync('apps/mobile/shell.config.json', 'utf8'));
 
   assert.deepEqual(native.server.allowNavigation, shell.allowedHosts);
