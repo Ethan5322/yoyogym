@@ -87,9 +87,20 @@ export function platformDeps() {
     // ---- authentication ------------------------------------------------
     /** For the health check: does the app see ANY platform user? */
     countUsers: async () => {
+      // NOT `head: true`, and that is the whole point.
+      //
+      // A HEAD request returns no body, so when PostgREST refuses one there is
+      // no body to carry the reason — the error arrives as {"message":""} and
+      // the diagnostic that exists to explain the failure cannot. Asking for
+      // one column of one row costs nothing and comes back with a readable
+      // error when it fails.
+      //
+      // `id` only: a uuid from the platform's own table, never a name or an
+      // email.
       const { count, error } = await db
         .from('platform_users')
-        .select('*', { count: 'exact', head: true });
+        .select('id', { count: 'exact' })
+        .limit(1);
 
       // THE WHOLE ERROR, not just `.message`.
       //
@@ -98,10 +109,17 @@ export function platformDeps() {
       // word "Error" and nothing else on a real diagnostic run — which is
       // exactly the situation this endpoint exists to end.
       if (error) {
-        const parts = [error.message, error.code && `code=${error.code}`, error.details, error.hint]
+        const parts = [
+          error.message,
+          error.code && `code=${error.code}`,
+          error.status && `status=${error.status}`,
+          error.details,
+          error.hint,
+        ]
           .filter(Boolean)
           .join(' | ');
-        throw new Error(parts || `Unreadable error: ${JSON.stringify(error)}`);
+
+        throw new Error(parts || `Empty error object: ${JSON.stringify(error)}`);
       }
 
       return count ?? 0;
