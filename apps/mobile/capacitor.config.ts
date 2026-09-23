@@ -9,7 +9,12 @@ import type { CapacitorConfig } from '@capacitor/cli';
  * than a JSON import: this file is evaluated by Capacitor's TypeScript loader,
  * whose module settings are not this repository's.
  */
-const shell = JSON.parse(readFileSync(`${__dirname}/shell.config.json`, 'utf8')) as {
+//
+// Read relative to the working directory, not `__dirname`. Capacitor evaluates
+// this file with its own loader, which may treat it as an ES module — and
+// `__dirname` does not exist there. It always runs from the project directory,
+// so a plain relative path works under either module system.
+const shell = JSON.parse(readFileSync('shell.config.json', 'utf8')) as {
   allowedHosts: string[];
 };
 

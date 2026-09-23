@@ -149,3 +149,46 @@ test('the generated file says not to edit it', () => {
   const generated = readFileSync('apps/mobile/www/qr-payload.js', 'utf8');
   assert.match(generated, /Do not edit/i);
 });
+
+// ---------------------------------------------------------------------------
+// The Android project — what the config INTENDS must survive into the manifest
+// ---------------------------------------------------------------------------
+
+test('A DEVICE BACKUP MUST NOT CARRY A LIVE SESSION OFF THE PHONE', () => {
+  // capacitor.config.ts says this in a comment. Comments do not configure
+  // anything: the generated manifest shipped allowBackup="true", which is
+  // Android's default and the opposite of what was intended.
+  const manifest = readFileSync('apps/mobile/android/app/src/main/AndroidManifest.xml', 'utf8');
+
+  assert.match(manifest, /android:allowBackup="false"/);
+  assert.ok(!/android:allowBackup="true"/.test(manifest));
+});
+
+test('the camera is declared, not assumed from the plugin', () => {
+  // A permission that is merely assumed fails at the gym door rather than at
+  // build time.
+  const manifest = readFileSync('apps/mobile/android/app/src/main/AndroidManifest.xml', 'utf8');
+  assert.match(manifest, /android\.permission\.CAMERA/);
+});
+
+test('a phone with no camera can still install the app', () => {
+  // The app is useful without one — search by name works. Required="true"
+  // would filter those devices out of the store listing for no reason.
+  const manifest = readFileSync('apps/mobile/android/app/src/main/AndroidManifest.xml', 'utf8');
+  assert.match(manifest, /android\.hardware\.camera"\s+android:required="false"/);
+});
+
+test('THE ALLOW LIST REACHED THE NATIVE PROJECT', () => {
+  // shell.config.json is the source of truth, capacitor.config.ts reads it,
+  // and `cap sync` copies the result into the app. If that chain breaks, the
+  // app can navigate nowhere and nothing says so until it is installed.
+  const native = JSON.parse(
+    readFileSync('apps/mobile/android/app/src/main/assets/capacitor.config.json', 'utf8')
+  );
+  const shell = JSON.parse(readFileSync('apps/mobile/shell.config.json', 'utf8'));
+
+  assert.deepEqual(native.server.allowNavigation, shell.allowedHosts);
+  assert.equal(native.server.androidScheme, 'https', 'a gym wi-fi is not a trusted network');
+  assert.equal(native.android.allowMixedContent, false);
+  assert.equal(native.android.webContentsDebuggingEnabled, false, 'never in a shipped build');
+});
