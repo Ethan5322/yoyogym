@@ -125,6 +125,14 @@ export function platformDeps() {
       return count ?? 0;
     },
 
+    saveRecoveryCodes: async (userId, hashes) => {
+      const { error } = await db
+        .from('platform_users')
+        .update({ recovery_code_hashes: hashes, updated_at: new Date().toISOString() })
+        .eq('id', userId);
+      if (error) throw new Error(`Could not save the new codes: ${error.message}`);
+    },
+
     findUserByEmail: async (email) => {
       const { data, error } = await db.from('platform_users').select('*').eq('email', email).maybeSingle();
 

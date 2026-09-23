@@ -96,6 +96,7 @@ export function layout({ title = 'Yoyo Gyms', body = '', user = null, indexable 
     <a href="/platform/finance">Finances</a>
     <a href="/platform/security">Security</a>
     <a href="/platform/audit">Audit</a>
+    <a href="/platform/account">Account</a>
   </nav>`
       : ''
   }
@@ -1557,6 +1558,70 @@ export function problemPage({ title = 'Something went wrong', message = '', fix 
   <p>${h(message)}</p>
   ${fix ? `<div class="card" style="border-left:4px solid #b7791f"><b>How to fix it</b><p>${h(fix)}</p></div>` : ''}
 </div>`,
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Your own account
+// ---------------------------------------------------------------------------
+
+/** Where you replace recovery codes you did not keep. */
+export function accountPage({ user = null, remaining = 0, csrfToken = '', error = '', codes = null }) {
+  if (codes) {
+    return layout({
+      title: 'New recovery codes',
+      user,
+      body: `<h1>Your new recovery codes</h1>
+<div class="card">
+  <h2>⚠️ Save these now</h2>
+  <p class="muted"><b>Your previous codes no longer work.</b> Each of these signs you in once if
+  you lose your phone, and <b>this is the only time they are shown</b> — only their hashes are
+  stored.</p>
+  <p style="font-family:monospace;font-size:1.15rem;line-height:2;letter-spacing:2px">
+    ${codes.map((c) => h(c)).join('<br>')}
+  </p>
+  <p class="muted">Put them somewhere that is not the phone your authenticator is on.</p>
+</div>`,
+    });
+  }
+
+  return layout({
+    title: 'Your account',
+    user,
+    body: `<h1>Your account</h1>
+
+<div class="card">
+  <h2>Recovery codes</h2>
+  <p>${
+    remaining > 0
+      ? `You have <b>${h(remaining)}</b> unused code${remaining === 1 ? '' : 's'}.`
+      : '<b>You have no recovery codes left.</b>'
+  }</p>
+  <p class="muted">These are what let you back in if you lose the phone with your authenticator
+  on it. Yours is the only account that reaches every gym — there is no second owner to let you
+  back in, so this matters more here than it would anywhere else.</p>
+</div>
+
+${error ? `<p class="err">${h(error)}</p>` : ''}
+
+<form class="card" method="post" action="/platform/account/recovery-codes">
+  <input type="hidden" name="csrf" value="${h(csrfToken)}">
+  <h2>Issue a new set</h2>
+  <p class="muted"><b>Your current codes will stop working.</b> Only do this if you have lost
+  them, or think somebody else has seen them.</p>
+
+  <label>Your password
+    <input type="password" name="password" required autocomplete="current-password">
+  </label>
+  <label>Code from your authenticator
+    <input name="totp" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" required
+           autocomplete="one-time-code">
+  </label>
+  <p class="muted">Asked for again on purpose: recovery codes bypass two-factor authentication,
+  so a borrowed browser tab must not be enough to mint a new set.</p>
+
+  <button type="submit">Issue new codes</button>
+</form>`,
   });
 }
 

@@ -58,11 +58,13 @@ import {
   setupDonePage,
   paymentResultPage,
   problemPage,
+  accountPage,
 } from './views.js';
 import { eventToIntent } from './billing.js';
 import { findAlerts, DEFAULT_WINDOW_HOURS } from './alerts.js';
 import { setupAllowed, beginSetup, completeSetup } from './setup.js';
 import { platformHealth } from './health.js';
+import { regenerateRecoveryCodes, remainingCodes } from './account.js';
 import { startCheckout, completeCheckout } from './checkout.js';
 import { completeActivation } from './activation.js';
 import { validateUploadRequest, pathBelongsTo, documentRow } from './documents.js';
@@ -765,6 +767,43 @@ async function handleExtraRoutes(req, res, deps, { url, path, method }) {
       entries: await deps.listAuditLog(filter),
       filter,
       user: { email: session.email },
+    }));
+    return true;
+  }
+
+  // ---- your own account ----------------------------------------------------
+  if (path === 'account' && method === 'GET') {
+    const session = requireSession(req, res);
+    if (!session) return true;
+
+    const user = await deps.findUserByEmail(session.email);
+    html(res, 200, accountPage({
+      user: { email: session.email },
+      remaining: remainingCodes(user),
+      csrfToken: issueCsrfToken(session.sub),
+    }));
+    return true;
+  }
+
+  if (path === 'account/recovery-codes' && method === 'POST') {
+    const form = await readFormBody(req);
+
+    const session = requireSession(req, res, { csrfToken: form.csrf });
+    if (!session) return true;
+
+    const user = await deps.findUserByEmail(session.email);
+    const result = await regenerateRecoveryCodes(deps, {
+      user,
+      password: form.password,
+      totp: form.totp,
+    });
+
+    html(res, result.ok ? 200 : 400, accountPage({
+      user: { email: session.email },
+      remaining: remainingCodes(user),
+      csrfToken: issueCsrfToken(session.sub),
+      error: result.ok ? '' : result.reason,
+      codes: result.ok ? result.codes : null,
     }));
     return true;
   }
