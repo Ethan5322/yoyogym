@@ -11,7 +11,21 @@
     "`npm run mobile:configure` regenerates www/config.js and www/qr-payload.js",
     "from here and from shared/. Edit this file and nowhere else.",
     "",
-    "TEMPORARY ADDRESS \u2014 this is a Vercel deployment URL, not a domain.",
+    "TEMPORARY ADDRESS \u2014 and a PER-DEPLOYMENT one, which is the weaker kind.",
+    "",
+    "Vercel gives three sorts of address. This is the first:",
+    "  per-deployment  yoyogym-<hash>-<scope>.vercel.app   frozen to ONE build",
+    "  per-branch      yoyogym-git-<branch>-<scope>.vercel.app   follows the branch",
+    "  production      the project's own address, or a custom domain",
+    "",
+    "A per-deployment URL CHANGES WITH EVERY PUSH. The app baked against this one",
+    "keeps pointing at this one build forever, so every push needs another",
+    "`npm run mobile:configure` and another APK. Fine for testing on your own",
+    "phone today; not something to hand to anybody else.",
+    "",
+    "The branch URL is stable and Vercel creates it automatically \u2014 look for it",
+    "in Deployments, on any build from the `platform` branch. Switching to it is",
+    "a one-line edit here.",
     "",
     "yoyogyms.com is not registered yet. A Vercel branch URL works for testing",
     "and is honest about what it is. What it costs, stated now rather than",
@@ -34,9 +48,9 @@
     "links there. Serving the panel from its own hostname is the intended fix."
   ],
   "allowedHosts": [
-    "yoyogym-git-platform-ethan5322.vercel.app"
+    "yoyogym-p3vy7povp-ethanesone.vercel.app"
   ],
-  "defaultServer": "https://yoyogym-git-platform-ethan5322.vercel.app",
+  "defaultServer": "https://yoyogym-p3vy7povp-ethanesone.vercel.app",
   "adminHost": "",
   "supportContact": "MuleSoo Digital Solutions"
 }
