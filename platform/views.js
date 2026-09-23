@@ -1532,3 +1532,25 @@ export function paymentResultPage({ ok = false, reason = '', alreadyPaid = false
   });
 }
 
+/**
+ * Something went wrong, said usefully.
+ *
+ * Replaces the bare `<p>error</p>` these paths used to render — a white page
+ * with four words on it, which is the least helpful thing a first-run screen
+ * can do to the person setting the system up.
+ *
+ * `fix` is only ever set for operator-facing problems (a missing environment
+ * variable, a seed that has not been run). Attacker-facing refusals still say
+ * one generic thing and no more.
+ */
+export function problemPage({ title = 'Something went wrong', message = '', fix = null } = {}) {
+  return layout({
+    title,
+    body: `<div class="card">
+  <h1>${h(title)}</h1>
+  <p>${h(message)}</p>
+  ${fix ? `<div class="card" style="border-left:4px solid #b7791f"><b>How to fix it</b><p>${h(fix)}</p></div>` : ''}
+</div>`,
+  });
+}
+

@@ -162,3 +162,28 @@ test('setup is written to the audit log, without the secret', async () => {
   assert.ok(entry);
   assert.ok(!JSON.stringify(entry).includes(secret), 'the log is readable in the panel');
 });
+
+test('a missing setup token NAMES THE VARIABLE, because this is operator-facing', () => {
+  // "Setup is not enabled" on a white page cost a round trip to work out that
+  // an environment variable was missing. This screen is read by the person who
+  // owns the deployment; nothing is leaked by telling them which one.
+  const saved = process.env.PLATFORM_SETUP_TOKEN;
+  delete process.env.PLATFORM_SETUP_TOKEN;
+  try {
+    const result = setupAllowed('anything');
+
+    assert.equal(result.ok, false);
+    assert.match(result.fix, /PLATFORM_SETUP_TOKEN/);
+    assert.match(result.fix, /REDEPLOY/i, 'and says variables need a rebuild');
+  } finally {
+    process.env.PLATFORM_SETUP_TOKEN = saved;
+  }
+});
+
+test('a WRONG token still says nothing specific — that one is attacker-facing', () => {
+  const result = setupAllowed('not-the-token');
+
+  assert.equal(result.ok, false);
+  assert.equal(result.fix, undefined, 'no hint for someone guessing');
+  assert.match(result.reason, /not valid/i);
+});

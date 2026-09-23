@@ -57,6 +57,7 @@ import {
   setupPage,
   setupDonePage,
   paymentResultPage,
+  problemPage,
 } from './views.js';
 import { eventToIntent } from './billing.js';
 import { findAlerts, DEFAULT_WINDOW_HOURS } from './alerts.js';
@@ -406,7 +407,7 @@ async function handleExtraRoutes(req, res, deps, { url, path, method }) {
 
     const allowed = setupAllowed(token);
     if (!allowed.ok) {
-      html(res, 403, `<p>${allowed.reason}</p>`);
+      html(res, 403, problemPage({ title: 'Setup is not available', message: allowed.reason, fix: allowed.fix }));
       return true;
     }
 
@@ -416,7 +417,11 @@ async function handleExtraRoutes(req, res, deps, { url, path, method }) {
     if (method === 'GET') {
       const begun = beginSetup(user);
       if (!begun.ok) {
-        html(res, 400, `<p>${begun.reason}</p>`);
+        html(res, 400, problemPage({
+          title: 'Cannot set up this account',
+          message: begun.reason,
+          fix: user ? null : `No platform account exists for that email address. Check the email in the link, or re-run platform/seed.sql with your address in it.`,
+        }));
         return true;
       }
       html(res, 200, setupPage({
