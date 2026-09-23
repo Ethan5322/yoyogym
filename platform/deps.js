@@ -86,7 +86,24 @@ export function platformDeps() {
   return {
     // ---- authentication ------------------------------------------------
     findUserByEmail: async (email) => {
-      const { data } = await db.from('platform_users').select('*').eq('email', email).maybeSingle();
+      const { data, error } = await db.from('platform_users').select('*').eq('email', email).maybeSingle();
+
+      // THE ERROR IS NOT SWALLOWED, and this cost real time on 2026-09-22.
+      //
+      // Destructuring only `data` made two completely different situations
+      // identical: "no account with that email" and "the platform schema is
+      // not exposed to the API, so this query could not run at all". Both
+      // arrived as null, and the setup screen confidently reported the first
+      // when the truth was the second.
+      //
+      // A query that could not run is not an empty result.
+      if (error) {
+        throw new Error(
+          `Could not read platform_users: ${error.message}. ` +
+            'If this says the schema is not exposed, add `platform` to Settings -> API -> Exposed schemas in Supabase.'
+        );
+      }
+
       return data ?? null;
     },
 
