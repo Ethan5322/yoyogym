@@ -116,14 +116,35 @@ export function schemaRunnerDeps({ projectRef } = {}) {
         `do $$
          declare current_schemas text;
          begin
+           -- READ FROM pg_roles.rolconfig, NOT pg_settings.
+           --
+           -- The exposed-schema list is stored ON THE authenticator ROLE.
+           -- pg_settings shows the CURRENT session's value, and this runs as
+           -- postgres through the Management API — so pg_settings finds
+           -- nothing, the coalesce falls back to a bare default, and the next
+           -- statement overwrites the role with that plus the new gym.
+           --
+           -- That would DROP every existing gym AND the platform schema from
+           -- the list. The first gym ever provisioned would take the whole
+           -- platform down with it, and the only symptom would be PGRST106
+           -- on absolutely everything.
            select coalesce(
-             (select setting from pg_settings where name = 'pgrst.db_schemas'),
+             (select replace(cfg, 'pgrst.db_schemas=', '')
+                from pg_roles r, unnest(r.rolconfig) cfg
+               where r.rolname = 'authenticator'
+                 and cfg like 'pgrst.db_schemas=%'
+               limit 1),
              'public, graphql_public'
            ) into current_schemas;
 
            if position('${schema}' in current_schemas) = 0 then
              execute format('alter role authenticator set pgrst.db_schemas = %L', current_schemas || ', ${schema}');
+             -- 'reload config' for WHICH schemas, then 'reload schema' for
+             -- what is inside them. Only one, or the wrong order, leaves the
+             -- gym exposed with none of its tables in the cache — which reads
+             -- as "table not found" and sends somebody hunting.
              notify pgrst, 'reload config';
+             notify pgrst, 'reload schema';
            end if;
          end $$;`,
         opts
