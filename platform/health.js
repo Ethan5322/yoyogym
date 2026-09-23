@@ -83,7 +83,13 @@ export async function platformHealth(deps) {
   try {
     users = await deps.countUsers();
   } catch (err) {
-    readError = err?.message || String(err);
+    // Everything, in order of usefulness. `String(err)` alone gives "Error"
+    // when the message is empty, which is worse than useless on a page whose
+    // only job is to say what went wrong.
+    readError =
+      err?.message ||
+      (err && typeof err === 'object' ? JSON.stringify(err) : null) ||
+      String(err);
   }
 
   if (readError) {

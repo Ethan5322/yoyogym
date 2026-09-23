@@ -90,7 +90,20 @@ export function platformDeps() {
       const { count, error } = await db
         .from('platform_users')
         .select('*', { count: 'exact', head: true });
-      if (error) throw new Error(error.message);
+
+      // THE WHOLE ERROR, not just `.message`.
+      //
+      // A PostgREST error carries message, details, hint and code, and the
+      // useful one varies by failure. Taking only `.message` produced the
+      // word "Error" and nothing else on a real diagnostic run — which is
+      // exactly the situation this endpoint exists to end.
+      if (error) {
+        const parts = [error.message, error.code && `code=${error.code}`, error.details, error.hint]
+          .filter(Boolean)
+          .join(' | ');
+        throw new Error(parts || `Unreadable error: ${JSON.stringify(error)}`);
+      }
+
       return count ?? 0;
     },
 
