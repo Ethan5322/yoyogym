@@ -67,6 +67,27 @@ export async function provisionGym(application, deps, options = {}) {
     return { ok: false, failedAt: 'schemaName', error: `Cannot derive a safe schema name from "${application.slug}".`, orphanedSchema: null };
   }
 
+  // REFUSED BEFORE ANYTHING IS CREATED, not at step six of seven.
+  //
+  // `migration_runs.checksum` is NOT NULL, and it records which schema version
+  // a gym was built from. Without it the run would create the schema, apply
+  // it, seed it, save two rows — and then fail on a constraint, leaving a real
+  // schema behind that the registry half knows about.
+  //
+  // A missing checksum also means db/schema.sql could not be read, which means
+  // applySchema has nothing to apply. Failing here costs nothing; failing at
+  // step six costs an orphan.
+  if (options.dryRun === false && !options.schemaChecksum) {
+    return {
+      ok: false,
+      failedAt: 'schemaChecksum',
+      error:
+        'Cannot read db/schema.sql, so there is no schema to apply and no version to record. ' +
+        'Nothing was created.',
+      orphanedSchema: null,
+    };
+  }
+
   if (dryRun) {
     return {
       dryRun: true,

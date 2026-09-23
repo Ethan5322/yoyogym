@@ -7,6 +7,13 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { provisionGym, PROVISION_STEPS, schemaNameFor } from '../platform/provisioning.js';
 
+/**
+ * A real live run always carries one: it records which schema version a gym
+ * was built from, and provisioning refuses without it rather than failing on
+ * a NOT NULL constraint at step six of seven.
+ */
+const CHECKSUM = 'sha256-of-db-schema-sql';
+
 const application = {
   id: 'app-1',
   proposed_gym_name: 'Iron Works',
@@ -65,7 +72,7 @@ test('dry run is the DEFAULT — provisioning never happens by accident', async 
 
 test('a live run executes every step in order', async () => {
   const d = deps();
-  const r = await provisionGym(application, d, { dryRun: false });
+  const r = await provisionGym(application, d, { dryRun: false, schemaChecksum: CHECKSUM });
 
   assert.equal(r.ok, true);
   assert.equal(r.schema, 'gym_iron_works');
@@ -75,7 +82,7 @@ test('a live run executes every step in order', async () => {
 
 test('exposing the schema is LAST — it reloads PostgREST for every gym', async () => {
   const d = deps();
-  await provisionGym(application, d, { dryRun: false });
+  await provisionGym(application, d, { dryRun: false, schemaChecksum: CHECKSUM });
 
   const names = d.calls.map((c) => c.name).filter((n) => n !== 'audit');
   assert.equal(names.at(-1), 'exposeSchema', 'everything that can fail must fail before this');
@@ -83,7 +90,7 @@ test('exposing the schema is LAST — it reloads PostgREST for every gym', async
 
 test('a failure AFTER the schema exists reports it — no invisible schema', async () => {
   const d = deps({ failAt: 'saveGym' });
-  const r = await provisionGym(application, d, { dryRun: false });
+  const r = await provisionGym(application, d, { dryRun: false, schemaChecksum: CHECKSUM });
 
   assert.equal(r.ok, false);
   assert.equal(r.failedAt, 'saveGym');
@@ -93,7 +100,7 @@ test('a failure AFTER the schema exists reports it — no invisible schema', asy
 
 test('a failure before the schema exists reports no orphan', async () => {
   const d = deps({ failAt: 'createSchema' });
-  const r = await provisionGym(application, d, { dryRun: false });
+  const r = await provisionGym(application, d, { dryRun: false, schemaChecksum: CHECKSUM });
 
   assert.equal(r.ok, false);
   assert.equal(r.orphanedSchema, null);
@@ -101,7 +108,7 @@ test('a failure before the schema exists reports no orphan', async () => {
 
 test('it stops at the first failure', async () => {
   const d = deps({ failAt: 'applySchema' });
-  const r = await provisionGym(application, d, { dryRun: false });
+  const r = await provisionGym(application, d, { dryRun: false, schemaChecksum: CHECKSUM });
 
   assert.equal(r.ok, false);
   const names = d.calls.map((c) => c.name);
@@ -111,7 +118,7 @@ test('it stops at the first failure', async () => {
 
 test('a slug that cannot make a safe schema name is refused before anything runs', async () => {
   const d = deps();
-  const r = await provisionGym({ ...application, slug: '!!!' }, d, { dryRun: false });
+  const r = await provisionGym({ ...application, slug: '!!!' }, d, { dryRun: false, schemaChecksum: CHECKSUM });
 
   assert.equal(r.ok, false);
   assert.equal(r.failedAt, 'schemaName');
@@ -120,7 +127,7 @@ test('a slug that cannot make a safe schema name is refused before anything runs
 
 test('the gym is registered as pending — payment activates it', async () => {
   const d = deps();
-  await provisionGym(application, d, { dryRun: false });
+  await provisionGym(application, d, { dryRun: false, schemaChecksum: CHECKSUM });
 
   const gym = d.calls.find((c) => c.name === 'saveGym').payload;
   assert.equal(gym.status, 'pending');
@@ -136,7 +143,7 @@ test('provisioning opens the trial, or the gym would be refused for payment on d
   // is the only moment at which that row can be created before anybody tries
   // to use the gym.
   const d = deps();
-  const r = await provisionGym(application, d, { dryRun: false, plan: { id: 'plan-basic' } });
+  const r = await provisionGym(application, d, { dryRun: false, schemaChecksum: CHECKSUM, plan: { id: 'plan-basic' } });
 
   const sub = d.calls.find((c) => c.name === 'startSubscription').payload;
   assert.equal(sub.status, 'trialing');
@@ -148,4 +155,39 @@ test('provisioning opens the trial, or the gym would be refused for payment on d
   // live gym. Activation is what opens the doors.
   assert.equal(d.calls.find((c) => c.name === 'saveGym').payload.status, 'pending');
   assert.equal(r.ok, true);
+});
+
+// ---------------------------------------------------------------------------
+// Failing before anything exists, rather than halfway through
+// ---------------------------------------------------------------------------
+
+test('WITHOUT A CHECKSUM IT REFUSES, AND CREATES NOTHING', async () => {
+  // migration_runs.checksum is NOT NULL. Without this guard the run would
+  // create the schema, apply it, seed it, save two rows — and then fail on a
+  // constraint at step six of seven, leaving a real schema behind that the
+  // registry only half knows about.
+  //
+  // A missing checksum also means db/schema.sql could not be read, so there is
+  // nothing to apply either.
+  const d = deps();
+  const r = await provisionGym(application, d, { dryRun: false, schemaChecksum: null });
+
+  assert.equal(r.ok, false);
+  assert.equal(r.failedAt, 'schemaChecksum');
+  assert.equal(d.calls.length, 0, 'not one step ran');
+  assert.equal(r.orphanedSchema, null, 'and nothing was left behind');
+});
+
+test('a dry run does not need a checksum — it creates nothing anyway', async () => {
+  const r = await provisionGym(application, deps(), { dryRun: true });
+  assert.equal(r.ok, true);
+});
+
+test('with a checksum it proceeds as normal', async () => {
+  const d = deps();
+  const r = await provisionGym(application, d, { dryRun: false, schemaChecksum: 'abc123' });
+
+  assert.equal(r.ok, true);
+  const baseline = d.calls.find((c) => c.name === 'recordMigrationBaseline');
+  assert.equal(baseline.payload.checksum, 'abc123', 'recorded, so drift can be spotted later');
 });
