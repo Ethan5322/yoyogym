@@ -95,17 +95,57 @@ test('the generated config is frozen, so a page script cannot widen it', () => {
 // The config as it actually stands in the repository
 // ---------------------------------------------------------------------------
 
-test('the shipped config is deliberately incomplete, and says why', () => {
-  // yoyogyms.com is not registered. An unregistered domain sitting in an allow
-  // list is a name somebody else can buy — and this list is what decides where
-  // a member types their ID number. The build refuses until a real address is
-  // put in, which is the intended state, not an oversight.
+test('the shipped config uses a real deployment address, not an unregistered domain', () => {
+  // There is no domain yet. The choice is between an unregistered name —
+  // which somebody else can buy, on the list that decides where a member types
+  // their ID number — and a Vercel address that is honest about being
+  // temporary. The second is safer.
   const config = JSON.parse(readFileSync('apps/mobile/shell.config.json', 'utf8'));
 
-  assert.deepEqual(config.allowedHosts, [], 'no placeholder domains are shipped');
-  assert.ok(validateShellConfig(config).length > 0, 'so the build refuses');
-  assert.ok(
-    config._comment.join(' ').includes('NOT registered'),
-    'and the file explains it rather than looking like a mistake'
-  );
+  assert.ok(config.allowedHosts.length > 0, 'the app must be able to navigate somewhere');
+  assert.deepEqual(validateShellConfig(config), [], 'and the config must be buildable');
+
+  for (const host of config.allowedHosts) {
+    assert.ok(!/^yoyogyms\.com$/.test(host), 'never an unregistered domain');
+  }
+});
+
+test('the cost of a temporary address is written down, not left to be discovered', () => {
+  // An APK built against this address keeps it. Moving to a real domain means
+  // a new build, and once the app is on a store, a new review and rollout.
+  const config = JSON.parse(readFileSync('apps/mobile/shell.config.json', 'utf8'));
+  const notes = config._comment.join(' ');
+
+  assert.match(notes, /KEEPS THIS ADDRESS/i);
+  assert.match(notes, /new build/i);
+});
+
+// ---------------------------------------------------------------------------
+// The QR rules reach the app without being rewritten
+// ---------------------------------------------------------------------------
+
+test('THE APP GETS THE QR RULES FROM shared/, GENERATED NOT COPIED', async () => {
+  // A hand-written second copy in the shell would drift, and the drift would
+  // be silent: the app accepting a payload the platform refuses, or refusing
+  // one it should take.
+  const { generateQrPayload } = await import('../scripts/mobile/configure-shell.mjs');
+  const source = readFileSync('shared/qr-payload.js', 'utf8');
+  const generated = generateQrPayload(source);
+
+  assert.match(generated, /GENERATED from shared\/qr-payload\.js/);
+  assert.match(generated, /window\.YOYO_QR/);
+  assert.ok(!/^export /m.test(generated), 'the shell cannot use ESM exports');
+});
+
+test('the generated file still refuses a payload carrying a secret', () => {
+  // The rule that matters, surviving the transform.
+  const generated = readFileSync('apps/mobile/www/qr-payload.js', 'utf8');
+
+  assert.match(generated, /verification_code/, 'the forbidden list travels with it');
+  assert.match(generated, /FORBIDDEN_PARAMS/);
+});
+
+test('the generated file says not to edit it', () => {
+  const generated = readFileSync('apps/mobile/www/qr-payload.js', 'utf8');
+  assert.match(generated, /Do not edit/i);
 });
