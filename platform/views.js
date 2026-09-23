@@ -16,6 +16,7 @@
 // an internal panel would be work with no return.
 
 import { when, exact, until, money as fmtMoney, count } from './format.js';
+import { pageLink } from './paging.js';
 
 /** Escape text for safe interpolation into markup or an attribute. */
 export function escapeHtml(value) {
@@ -383,7 +384,41 @@ ask for your documents, and again once a decision is made.</p>
  * need to see that a gym is broken without being able to read anybody's
  * personal data (D-044), and the way to guarantee that is not to render it.
  */
-export function registryPage({ gyms = [], user = null, canSuspend = false, filter = {} } = {}) {
+/**
+ * Where you are in a long list, and how to move.
+ *
+ * Always rendered — even on a single page — because "Showing 1–7 of 7" is the
+ * sentence that tells a reader the list is COMPLETE. Silence does not say
+ * that; silence is what a truncated list also looks like.
+ *
+ * `params` are the filters in force. They are carried into every link, because
+ * losing a search when you turn a page is the single most irritating thing a
+ * paginated list can do.
+ */
+function pager(page, basePath, params = {}) {
+  if (!page) return '';
+
+  const prev = page.hasPrev
+    ? `<a href="${h(pageLink(basePath, params, page.page - 1))}">← Previous</a>`
+    : '<span class="muted">← Previous</span>';
+
+  const next = page.hasNext
+    ? `<a href="${h(pageLink(basePath, params, page.page + 1))}">Next →</a>`
+    : '<span class="muted">Next →</span>';
+
+  // One page and nothing to turn to: the count alone, with no dead controls.
+  // A link that goes nowhere is the "dead text" this panel is meant not to
+  // have.
+  if (!page.hasPrev && !page.hasNext) {
+    return `<p class="muted">${h(page.label)}</p>`;
+  }
+
+  return `<p class="muted" style="display:flex;gap:1rem;align-items:center">
+  ${prev}<span>${h(page.label)}</span>${next}
+</p>`;
+}
+
+export function registryPage({ gyms = [], user = null, canSuspend = false, filter = {}, page = null } = {}) {
   const body = gyms.length
     ? `<table>
   <thead><tr><th>Gym</th><th>City</th><th>Plan</th><th>Status</th><th>Billing</th></tr></thead>
@@ -407,9 +442,11 @@ ${gyms
     title: 'Gyms',
     user,
     body: `<h1>Gyms</h1>
-<p class="muted">${gyms.length} gym${gyms.length === 1 ? '' : 's'} on the platform.${
-      canSuspend ? '' : ' You have read-only access.'
-    }</p>
+<p class="muted">${
+      page && page.total !== null
+        ? `${h(count(page.total, 'gym'))} on the platform.`
+        : `${h(count(gyms.length, 'gym'))} shown.`
+    }${canSuspend ? '' : ' You have read-only access.'}</p>
 <p><a href="/platform/reconcile">Check for drift →</a></p>
 
 <form class="card row" method="get" action="/platform/registry">
@@ -424,7 +461,8 @@ ${gyms
   </label>
   <button type="submit">Search</button>
 </form>
-${body}`,
+${body}
+${pager(page, '/platform/registry', { q: filter.query, status: filter.status })}`,
   });
 }
 
@@ -1000,7 +1038,7 @@ billing date. Every change here is written to the audit log.</p>`,
  * Filtered rather than paged: after a year this table is the largest thing on
  * the platform, and "show me everything" stops being a useful question.
  */
-export function auditPage({ entries = [], user = null, filter = {} } = {}) {
+export function auditPage({ entries = [], user = null, filter = {}, page = null } = {}) {
   const rows = entries.length
     ? `<table>
   <thead><tr><th>When</th><th>Action</th><th>Who</th><th>What</th><th>Detail</th></tr></thead>
@@ -1032,7 +1070,8 @@ ${entries
   <button type="submit">Filter</button>
 </form>
 
-${rows}`,
+${rows}
+${pager(page, '/platform/audit', { action: filter.action, entity_id: filter.entityId })}`,
   });
 }
 
@@ -1057,7 +1096,7 @@ function detailText(detail) {
 // ---------------------------------------------------------------------------
 
 /** Gym owners, and the switch that stops one. */
-export function ownersPage({ owners = [], user = null, csrfToken = '', filter = {} } = {}) {
+export function ownersPage({ owners = [], user = null, csrfToken = '', filter = {}, page = null } = {}) {
   const rows = owners.length
     ? `<table>
   <thead><tr><th>Owner</th><th>Email</th><th>Gyms</th><th>Status</th><th></th></tr></thead>
@@ -1094,7 +1133,8 @@ and it deletes nothing — suspend the gym itself if that is what you mean.</p>
   <button type="submit">Search</button>
 </form>
 
-${rows}`,
+${rows}
+${pager(page, '/platform/owners', { q: filter.query })}`,
   });
 }
 

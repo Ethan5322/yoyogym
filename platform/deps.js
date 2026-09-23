@@ -435,20 +435,28 @@ export function platformOpsDeps(db = platformDb()) {
     /** Read per request. Revoking a role must take effect now, not in 8 hours. */
     permissionsFor: (session) => permissionsFor(db, session.sub),
 
-    listGyms: async ({ query = '', status = '', limit = 200 } = {}) => {
+    listGyms: async ({ query = '', status = '', from = 0, to = 49, limit = null } = {}) => {
+      // `count: 'exact'` alongside the rows: the reader is told how many gyms
+      // exist, not just how many fitted on this page. A list that ENDS looks
+      // finished, and somebody would conclude a gym does not exist because it
+      // was on page four.
       let q = db
         .from('gyms')
-        .select('id, slug, search_name, city, country, status, plan_key, created_at')
-        .order('created_at', { ascending: false })
-        .limit(Math.min(Number(limit) || 200, 500));
+        .select('id, slug, search_name, city, country, status, plan_key, created_at', { count: 'exact' })
+        .order('created_at', { ascending: false });
+
+      q = limit ? q.limit(Math.min(Number(limit), 500)) : q.range(from, to);
 
       // A list capped at 500 with no search is not a registry at ten thousand
       // gyms — it is the newest 500 gyms.
       if (query) q = q.or(`search_name.ilike.%${query}%,slug.ilike.%${query}%,city.ilike.%${query}%`);
       if (status) q = q.eq('status', status);
 
-      const { data } = await q;
+      const { data, count: total } = await q;
       const gyms = data ?? [];
+      // The total rides along on the array, so every existing caller that just
+      // iterates it keeps working unchanged.
+      gyms.total = Number.isInteger(total) ? total : null;
       if (!gyms.length) return gyms;
 
       // One query for the subscription states rather than one per gym: a
@@ -1162,35 +1170,42 @@ export function platformControlDeps(db = platformDb()) {
     },
 
     // ---- the audit log ----------------------------------------------------
-    listAuditLog: async ({ action = '', entityId = '', limit = 200 } = {}) => {
+    listAuditLog: async ({ action = '', entityId = '', from = 0, to = 49, limit = null } = {}) => {
       let q = db
         .from('platform_audit_log')
-        .select('id, action, actor_kind, actor_user_id, entity, entity_id, detail, created_at')
-        .order('created_at', { ascending: false })
-        .limit(Math.min(Number(limit) || 200, 500));
+        .select('id, action, actor_kind, actor_user_id, entity, entity_id, detail, created_at', { count: 'exact' })
+        .order('created_at', { ascending: false });
+
+      // The security screen and the dashboard want a WINDOW to analyse, not a
+      // page to read, so they pass a limit instead.
+      q = limit ? q.limit(Math.min(Number(limit), 500)) : q.range(from, to);
 
       if (action) q = q.ilike('action', `%${action}%`);
       if (entityId) q = q.eq('entity_id', entityId);
 
-      const { data } = await q;
-      return data ?? [];
+      const { data, count: total } = await q;
+      const entries = data ?? [];
+      entries.total = Number.isInteger(total) ? total : null;
+      return entries;
     },
 
     // ---- gym owners -------------------------------------------------------
-    listOwners: async ({ query = '', limit = 100 } = {}) => {
+    listOwners: async ({ query = '', from = 0, to = 49 } = {}) => {
       let q = db
         .from('platform_users')
-        .select('id, email, full_name, is_active, created_at')
+        .select('id, email, full_name, is_active, created_at', { count: 'exact' })
         .eq('kind', 'gym_owner')
         .order('created_at', { ascending: false })
-        .limit(Math.min(Number(limit) || 100, 200));
+        .range(from, to);
 
       // `or` rather than two queries: a search that only matched email would
       // fail every time someone typed a name, which is what people type.
       if (query) q = q.or(`email.ilike.%${query}%,full_name.ilike.%${query}%`);
 
-      const { data: owners } = await q;
-      if (!owners?.length) return [];
+      const { data, count: total } = await q;
+      const owners = data ?? [];
+      owners.total = Number.isInteger(total) ? total : null;
+      if (!owners.length) return owners;
 
       const { data: gyms } = await db
         .from('gyms')
@@ -1200,7 +1215,9 @@ export function platformControlDeps(db = platformDb()) {
       const counts = new Map();
       for (const g of gyms ?? []) counts.set(g.owner_user_id, (counts.get(g.owner_user_id) ?? 0) + 1);
 
-      return owners.map((o) => ({ ...o, gym_count: counts.get(o.id) ?? 0 }));
+      const withCounts = owners.map((o) => ({ ...o, gym_count: counts.get(o.id) ?? 0 }));
+      withCounts.total = owners.total;
+      return withCounts;
     },
 
     /**

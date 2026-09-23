@@ -62,6 +62,7 @@ import {
   dashboardPage,
 } from './views.js';
 import { eventToIntent } from './billing.js';
+import { pageRequest, pageState } from './paging.js';
 import { findAlerts, DEFAULT_WINDOW_HOURS } from './alerts.js';
 import { setupAllowed, beginSetup, completeSetup } from './setup.js';
 import { platformHealth } from './health.js';
@@ -756,17 +757,22 @@ async function handleExtraRoutes(req, res, deps, { url, path, method }) {
       return true;
     }
 
-    // Filtered rather than paged: after a year this is the largest table on
-    // the platform and "show me everything" stops being a useful question.
+    // Filtered AND paged. After a year this is the largest table on the
+    // platform; a filter narrows it to a question, and paging makes the
+    // answer readable when the question is still a broad one.
+    const paging = pageRequest(url.searchParams.get('page'));
     const filter = {
       action: (url.searchParams.get('action') || '').trim(),
       entityId: (url.searchParams.get('entity_id') || '').trim(),
-      limit: 200,
+      from: paging.from,
+      to: paging.to,
     };
 
+    const entries = await deps.listAuditLog(filter);
     html(res, 200, auditPage({
-      entries: await deps.listAuditLog(filter),
+      entries,
       filter,
+      page: pageState({ ...paging, total: entries.total, returned: entries.length }),
       user: { email: session.email },
     }));
     return true;
@@ -886,10 +892,17 @@ async function handleExtraRoutes(req, res, deps, { url, path, method }) {
       return true;
     }
 
-    const filter = { query: (url.searchParams.get('q') || '').trim(), limit: 100 };
+    const paging = pageRequest(url.searchParams.get('page'));
+    const filter = {
+      query: (url.searchParams.get('q') || '').trim(),
+      from: paging.from,
+      to: paging.to,
+    };
 
+    const owners = await deps.listOwners(filter);
     html(res, 200, ownersPage({
-      owners: await deps.listOwners(filter),
+      owners,
+      page: pageState({ ...paging, total: owners.total, returned: owners.length }),
       filter,
       user: { email: session.email },
       csrfToken: issueCsrfToken(session.sub),
@@ -1106,17 +1119,21 @@ async function handleExtraRoutes(req, res, deps, { url, path, method }) {
       return true;
     }
 
-    // Searchable, because a list capped at 500 is not a registry at ten
-    // thousand gyms — it is the first 500 gyms alphabetically.
+    // Searchable AND paged. A list capped at 200 is not a registry at ten
+    // thousand gyms — it is the first 200, with the rest invisible and no
+    // sign that they were left out.
+    const paging = pageRequest(url.searchParams.get('page'));
     const filter = {
       query: (url.searchParams.get('q') || '').trim(),
       status: (url.searchParams.get('status') || '').trim(),
-      limit: 200,
+      from: paging.from,
+      to: paging.to,
     };
 
     const gyms = await deps.listGyms(filter);
     html(res, 200, registryPage({
       gyms,
+      page: pageState({ ...paging, total: gyms.total, returned: gyms.length }),
       filter,
       user: { email: session.email },
       canSuspend: await may(deps, session, 'gym.suspend'),
