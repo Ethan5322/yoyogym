@@ -79,3 +79,38 @@ test('an unsafe schema name never reaches the SQL', async () => {
     await assert.rejects(() => schemaRunnerDeps().exposeSchema(bad), /Unsafe schema name/);
   }
 });
+
+// ---------------------------------------------------------------------------
+// The schema has to reach production, not just this machine
+// ---------------------------------------------------------------------------
+
+test('THE SCHEMA IS IMPORTED, NOT READ FROM DISK', async () => {
+  // readFileSync works locally and fails on Vercel: the bundler ships what it
+  // can trace through imports, and a file read is not traceable. In production
+  // the file would simply not be there — silently, and only in production.
+  const { readFileSync: read } = await import('node:fs');
+
+  // Comments stripped, for the second time today: the file explains at length
+  // why a readFileSync is wrong here, and that prose must not be what fails a
+  // test looking for the fix.
+  const source = read('platform/schema-runner.js', 'utf8')
+    .split('\n')
+    .map((line) => line.replace(/^\s*(\/\/|\*|\/\*).*$/, ''))
+    .join('\n');
+
+  assert.match(source, /import \{ GYM_SCHEMA_SQL \}/, 'an import is traced by the bundler');
+  assert.ok(!/readFileSync\(.*schema\.sql/.test(source), 'a file read is not');
+});
+
+test('the generated module matches db/schema.sql exactly', async () => {
+  // It is a build artefact of the real file, which stays the source of truth.
+  const { readFileSync: read } = await import('node:fs');
+  const { GYM_SCHEMA_SQL } = await import('../db/schema.sql.js');
+
+  assert.equal(GYM_SCHEMA_SQL, read('db/schema.sql', 'utf8'), 'run `npm run build:schema`');
+});
+
+test('the checksum is real, so a gym records what it was built from', async () => {
+  const { gymSchemaChecksum } = await import('../platform/schema-runner.js');
+  assert.match(gymSchemaChecksum(), /^[a-f0-9]{64}$/);
+});

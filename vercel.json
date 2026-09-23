@@ -68,10 +68,5 @@
       "destination": "/platform/login",
       "permanent": false
     }
-  ],
-  "outputFileTracingIncludes": {
-    "api/platform/**": [
-      "db/schema.sql"
-    ]
-  }
+  ]
 }

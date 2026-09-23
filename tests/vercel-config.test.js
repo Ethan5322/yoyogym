@@ -20,7 +20,11 @@ const ALLOWED = new Set([
   'outputDirectory', 'framework', 'public', 'regions', 'functions', 'routes',
   'rewrites', 'redirects', 'headers', 'cleanUrls', 'trailingSlash', 'crons',
   'github', 'images', 'git', 'name', 'version', 'builds', 'env', 'build',
-  'alias', 'scope', 'outputFileTracingIncludes', 'outputFileTracingExcludes',
+  'alias', 'scope',
+  // NOT outputFileTracingIncludes / outputFileTracingExcludes. Those are
+  // next.config.js options, not vercel.json ones. I put them in this list
+  // from memory, which is exactly why the test passed while the deploy was
+  // rejected — an allow list built from assumption cannot catch an assumption.
 ]);
 
 test('NO UNKNOWN ROOT KEYS — Vercel rejects them and fails the deploy', () => {

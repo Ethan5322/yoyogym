@@ -9,13 +9,14 @@
     "mobile:sync": "npm run mobile:configure && cd apps/mobile && npx cap sync",
     "dev": "vite",
     "dev:api": "node scripts/dev-server.js",
-    "build": "vite build",
+    "build": "npm run build:schema && vite build",
     "preview": "vite preview",
     "test": "node --test \"tests/**/*.test.js\"",
     "docs:validate": "node scripts/validate-vault.mjs",
     "seed:owner": "node scripts/seed-owner.js",
     "seed:catalog": "node scripts/seed-catalog.js",
-    "sql:bundle": "node scripts/sql-bundle.mjs"
+    "sql:bundle": "node scripts/sql-bundle.mjs",
+    "build:schema": "node scripts/build-schema-module.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.45.4",

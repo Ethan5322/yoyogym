@@ -7,9 +7,8 @@
 // ⚠️ THE TOKEN THIS USES CAN ALTER EVERY GYM'S DATABASE. It is a platform-level
 // secret. It never goes near `gym_secrets`, never reaches a browser, and is not
 // needed by anything except provisioning and migrations.
-import { readFileSync } from 'node:fs';
-import { fileURLToPath } from 'node:url';
 import { createHash } from 'node:crypto';
+import { GYM_SCHEMA_SQL } from '../db/schema.sql.js';
 
 const BASE = process.env.SUPABASE_MANAGEMENT_URL || 'https://api.supabase.com';
 
@@ -44,10 +43,23 @@ export async function runSql(query, { projectRef = process.env.SUPABASE_PROJECT_
   return res.json().catch(() => null);
 }
 
-/** The gym schema, as shipped. One definition for every gym. */
+/**
+ * The gym schema, as shipped. One definition for every gym.
+ *
+ * IMPORTED, NOT READ FROM DISK.
+ *
+ * This used to `readFileSync('../db/schema.sql')`, which works locally and
+ * fails on Vercel: the bundler ships what it can trace through imports, and a
+ * file read is not traceable. In production the file simply would not be
+ * there, and provisioning would have had nothing to apply — silently, and only
+ * in production.
+ *
+ * `db/schema.sql.js` is generated from `db/schema.sql` by
+ * `npm run build:schema`, which the build runs, so it cannot go stale.
+ * db/schema.sql remains the single source of truth.
+ */
 export function gymSchemaSql() {
-  const path = fileURLToPath(new URL('../db/schema.sql', import.meta.url));
-  return readFileSync(path, 'utf8');
+  return GYM_SCHEMA_SQL;
 }
 
 /** So a gym's recorded baseline can be compared against what is in git. */
