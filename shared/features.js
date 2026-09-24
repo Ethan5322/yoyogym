@@ -75,6 +75,7 @@ export const ROUTE_FEATURES = {
 
   // Prime
   'face-descriptors': FEATURES.FACE,
+  'face-learn': FEATURES.FACE,
   'enroll-face': FEATURES.FACE,
   'access-card': FEATURES.ACCESS_CONTROL,
   'access-action': FEATURES.ACCESS_CONTROL,

@@ -213,6 +213,17 @@ export default function FaceScan() {
             setCard(data);
             flashFx('success');
             setPhase('result');
+            // Keep this member's face gallery current, so recognition stays
+            // sure as they change over months and years. Only a SUGGESTION:
+            // the server re-identifies the face against every member and
+            // learns only if it agrees (server/handlers/admin/face-learn.js).
+            // Fire-and-forget — it must never slow down or fail a check-in.
+            if (best.type === 'member') {
+              apiFetch('/admin/face-learn', {
+                method: 'POST',
+                body: { type: 'member', id: best.id, descriptor: Array.from(probe) },
+              }).catch(() => {});
+            }
           } catch (e) {
             setError(e.message);
             setPhase('error');
