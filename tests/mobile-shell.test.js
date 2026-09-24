@@ -246,3 +246,25 @@ test('a stored value that is not a slug is ignored, not followed', () => {
   const read = app.slice(app.indexOf('function myGym'), app.indexOf('function forgetGym'));
   assert.match(read, /\[a-z0-9\]\[a-z0-9-\]\{0,47\}/);
 });
+
+// ---------------------------------------------------------------------------
+// The icon is the gym's brand, not Capacitor's placeholder
+// ---------------------------------------------------------------------------
+
+test('THE APP ICON IS NOT CAPACITOR\'S PLACEHOLDER', async () => {
+  // The first build shipped the blue-cross-on-a-grid default: the first thing
+  // a store reviewer and a gym member would have seen.
+  const { createHash } = await import('node:crypto');
+  const PLACEHOLDER = '9e029293ab1ae8e3a6a7b7d0b7177e46'; // md5 of the default xxxhdpi icon
+  for (const f of ['ic_launcher.png', 'ic_launcher_round.png', 'ic_launcher_foreground.png']) {
+    const png = readFileSync(`apps/mobile/android/app/src/main/res/mipmap-xxxhdpi/${f}`);
+    assert.notEqual(createHash('md5').update(png).digest('hex'), PLACEHOLDER, f);
+  }
+});
+
+test('the icon is drawn from the same brand mark as the web app', () => {
+  const script = readFileSync('scripts/mobile/make-icon-sources.mjs', 'utf8');
+  assert.match(script, /public\/icon\.svg/);
+  assert.match(readFileSync('public/icon.svg', 'utf8'), /#E63946/);
+  assert.match(script, /const RED = '#E63946'/);
+});
