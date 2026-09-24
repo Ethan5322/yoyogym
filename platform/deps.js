@@ -25,8 +25,20 @@ import { gymOwnerAccount } from './gym-admin.js';
 import { reconcileSchemas } from './reconciliation.js';
 import { GRACE_DAYS } from './billing.js';
 import { chargeAuthorization, paystackConfigured, initializeSubscriptionPayment, verifyTransaction } from './paystack.js';
+import { makeLimiter } from './ratelimit.js';
+import {
+  coordinate, haversineKm, nearestGyms, likeTerm, RESULT_LIMIT, BOX_FETCH,
+} from './gym-search.js';
 
 let _db = null;
+
+// MODULE LEVEL, not inside platformDeps(). The factory runs on every request,
+// so a limiter built inside it would start every request at a count of zero —
+// a limit in name only.
+//
+// Five lookups per ten minutes per address: a member who has forgotten their
+// gym needs one or two, and anyone needing fifty is asking about other people.
+const findGymLimiter = makeLimiter({ key: 'find-gym', limit: 5, windowMs: 10 * 60_000 });
 
 /** The platform database client, scoped to the `platform` schema. */
 export function platformDb() {
@@ -157,6 +169,16 @@ export function platformDeps() {
     },
 
     verifyPassword: (plain, hash) => (hash ? verifyPassword(plain, hash) : Promise.resolve(false)),
+
+    /** The failed-sign-in counter and lock (platform/login.js decides the values). */
+    saveLoginState: async (userId, patch) => {
+      const { error } = await db.from('platform_users').update(patch).eq('id', userId);
+      // Thrown, not ignored: a lockout that silently fails to record is the
+      // bug this dependency was written to fix.
+      if (error) throw new Error(`Could not record sign-in state: ${error.message}`);
+    },
+
+    rateLimitFindGym: (req) => findGymLimiter(req),
 
     /** First run only. Guarded upstream by the setup token AND by having no password. */
     finishSetup: async (userId, patch) => {
@@ -320,24 +342,58 @@ export function platformDeps() {
 
     // ---- public: gym search ----------------------------------------------
     searchGyms: async ({ query, lat, lng }) => {
-      let q = db
-        .from('gyms')
-        // Only what a stranger may know. No schema name, no connection.
-        .select('slug, search_name, city, country, latitude, longitude')
-        .eq('status', 'active')
-        .limit(25);
+      const here = coordinate(lat) !== null && coordinate(lng) !== null;
 
-      if (query) q = q.ilike('search_name', `%${query}%`);
+      const base = (limit) => {
+        let q = db
+          .from('gyms')
+          // Only what a stranger may know. No schema name, no connection.
+          .select('slug, search_name, city, country, latitude, longitude')
+          .eq('status', 'active')
+          .limit(limit);
+        if (query) q = q.ilike('search_name', likeTerm(query));
+        return q;
+      };
 
-      const { data } = await q;
-      const gyms = data ?? [];
+      // A failed query is not "no gyms". Returned as empty, a member is told
+      // their gym is not on Yoyo Gyms when the truth is that we are down.
+      const rows = async (q) => {
+        const { data, error } = await q;
+        if (error) throw new Error(`Gym search failed: ${error.message}`);
+        return data ?? [];
+      };
 
-      // "Show the nearest whatever the distance" (D-073): an empty screen looks
-      // broken, and a member told the closest gym is 80 km away has learned
-      // something true and useful.
-      if (Number.isFinite(lat) && Number.isFinite(lng)) {
-        for (const g of gyms) g.distance_km = haversineKm(lat, lng, g.latitude, g.longitude);
-        gyms.sort((a, b) => (a.distance_km ?? Infinity) - (b.distance_km ?? Infinity));
+      let gyms;
+
+      if (query) {
+        // The NAME narrows it. Distance only orders the matches, and a
+        // matching gym that has not given a location is still shown — last,
+        // rather than hidden for a missing field.
+        gyms = await rows(base(BOX_FETCH));
+        if (here) {
+          for (const g of gyms) g.distance_km = haversineKm(lat, lng, g.latitude, g.longitude);
+          gyms.sort((a, b) => (a.distance_km ?? Infinity) - (b.distance_km ?? Infinity));
+        }
+        gyms = gyms.slice(0, RESULT_LIMIT);
+      } else if (here) {
+        // "Show the nearest whatever the distance" (D-073): an empty screen
+        // looks broken, and a member told the closest gym is 80 km away has
+        // learned something true and useful. So the box widens until it finds
+        // something — see platform/gym-search.js for why it is a box at all.
+        gyms = await nearestGyms(
+          (box, limit) =>
+            rows(
+              box
+                ? base(limit)
+                    .gte('latitude', box.minLat).lte('latitude', box.maxLat)
+                    .gte('longitude', box.minLng).lte('longitude', box.maxLng)
+                : base(limit).not('latitude', 'is', null).not('longitude', 'is', null)
+            ),
+          coordinate(lat),
+          coordinate(lng)
+        );
+      } else {
+        gyms = [];
       }
 
       return gyms.map((g) => ({
@@ -361,19 +417,6 @@ function slugify(name) {
     .replace(/[^a-z0-9]+/g, '-')
     .replace(/^-+|-+$/g, '')
     .slice(0, 48);
-}
-
-/** Great-circle distance in km. Good enough for "which gym is nearest". */
-function haversineKm(lat1, lon1, lat2, lon2) {
-  if (![lat1, lon1, lat2, lon2].every((n) => Number.isFinite(Number(n)))) return null;
-  const R = 6371;
-  const toRad = (d) => (Number(d) * Math.PI) / 180;
-  const dLat = toRad(lat2 - lat1);
-  const dLon = toRad(lon2 - lon1);
-  const a =
-    Math.sin(dLat / 2) ** 2 +
-    Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon / 2) ** 2;
-  return Math.round(2 * R * Math.asin(Math.sqrt(a)) * 10) / 10;
 }
 
 /**

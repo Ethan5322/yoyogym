@@ -68,7 +68,10 @@ export function findAlerts(entries, { now = new Date(), windowHours = DEFAULT_WI
   // ---- someone guessing a password ---------------------------------------
   const failuresByEmail = new Map();
   for (const e of recent) {
-    if (e.action !== 'platform.login.failed') continue;
+    // An attempt refused by the LOCK counts too. Guessing does not stop
+    // because the account locked, and without this the alert would go quiet
+    // at exactly the moment the guessing was confirmed.
+    if (e.action !== 'platform.login.failed' && e.action !== 'platform.login.locked') continue;
     const who = e.detail?.email || '(unknown)';
     failuresByEmail.set(who, (failuresByEmail.get(who) ?? 0) + 1);
   }

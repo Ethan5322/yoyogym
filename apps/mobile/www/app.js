@@ -136,6 +136,10 @@
     out.innerHTML = gyms.map(gymButton).join('');
   }
 
+  // Which search is the latest. Answers can come back out of order — "bo"
+  // slower than "bos" — and an older answer must not overwrite a newer one.
+  var searchSeq = 0;
+
   function search() {
     var params = new URLSearchParams();
     var term = q.value.trim();
@@ -144,6 +148,7 @@
       params.set('lat', coords.lat);
       params.set('lng', coords.lng);
     }
+    var mine = ++searchSeq;
     if (!params.toString()) {
       out.innerHTML = '';
       return;
@@ -153,9 +158,20 @@
     if (!allowed(url)) return;
 
     fetch(url)
-      .then(function (r) { return r.json(); })
-      .then(function (d) { render(d.gyms || []); })
+      .then(function (r) {
+        // A failed search is NOT an empty one. Rendered as "no gyms found" it
+        // tells a member their gym is not on Yoyo Gyms, when the truth is
+        // that we are having a problem.
+        if (!r.ok) throw new Error('search ' + r.status);
+        return r.json();
+      })
+      .then(function (d) {
+        if (mine !== searchSeq) return;
+        render(d.gyms || []);
+      })
       .catch(function () {
+        if (mine !== searchSeq) return;
+        out.innerHTML = '';
         note.className = 'err';
         note.textContent = 'Could not reach Yoyo Gyms. Check your connection and try again.';
       });

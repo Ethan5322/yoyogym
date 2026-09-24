@@ -56,6 +56,7 @@ function deps(over = {}) {
           ? { ...STAFF, password_hash: 'h', totp_enabled: false, is_active: true }
           : null,
     verifyPassword: async (plain) => plain === 'correct-horse',
+    saveLoginState: async () => {},
     verifySecondFactor: async () => false,
     searchGyms: async () => [{ slug: 'bos-gym', name: 'BOS GYM', city: 'Cape Town', distance_km: 2 }],
     createApplication: async (input) => { calls.created.push(input); return { ok: true, applicationId: 'app-1' }; },

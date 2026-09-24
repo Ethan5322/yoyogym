@@ -37,6 +37,7 @@ function res() {
 const deps = (user) => ({
   findUserByEmail: async () => user,
   verifyPassword: async (plain) => plain === 'correct-horse',
+  saveLoginState: async () => {},
   verifySecondFactor: async (u, code) => Boolean(u?.totp_enabled) && code === '123456',
   audit: async () => {},
 });

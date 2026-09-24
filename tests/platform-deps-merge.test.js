@@ -44,6 +44,7 @@ test('the router gets every dependency its routes call for', () => {
   // test happens to cover.
   for (const name of [
     'findUserByEmail', 'verifyPassword', 'verifySecondFactor', 'finishSetup',
+    'saveLoginState', 'rateLimitFindGym',
     'saveRecoveryCodes', 'countUsers',
     'listApplications', 'getApplicationView', 'decide',
     'createApplication', 'searchGyms',

@@ -21,6 +21,7 @@ import { PLANS, ownerFacingPlan, planByKey } from './plans.js';
 import { completeActivation } from './activation.js';
 import { validateUploadRequest, pathBelongsTo, documentRow } from './documents.js';
 import { lookupHash, routeMember } from './member-directory.js';
+import { decideLogin, INVALID, LOCKED } from './login.js';
 
 const json = (res, status, body) => {
   res.writeHead(status, {
@@ -31,7 +32,6 @@ const json = (res, status, body) => {
   res.end(JSON.stringify(body));
 };
 
-const INVALID = 'Invalid email, password or authentication code.';
 
 /** Read a JSON body. Capped: an app sends a form, not an upload. */
 async function readJson(req, { maxBytes = 64 * 1024 } = {}) {
@@ -71,33 +71,29 @@ export async function handlePlatformApi(req, res, deps, { path, method, url }) {
     const body = await readJson(req);
     if (!body) return json(res, 400, { error: 'Malformed request.' }), true;
 
-    const user = await deps.findUserByEmail(String(body.email || '').trim().toLowerCase());
+    // The SAME decision as the website (D-119), from the same function —
+    // platform/login.js — so the lockout cannot exist on one door only.
+    const { outcome, user } = await decideLogin(deps, {
+      email: body.email,
+      password: body.password,
+      totp: body.totp,
+    });
 
-    // The SAME rule as the website (D-119), because it is the same decision:
-    // staff reach every gym and must have 2FA; an owner reaches one gym.
-    let ok = false;
-    let needs2fa = false;
-
-    if (user && user.is_active !== false) {
-      const passwordOk = await deps.verifyPassword(body.password, user.password_hash);
-      const isOwner = user.kind === 'gym_owner';
-
-      if (isOwner) {
-        const secondOk = user.totp_enabled ? await deps.verifySecondFactor(user, body.totp) : true;
-        ok = Boolean(passwordOk && secondOk);
-      } else if (!user.totp_enabled) {
-        needs2fa = passwordOk;
-      } else {
-        ok = Boolean(passwordOk && (await deps.verifySecondFactor(user, body.totp)));
-      }
-    }
-
-    if (needs2fa) {
+    if (outcome === 'needs2fa') {
       await deps.audit({ action: 'platform.login.blocked_no_2fa', actor_user_id: user.id });
       return json(res, 403, { error: 'This account requires two-factor authentication.' }), true;
     }
 
-    if (!ok) {
+    if (outcome === 'locked') {
+      await deps.audit({
+        action: 'platform.login.locked',
+        actor_user_id: user.id,
+        detail: { email: body.email, via: 'app' },
+      });
+      return json(res, 429, { error: LOCKED }), true;
+    }
+
+    if (outcome !== 'ok') {
       await deps.audit({ action: 'platform.login.failed', detail: { email: body.email, via: 'app' } });
       // One message for every failure, so the API cannot be used to discover
       // which accounts exist.
@@ -141,6 +137,19 @@ export async function handlePlatformApi(req, res, deps, { path, method, url }) {
   // thing — names the gym. It never signs anybody in, and it returns no member
   // data at all.
   if (path === 'api/member/find-gym' && method === 'POST') {
+    // Rate limited hard, and FIRST: this endpoint takes two guessable values
+    // and answers a question about a real person. Without a limit it is an
+    // oracle for "which gym does this phone number attend".
+    //
+    // Called, not `?.`-called. It used to be optional, the dependency was
+    // never written, and the optional chain turned "not wired" into "no
+    // limit" without a sound. A missing limiter is now a crash, which a test
+    // catches, rather than an open door, which nothing does.
+    const allowed = await deps.rateLimitFindGym(req);
+    if (!allowed) {
+      return json(res, 429, { error: 'Too many attempts. Please wait a minute and try again.' }), true;
+    }
+
     const body = await readJson(req);
     if (!body) return json(res, 400, { error: 'Malformed request.' }), true;
 
@@ -148,14 +157,6 @@ export async function handlePlatformApi(req, res, deps, { path, method, url }) {
       membershipNumber: body.membership_number,
       phone: body.phone,
     });
-
-    // Rate limited hard: this endpoint takes two guessable values and answers
-    // a question about a real person. Without a limit it is an oracle for
-    // "which gym does this phone number attend".
-    const allowed = await deps.rateLimitFindGym?.(req);
-    if (allowed === false) {
-      return json(res, 429, { error: 'Too many attempts. Please wait a minute and try again.' }), true;
-    }
 
     const matches = hash ? await deps.findGymsForMember(hash) : [];
     const routed = routeMember(matches);

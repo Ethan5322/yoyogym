@@ -53,6 +53,7 @@ function deps({ user = null, applications = [], application = null } = {}) {
     permissionsFor: async () => ['application.view', 'application.approve', 'application.reject'],
     findUserByEmail: async () => user,
     verifyPassword: async (plain) => plain === 'correct-horse',
+    saveLoginState: async () => {},
     verifySecondFactor: async (_u, code) => code === '123456',
     listApplications: async () => applications,
     getApplicationView: async () => application,

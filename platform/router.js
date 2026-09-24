@@ -34,6 +34,7 @@
 // router is testable with no database and no network.
 import { timingSafeEqual } from 'node:crypto';
 import { handlePlatformApi } from './api.js';
+import { decideLogin, INVALID, LOCKED } from './login.js';
 import {
   loginPage,
   applicationsPage,
@@ -93,7 +94,6 @@ const redirect = (res, location, headers = {}) => {
 };
 
 /** Generic on purpose: never reveal whether an email exists. */
-const INVALID = 'Invalid email, password or authentication code.';
 
 /**
  * Handle a request under /platform/*.
@@ -204,44 +204,16 @@ export async function handlePlatform(req, res, deps) {
 
     if (method === 'POST') {
       const form = await readFormBody(req);
-      const user = await deps.findUserByEmail(String(form.email || '').trim().toLowerCase());
 
-      // Every failure takes the same path and says the same thing, so the
-      // response cannot be used to discover which accounts exist.
-      let ok = false;
-      let needsSetup = false;
+      // The decision is platform/login.js, shared with the app door so the two
+      // cannot drift apart. Only the representation is decided here.
+      const { outcome, user } = await decideLogin(deps, {
+        email: form.email,
+        password: form.password,
+        totp: form.totp,
+      });
 
-      if (user && user.is_active !== false) {
-        const passwordOk = await deps.verifyPassword(form.password, user.password_hash);
-
-        // WHO NEEDS A SECOND FACTOR, and why it is not "everyone".
-        //
-        // A gym owner reaches ONE gym — their own. Platform staff reach EVERY
-        // gym on the platform, which is why D-077 makes 2FA mandatory for them
-        // and why a correct password alone must never be enough.
-        //
-        // Anything that is not explicitly a gym owner is treated as staff, so
-        // a mistyped or unrecognised `kind` in the database produces the
-        // STRICTER rule, never the weaker one.
-        const isOwner = user.kind === 'gym_owner';
-
-        if (isOwner) {
-          // Optional, but not decorative: an owner who has turned 2FA on must
-          // use it, or the setting would be a lie.
-          const secondOk = user.totp_enabled
-            ? await deps.verifySecondFactor(user, form.totp)
-            : true;
-          ok = Boolean(passwordOk && secondOk);
-        } else if (!user.totp_enabled) {
-          // Staff without 2FA cannot sign in at all. Half-finished setup is
-          // the situation the rule exists for, not an exception to it.
-          needsSetup = passwordOk;
-        } else {
-          ok = Boolean(passwordOk && (await deps.verifySecondFactor(user, form.totp)));
-        }
-      }
-
-      if (needsSetup) {
+      if (outcome === 'needs2fa') {
         await deps.audit({ action: 'platform.login.blocked_no_2fa', actor_user_id: user.id });
         return html(
           res,
@@ -254,7 +226,14 @@ export async function handlePlatform(req, res, deps) {
         );
       }
 
-      if (!ok) {
+      if (outcome === 'locked') {
+        await deps.audit({ action: 'platform.login.locked', actor_user_id: user.id, detail: { email: form.email } });
+        return html(res, 200, loginPage({ error: LOCKED }));
+      }
+
+      if (outcome !== 'ok') {
+        // Every failure takes the same path and says the same thing, so the
+        // response cannot be used to discover which accounts exist.
         await deps.audit({ action: 'platform.login.failed', detail: { email: form.email } });
         return html(res, 200, loginPage({ error: INVALID }));
       }

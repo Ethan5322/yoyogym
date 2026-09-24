@@ -15,6 +15,39 @@ occurrence is answered from notes rather than rediscovered.
 
 ---
 
+## 2026-09-24 — Protections that were written down but never wired
+
+Found by walking the app's flows end to end. **675 tests pass.** Not deployed.
+
+**Platform sign-in had no lockout.** `platform_users.failed_logins` and `locked_until` existed from
+the first schema, commented "5 attempts → 15 minute lock". No code read or wrote either. Gym owners
+sign in with a password alone, and that password reaches their gym and every member in it. Fixed in
+`platform/login.js`: one `decideLogin()` now called by **both** the website and the app door. The two
+doors used to carry their own copies of the rule, which is how the lockout ended up on neither.
+Attempts refused by the lock still count toward the brute-force alert.
+
+**`/platform/api/member/find-gym` was unlimited.** The comment said "rate limited hard" above
+`deps.rateLimitFindGym?.(req)`, and the dependency was never written. The optional chain turned "not
+wired" into "no limit" without a sound. Now called without `?.`, backed by `platform/ratelimit.js`
+(5 per 10 minutes per address), and listed in the deps-merge test, whose list of required
+dependencies was the other half of how this stayed hidden.
+
+**"Use my location" did not find the nearest gym.** It fetched any 25 active gyms, then sorted
+those 25. `platform/gym-search.js` now searches boxes of widening radius (25/100/500/2500 km, then
+anywhere). **And `Number(null) === 0` a fourth time:** a gym with no coordinates was measured as
+though it stood at 0°, 0°.
+
+**The app called a failed search "No gyms found"**, which told members their gym was not on Yoyo
+Gyms. It now reports a connection problem, and a slow older search answer can no longer overwrite
+a newer one.
+
+**Lesson recorded.** *A comment is not a control.* All three of the first findings had a comment,
+a column or a promise describing a protection that did not exist. When auditing, check that the
+comment is backed by code that actually runs. `?.` on a security dependency is a smell: it makes
+absence indistinguishable from permission.
+
+---
+
 ## 2026-09-21 — Cookies brought CSRF with them
 
 **Built** `platform/http.js`: session cookies, CSRF tokens and the route guard. **115 tests pass.**
