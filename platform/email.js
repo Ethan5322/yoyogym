@@ -137,6 +137,35 @@ If you did not ask for this, ignore this email. Your password stays as it is.`,
   };
 }
 
+/**
+ * "We have your application" — sent the moment an owner applies.
+ *
+ * Says what happens next and the one thing the owner can do right now:
+ * sign in and upload the documents a reviewer needs. Without it the owner's
+ * only record was a web page, and nothing told them documents were waiting.
+ */
+export function applicationReceivedEmail({ gymName, signInUrl }) {
+  const safeName = escapeHtml(gymName || 'your gym');
+  return {
+    subject: `We have your application for ${gymName || 'your gym'}`,
+    html: `<p>Thank you — your application to list <b>${safeName}</b> on Yoyo Gyms has arrived.</p>
+<p><b>What happens next</b></p>
+<ol>
+  <li><a href="${escapeHtml(signInUrl)}">Sign in</a> with this email and the password you chose, and upload your
+  documents: business registration, your ID, proof of your premises and tax clearance.</li>
+  <li>A person reviews your application and documents. We email you with the decision.</li>
+  <li>Once approved, you receive an activation link and code, and your gym opens.</li>
+</ol>
+<p style="color:#666;font-size:12px">If you did not apply, you can ignore this email.</p>`,
+    text: `Thank you — your application to list ${gymName || 'your gym'} on Yoyo Gyms has arrived.
+
+What happens next:
+1. Sign in at ${signInUrl} and upload your documents: business registration, ID, proof of premises, tax clearance.
+2. A person reviews your application. We email you with the decision.
+3. Once approved, you receive an activation link and code, and your gym opens.`,
+  };
+}
+
 /** A decision email — approved without activation, rejected, or more info wanted. */
 export function decisionEmail({ gymName, decision, reason }) {
   const safeName = escapeHtml(gymName || 'your gym');

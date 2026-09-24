@@ -119,13 +119,23 @@ test('requesting more information sends it back without deciding it', async () =
   assert.equal(d.events.at(-1).event, 'info_requested');
 });
 
-test('dry run is inherited — approving does not provision by accident', async () => {
+test('WITH PROVISIONING OFF, APPROVAL IS REFUSED AND NOTHING IS RECORDED', async () => {
+  // It used to record "approved" and run a dry run: no gym, no email, and an
+  // application that could never be approved again. The owner was stranded.
   const app = submitted();
   const d = deps(app);
 
-  await approveApplication('app-1', reviewer, d);   // no options
+  const r = await approveApplication('app-1', reviewer, d);   // no options: the default is off
 
-  assert.equal(d.provisioned[0].opts.dryRun, true, 'the default must reach the orchestrator');
+  assert.equal(r.ok, false);
+  assert.match(r.error, /PLATFORM_PROVISION_LIVE/, 'says exactly what to switch on');
+  assert.equal(d.provisioned.length, 0, 'nothing provisioned by accident');
+  assert.equal(app.status, 'submitted', 'the application is still open');
+  assert.equal(app.decided_at, undefined, 'no decision was spent');
+
+  // ...and once provisioning is on, the same application can be approved.
+  const later = await approveApplication('app-1', reviewer, d, { dryRun: false });
+  assert.equal(later.ok, true);
 });
 
 test('a failed provision does not leave the application looking successful', async () => {

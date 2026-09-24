@@ -63,6 +63,25 @@ export async function approveApplication(applicationId, actor, deps, options = {
     );
   }
 
+  // PROVISIONING SWITCHED OFF: REFUSE, AND RECORD NOTHING.
+  //
+  // This used to record the approval and then run a DRY RUN — which creates
+  // no gym and sends no activation email. The application was then marked
+  // "approved" for good, could never be approved again ("already decided"),
+  // and the owner waited for an email that would never come, while the panel
+  // reported success. Approval is a one-time decision, so it must not be
+  // spent on a rehearsal. Nothing is written; the application stays open.
+  if (dryRun) {
+    return {
+      ok: false,
+      dryRun: true,
+      error:
+        'Nothing was approved: creating gyms is switched off on this server. ' +
+        'Set PLATFORM_PROVISION_LIVE=true (with SUPABASE_PROJECT_REF and SUPABASE_MANAGEMENT_TOKEN) ' +
+        'in Vercel, redeploy, and approve again. The application is still waiting.',
+    };
+  }
+
   const now = new Date().toISOString();
 
   // The decision is recorded BEFORE provisioning is attempted. If provisioning

@@ -121,7 +121,8 @@ export function loginPage({ error = '' } = {}) {
     body: `
 <form class="card" method="post" action="/platform/login">
   <h1>Sign in</h1>
-  <p class="muted">Platform administration</p>
+  <p class="muted">For gym owners and Yoyo Gyms staff. Gym members sign in at their gym —
+  <a href="/platform/find">find your gym</a>.</p>
   ${error ? `<p class="err">${h(error)}</p>` : ''}
   <label>Email
     <input type="email" name="email" autocomplete="username" required>
@@ -382,7 +383,7 @@ ${error ? `<p class="err">${h(error)}</p>` : ''}
 
   <label>Choose a password
     <input type="password" name="password" required minlength="10" autocomplete="new-password">
-    <span class="muted">At least 10 characters. You will set up two-factor authentication next.</span>
+    <span class="muted">At least 10 characters. You will use it to follow your application and upload your documents.</span>
   </label>
 
   <div class="two">
@@ -425,8 +426,18 @@ export function signupSuccessPage({ gymName = '' } = {}) {
     title: 'Application received',
     body: `<h1>Application received</h1>
 <p>Thank you — we have your application for <b>${h(gymName)}</b>.</p>
-<p class="muted">A person reviews every application, so this is not instant. We will email you to
-ask for your documents, and again once a decision is made.</p>
+
+<div class="card">
+  <h2>What happens next</h2>
+  <ol>
+    <li><b>Upload your documents now.</b> <a href="/platform/login">Sign in</a> with your email and the
+    password you just chose, and open <b>Your gym</b>. We need your business registration, your ID,
+    proof of your premises and tax clearance.</li>
+    <li><b>A person reviews it.</b> It is not instant. We email you with the decision.</li>
+    <li><b>Once approved,</b> you receive an activation link and a code. Using them opens your gym,
+    and gives you your own gym admin panel.</li>
+  </ol>
+</div>
 <p class="muted">Your gym will not appear in member search until it is approved and live.</p>`,
   });
 }
@@ -1839,9 +1850,21 @@ export function dashboardPage({
   trialsEndingSoon = [],
   driftFindings = null,
   closureRequests = 0,
+  provisioningOff = false,
 } = {}) {
   // Ordered by what it costs to ignore, not by what is interesting.
   const needsYou = [];
+
+  // Applications are waiting and approving them CANNOT work: said before
+  // anyone presses Approve and wonders why nothing happened.
+  if (provisioningOff && waiting) {
+    needsYou.push({
+      urgency: 'high',
+      text: 'Creating gyms is switched off on this server, so approving an application cannot open a gym yet.',
+      href: '/platform/applications',
+      action: 'See what is waiting',
+    });
+  }
 
   // Someone asked to leave. The stores require it to be honoured, and an
   // owner still being billed after asking to close is a complaint waiting.
@@ -2054,5 +2077,51 @@ export function privacyPage({ approved = false, contact = '', operator = 'MuleSo
   <h2>Changes</h2>
   <p>If this policy changes, the new version is published here with its date.</p>
 </div>`,
+  });
+}
+
+// ---------------------------------------------------------------------------
+// The front door
+// ---------------------------------------------------------------------------
+
+/**
+ * What a visitor to the website sees first.
+ *
+ * The site root used to redirect straight to the STAFF sign-in, with no link
+ * anywhere to joining a gym or listing one. The owner application and the gym
+ * finder existed and nobody could reach them from the website. The staff
+ * panel is still the website's main job (D-133); this page only makes sure a
+ * gym member or a gym owner who arrives here has a way forward.
+ */
+export function welcomePage() {
+  return layout({
+    title: 'Yoyo Gyms',
+    indexable: true,
+    body: `<style>
+  .doors { display: grid; gap: 16px; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); margin: 24px 0; }
+  .door { display: block; padding: 24px; border-radius: 16px; text-decoration: none; color: inherit;
+          border: 1px solid var(--line); background: var(--card, transparent); }
+  .door:hover { border-color: #E63946; }
+  .door h2 { margin: 0 0 8px; }
+  .door .go { color: #E63946; font-weight: 600; }
+</style>
+<h1>Yoyo Gyms</h1>
+<p class="muted">Many gyms, one place to find them.</p>
+
+<div class="doors">
+  <a class="door" href="/platform/find">
+    <h2>I train at a gym</h2>
+    <p class="muted">Find your gym to join as a new member, or sign in with your membership number and phone.</p>
+    <span class="go">Find your gym →</span>
+  </a>
+  <a class="door" href="/platform/apply">
+    <h2>I own a gym</h2>
+    <p class="muted">List your gym on Yoyo Gyms. You get your own gym admin panel, member sign-up and check-in.</p>
+    <span class="go">List your gym →</span>
+  </a>
+</div>
+
+<p>Already applied, or already running your gym here? <a href="/platform/login">Sign in</a></p>
+<p class="muted"><a href="/platform/privacy">Privacy policy</a> · <a href="/platform/delete-account">Delete your account</a> · <a href="/platform/login">Yoyo staff sign in</a></p>`,
   });
 }

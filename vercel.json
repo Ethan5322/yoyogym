@@ -65,7 +65,7 @@
   "redirects": [
     {
       "source": "/",
-      "destination": "/platform/login",
+      "destination": "/platform/welcome",
       "permanent": false
     }
   ]

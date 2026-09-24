@@ -43,6 +43,7 @@ import {
   resetPage,
   resetDonePage,
   deleteAccountPage,
+  welcomePage,
   privacyPage,
   applicationsPage,
   applicationDetailPage,
@@ -327,6 +328,25 @@ export async function handlePlatform(req, res, deps) {
 
     const outcome = await deps.decide(decide[1], session, form.action, form.reason ?? '');
 
+    // A decision that did not go through is SAID. It used to redirect to the
+    // application as though it had worked, so a reviewer who pressed Approve
+    // with provisioning switched off saw nothing and assumed it was done.
+    if (outcome && outcome.ok === false) {
+      return html(
+        res,
+        409,
+        problemPage({
+          title: outcome.dryRun ? 'Creating gyms is switched off' : 'That decision did not go through',
+          message: outcome.error || 'Nothing was changed.',
+          // Plain text: problemPage escapes it, as it should.
+          fix: outcome.dryRun
+            ? 'In Vercel, open Settings → Environment Variables and set PLATFORM_PROVISION_LIVE to true, ' +
+              'plus SUPABASE_PROJECT_REF and SUPABASE_MANAGEMENT_TOKEN. Redeploy, then approve the application again.'
+            : null,
+        })
+      );
+    }
+
     // If the activation email could not be sent, the link must not vanish —
     // that was the bug that broke onboarding at the last step. It is handed
     // straight back to the reviewer, once, to send by hand.
@@ -585,6 +605,12 @@ async function handleExtraRoutes(req, res, deps, { url, path, method }) {
   }
 
   // ---- how to delete your account — the web route the stores require -------
+  // ---- the website's front door (vercel.json sends / here) ------------------
+  if (path === 'welcome' && method === 'GET') {
+    html(res, 200, welcomePage());
+    return true;
+  }
+
   if (path === 'delete-account' && method === 'GET') {
     html(res, 200, deleteAccountPage());
     return true;
@@ -885,6 +911,7 @@ async function handleExtraRoutes(req, res, deps, { url, path, method }) {
       activeGyms: allGyms.filter((g) => g.status === 'active').length,
       alerts: findAlerts(entries, { now: new Date() }).length,
       closureRequests,
+      provisioningOff: process.env.PLATFORM_PROVISION_LIVE !== 'true',
       unpricedPlans: finance.unpriced_plans || [],
       outstandingCents: finance.outstanding_cents ?? 0,
       currency: finance.currency || 'ZAR',

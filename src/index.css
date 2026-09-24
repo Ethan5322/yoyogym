@@ -175,6 +175,18 @@ textarea:focus-visible,
   -webkit-backdrop-filter: blur(8px);
   backdrop-filter: blur(8px);
   border-top: 1px solid rgba(230, 57, 70, 0.15);
+  /* THE ANSWER AREA SCROLLS, never overflows the chat.
+     .chat-shell is a fixed-height column (and clips its overflow on larger
+     screens). A step with a tall control — several membership plans, each
+     with benefits and its own "Choose" button; add-ons with Continue below
+     them — pushed its lower buttons past the bottom edge, where they could
+     not be reached. Registration looked frozen at "choose your membership /
+     services". Capped here, with its own scroll, the buttons are always
+     reachable and the question above stays visible. */
+  flex-shrink: 0;
+  max-height: 62dvh;
+  overflow-y: auto;
+  overscroll-behavior: contain;
 }
 
 /* Progress bar */

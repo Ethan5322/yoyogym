@@ -16,7 +16,7 @@ import { schemaRunnerDeps, gymSchemaChecksum, runSql } from './schema-runner.js'
 import { runBilling } from './billing-runner.js';
 import { issueActivation, activationLookupHash } from './activation.js';
 import { DOCUMENT_BUCKET } from './documents.js';
-import { sendEmail, activationEmail, billingEmail, emailConfigured, passwordResetEmail } from './email.js';
+import { sendEmail, activationEmail, billingEmail, emailConfigured, passwordResetEmail, applicationReceivedEmail } from './email.js';
 import { purgeExpiredDocuments } from './retention.js';
 import { directoryRow } from './member-directory.js';
 import { fileFacts } from './forensics.js';
@@ -292,7 +292,34 @@ export function platformDeps() {
       const { data: taken } = await db.from('gyms').select('id').eq('slug', slug).maybeSingle();
       if (taken) return { ok: false, error: 'A gym with a very similar name is already listed. Please contact us.' };
 
-      let { data: user } = await db.from('platform_users').select('id').eq('email', input.email).maybeSingle();
+      let { data: user } = await db
+        .from('platform_users')
+        .select('id, kind, is_active, password_hash')
+        .eq('email', input.email)
+        .maybeSingle();
+
+      // AN EXISTING ACCOUNT MUST BE PROVEN, NOT ASSUMED.
+      //
+      // This used to reuse any account with the typed email, without checking
+      // the password — so anyone could file applications under someone else's
+      // account (a Yoyo staff member's included) just by typing their address,
+      // and an approval would hand that person a gym they never asked for.
+      // Now: the same password, an active gym-owner account, or no.
+      if (user) {
+        const proven =
+          user.kind === 'gym_owner' &&
+          user.is_active !== false &&
+          user.password_hash &&
+          (await verifyPassword(input.password, user.password_hash));
+        if (!proven) {
+          return {
+            ok: false,
+            error:
+              'This email already has a Yoyo Gyms account. Use that account\'s password, ' +
+              'or reset it from the sign-in page if you have forgotten it.',
+          };
+        }
+      }
 
       if (!user) {
         const { data: created, error } = await db
@@ -341,6 +368,17 @@ export function platformDeps() {
         entity_id: application.id,
         detail: { gym_name: input.gym_name, plan: input.plan_key },
       });
+
+      // A confirmation, saying what happens next and where to upload the
+      // documents. Best-effort: a mail failure must never lose an application.
+      try {
+        await sendEmail({
+          to: input.email,
+          ...applicationReceivedEmail({ gymName: input.gym_name, signInUrl: `${platformBaseUrl()}/platform/login` }),
+        });
+      } catch {
+        /* the application is saved; the page already says what to do */
+      }
 
       return { ok: true, applicationId: application.id };
     },

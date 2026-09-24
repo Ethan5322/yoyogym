@@ -3,7 +3,7 @@
 // match, then issues a member session token.
 import { getSupabase } from '../../lib/supabase.js';
 import { allowMethods, readJsonBody, ok, badRequest, unauthorized, serverError } from '../../lib/http.js';
-import { signMemberToken, normalizePhone } from '../../lib/memberauth.js';
+import { signMemberToken, phoneMatches } from '../../lib/memberauth.js';
 import { rateLimit } from '../../lib/ratelimit.js';
 import { currentGym } from '../../lib/tenancy.js';
 
@@ -29,7 +29,9 @@ export default async function handler(req, res) {
       .maybeSingle();
     if (error) return serverError(res, error.message);
 
-    if (!member || normalizePhone(member.phone) !== normalizePhone(phone)) {
+    // phoneMatches, not a plain comparison: phones are stored +27…, and people
+    // type 082… (see memberauth.js).
+    if (!member || !phoneMatches(member.phone, phone)) {
       return unauthorized(res, 'We could not find a matching membership. Please check your details.');
     }
 

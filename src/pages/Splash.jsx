@@ -1,11 +1,15 @@
 // Splash / landing screen (spec 2.2). Branded entry shown after a QR scan.
 // Gym name, tagline, logo and welcome message come live from Admin → Settings
 // (via /api/content) — no per-gym code change required.
-import { Link } from 'react-router-dom';
+import { Link, useParams } from 'react-router-dom';
 import { useBranding } from '../lib/branding.js';
 
 export default function Splash() {
   const b = useBranding();
+  // Under /g/<gym>/ the links keep the gym in the address, so a refreshed or
+  // shared link still knows which gym it is for. Single-gym mode is unchanged.
+  const { slug } = useParams();
+  const base = slug ? `/g/${encodeURIComponent(slug)}` : '';
   const name = b.name || 'Your Gym Name';
   const tagline = b.tagline || 'Train harder. Live stronger.';
 
@@ -34,10 +38,10 @@ export default function Splash() {
         )}
 
         <div className="mt-12 space-y-4">
-          <Link to="/register" className="btn-primary w-full">
+          <Link to={`${base}/register`} className="btn-primary w-full">
             Join as a New Member
           </Link>
-          <Link to="/member" className="btn-outline w-full">
+          <Link to={`${base}/member`} className="btn-outline w-full">
             I am Already a Member
           </Link>
         </div>

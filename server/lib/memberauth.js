@@ -47,3 +47,34 @@ export function authenticateMember(req, res) {
 }
 
 export const normalizePhone = (p) => (p || '').replace(/[\s-]/g, '');
+
+/**
+ * Is this the member's phone, however it was typed?
+ *
+ * Registration stores phones internationally (+27821234567), and a member
+ * types the number the way they say it (082 123 4567). Compared after
+ * removing only spaces and dashes, those never matched: every KOM member who
+ * typed their phone the local way was told "We could not find a matching
+ * membership" — while the sign-in screen's own example showed the local form.
+ *
+ * Equal when the digits are equal, or when one is the national number with
+ * its trunk 0 and the other is the same number behind a 1-3 digit country
+ * code. Nothing looser: the membership number must still match exactly, and
+ * this never widens which member a number can reach.
+ */
+export function phoneMatches(stored, typed) {
+  const a = String(stored || '').replace(/\D/g, '');
+  const b = String(typed || '').replace(/\D/g, '');
+  if (!a || !b) return false;
+  if (a === b) return true;
+
+  // National significant number: the trunk 0 removed.
+  const na = a.replace(/^0+/, '');
+  const nb = b.replace(/^0+/, '');
+  if (na === nb) return true;
+
+  // One side carries a country code in front of the other's national number.
+  const [longer, shorter] = na.length > nb.length ? [na, nb] : [nb, na];
+  const prefix = longer.length - shorter.length;
+  return shorter.length >= 7 && prefix >= 1 && prefix <= 3 && longer.endsWith(shorter);
+}
