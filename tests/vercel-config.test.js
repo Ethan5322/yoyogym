@@ -49,7 +49,15 @@ test('the cron count stays within a Hobby plan', () => {
 });
 
 test('function duration stays within the Hobby limit', () => {
-  assert.ok(config.functions['api/**/*.js'].maxDuration <= 10);
+  // Checked against Vercel's docs (functions/configuring-functions/duration,
+  // updated 2026-08-24): Hobby may run up to 300 s with Fluid compute, and
+  // 60 s without it. 60 is safe on either. It was 10, the old Hobby cap, which
+  // is too short for creating a gym: schema, seed, registry, subscription and
+  // exposing the schema all happen inside the one "Approve" request, and a
+  // timeout part-way would leave a half-built gym.
+  const max = config.functions['api/**/*.js'].maxDuration;
+  assert.ok(max <= 60, `${max}s is over the Hobby limit without Fluid compute`);
+  assert.ok(max >= 60, 'gym creation needs the time');
 });
 
 test('the SPA rewrite still lets /api through', () => {
