@@ -22,6 +22,7 @@ import { completeActivation } from './activation.js';
 import { validateUploadRequest, pathBelongsTo, documentRow } from './documents.js';
 import { lookupHash, routeMember } from './member-directory.js';
 import { decideLogin, INVALID, LOCKED } from './login.js';
+import { requestReset, completeReset } from './password-reset.js';
 
 const json = (res, status, body) => {
   res.writeHead(status, {
@@ -235,6 +236,27 @@ export async function handlePlatformApi(req, res, deps, { path, method, url }) {
     if (!result.ok) return json(res, 400, { error: result.reason }), true;
 
     return json(res, 200, { ok: true, gym_activated: result.gymActivated }), true;
+  }
+
+  // ---- forgot password (owners and staff) ---------------------------------
+  // The same two functions as the website's /platform/forgot and /reset, so
+  // the app cannot become the weaker door.
+  if (path === 'api/forgot' && method === 'POST') {
+    if (!(await deps.rateLimitReset(req))) {
+      return json(res, 429, { error: 'Too many requests. Please wait a few minutes and try again.' }), true;
+    }
+    const body = await readJson(req);
+    if (!body) return json(res, 400, { error: 'Malformed request.' }), true;
+    // 200 with the same sentence whether or not the account exists.
+    return json(res, 200, await requestReset(deps, { email: body.email })), true;
+  }
+
+  if (path === 'api/reset' && method === 'POST') {
+    const body = await readJson(req);
+    if (!body) return json(res, 400, { error: 'Malformed request.' }), true;
+    const result = await completeReset(deps, { token: body.token, password: body.password });
+    if (!result.ok) return json(res, 400, { error: result.reason }), true;
+    return json(res, 200, { ok: true, gym_accounts_updated: result.gymAccountsUpdated }), true;
   }
 
   // ---- everything below needs a signed-in owner ---------------------------

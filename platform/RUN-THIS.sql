@@ -280,6 +280,21 @@ create index if not exists owner_activations_user_idx    on platform.owner_activ
 create index if not exists owner_activations_expires_idx on platform.owner_activations(expires_at);
 
 -- -----------------------------------------------------------------------------
+-- password_resets — "I forgot my password" for platform accounts.
+-- HASHES ONLY, one hour, single use (platform/password-reset.js).
+-- -----------------------------------------------------------------------------
+create table if not exists platform.password_resets (
+  id         uuid primary key default gen_random_uuid(),
+  user_id    uuid not null references platform.platform_users(id) on delete cascade,
+  token_hash text not null unique,
+  expires_at timestamptz not null,
+  used_at    timestamptz,
+  created_at timestamptz not null default now()
+);
+create index if not exists password_resets_user_idx on platform.password_resets(user_id);
+
+
+-- -----------------------------------------------------------------------------
 -- gym_connections — how the platform reaches ONE gym's Supabase project.
 -- status: provisioning | healthy | degraded | unreachable | retired
 -- -----------------------------------------------------------------------------
@@ -518,6 +533,7 @@ create index if not exists migration_runs_mig_idx    on platform.migration_runs(
 -- This is the same posture as db/schema.sql and is deliberate, not an oversight.
 -- =============================================================================
 alter table platform.platform_users            enable row level security;
+alter table platform.password_resets          enable row level security;
 alter table platform.platform_roles            enable row level security;
 alter table platform.platform_permissions      enable row level security;
 alter table platform.platform_role_permissions enable row level security;

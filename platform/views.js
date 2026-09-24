@@ -129,13 +129,70 @@ export function loginPage({ error = '' } = {}) {
   <label>Password
     <input type="password" name="password" autocomplete="current-password" required>
   </label>
-  <label>Authentication code
+  <label>Authentication code <span class="muted">(if you have set one up)</span>
     <input type="text" name="totp" inputmode="numeric" autocomplete="one-time-code"
-           pattern="[0-9]*" placeholder="6 digits" required>
+           placeholder="6 digits">
   </label>
   <button type="submit">Sign in</button>
+  <p><a href="/platform/forgot">Forgot your password?</a></p>
   <p class="muted">Lost your device? Use a recovery code in place of the authentication code.</p>
 </form>`,
+  });
+  // The code field used to be `required`. Two-factor is REQUIRED for Yoyo
+  // staff but OPTIONAL for gym owners (D-119), so an owner without it could
+  // not submit the form until they typed something meaningless into a box
+  // they had never been given. Staff without a code are still refused — by
+  // the server, which is where that rule belongs. `pattern` went with it: a
+  // recovery code is not all digits.
+}
+
+/** "I forgot my password." The same answer whether or not the account exists. */
+export function forgotPage({ message = '', error = '' } = {}) {
+  return layout({
+    title: 'Reset your password',
+    body: `
+<form class="card" method="post" action="/platform/forgot">
+  <h1>Reset your password</h1>
+  ${message ? `<p>${h(message)}</p>` : `<p class="muted">Enter the email you sign in with. We will send a link to choose a new password.</p>`}
+  ${error ? `<p class="err">${h(error)}</p>` : ''}
+  <label>Email
+    <input type="email" name="email" autocomplete="username" required>
+  </label>
+  <button type="submit">Send the link</button>
+  <p><a href="/platform/login">Back to sign in</a></p>
+</form>`,
+  });
+}
+
+/** Choose a new password, from the emailed link. */
+export function resetPage({ token = '', error = '' } = {}) {
+  return layout({
+    title: 'Choose a new password',
+    body: `
+<form class="card" method="post" action="/platform/reset">
+  <h1>Choose a new password</h1>
+  ${error ? `<p class="err">${h(error)}</p>` : ''}
+  <input type="hidden" name="token" value="${h(token)}">
+  <label>New password
+    <input type="password" name="password" autocomplete="new-password" minlength="10" required>
+  </label>
+  <p class="muted">At least 10 characters. If you own a gym, this also becomes your sign-in for its admin panel.</p>
+  <button type="submit">Save password</button>
+</form>`,
+  });
+}
+
+/** Done. Says plainly what changed, and where to go next. */
+export function resetDonePage({ gymAccountsUpdated = 0 } = {}) {
+  return layout({
+    title: 'Password changed',
+    body: `
+<div class="card">
+  <h1>Password changed</h1>
+  <p>You can sign in with your new password now.</p>
+  ${gymAccountsUpdated ? '<p class="muted">Your gym\'s admin panel uses the new password too — sign in there as <b>owner</b>.</p>' : ''}
+  <p><a href="/platform/login">Sign in</a></p>
+</div>`,
   });
 }
 

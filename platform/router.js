@@ -35,8 +35,12 @@
 import { timingSafeEqual } from 'node:crypto';
 import { handlePlatformApi } from './api.js';
 import { decideLogin, INVALID, LOCKED } from './login.js';
+import { requestReset, completeReset } from './password-reset.js';
 import {
   loginPage,
+  forgotPage,
+  resetPage,
+  resetDonePage,
   applicationsPage,
   applicationDetailPage,
   signupPage,
@@ -459,6 +463,45 @@ async function handleExtraRoutes(req, res, deps, { url, path, method }) {
   // signed in to yet, and the link-plus-code IS the credential. A cross-site
   // request here would need both halves, and an attacker with both does not
   // need the victim's browser.
+  // ---- forgot password ------------------------------------------------------
+  // (Inside handleExtraRoutes, a handled request must RETURN TRUE. html()
+  // returns nothing, so `return html(...)` reads as "not handled" and the
+  // caller writes a 404 over the page.)
+  if (path === 'forgot') {
+    if (method === 'GET') {
+      html(res, 200, forgotPage({}));
+      return true;
+    }
+
+    if (method === 'POST') {
+      if (!(await deps.rateLimitReset(req))) {
+        html(res, 429, forgotPage({ error: 'Too many requests. Please wait a few minutes and try again.' }));
+        return true;
+      }
+      const form = await readFormBody(req);
+      const { message } = await requestReset(deps, { email: form.email });
+      html(res, 200, forgotPage({ message }));
+      return true;
+    }
+  }
+
+  if (path === 'reset') {
+    if (method === 'GET') {
+      html(res, 200, resetPage({ token: url.searchParams.get('token') || '' }));
+      return true;
+    }
+
+    if (method === 'POST') {
+      const form = await readFormBody(req);
+      const result = await completeReset(deps, { token: form.token, password: form.password });
+      // The token is echoed back on a too-short password, so the person can
+      // try again without going back to their inbox.
+      if (!result.ok) html(res, 400, resetPage({ token: form.token, error: result.reason }));
+      else html(res, 200, resetDonePage({ gymAccountsUpdated: result.gymAccountsUpdated }));
+      return true;
+    }
+  }
+
   if (path === 'activate') {
     if (method === 'GET') {
       const token = url.searchParams.get('token') || '';

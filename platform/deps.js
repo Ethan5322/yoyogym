@@ -16,7 +16,7 @@ import { schemaRunnerDeps, gymSchemaChecksum, runSql } from './schema-runner.js'
 import { runBilling } from './billing-runner.js';
 import { issueActivation, activationLookupHash } from './activation.js';
 import { DOCUMENT_BUCKET } from './documents.js';
-import { sendEmail, activationEmail, billingEmail, emailConfigured } from './email.js';
+import { sendEmail, activationEmail, billingEmail, emailConfigured, passwordResetEmail } from './email.js';
 import { purgeExpiredDocuments } from './retention.js';
 import { directoryRow } from './member-directory.js';
 import { fileFacts } from './forensics.js';
@@ -39,6 +39,10 @@ let _db = null;
 // Five lookups per ten minutes per address: a member who has forgotten their
 // gym needs one or two, and anyone needing fifty is asking about other people.
 const findGymLimiter = makeLimiter({ key: 'find-gym', limit: 5, windowMs: 10 * 60_000 });
+
+// Password-reset requests: each one sends an email, so without a limit the
+// form is a way to flood someone's inbox from our address.
+const resetLimiter = makeLimiter({ key: 'password-reset', limit: 5, windowMs: 15 * 60_000 });
 
 /** The platform database client, scoped to the `platform` schema. */
 export function platformDb() {
@@ -1010,6 +1014,36 @@ export function activationDeps(db = platformDb()) {
 
       return true;
     },
+
+    // ---- password reset (platform/password-reset.js) -------------------
+    saveReset: async (row) => {
+      const { error } = await db.from('password_resets').insert(row);
+      if (error) throw new Error(`Could not create the reset: ${error.message}`);
+    },
+
+    findReset: async (tokenHash) => {
+      const { data } = await db.from('password_resets').select('*').eq('token_hash', tokenHash).maybeSingle();
+      return data ?? null;
+    },
+
+    markResetsUsed: async (userId, at) => {
+      await db.from('password_resets').update({ used_at: at }).eq('user_id', userId).is('used_at', null);
+    },
+
+    /** Every gym this account owns — each has a gym-side sign-in to keep in step. */
+    gymsOwnedBy: async (userId) => {
+      const { data, error } = await db.from('gyms').select('id').eq('owner_user_id', userId);
+      if (error) throw new Error(`Could not read the owner's gyms: ${error.message}`);
+      return (data ?? []).map((g) => g.id);
+    },
+
+    sendResetEmail: async ({ to, token }) => {
+      const base = process.env.PLATFORM_BASE_URL || '';
+      const link = `${base}/platform/reset?token=${encodeURIComponent(token)}`;
+      return sendEmail({ to, ...passwordResetEmail({ link }) });
+    },
+
+    rateLimitReset: (req) => resetLimiter(req),
 
     // NOTE: deliberately no `setGymStatus` here. platformOpsDeps() already
     // provides one, these objects are merged at the entry point, and the ops

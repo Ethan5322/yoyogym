@@ -95,6 +95,33 @@ This link expires in ${expiresInHours} hours.`,
   };
 }
 
+/**
+ * The password-reset email.
+ *
+ * Says what the link does, how long it lasts, and — for the person who did
+ * NOT ask — that ignoring it changes nothing. That last line is what stops a
+ * reset email from reading as a breach notice.
+ */
+export function passwordResetEmail({ link, expiresInMinutes = 60 }) {
+  return {
+    subject: 'Reset your Yoyo Gyms password',
+    html: `<p>Someone asked to reset the password for this Yoyo Gyms account.</p>
+<p><a href="${escapeHtml(link)}">Choose a new password</a></p>
+<p><b>This link works once, for ${expiresInMinutes} minutes.</b> If you own a gym, the new
+password also becomes your sign-in for your gym's admin panel.</p>
+<p style="color:#666;font-size:12px">If you did not ask for this, ignore this email. Your
+password stays as it is unless someone uses this link.</p>`,
+    text: `Someone asked to reset the password for this Yoyo Gyms account.
+
+Choose a new password: ${link}
+
+This link works once, for ${expiresInMinutes} minutes. If you own a gym, the new password
+also becomes your sign-in for your gym's admin panel.
+
+If you did not ask for this, ignore this email. Your password stays as it is.`,
+  };
+}
+
 /** A decision email — approved without activation, rejected, or more info wanted. */
 export function decisionEmail({ gymName, decision, reason }) {
   const safeName = escapeHtml(gymName || 'your gym');
