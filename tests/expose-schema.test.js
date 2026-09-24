@@ -110,7 +110,8 @@ test('the generated module matches db/schema.sql exactly', async () => {
   const { readFileSync: read } = await import('node:fs');
   const { GYM_SCHEMA_SQL } = await import('../db/schema.sql.js');
 
-  assert.equal(GYM_SCHEMA_SQL, read('db/schema.sql', 'utf8'), 'run `npm run build:schema`');
+  // Compared with line endings normalised, as the generator writes them.
+  assert.equal(GYM_SCHEMA_SQL, read('db/schema.sql', 'utf8').replace(/\r\n/g, '\n'), 'run `npm run build:schema`');
 });
 
 test('the checksum is real, so a gym records what it was built from', async () => {

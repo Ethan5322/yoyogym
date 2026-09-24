@@ -18,7 +18,12 @@
 // what a gym's database looks like; this is a build artefact of it.
 import { readFileSync, writeFileSync } from 'node:fs';
 
-const sql = readFileSync('db/schema.sql', 'utf8');
+// LINE ENDINGS NORMALISED. A Windows checkout gives db/schema.sql CRLF endings
+// and Linux gives LF, so the same schema generated different modules - and
+// different checksums, which the drift report compares per gym. CI on Linux
+// failed on a module generated on Windows. The schema is now the same bytes
+// wherever it is built.
+const sql = readFileSync('db/schema.sql', 'utf8').replace(/\r\n/g, '\n');
 
 const module = `// GENERATED from db/schema.sql by scripts/build-schema-module.mjs.
 // Do not edit. Run \`npm run build:schema\` after changing db/schema.sql.

@@ -115,5 +115,6 @@ test('the bundled gym schema matches db/schema.sql', async () => {
   // Provisioning uses db/schema.sql.js; a stale bundle would build new gyms
   // without the deletion column.
   const { GYM_SCHEMA_SQL } = await import('../db/schema.sql.js');
-  assert.equal(GYM_SCHEMA_SQL, fs.readFileSync('db/schema.sql', 'utf8'));
+  assert.equal(GYM_SCHEMA_SQL, fs.readFileSync('db/schema.sql', 'utf8').replace(/\r\n/g, '\n'));
+  assert.ok(!GYM_SCHEMA_SQL.includes('\r'), 'the same bytes on every operating system');
 });
