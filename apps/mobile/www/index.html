@@ -145,6 +145,186 @@
       .scan-foot .link { color: #9fb0b3; }
 
       .hidden { display: none; }
+
+      /* ==== The member area (member.js) ===================================
+         One dark surface, the GYM'S accent at about 10%, four text sizes
+         (32 / 20 / 16 / 13), two weights, an 8-point grid. Numbers use
+         tabular figures so they do not jiggle as they change.            */
+      body.in-member { padding: 0; background: #0e1416; }
+      body.in-member > *:not(#member):not(.m-toast) { display: none; }
+      #member {
+        --m-accent: #e63946;
+        --m-ground: #0e1416;
+        --m-surface: #172024;
+        --m-line: rgba(255, 255, 255, 0.08);
+        --m-text: #ffffff;
+        --m-muted: rgba(255, 255, 255, 0.64);
+        --m-good: #2fbf71;
+        --m-warn: #f2b33d;
+        --m-bad: #ff6b5e;
+        min-height: 100dvh;
+        color: var(--m-text);
+        background: var(--m-ground);
+        display: flex;
+        flex-direction: column;
+      }
+      #member h1 { font-size: 32px; line-height: 1.15; margin: 0; font-weight: 700; letter-spacing: -0.01em; }
+      #member h2 { font-size: 20px; margin: 0 0 16px; font-weight: 700; }
+      #member label { color: var(--m-muted); font-weight: 600; font-size: 13px; margin: 16px 0 8px; }
+      #member input { background: #0e1416; color: #fff; border-color: var(--m-line); }
+      #member input:focus { outline: 2px solid var(--m-accent); outline-offset: 1px; }
+      .m-num { font-variant-numeric: tabular-nums; }
+      .m-eyebrow { color: var(--m-muted); margin: 0 0 8px; font-size: 16px; }
+      .m-sub { color: var(--m-muted); font-size: 13px; }
+      .m-hint { color: var(--m-muted); font-size: 13px; text-align: center; margin: 8px 0 24px; }
+      .m-note { color: var(--m-warn); font-size: 13px; }
+      .m-err { color: var(--m-bad); font-size: 13px; min-height: 16px; margin: 8px 0 0; }
+
+      .m-top {
+        position: sticky; top: 0; z-index: 2;
+        padding: max(16px, env(safe-area-inset-top)) 24px 16px;
+        background: linear-gradient(var(--m-ground) 70%, transparent);
+      }
+      .m-gym { font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; font-size: 13px; color: var(--m-muted); }
+      .m-main { flex: 1; padding: 0 24px calc(96px + env(safe-area-inset-bottom)); }
+      .m-hello { margin: 8px 0 24px; }
+
+      .m-card {
+        background: var(--m-surface);
+        border: 1px solid var(--m-line);
+        border-radius: 24px;
+        padding: 24px;
+        margin-bottom: 16px;
+        box-shadow: 0 16px 32px rgba(0, 0, 0, 0.28);
+      }
+
+      /* Status: the first thing a member wants to know. */
+      .m-status { display: flex; gap: 16px; align-items: center; }
+      .m-status b { display: block; font-size: 20px; }
+      .m-status span { color: var(--m-muted); font-size: 13px; }
+      .m-dot { width: 12px; height: 12px; border-radius: 50%; flex: none; background: var(--m-warn); box-shadow: 0 0 0 6px rgba(242, 179, 61, 0.16); }
+      .m-status.is-good .m-dot { background: var(--m-good); box-shadow: 0 0 0 6px rgba(47, 191, 113, 0.16); }
+      .m-status.is-bad .m-dot { background: var(--m-bad); box-shadow: 0 0 0 6px rgba(255, 107, 94, 0.16); }
+      .m-owe { border-color: rgba(255, 107, 94, 0.4); }
+      .m-owe b { display: block; color: var(--m-bad); }
+      .m-owe span { color: var(--m-muted); font-size: 13px; }
+
+      /* Check-in: the peak moment. Big, round, in the thumb zone. */
+      .m-checkin {
+        position: relative; display: grid; place-items: center;
+        width: 184px; height: 184px; margin: 24px auto 0; padding: 0;
+        border-radius: 50%; min-height: 0;
+        /* Plain first: an older WebView without color-mix() ignores the next
+           line entirely, and must still see a coloured button. */
+        background: var(--m-accent);
+        background: radial-gradient(circle at 50% 35%, color-mix(in srgb, var(--m-accent) 88%, #fff), var(--m-accent));
+        color: #fff; font-size: 20px;
+        box-shadow: 0 16px 48px color-mix(in srgb, var(--m-accent) 45%, transparent), inset 0 2px 0 rgba(255, 255, 255, 0.28);
+        transition: transform 0.15s ease;
+      }
+      .m-checkin:active { transform: scale(0.96); }
+      .m-checkin:disabled { background: #2a3337; box-shadow: none; color: var(--m-muted); }
+      .m-checkin__ring { position: absolute; inset: -8px; border-radius: 50%; border: 2px solid color-mix(in srgb, var(--m-accent) 40%, transparent); }
+      .m-checkin.is-busy .m-checkin__ring { animation: m-spin 1s linear infinite; border-top-color: #fff; }
+      .m-checkin.is-done { background: var(--m-good); box-shadow: 0 16px 48px rgba(47, 191, 113, 0.4); animation: m-pop 0.4s ease; }
+      @keyframes m-spin { to { transform: rotate(360deg); } }
+      @keyframes m-pop { 50% { transform: scale(1.06); } }
+
+      .m-progress__top { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 16px; }
+      .m-progress__top span { color: var(--m-muted); font-size: 13px; }
+      .m-progress__top b { font-size: 32px; }
+      .m-progress__top small { font-size: 16px; color: var(--m-muted); }
+      .m-bar { height: 8px; border-radius: 8px; background: rgba(255, 255, 255, 0.08); overflow: hidden; margin-bottom: 8px; }
+      .m-bar i { display: block; height: 100%; background: var(--m-accent); border-radius: 8px; transition: width 0.6s ease; }
+
+      /* The card: made to be shown across a desk. */
+      .m-pass {
+        background: #fff; color: #0e1416; border-radius: 24px; padding: 24px;
+        display: flex; flex-direction: column; align-items: center; gap: 8px;
+        box-shadow: 0 24px 48px rgba(0, 0, 0, 0.4);
+      }
+      .m-pass__head { width: 100%; display: flex; justify-content: space-between; align-items: center; font-weight: 700; margin-bottom: 8px; }
+      .m-pass canvas { width: 240px; height: 240px; }
+      .m-pass__name { font-size: 20px; margin-top: 8px; }
+      .m-pass__no { font-size: 16px; letter-spacing: 0.06em; }
+      .m-pass .m-sub { color: #5b6a6d; }
+      .m-pill { font-size: 13px; padding: 4px 12px; border-radius: 16px; background: #fdf1d8; color: #7a5200; }
+      .m-pill.is-good { background: #dcf5e7; color: #16693c; }
+      .m-pill.is-bad { background: #fde3e0; color: #8c2f22; }
+
+      /* Classes */
+      .m-day { font-size: 13px !important; text-transform: uppercase; letter-spacing: 0.08em; color: var(--m-muted); margin: 24px 0 8px !important; }
+      .m-class { display: flex; align-items: center; gap: 16px; padding: 16px; }
+      .m-class__time { font-size: 20px; font-weight: 700; min-width: 56px; }
+      .m-class__body { flex: 1; min-width: 0; }
+      .m-class__body b { display: block; }
+      .m-class__body span { color: var(--m-muted); font-size: 13px; }
+      .m-chip {
+        width: auto; min-height: 44px; margin: 0; padding: 0 16px; font-size: 13px;
+        border-radius: 24px; background: rgba(255, 255, 255, 0.12);
+        background: color-mix(in srgb, var(--m-accent) 16%, transparent); color: #fff;
+      }
+      .m-chip.is-on { background: var(--m-good); }
+      .m-chip.is-off { display: inline-flex; align-items: center; color: var(--m-muted); background: transparent; }
+
+      /* Profile */
+      .m-list { padding: 8px 0; }
+      .m-row {
+        display: flex; justify-content: space-between; align-items: center; gap: 16px;
+        width: 100%; min-height: 56px; margin: 0; padding: 0 24px; border-radius: 0;
+        background: transparent; color: #fff; font-weight: 500; text-align: left;
+      }
+      .m-row + .m-row { border-top: 1px solid var(--m-line); }
+      .m-row.is-static { flex-direction: column; align-items: flex-start; justify-content: center; gap: 0; padding: 8px 24px; }
+      .m-row span:last-child { color: var(--m-muted); }
+
+      .m-primary { background: var(--m-accent); }
+      .m-secondary { background: rgba(255, 255, 255, 0.08); color: #fff; }
+      .m-danger { background: transparent; color: var(--m-bad); font-weight: 500; }
+
+      .m-empty { text-align: center; padding: 48px 24px; color: var(--m-muted); }
+      .m-empty b { display: block; color: #fff; font-size: 20px; margin-bottom: 8px; }
+
+      .m-skel i { display: block; height: 88px; border-radius: 24px; margin-bottom: 16px; background: linear-gradient(90deg, #172024, #1f2a2e, #172024); background-size: 200% 100%; animation: m-shimmer 1.2s infinite; }
+      .m-skel i.is-tall { height: 184px; width: 184px; border-radius: 50%; margin: 24px auto; }
+      @keyframes m-shimmer { to { background-position: -200% 0; } }
+
+      /* Tabs: in the thumb zone, above the home indicator. */
+      .m-tabs {
+        position: fixed; left: 0; right: 0; bottom: 0; z-index: 3;
+        display: flex; justify-content: space-around;
+        padding: 8px 8px max(8px, env(safe-area-inset-bottom));
+        background: rgba(14, 20, 22, 0.92); backdrop-filter: blur(16px);
+        border-top: 1px solid var(--m-line);
+      }
+      .m-tab {
+        flex: 1; width: auto; min-height: 56px; margin: 0; padding: 4px 0;
+        background: transparent; color: var(--m-muted); font-size: 13px; font-weight: 500;
+        display: flex; flex-direction: column; align-items: center; gap: 4px; border-radius: 16px;
+      }
+      .m-tab svg { width: 24px; height: 24px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+      .m-tab.is-on { color: #fff; }
+      .m-tab.is-on svg { stroke: var(--m-accent); }
+
+      /* Sign in */
+      .m-signin { padding: max(16px, env(safe-area-inset-top)) 24px max(24px, env(safe-area-inset-bottom)); }
+      .m-back { width: auto; min-height: 44px; margin: 0; padding: 0; background: none; color: var(--m-muted); font-weight: 500; }
+      .m-hero { margin: 24px 0 32px; }
+      .m-join { text-align: center; margin-top: 24px; color: var(--m-muted); }
+      .m-join p { margin: 0 0 8px; }
+
+      .m-toast {
+        position: fixed; left: 24px; right: 24px; bottom: calc(96px + env(safe-area-inset-bottom)); z-index: 5;
+        background: #fff; color: #0e1416; border-radius: 16px; padding: 16px; font-weight: 600; text-align: center;
+        box-shadow: 0 16px 32px rgba(0, 0, 0, 0.4); transition: opacity 0.3s, transform 0.3s;
+      }
+      .m-toast.is-bad { background: var(--m-bad, #ff6b5e); color: #fff; }
+      .m-toast.is-out { opacity: 0; transform: translateY(8px); }
+
+      @media (prefers-reduced-motion: reduce) {
+        .m-checkin, .m-bar i, .m-toast { transition: none; }
+        .m-checkin.is-busy .m-checkin__ring, .m-skel i, .m-checkin.is-done { animation: none; }
+      }
       .back { color: #9fb0b3; background: none; text-align: left; width: auto;
               min-height: 44px; padding: 0; margin: 0 0 0.5rem; text-decoration: underline; }
     </style>
@@ -260,8 +440,13 @@
       </div>
     </div>
 
+    <!-- ============ 5. The member's own area (member.js) ============ -->
+    <div id="member" class="hidden"></div>
+
     <script src="config.js"></script>
     <script src="qr-payload.js"></script>
+    <script src="vendor-qrcode.js"></script>
+    <script src="member.js"></script>
     <script src="app.js"></script>
   </body>
 </html>

@@ -95,7 +95,8 @@
 
   document.getElementById('mine-open').addEventListener('click', function () {
     var mine = myGym();
-    if (mine) go('/g/' + encodeURIComponent(mine.slug) + '/member');
+    // The app's own member screens (member.js), not the gym's website.
+    if (mine) window.YOYO_MEMBER.open(mine.slug, { name: mine.name });
   });
 
   document.getElementById('mine-forget').addEventListener('click', function () {
@@ -254,8 +255,11 @@
     if (!button) return;
     var slug = button.dataset.slug;
     rememberGym(slug, button.dataset.name);
-    go(intent === 'register' ? '/g/' + encodeURIComponent(slug) + '/register'
-                             : '/g/' + encodeURIComponent(slug) + '/member');
+    // Joining is the gym's own registration flow, on its web screens — the
+    // PAR-Q and agreements are handled there and only there. Signing in is the
+    // app's own member area.
+    if (intent === 'register') go('/g/' + encodeURIComponent(slug) + '/register');
+    else window.YOYO_MEMBER.open(slug, { name: button.dataset.name });
   });
 
   document.getElementById('near').addEventListener('click', function () {
@@ -391,7 +395,14 @@
           return w.charAt(0).toUpperCase() + w.slice(1);
         }).join(' '));
       }
-      go(window.YOYO_QR.pathForPayload(payload));
+      // A member's own card opens sign-in with the number filled in — never
+      // signed in (CLAUDE.md §14). A gym's poster opens that gym, offering
+      // both signing in and joining.
+      if (payload.kind === 'member') {
+        window.YOYO_MEMBER.open(payload.slug, { number: payload.membershipNumber });
+      } else {
+        window.YOYO_MEMBER.open(payload.slug, { join: true });
+      }
     } catch (err) {
       scanFailed('The camera could not start. Search by name instead.', true);
     }
@@ -449,6 +460,10 @@
         findNote.textContent = 'Could not reach Yoyo Gyms. Check your connection and try again.';
       });
   });
+
+  // What member.js needs from here: the one way to leave the app for a web
+  // screen (so the allowed-host check is never bypassed), and the way home.
+  window.YOYO_APP = Object.freeze({ go: go, home: function () { show('home'); } });
 
   show('home');
 })();
