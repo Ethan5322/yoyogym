@@ -91,6 +91,7 @@ test('AN OWNER CAN ASK TO CLOSE THEIR ACCOUNT, AND THE PAGE SAYS WHAT HAPPENS', 
   assert.match(page, /action="\/platform\/my-gym\/close"/);
   assert.match(page, /name="csrf"/);
   assert.match(page, /90 days/);
+  assert.ok(!/deleted 90 days later/.test(page), 'no automatic deletion exists (D-071), so none is promised');
   assert.match(page, /Download anything you want to keep/);
 });
 

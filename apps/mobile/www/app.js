@@ -159,6 +159,8 @@
 
     if (where === 'home') return show('home');
 
+    if (where === 'privacy') return go('/platform/privacy');
+    if (where === 'delete-account') return go('/platform/delete-account');
     if (where === 'owner-register') return go('/platform/apply');
     if (where === 'owner-signin') return go('/platform/login');
 

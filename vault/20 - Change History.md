@@ -15,6 +15,48 @@ occurrence is answered from notes rather than rediscovered.
 
 ---
 
+## 2026-09-24 — Store blockers: password recovery, account deletion, privacy policy
+
+**755 tests pass.** Not deployed. **Two migrations written and NOT run:**
+`platform/migrations/2026-09-24-password-resets.sql` and `2026-09-24-account-closure.sql`.
+
+**Password recovery** did not exist. The new `platform/password-reset.js` uses single-use links
+that last one hour and are stored as hashes only. A request gets the same answer whether or not the
+account exists, and requests are rate limited.
+
+**A reset sets both of the owner's passwords.** Activation gives the owner the same password on the
+platform and inside their gym, so a reset that changed only one would have locked them out of their
+own gym.
+
+**Also fixed:** the sign-in page marked the 2FA code as `required`, which is optional for owners.
+
+**Deletion:**
+- Erasing a member left their entry in `platform.member_directory`, so the platform could still say
+  which gym they had belonged to. They are now removed from it, and a failure is reported to the owner.
+- Members' deletion requests now appear on the gym dashboard by name.
+- Owners can ask to close their account. This records the request and deletes nothing by itself.
+- `/platform/delete-account` is the web route the stores require.
+
+**Privacy policy** at `/platform/privacy`. It is written from the code, and a test fails if the
+code calls an outside service the policy does not name. It shows as a **DRAFT** until
+`PLATFORM_PRIVACY_APPROVED=true`.
+
+**Found while writing the policy:**
+- **New-member alerts go to the owner through CallMeBot**, a free third-party WhatsApp/Telegram
+  relay. They include the member's name, phone, email and whether the PAR-Q needs a doctor's
+  clearance. That is health information passing through a third party. It is disclosed now; whether
+  it should happen at all is a decision.
+- **No code deletes a closed gym's data.** D-071 reports the gym after 90 days suspended; a person
+  decides. The draft policy nearly promised automatic deletion. It was corrected, and a test now
+  stops that promise coming back.
+- The policy says declined applicants' documents are deleted after 90 days. **That is only true
+  while `PLATFORM_RETENTION_LIVE=true`.**
+
+**Lesson recorded.** *Write a policy from the code, not from a template.* Two of its first draft's
+sentences were false, and one real data flow was missing.
+
+---
+
 ## 2026-09-24 — Plans were never enforced; gyms were not kept apart on the client
 
 Found by an audit of CLAUDE.md against the code. **715 tests pass.** Not deployed.

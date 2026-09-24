@@ -1162,7 +1162,8 @@ export function ownerDeps(db = platformDb()) {
      * closing a gym that has members, payments and legal records — a person
      * must look at it. It appears on the platform's home page and owner list,
      * and is carried out with the switches that already exist: deactivate the
-     * owner, suspend the gym, and D-071's deletion after 90 suspended days.
+     * owner, suspend the gym. D-071: after 90 suspended days the gym is REPORTED;
+     * deleting its data is a human decision, and no code does it yet.
      */
     requestClosure: async (userId) => {
       const { error } = await db

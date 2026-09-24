@@ -136,6 +136,7 @@ export function loginPage({ error = '' } = {}) {
   <button type="submit">Sign in</button>
   <p><a href="/platform/forgot">Forgot your password?</a></p>
   <p class="muted">Lost your device? Use a recovery code in place of the authentication code.</p>
+  <p class="muted"><a href="/platform/privacy">Privacy policy</a> · <a href="/platform/delete-account">Delete your account</a></p>
 </form>`,
   });
   // The code field used to be `required`. Two-factor is REQUIRED for Yoyo
@@ -1025,7 +1026,8 @@ ${documents
     : `<details class="card">
   <summary>Close my account</summary>
   <p>We will contact you to confirm. Then your gym is closed to members, your sign-in is switched
-  off, and your gym's data is deleted 90 days later. <b>Download anything you want to keep first.</b></p>
+  off, and your gym's data is kept for 90 days in case you change your mind, then deleted once we have
+  confirmed it with you. <b>Download anything you want to keep first.</b></p>
   <form method="post" action="/platform/my-gym/close">
     <input type="hidden" name="csrf" value="${h(csrfToken)}">
     <button type="submit">Ask to close my account</button>
@@ -1077,9 +1079,11 @@ export function deleteAccountPage() {
   <ol>
     <li><a href="/platform/login">Sign in</a> and open <b>Your gym</b>.</li>
     <li>Choose <b>Close my account</b>. We contact you to confirm, close the gym to members and switch
-    off your sign-in. Your gym's data is deleted 90 days later.</li>
+    off your sign-in. Your gym's data is kept for 90 days in case you change your mind, then deleted
+    once we have confirmed it with you.</li>
   </ol>
   <p class="muted">Forgot your password? <a href="/platform/forgot">Reset it</a> first.</p>
+  <p class="muted"><a href="/platform/privacy">Privacy policy</a></p>
 </div>`,
   });
 }
@@ -1948,5 +1952,107 @@ ${todo}
 
 <p class="muted">Counts only — the platform never reads a gym member's name,
 phone, ID or health answers.</p>`,
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Privacy policy
+// ---------------------------------------------------------------------------
+
+/**
+ * The privacy policy — required by both stores, and by POPIA.
+ *
+ * EVERY STATEMENT HERE WAS CHECKED AGAINST THE CODE on 2026-09-24: the member
+ * columns in db/schema.sql, the owner alert templates, the retention rules
+ * (D-071, D-121), the providers actually called. It describes what the system
+ * does, not what a policy usually says. When the system changes, this must.
+ *
+ * NOT IN FORCE UNTIL SOMEONE SAYS SO. A privacy policy is a legal promise;
+ * it is shown as a draft until PLATFORM_PRIVACY_APPROVED=true, the same way
+ * billing and provisioning are dry runs until switched on.
+ *
+ * @param {object} opts
+ * @param {boolean} opts.approved  PLATFORM_PRIVACY_APPROVED
+ * @param {string}  opts.contact   PLATFORM_PRIVACY_CONTACT — where to write
+ * @param {string}  opts.operator  the business that runs Yoyo Gyms
+ */
+export function privacyPage({ approved = false, contact = '', operator = 'MuleSoo Digital Solutions' } = {}) {
+  const contactLine = contact
+    ? `<a href="mailto:${h(contact)}">${h(contact)}</a>`
+    : '<i>the contact address will be added before this policy takes effect</i>';
+
+  return layout({
+    title: 'Privacy policy',
+    indexable: approved,
+    body: `
+<div class="card">
+  ${approved ? '' : `<p class="err">DRAFT — under review and not yet in force.</p>`}
+  <h1>Privacy policy</h1>
+  <p>Yoyo Gyms connects gyms with their members and runs each gym's own system. It is operated by
+  ${h(operator)}. Questions about this policy: ${contactLine}.</p>
+
+  <h2>Who is responsible for what</h2>
+  <p><b>If you are a gym member</b>, your gym decides what it collects about you and why, and is
+  responsible for it. We store and process it for your gym, and nothing else. Each gym's records are
+  kept separate from every other gym's.</p>
+  <p><b>If you own a gym</b>, we are responsible for the information about you and your business.</p>
+
+  <h2>What your gym may collect about you</h2>
+  <ul>
+    <li><b>Identity and contact:</b> name, date of birth, gender, ID or passport number, nationality,
+    phone, email, address, and an emergency contact. For a minor, a guardian's consent.</li>
+    <li><b>Your membership:</b> plan, dates, payments your gym records, check-ins, class bookings,
+    training notes, progress entries you add, and messages with your gym.</li>
+    <li><b>Health:</b> your answers to the PAR-Q health questions, injuries you tell your gym about,
+    and whether you have medical aid. Used for your safety when you exercise.</li>
+    <li><b>A photo</b> for your membership card.</li>
+    <li><b>Face data, only if you agree to it:</b> a set of numbers made from your photo, used to
+    recognise you at check-in and sign-in. It is not a picture, and you can use the gym without it.</li>
+  </ul>
+
+  <h2>What we collect about gym owners</h2>
+  <ul>
+    <li>Your name, email, password (stored only in a form that cannot be reversed) and your gym's details.</li>
+    <li>The documents you upload with your application.</li>
+    <li>For your subscription, Paystack handles your card. We keep only a token that lets us charge the
+    same card again, and the card type and last four digits so you can recognise it. We never see or
+    store the card number.</li>
+  </ul>
+
+  <h2>The app</h2>
+  <ul>
+    <li><b>Camera:</b> only when you press Scan, to read a gym's QR code. No image is kept.</li>
+    <li><b>Location:</b> only when you press "Use my location", to show the nearest gyms first. It is
+    not saved to your account.</li>
+    <li>The app remembers which gym you chose, on your phone only. You can make it forget.</li>
+  </ul>
+
+  <h2>Who else handles it</h2>
+  <ul>
+    <li><b>Supabase</b> stores the databases. <b>Vercel</b> runs the service.</li>
+    <li><b>Brevo</b> sends emails — membership confirmations, reminders and account emails.</li>
+    <li><b>Paystack</b> takes gym owners' subscription payments.</li>
+    <li><b>CallMeBot</b>, if your gym switches it on, sends the gym owner WhatsApp or Telegram alerts.
+    A new-member alert includes the member's name, membership number, phone, email and whether the
+    PAR-Q health questions need a doctor's clearance.</li>
+  </ul>
+  <p>These providers may store information outside your country.</p>
+
+  <h2>How long it is kept</h2>
+  <ul>
+    <li>A member's records are kept until the gym deletes them, or until you ask for them to be deleted.</li>
+    <li>When a gym closes, its records are kept for 90 days in case it reopens, and then deleted after
+    we have confirmed it with the gym.</li>
+    <li>Documents from an application we decline are deleted 90 days after the decision.</li>
+  </ul>
+
+  <h2>Your rights</h2>
+  <p>You can ask to see, correct or delete what is held about you. Members: ask your gym, or use
+  <b>Request data deletion</b> in the member area. Everyone: <a href="/platform/delete-account">how to
+  delete your account</a>. In South Africa you may also complain to the Information Regulator.</p>
+
+  <h2>Changes</h2>
+  <p>If this policy changes, the new version is published here with its date.</p>
+</div>`,
   });
 }

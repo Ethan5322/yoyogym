@@ -14,6 +14,24 @@ Checklist for Google Play and the Apple App Store. **[M]** — no store submissi
 > official store documentation at Stage 10.** Never from this note, and never from model memory.
 > Treat everything here as a checklist of *topics*, not as current rules.
 
+## Status — 2026-09-24
+
+What exists in the code today. Store rules themselves are still to be re-verified at Stage 10.
+
+| Item | State |
+|---|---|
+| Privacy policy | ✅ `/platform/privacy`, written from the code. **DRAFT until `PLATFORM_PRIVACY_APPROVED=true`** and needs a contact address (`PLATFORM_PRIVACY_CONTACT`) and legal review |
+| Account deletion, in the app | ✅ Members: *Request data deletion* on the Status tab. Owners: *Close my account*. Both reachable from the app home |
+| Account deletion, on the web | ✅ `/platform/delete-account` |
+| Deletion actually carried out | ⚠️ Members: yes, by the gym owner (now includes the platform lookup entry). Owners and gyms: a request plus manual steps; **no code deletes a gym's data** (D-071) |
+| Secure password recovery | ✅ Owners and staff (`platform/password-reset.js`). Members have no password |
+| Minimum permissions | ✅ Camera and location, both only on a button press. No background location |
+| Consent screens | ❌ Not reviewed against store wording |
+| Crash monitoring | ❌ |
+| Reviewer demo gym | ❌ |
+| iOS project | ❌ Not generated |
+| Deep links | ❌ Stage 9 |
+
 ## Checklist
 
 **Technical** — current Android target API level · current iOS SDK level · crash monitoring ·

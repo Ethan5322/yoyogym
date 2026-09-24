@@ -42,6 +42,7 @@ import {
   resetPage,
   resetDonePage,
   deleteAccountPage,
+  privacyPage,
   applicationsPage,
   applicationDetailPage,
   signupPage,
@@ -582,6 +583,15 @@ async function handleExtraRoutes(req, res, deps, { url, path, method }) {
   // ---- how to delete your account — the web route the stores require -------
   if (path === 'delete-account' && method === 'GET') {
     html(res, 200, deleteAccountPage());
+    return true;
+  }
+
+  // ---- the privacy policy — a draft until someone approves it --------------
+  if (path === 'privacy' && method === 'GET') {
+    html(res, 200, privacyPage({
+      approved: process.env.PLATFORM_PRIVACY_APPROVED === 'true',
+      contact: process.env.PLATFORM_PRIVACY_CONTACT || '',
+    }));
     return true;
   }
 
