@@ -99,51 +99,8 @@
       .note { color: var(--muted); font-size: 0.9rem; margin: 0.75rem 0 0; }
       .err { color: var(--bad); font-weight: 600; margin: 0.75rem 0 0; }
       .empty { color: var(--muted); padding: 0.75rem 0; }
-      /* ---- Scanner -------------------------------------------------------
-         The camera fills the screen and Capacitor renders the preview BEHIND
-         the WebView, so this layer is transparent by design. Everything here
-         is either a frame to aim with or a control to press.               */
-      .scanner {
-        position: fixed;
-        inset: 0;
-        background: transparent;
-        display: flex;
-        flex-direction: column;
-        justify-content: space-between;
-        padding: max(24px, env(safe-area-inset-top)) 24px max(24px, env(safe-area-inset-bottom));
-      }
-      body.scanning { background: transparent; }
-      body.scanning > *:not(.scanner) { display: none; }
-
-      .scan-frame {
-        position: relative;
-        width: min(72vw, 288px);
-        aspect-ratio: 1;
-        margin: auto;
-      }
-      .corner {
-        position: absolute;
-        width: 32px; height: 32px;
-        border: 4px solid var(--accent-ink);
-        /* A tinted glow, not a grey shadow — it sits over live camera. */
-        filter: drop-shadow(0 0 8px rgba(0, 0, 0, 0.55));
-      }
-      .corner.tl { top: 0; left: 0; border-right: 0; border-bottom: 0; border-radius: 12px 0 0 0; }
-      .corner.tr { top: 0; right: 0; border-left: 0; border-bottom: 0; border-radius: 0 12px 0 0; }
-      .corner.bl { bottom: 0; left: 0; border-right: 0; border-top: 0; border-radius: 0 0 0 12px; }
-      .corner.br { bottom: 0; right: 0; border-left: 0; border-top: 0; border-radius: 0 0 12px 0; }
-
-      /* Every control in the bottom third. A hand is already there. */
-      .scan-foot {
-        background: rgba(14, 20, 22, 0.88);
-        backdrop-filter: blur(8px);
-        border-radius: 18px;
-        padding: 24px;
-      }
-      .scan-hint  { color: #fff; text-align: center; margin: 0 0 16px; font-size: 1.05rem; }
-      .scan-error { color: #ffb4a8; text-align: center; margin: 0 0 16px; font-weight: 600; }
-      .scan-foot .link { color: #9fb0b3; }
-
+      /* The QR scanner is the plugin's own native screen (see app.js), so
+         there is no overlay to style here. */
       .hidden { display: none; }
 
       /* ==== The member area (member.js) ===================================
@@ -408,35 +365,6 @@
         <button id="find" type="button">Find my gym</button>
         <p class="note" id="find-note"></p>
         <div id="find-results"></div>
-      </div>
-    </div>
-
-    <!-- ============ 4. Scanning a gym's QR code ============ -->
-    <!--
-      Held up to a poster by somebody standing at a gym door, one-handed.
-
-      Every control sits in the bottom third — the thumb zone — because the top
-      of a phone is where the camera needs to be and the bottom is where a hand
-      already is. The frame is the only thing above it, and it is the only
-      thing that needs looking at.
-
-      Four states, all designed rather than left to fail: scanning, permission
-      refused, a code that is not ours, and a code carrying something it should
-      not. The last two are different on purpose — "not a Yoyo code" is a
-      mistake, and "this code carries a secret" is a warning.
-    -->
-    <div id="scan-panel" class="hidden scanner">
-      <div class="scan-frame" aria-hidden="true">
-        <span class="corner tl"></span><span class="corner tr"></span>
-        <span class="corner bl"></span><span class="corner br"></span>
-      </div>
-
-      <div class="scan-foot">
-        <p class="scan-hint" id="scan-hint">Point your camera at the gym's QR code</p>
-        <p class="scan-error hidden" id="scan-error"></p>
-        <button type="button" id="scan-cancel" class="secondary">Cancel</button>
-        <button type="button" id="scan-retry" class="hidden">Try again</button>
-        <button type="button" class="link" data-go="member-signin">Search by name instead</button>
       </div>
     </div>
 

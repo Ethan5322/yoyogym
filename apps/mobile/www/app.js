@@ -37,7 +37,10 @@
   // Navigation between the three screens
   // -------------------------------------------------------------------------
 
+  var current = 'home';
+
   function show(name) {
+    current = name;
     Object.keys(views).forEach(function (k) {
       views[k].classList.toggle('hidden', k !== name);
     });
@@ -129,6 +132,15 @@
 
   function go(path) {
     var url = shell.defaultServer.replace(/\/+$/, '') + path;
+    // Leaving for a web screen with no signal would show Android's raw
+    // "net::ERR_INTERNET_DISCONNECTED" page, with no way back but the back
+    // button. Said here instead, where the member can still do something.
+    if (navigator.onLine === false) {
+      note.className = 'err';
+      note.textContent = 'You are offline. Connect to the internet and try again.';
+      if (window.YOYO_MEMBER && document.body.classList.contains('in-member')) alert(note.textContent);
+      return;
+    }
     if (!allowed(url)) {
       note.className = 'err';
       note.textContent = 'This app is not set up to open that address. Contact ' + shell.supportContact + '.';
@@ -287,135 +299,110 @@
   // Scanning a gym's QR code
   // -------------------------------------------------------------------------
   //
-  // The camera is the reason this is an app rather than a page. Capacitor
-  // renders the preview BEHIND the WebView, so the scanner screen is
-  // transparent and the body gets a class that hides everything else.
+  // THE SCANNER NEVER WORKED IN A BUILT APP. This code used to look for
+  // Capacitor.Plugins.BarcodeScanner and call checkPermissions / scan — the
+  // API of a DIFFERENT plugin. The one installed, @capacitor/barcode-scanner,
+  // registers as CapacitorBarcodeScanner with a single scanBarcode() that
+  // opens its own full-screen native scanner and asks for the camera itself.
+  // So the plugin was never found, and every press said "Scanning needs the
+  // Yoyo Gyms app" — inside the Yoyo Gyms app.
   //
-  // Four states, all designed: scanning, permission refused, a code that is
-  // not ours, and a code carrying something it should not. The last two read
-  // differently on purpose — one is a mistake, the other is a warning.
+  // What remains designed: a refused camera, a cancelled scan, a code that is
+  // not ours, and a code of ours that names no gym. Each is said on the gym
+  // picker, where searching by name is right there.
 
-  var scanPanel = document.getElementById('scan-panel');
-  var scanError = document.getElementById('scan-error');
-  var scanHint = document.getElementById('scan-hint');
-  var scanRetry = document.getElementById('scan-retry');
+  /** QR_CODE in the plugin's format list (html5-qrcode's enum). */
+  var QR_CODE = 0;
 
-  function scanning(on) {
-    document.body.classList.toggle('scanning', on);
-    scanPanel.classList.toggle('hidden', !on);
+  function scanPlugin() {
+    return window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.CapacitorBarcodeScanner;
   }
 
-  function scanFailed(message, retryable) {
-    scanError.textContent = message;
-    scanError.classList.remove('hidden');
-    scanHint.classList.add('hidden');
-    scanRetry.classList.toggle('hidden', !retryable);
+  function scanNote(text, tone) {
+    note.className = tone === 'err' ? 'err' : 'note';
+    note.textContent = text;
   }
 
-  function stopScanner() {
-    scanning(false);
-    scanError.classList.add('hidden');
-    scanHint.classList.remove('hidden');
-    scanRetry.classList.add('hidden');
-    try {
-      if (window.Capacitor?.Plugins?.BarcodeScanner) {
-        window.Capacitor.Plugins.BarcodeScanner.stopScan();
-      }
-    } catch (e) {
-      /* already stopped */
-    }
-  }
+  /** Nothing to stop: the native scanner is its own screen. Kept for the back button. */
+  function stopScanner() {}
 
-  async function startScanner() {
-    var plugin = window.Capacitor?.Plugins?.BarcodeScanner;
+  function startScanner() {
+    var plugin = scanPlugin();
 
     if (!plugin) {
       // A browser, or a build without the plugin. Said plainly rather than
       // opening a camera screen that can never see anything.
-      note.className = 'note';
-      note.textContent = 'Scanning needs the Yoyo Gyms app. Search by name here instead.';
+      scanNote('Scanning needs the Yoyo Gyms app. Search by name here instead.');
       return;
     }
 
-    scanning(true);
+    plugin
+      .scanBarcode({
+        hint: QR_CODE,
+        scanInstructions: "Point your camera at the gym's QR code",
+        scanButton: false,
+        cameraDirection: 1, // back camera
+      })
+      .then(function (result) {
+        var text = (result && result.ScanResult) || '';
 
-    try {
-      var permission = await plugin.checkPermissions();
-      if (permission.camera !== 'granted') {
-        permission = await plugin.requestPermissions();
-      }
+        // The allowed hosts are handed in so a code printed BEFORE gym slugs
+        // existed can be recognised as ours. Every code this system made until
+        // then was gym-less, and they are on real walls.
+        var payload = window.YOYO_QR.readQrPayload(text, shell.allowedHosts);
 
-      if (permission.camera !== 'granted') {
-        // Refusing the camera is a normal answer, and the app must still be
-        // usable afterwards — which is why searching by name is offered right
-        // there rather than being somewhere they have to go and find.
-        scanFailed('Yoyo Gyms cannot use the camera. You can allow it in your phone settings, or search by name.', false);
-        return;
-      }
+        if (payload.kind === 'gymless') {
+          // Our code, but it does not say which gym. Scanning again gives the
+          // same answer, so the way out is the gym picker, right here.
+          intent = 'signin';
+          pickTitle.textContent = 'Which gym are you a member of?';
+          pickSub.textContent = 'Search by name, or use your location to see the closest gyms first.';
+          forgotBtn.classList.remove('hidden');
+          out.innerHTML = '';
+          q.value = '';
+          show('pick');
+          // AFTER show(), which clears the note.
+          scanNote(payload.reason);
+          return;
+        }
 
-      var result = await plugin.scan();
-      var text = result?.barcodes?.[0]?.rawValue || result?.ScanResult || '';
+        if (payload.kind === 'unknown') {
+          scanNote(payload.reason, 'err');
+          return;
+        }
 
-      // The allowed hosts are handed in so a code printed BEFORE gym slugs
-      // existed can be recognised as ours. Every code this system made until
-      // today was gym-less, and they are on real walls.
-      var payload = window.YOYO_QR.readQrPayload(text, shell.allowedHosts);
-
-      if (payload.kind === 'gymless') {
-        // Our code, but it does not say which gym. Not a failure to retry —
-        // scanning it again produces the same answer — so the way out is the
-        // gym picker, opened right here.
-        stopScanner();
-        intent = 'signin';
-        pickTitle.textContent = 'Which gym are you a member of?';
-        pickSub.textContent = 'Search by name, or use your location to see the closest gyms first.';
-        forgotBtn.classList.remove('hidden');
-        out.innerHTML = '';
-        q.value = '';
-        show('pick');
-        // AFTER show(), which clears the note — saying it before would be
-        // saying nothing.
-        note.className = 'note';
-        note.textContent = payload.reason;
-        return;
-      }
-
-      if (payload.kind === 'unknown') {
-        scanFailed(payload.reason, true);
-        return;
-      }
-
-      stopScanner();
-      // A scanned code names the gym by slug only. Keep a name already known
-      // for it; otherwise "bos-gym" reads as "Bos Gym" until the member next
-      // picks it from search.
-      var known = myGym();
-      if (!known || known.slug !== payload.slug) {
-        rememberGym(payload.slug, payload.slug.split('-').map(function (w) {
-          return w.charAt(0).toUpperCase() + w.slice(1);
-        }).join(' '));
-      }
-      // A member's own card opens sign-in with the number filled in — never
-      // signed in (CLAUDE.md §14). A gym's poster opens that gym, offering
-      // both signing in and joining.
-      if (payload.kind === 'member') {
-        window.YOYO_MEMBER.open(payload.slug, { number: payload.membershipNumber });
-      } else {
-        window.YOYO_MEMBER.open(payload.slug, { join: true });
-      }
-    } catch (err) {
-      scanFailed('The camera could not start. Search by name instead.', true);
-    }
+        // A scanned code names the gym by slug only. Keep a name already known
+        // for it; otherwise "bos-gym" reads as "Bos Gym" until the member next
+        // picks it from search.
+        var known = myGym();
+        if (!known || known.slug !== payload.slug) {
+          rememberGym(payload.slug, payload.slug.split('-').map(function (w) {
+            return w.charAt(0).toUpperCase() + w.slice(1);
+          }).join(' '));
+        }
+        // A member's own card opens sign-in with the number filled in — never
+        // signed in (CLAUDE.md §14). A gym's poster opens that gym, offering
+        // both signing in and joining.
+        if (payload.kind === 'member') {
+          window.YOYO_MEMBER.open(payload.slug, { number: payload.membershipNumber });
+        } else {
+          window.YOYO_MEMBER.open(payload.slug, { join: true });
+        }
+      })
+      .catch(function (err) {
+        var message = String((err && (err.message || err.code)) || '').toLowerCase();
+        // Backing out of the scanner is a normal answer, not an error.
+        if (/cancel/.test(message)) return;
+        // Refusing the camera is normal too, and the app must stay usable.
+        if (/permission|denied|camera/.test(message)) {
+          scanNote('Yoyo Gyms cannot use the camera. You can allow it in your phone settings, or search by name.', 'err');
+          return;
+        }
+        scanNote('The camera could not start. Search by name instead.', 'err');
+      });
   }
 
   document.getElementById('scan').addEventListener('click', startScanner);
-  document.getElementById('scan-cancel').addEventListener('click', stopScanner);
-  scanRetry.addEventListener('click', function () {
-    scanError.classList.add('hidden');
-    scanHint.classList.remove('hidden');
-    scanRetry.classList.add('hidden');
-    startScanner();
-  });
 
   // -------------------------------------------------------------------------
   // "I don't remember which gym I joined"
@@ -465,5 +452,38 @@
   // screen (so the allowed-host check is never bypassed), and the way home.
   window.YOYO_APP = Object.freeze({ go: go, home: function () { show('home'); } });
 
+  // -------------------------------------------------------------------------
+  // Behaving like an app, not a web page
+  // -------------------------------------------------------------------------
+  //
+  // Each plugin is optional: in a browser, or a build without it, the app
+  // still works — it just behaves like a web page.
+
+  var Plugins = (window.Capacitor && window.Capacitor.Plugins) || {};
+  var noop = function () {};
+
+  // Light status-bar text on the app's dark ground. (Capacitor's "DARK"
+  // style means "for a dark background".)
+  if (Plugins.StatusBar) {
+    Plugins.StatusBar.setStyle({ style: 'DARK' }).catch(noop);
+    if (Plugins.StatusBar.setBackgroundColor) Plugins.StatusBar.setBackgroundColor({ color: '#0e1416' }).catch(noop);
+  }
+
+  // Android's back button walks back through the app — scanner, member area,
+  // sub-screen, home — and at home puts the app away like any other app,
+  // rather than closing it and losing the member's place.
+  if (Plugins.App) {
+    Plugins.App.addListener('backButton', function () {
+      if (window.YOYO_MEMBER && window.YOYO_MEMBER.back()) return;
+      if (current !== 'home') return show('home');
+      if (Plugins.App.minimizeApp) Plugins.App.minimizeApp().catch(noop);
+      else Plugins.App.exitApp();
+    });
+  }
+
   show('home');
+
+  // Only now: the first screen is drawn, so hiding the splash shows it, not a
+  // blank page.
+  if (Plugins.SplashScreen) Plugins.SplashScreen.hide().catch(noop);
 })();

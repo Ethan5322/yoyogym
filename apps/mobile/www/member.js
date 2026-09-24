@@ -537,5 +537,20 @@
     }
   });
 
-  window.YOYO_MEMBER = Object.freeze({ open: open, close: close });
+  /**
+   * Android's back button, inside the member area. Returns true if it was
+   * handled here. Another tab goes back to Home; Home goes back to the gyms.
+   */
+  function back() {
+    if (root.classList.contains('hidden')) return false;
+    if (state.token && state.tab !== 'home' && root.querySelector('.m-main')) {
+      state.tab = 'home';
+      render();
+      return true;
+    }
+    close();
+    return true;
+  }
+
+  window.YOYO_MEMBER = Object.freeze({ open: open, close: close, back: back });
 })();

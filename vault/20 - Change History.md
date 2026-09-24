@@ -15,6 +15,44 @@ occurrence is answered from notes rather than rediscovered.
 
 ---
 
+## 2026-09-24 — Stage 8 opened: the app's own screens, and four things that never worked
+
+**800 tests pass.** Not deployed, and **not yet run on a real device**: no emulator or device is
+available here. The screens are tested by driving them in a simulated browser (jsdom).
+
+**Built (D-155):**
+- **Native member screens.** Sign-in, a Home screen showing status first, one-tap check-in, a Card
+  that works offline, Classes (only on plans that include them) and Profile. They call the same
+  `/api/member/*` endpoints as the website. Registration stays on the gym's web flow.
+- **Brand icon and splash** on Android and iPhone, drawn from `public/icon.svg`.
+- **Native behaviour:** Android back button, status bar, splash, haptics, and a no-signal message
+  instead of Android's raw error page.
+- **The iPhone project,** generated on Windows through Swift Package Manager. It needs a Mac to
+  build and sign.
+
+**Four things that could never have worked:**
+1. **No CORS headers.** On a phone, the app could not read any reply from its own server, so gym
+   search and "which gym did I join?" failed.
+2. **`iosScheme: 'https'`.** WKWebView refuses a custom handler for http or https, so the iPhone
+   app could not load its own pages.
+3. **The QR scanner called another plugin's API.** It used `BarcodeScanner.checkPermissions/scan`,
+   but the installed plugin is `CapacitorBarcodeScanner.scanBarcode()`. Every tap answered
+   "Scanning needs the Yoyo Gyms app", inside the Yoyo Gyms app. The plugin was also the
+   Capacitor 7 line; it is now 3.1.2.
+4. **`Permissions-Policy: geolocation=()`** switched location off on every web page, so "near me"
+   on `/platform/find` never worked.
+
+**Caught by the new tests before shipping:**
+- The check-in success state vanished as soon as it appeared.
+- An unescaped apostrophe was a syntax error that would have made the whole entry screen dead on
+  arrival. A test now parses every script the app loads.
+
+**Lesson recorded.** *Test code against the thing it calls, not against what it was written to
+expect.* The scanner had tests; they mocked the API the code assumed. A test pinned to the
+installed plugin's own type definitions would have failed on day one.
+
+---
+
 ## 2026-09-24 — Store blockers: password recovery, account deletion, privacy policy
 
 **755 tests pass.** Not deployed. **Two migrations written and NOT run:**

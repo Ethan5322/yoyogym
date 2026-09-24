@@ -21,7 +21,7 @@ const STATUS = {
 };
 
 /** Boot the app. `routes` maps "METHOD /api/path" to a reply (or a function of the request). */
-function boot(routes = {}, { storage = null } = {}) {
+function boot(routes = {}, { storage = null, plugins = null } = {}) {
   const calls = [];
   const virtualConsole = new VirtualConsole(); // canvas and navigation "not implemented" notices are expected
   const dom = new JSDOM(read('index.html').replace(/<script src="[^"]+"><\/script>/g, ''), {
@@ -46,6 +46,9 @@ function boot(routes = {}, { storage = null } = {}) {
     return { ok: r.status < 400, status: r.status, json: async () => r.body };
   };
   window.confirm = () => true;
+  window.alert = () => {};
+  // Native plugins, as Capacitor exposes them to the page.
+  if (plugins) window.Capacitor = { Plugins: plugins };
 
   for (const f of ['config.js', 'qr-payload.js', 'vendor-qrcode.js', 'member.js', 'app.js']) window.eval(read(f));
   return { window, doc: window.document, calls };

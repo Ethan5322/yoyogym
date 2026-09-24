@@ -17,7 +17,7 @@
     "seed:catalog": "node scripts/seed-catalog.js",
     "sql:bundle": "node scripts/sql-bundle.mjs",
     "build:schema": "node scripts/build-schema-module.mjs",
-    "mobile:icons": "node scripts/mobile/make-icon-sources.mjs && cd apps/mobile && npx @capacitor/assets generate --android --iconBackgroundColor \"#0A0A0A\" --splashBackgroundColor \"#0e1416\" --splashBackgroundColorDark \"#0e1416\""
+    "mobile:icons": "node scripts/mobile/make-icon-sources.mjs && cd apps/mobile && npx @capacitor/assets generate --android --ios --iconBackgroundColor \"#0A0A0A\" --splashBackgroundColor \"#0e1416\" --splashBackgroundColorDark \"#0e1416\""
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.45.4",
