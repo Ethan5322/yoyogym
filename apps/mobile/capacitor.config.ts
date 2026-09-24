@@ -85,7 +85,11 @@ const config: CapacitorConfig = {
   },
   server: {
     androidScheme: 'https',
-    iosScheme: 'https',
+    // NO iosScheme. It was set to 'https', which Capacitor documents as
+    // impossible: WKWebView already handles http and https and refuses a
+    // custom handler for them, so the iPhone app could not have loaded its
+    // own pages. The default, `capacitor`, is right — the app is then served
+    // at capacitor://localhost, which shared/cors.js allows.
     allowNavigation: shell.allowedHosts,
   },
 };

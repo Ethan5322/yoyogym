@@ -3,6 +3,7 @@ import { json } from '../../server/lib/http.js';
 import { withGym } from '../../server/lib/gymcontext.js';
 import { enforceEntitlement } from '../../server/lib/entitlements.js';
 import { MEMBER_ROUTE_FEATURES } from '../../shared/features.js';
+import { applyAppCors } from '../../shared/cors.js';
 import { captureError } from '../../server/lib/observability.js';
 import login from '../../server/handlers/member/login.js';
 import faceLogin from '../../server/handlers/member/face-login.js';
@@ -43,6 +44,8 @@ const routes = {
 };
 
 export default async function handler(req, res) {
+  // The app's own member screens call these from its origin (shared/cors.js).
+  if (applyAppCors(req, res)) return;
   const parts = new URL(req.url, 'http://localhost').pathname.split('/').filter(Boolean);
   const seg = parts[2];
   const fn = routes[seg];

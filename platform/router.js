@@ -35,6 +35,7 @@
 import { timingSafeEqual } from 'node:crypto';
 import { handlePlatformApi } from './api.js';
 import { decideLogin, INVALID, LOCKED } from './login.js';
+import { applyAppCors } from '../shared/cors.js';
 import { requestReset, completeReset } from './password-reset.js';
 import {
   loginPage,
@@ -132,6 +133,9 @@ export async function handlePlatform(req, res, deps) {
   // lacks: every route in api.js calls the same injected dependency as its
   // HTML counterpart, so a rule can only be enforced in one place.
   if (path.startsWith('api/')) {
+    // CORS for the app's origin — on the JSON API ONLY. The cookie pages
+    // below never get it (shared/cors.js explains why that is the line).
+    if (applyAppCors(req, res)) return;
     if (await handlePlatformApi(req, res, deps, { path, method, url })) return;
   }
 
