@@ -4,6 +4,7 @@
 import { useEffect, useState } from 'react';
 import AdminShell from '../../components/AdminShell.jsx';
 import { apiFetch } from '../../lib/api.js';
+import { useAuth } from '../../lib/auth.jsx';
 import FaceCapture from '../../chatbot/components/FaceCapture.jsx';
 import CredentialActions from '../../components/CredentialActions.jsx';
 import IdPhotoUpload from '../../components/IdPhotoUpload.jsx';
@@ -12,6 +13,7 @@ const ROLES = ['owner', 'manager', 'reception', 'trainer'];
 const empty = { username: '', full_name: '', email: '', role: 'reception', job_title: '', phone: '', password: '', trainer_id: '', contract_start: '', contract_end: '', photo_url: '', face_descriptor: null };
 
 export default function Staff() {
+  const { hasFeature } = useAuth();
   const [staff, setStaff] = useState(null);
   const [trainers, setTrainers] = useState([]);
   const [form, setForm] = useState(empty);
@@ -22,7 +24,12 @@ export default function Staff() {
 
   function load() {
     apiFetch('/admin/staff').then((d) => setStaff(d.staff || [])).catch((e) => setErr(e.message));
-    apiFetch('/admin/trainers').then((d) => setTrainers(d.trainers || [])).catch(() => {});
+    // Trainers are a MEDIUM feature. On a plan without them this list is
+    // empty by definition, and asking would only raise the upgrade notice on
+    // a screen every plan uses.
+    if (hasFeature('trainers')) {
+      apiFetch('/admin/trainers').then((d) => setTrainers(d.trainers || [])).catch(() => {});
+    }
   }
   useEffect(load, []);
 

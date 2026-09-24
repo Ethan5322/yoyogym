@@ -3,6 +3,7 @@
 import { getSupabase } from '../../lib/supabase.js';
 import { allowMethods, ok, serverError } from '../../lib/http.js';
 import { authenticateMember } from '../../lib/memberauth.js';
+import { currentGym } from '../../lib/tenancy.js';
 import { loadCompliance, expectedVisits, adherence } from '../../lib/compliance.js';
 
 export default async function handler(req, res) {
@@ -46,6 +47,9 @@ export default async function handler(req, res) {
       outstanding_balance: outstanding,
       has_outstanding: outstanding > 0,
       adherence: { ...score, visits_30d: visits30 || 0, expected_30d: expected },
+      // What this gym's plan includes, so the portal shows only what works
+      // here. null in single-gym mode: everything shown, exactly as before.
+      features: Array.isArray(currentGym()?.features) ? currentGym().features : null,
     });
   } catch (err) {
     console.error('member status error:', err.message);

@@ -4,6 +4,7 @@
 // account is still active.
 import { getSupabase } from '../../lib/supabase.js';
 import { authenticate } from '../../lib/auth.js';
+import { currentGym } from '../../lib/tenancy.js';
 import { allowMethods, ok, unauthorized, serverError } from '../../lib/http.js';
 
 export default async function handler(req, res) {
@@ -25,7 +26,16 @@ export default async function handler(req, res) {
       return unauthorized(res, 'Session no longer valid');
     }
 
-    return ok(res, { user });
+    // The gym's plan, so the screens can show what it includes and offer the
+    // upgrade for what it does not (CLAUDE.md §18.4 — navigation is UX only;
+    // the routers are what enforce). null in single-gym mode, where nothing is
+    // gated and the screens show everything, exactly as before.
+    const gym = currentGym();
+    const plan = gym && Array.isArray(gym.features)
+      ? { key: gym.plan?.key ?? null, features: gym.features }
+      : null;
+
+    return ok(res, { user, plan });
   } catch (err) {
     console.error('me error:', err.message);
     return serverError(res, 'Could not load session');

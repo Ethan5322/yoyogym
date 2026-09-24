@@ -19,7 +19,7 @@
 //
 // Enforcement sits in the ROUTERS, not in the ~76 handlers — one fixed key map
 // per router, so 42 admin routes are gated in one place and no handler changed.
-import { featureForRoute } from '../../shared/features.js';
+import { featureForRoute, ROUTE_FEATURES } from '../../shared/features.js';
 import { currentGym } from './tenancy.js';
 
 /**
@@ -28,13 +28,18 @@ import { currentGym } from './tenancy.js';
  * @param {string} route  the router key, e.g. 'classes'
  * @returns {{allowed: boolean, status?: number, message?: string, feature?: string}}
  */
-export function entitlementFor(route) {
+export function entitlementFor(route, map = ROUTE_FEATURES) {
   const resolved = currentGym();
 
   // Single-gym deployment: no platform involved, nothing to enforce.
+  //
+  // ONLY TRUE INSIDE THE GYM'S SCOPE. currentGym() is set by runWithGym(), so
+  // a router that calls this BEFORE withGym() sees no gym for every request
+  // and allows everything. That is exactly how the admin router called it, so
+  // no plan was ever enforced. Routers now check inside withGym().
   if (!resolved) return { allowed: true };
 
-  const feature = featureForRoute(route);
+  const feature = featureForRoute(route, map);
   if (!feature) {
     // Unknown route: not found, not a billing prompt. Fails closed.
     return { allowed: false, status: 404, message: 'Not found.' };
@@ -92,9 +97,12 @@ export function allowsMemberRegistration(activeMembers, plan = null) {
  * Router helper: enforce and respond in one step.
  * Returns true when the request may proceed.
  */
-export function enforceEntitlement(route, res, json) {
-  const check = entitlementFor(route);
+export function enforceEntitlement(route, res, json, map = ROUTE_FEATURES, { forMembers = false } = {}) {
+  const check = entitlementFor(route, map);
   if (check.allowed) return true;
-  json(res, check.status, { error: check.message, feature: check.feature ?? null });
+  // A member cannot buy their gym a plan. "Upgrade to use it" is the owner's
+  // sentence; said to a member it is advice they cannot take.
+  const message = forMembers && check.status === 402 ? 'This is not available at your gym.' : check.message;
+  json(res, check.status, { error: message, feature: check.feature ?? null });
   return false;
 }

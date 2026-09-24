@@ -128,7 +128,33 @@ export async function resolveGym(slug, deps) {
     db: { schema },
   });
 
-  return { gym, connection, schema, client };
+  return { gym, connection, schema, client, ...planFor(record.plan) };
+}
+
+/**
+ * The plan, in the shape the entitlement checks read.
+ *
+ * `features: null` means NO PLAN COULD BE LOADED — a gym with no plan_key, or
+ * a plan row that is missing or malformed. The entitlement check fails CLOSED
+ * on that ("absence of a plan is not permission"), so it is logged loudly: a
+ * gym in that state is refused every gated feature until its plan is fixed on
+ * the platform's plans screen.
+ */
+export function planFor(plan) {
+  if (!plan || !Array.isArray(plan.features)) {
+    console.warn(`[tenancy] no usable plan (${plan?.key ?? 'none'}); gated features will be refused`);
+    return { features: null, plan: null };
+  }
+  const limit = plan.max_active_members;
+  return {
+    features: plan.features,
+    plan: {
+      key: plan.key,
+      // NULL in the table is "no limit". Number(null) would be 0 — a gym
+      // that could register nobody.
+      maxActiveMembers: limit === null || limit === undefined ? null : Number(limit),
+    },
+  };
 }
 
 /**

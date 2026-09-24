@@ -91,9 +91,12 @@ export default async function handler(req, res) {
   // Plan gating. Inert for a single-gym deployment (no resolved gym); for a
   // platform gym it refuses a route the plan does not include, with 402.
   // Enforced HERE rather than in any of the 37 handlers below it.
-  if (!enforceEntitlement(seg, res, json)) return;
+  //
+  // INSIDE withGym(), not before it. The gym is only known inside that scope;
+  // checked before it, every request looked like single-gym mode and every
+  // plan was allowed everything.
   try {
-    return await withGym(req, res, () => fn(req, res), json);
+    return await withGym(req, res, () => (enforceEntitlement(seg, res, json) ? fn(req, res) : undefined), json);
   } catch (err) {
     captureError(`api/admin/${seg}`, err, { method: req.method });
     if (!res.headersSent) return json(res, 500, { error: 'Something went wrong. Please try again.' });

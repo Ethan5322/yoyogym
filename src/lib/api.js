@@ -67,6 +67,15 @@ export async function apiFetch(path, { method = 'GET', body, auth = true } = {})
 
   if (!res.ok) {
     const message = (data && data.error) || `Request failed (${res.status})`;
+
+    // NOT IN THIS GYM'S PLAN. Announced once, here, so one notice can offer
+    // the upgrade for every screen — rather than each of 23 screens showing
+    // "Request failed (402)" in its own red box. Still thrown below, so a
+    // screen's own handling is unchanged.
+    if (res.status === 402 && data?.feature && typeof window !== 'undefined') {
+      window.dispatchEvent?.(new CustomEvent('yoyo:upgrade', { detail: { feature: data.feature, message } }));
+    }
+
     const error = new Error(message);
     error.status = res.status;
     throw error;

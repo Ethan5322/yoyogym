@@ -17,7 +17,17 @@ const AuthContext = createContext(null);
 
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
+  // The gym's plan — { key, features } — or null in single-gym mode, where
+  // nothing is gated. UX only: the routers enforce (CLAUDE.md §18.4).
+  const [plan, setPlan] = useState(null);
   const [loading, setLoading] = useState(true);
+
+  // Login answers with the user but not the plan, so the plan is asked for
+  // separately. A failure leaves plan null: every screen shown, and the
+  // server still refuses what the plan does not include.
+  const loadPlan = useCallback(() => {
+    apiFetch('/auth/me').then((d) => setPlan(d.plan ?? null)).catch(() => {});
+  }, []);
 
   // Restore session on first load if a token exists.
   useEffect(() => {
@@ -28,8 +38,11 @@ export function AuthProvider({ children }) {
         return;
       }
       try {
-        const { user } = await apiFetch('/auth/me');
-        if (active) setUser(user);
+        const { user, plan } = await apiFetch('/auth/me');
+        if (active) {
+          setUser(user);
+          setPlan(plan ?? null);
+        }
       } catch {
         clearToken();
       } finally {
@@ -49,15 +62,17 @@ export function AuthProvider({ children }) {
     });
     setToken(token);
     setUser(user);
+    loadPlan();
     return user;
-  }, []);
+  }, [loadPlan]);
 
   // Apply an externally-obtained session (e.g. face login).
   const applySession = useCallback((token, user) => {
     setToken(token);
     setUser(user);
+    loadPlan();
     return user;
-  }, []);
+  }, [loadPlan]);
 
   const logout = useCallback(() => {
     clearToken();
@@ -68,7 +83,11 @@ export function AuthProvider({ children }) {
     // the same gym, they just need to sign in again.
     clearGym();
     setUser(null);
+    setPlan(null);
   }, []);
+
+  /** Is this feature in the gym's plan? Always true when nothing is gated. */
+  const hasFeature = useCallback((feature) => !plan || !feature || plan.features.includes(feature), [plan]);
 
   const hasRole = useCallback((roles) => !!user && roles.includes(user.role), [user]);
 
@@ -78,7 +97,7 @@ export function AuthProvider({ children }) {
   );
 
   return (
-    <AuthContext.Provider value={{ user, loading, login, applySession, logout, hasRole, homeFor }}>
+    <AuthContext.Provider value={{ user, plan, loading, login, applySession, logout, hasRole, hasFeature, homeFor }}>
       {children}
     </AuthContext.Provider>
   );

@@ -1,6 +1,8 @@
 // Member-portal router — /api/member/* .
 import { json } from '../../server/lib/http.js';
 import { withGym } from '../../server/lib/gymcontext.js';
+import { enforceEntitlement } from '../../server/lib/entitlements.js';
+import { MEMBER_ROUTE_FEATURES } from '../../shared/features.js';
 import { captureError } from '../../server/lib/observability.js';
 import login from '../../server/handlers/member/login.js';
 import faceLogin from '../../server/handlers/member/face-login.js';
@@ -45,8 +47,17 @@ export default async function handler(req, res) {
   const seg = parts[2];
   const fn = routes[seg];
   if (!fn) return json(res, 404, { error: `Not found: /api/member/${seg || ''}` });
+  // Plan gating, inside the gym's scope — see api/admin/[...path].js. The
+  // member router had none, so a BASIC gym's members could use every
+  // MEDIUM and PRIME feature the portal offers.
   try {
-    return await withGym(req, res, () => fn(req, res), json);
+    return await withGym(
+      req,
+      res,
+      () =>
+        enforceEntitlement(seg, res, json, MEMBER_ROUTE_FEATURES, { forMembers: true }) ? fn(req, res) : undefined,
+      json
+    );
   } catch (err) {
     captureError(`api/member/${seg}`, err, { method: req.method });
     if (!res.headersSent) return json(res, 500, { error: 'Something went wrong. Please try again.' });

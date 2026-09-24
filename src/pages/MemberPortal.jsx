@@ -24,12 +24,40 @@ function memberCardUrl(number) {
     : `${base}/p/m/${encodeURIComponent(number)}`;
 }
 
+/**
+ * The portal's tabs, and the plan feature each needs (null = every plan).
+ *
+ * A BASIC gym's member used to see Classes, Progress and Contact, open one,
+ * and read an error. A tab that cannot work at their gym is not shown at all.
+ */
+const TABS = [
+  ['status', 'Status', null],
+  ['checkin', 'Check In', null],
+  ['classes', 'Classes', 'classes'],
+  ['progress', 'Progress', 'progress'],
+  ['history', 'History', null],
+  ['contact', 'Contact', 'messaging'],
+];
+
+export function visibleTabs(features) {
+  return TABS.filter(([, , needs]) => !features || !needs || features.includes(needs));
+}
+
 export default function MemberPortal() {
   const [token, setTok] = useState(getMemberToken());
   const [member, setMember] = useState(null);
   const [tab, setTab] = useState('status');
+  // What this gym's plan includes — null means "not gated", show everything.
+  // Asked for once the member is signed in; a failure shows every tab, and
+  // the server still refuses what the plan does not include.
+  const [features, setFeatures] = useState(null);
 
   useEffect(() => logQrScan('existing_member'), []);
+
+  useEffect(() => {
+    if (!token) return;
+    memberFetch('/member/status').then((d) => setFeatures(d.features ?? null)).catch(() => {});
+  }, [token]);
 
   function onLoggedIn(t, m) {
     setMemberToken(t);
@@ -53,15 +81,11 @@ export default function MemberPortal() {
         </button>
       </header>
 
-      <nav className="grid grid-cols-6 border-b border-white/5 bg-surface text-xs">
-        {[
-          ['status', 'Status'],
-          ['checkin', 'Check In'],
-          ['classes', 'Classes'],
-          ['progress', 'Progress'],
-          ['history', 'History'],
-          ['contact', 'Contact'],
-        ].map(([key, label]) => (
+      <nav
+        className="grid border-b border-white/5 bg-surface text-xs"
+        style={{ gridTemplateColumns: `repeat(${visibleTabs(features).length}, minmax(0, 1fr))` }}
+      >
+        {visibleTabs(features).map(([key, label]) => (
           <button
             key={key}
             onClick={() => setTab(key)}

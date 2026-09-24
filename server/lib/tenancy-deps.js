@@ -82,7 +82,25 @@ export function tenancyDeps() {
         .eq('gym_id', gym.id)
         .maybeSingle();
 
-      const value = { gym, connection };
+      // THE GYM'S PLAN — what it may use and how many members it may have.
+      //
+      // Read here, with the gym, because until now it was read NOWHERE: the
+      // resolved gym carried no plan, so every feature check saw nothing and
+      // every member limit was "none". Data, not code (CLAUDE.md §18.4): an
+      // edit on the platform's plans screen applies within the cache window,
+      // with no deploy.
+      let plan = null;
+      if (gym.plan_key) {
+        const { data, error } = await db
+          .from('platform_plans')
+          .select('key, features, max_active_members')
+          .eq('key', gym.plan_key)
+          .maybeSingle();
+        if (error) throw new Error(`Could not read the gym's plan: ${error.message}`);
+        plan = data ?? null;
+      }
+
+      const value = { gym, connection, plan };
       cache.set(key, { value, expires: Date.now() + TTL_MS });
       return value;
     },

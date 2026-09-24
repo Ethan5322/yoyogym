@@ -87,4 +87,51 @@ export const ROUTE_FEATURES = {
   audit: FEATURES.AUDIT,
 };
 
-export const featureForRoute = (route) => ROUTE_FEATURES[route] ?? null;
+/**
+ * The member portal's routes (/api/member/*).
+ *
+ * A SEPARATE MAP, not more keys in the one above: the two routers share route
+ * names that mean different things. `profile` is staff management on the admin
+ * side (STAFF) and the member's own details here (MEMBERS).
+ *
+ * Until this existed the member router checked no plan at all, so a BASIC
+ * gym's members could book classes, message the gym, log progress, refer
+ * friends and sign in by face — every one a MEDIUM or PRIME feature.
+ *
+ * `request-deletion` is MEMBERS, which every plan includes, and must stay so:
+ * a member's right to ask for their data to be erased is not a paid feature.
+ */
+export const MEMBER_ROUTE_FEATURES = {
+  login: FEATURES.MEMBERS,
+  status: FEATURES.MEMBERS,
+  history: FEATURES.MEMBERS,
+  profile: FEATURES.MEMBERS,
+  'request-plan-change': FEATURES.MEMBERS,
+  'request-deletion': FEATURES.MEMBERS,
+  checkin: FEATURES.CHECKIN,
+
+  classes: FEATURES.CLASSES,
+  'book-class': FEATURES.CLASSES,
+  'cancel-booking': FEATURES.CLASSES,
+  message: FEATURES.MESSAGING,
+  messages: FEATURES.MESSAGING,
+  announcements: FEATURES.MESSAGING,
+  progress: FEATURES.PROGRESS,
+
+  refer: FEATURES.REFERRALS,
+  'face-login': FEATURES.FACE,
+  'enroll-face': FEATURES.FACE,
+};
+
+/**
+ * Staff sign-in (/api/auth/*). Signing in is core; signing in BY FACE is the
+ * PRIME face-recognition feature, the same as it is for members.
+ */
+export const AUTH_ROUTE_FEATURES = {
+  login: FEATURES.MEMBERS,
+  me: FEATURES.MEMBERS,
+  'change-password': FEATURES.MEMBERS,
+  'face-login': FEATURES.FACE,
+};
+
+export const featureForRoute = (route, map = ROUTE_FEATURES) => map[route] ?? null;

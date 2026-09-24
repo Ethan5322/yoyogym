@@ -15,6 +15,55 @@ occurrence is answered from notes rather than rediscovered.
 
 ---
 
+## 2026-09-24 — Plans were never enforced; gyms were not kept apart on the client
+
+Found by an audit of CLAUDE.md against the code. **715 tests pass.** Not deployed.
+
+**No plan limit had ever applied to any request.** Three faults stacked:
+1. `resolveGym()` returned no plan, so `resolved.features` and `resolved.plan` were undefined.
+2. The admin router checked the plan *before* `withGym()`. The gym only exists inside that scope, so
+   every check saw single-gym mode and allowed everything.
+3. The member and auth routers checked nothing.
+
+**Fixing (2) alone would have caused an outage.** With no features on the resolved gym, every gated
+route would have answered 402 for every gym, KOM included.
+
+Fixed:
+- `tenancy-deps.js` now loads `platform_plans` alongside the gym (cached, still data).
+- All three routers check the plan inside `withGym()`.
+- New `MEMBER_ROUTE_FEATURES` and `AUTH_ROUTE_FEATURES` maps.
+- A test checks that every live route has a mapping. An unmapped route fails closed with 404, so a gap
+  would have broken a KOM screen on deploy.
+- KOM is on PRIME, which reaches every route.
+
+CSV import now respects the member limit, and reports the rows it could not import. The admin menu
+shows locked screens with 🔒. A 402 opens a single upgrade notice: owners are offered the plans,
+other staff are told who can change it. Members see only the portal tabs their gym's plan includes,
+and are never told to "upgrade".
+
+**A token without a gym could choose one.** `gymForRequest()` treated a token with no gym claim as
+"whatever the header says". The unslugged `/admin/login` still issues such tokens, so any KOM staff
+member could become admin of any gym by sending `X-Gym-Slug`. Reproduced, then fixed: a gym-less
+token is now refused whenever a gym header is present.
+
+**Three client requests never named their gym:** the member portal client, the QR scan logger and
+the public profile page. A member of any gym but KOM signed in against KOM's members. Fixed with one
+`gymHeaders()` helper. Sessions are now stored per gym, because every gym shares one origin.
+
+**App:** "Use my location" could never work on Android, because no location permission was declared.
+Fixed, and the app now remembers the member's gym.
+
+**Found, not fixed:** project mode (a gym with its own Supabase) can never connect. `tenancy.js` reads
+`secrets.service_key`, but `fetchSecrets` selects `service_role_key` from `gym_secrets`, and that
+table holds references only by design. It needs the secrets-manager lookup it was designed around.
+No gym uses project mode.
+
+**Lesson recorded.** *A check that runs outside the context it reads from always passes.* The
+entitlement tests set the gym up by hand, so they passed while the router never saw a gym. Test the
+path a request actually takes, not the function in isolation.
+
+---
+
 ## 2026-09-24 — Protections that were written down but never wired
 
 Found by walking the app's flows end to end. **675 tests pass.** Not deployed.
