@@ -1,11 +1,13 @@
 // Application routing (spec Part 8). Public splash loads eagerly; everything
 // else is lazy-loaded so the QR-scan landing is fast on mobile (spec 6.4).
 import { Routes, Route, Navigate } from 'react-router-dom';
-import { Suspense, lazy, useEffect } from 'react';
+import { Suspense, lazy, useEffect, useState } from 'react';
 import ProtectedRoute from './components/ProtectedRoute.jsx';
 import Splash from './pages/Splash.jsx';
-import { loadBranding } from './lib/branding.js';
+import { loadBranding, brandingFailure } from './lib/branding.js';
 import { captureGym } from './lib/gym.js';
+import { gymGate } from './lib/gymGate.js';
+import GymUnavailable from './components/GymUnavailable.jsx';
 
 // Public (member-facing)
 const Register = lazy(() => import('./pages/Register.jsx'));
@@ -51,15 +53,27 @@ function Fallback() {
 const guard = (roles, el) => <ProtectedRoute roles={roles}>{el}</ProtectedRoute>;
 
 export default function App() {
+  // Null until the first gym-scoped fetch has answered. Only ever set for a
+  // /g/<slug>/… visit — see lib/gymGate.js.
+  const [gate, setGate] = useState(null);
+
   // Apply each gym's accent colour + title at runtime (no per-gym code).
   useEffect(() => {
     // WHICH GYM, BEFORE ANYTHING ELSE IS FETCHED. A member arrives at
     // /g/<slug>/register from the app or a scanned QR, and loadBranding() is
     // itself a gym-scoped request — capturing after it would fetch the wrong
     // gym's name and colours, or none at all.
-    captureGym();
-    loadBranding();
+    const slug = captureGym();
+    loadBranding().then(() => setGate(gymGate(brandingFailure(), slug)));
   }, []);
+
+  // A SUSPENDED OR UNKNOWN GYM IS SAID AT THE START OF THE VISIT.
+  //
+  // Resolution already answers 404 / 402 / 403 / 503 precisely; this is where
+  // that answer reaches the person. Without it a member scanned a suspended
+  // gym's code, filled in the whole registration form, and found out on the
+  // last step.
+  if (gate) return <GymUnavailable gate={gate} />;
 
   return (
     <Suspense fallback={<Fallback />}>

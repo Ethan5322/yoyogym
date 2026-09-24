@@ -7,6 +7,20 @@ import { apiFetch } from './api.js';
 let cache = null;
 let inflight = null;
 
+/**
+ * The status a gym-scoped content fetch failed with, if it did.
+ *
+ * Kept rather than swallowed: resolution answers 404 / 402 / 403 / 503 for
+ * four genuinely different situations, and throwing that away is how a member
+ * ended up filling in a whole registration form for a gym that was suspended.
+ */
+let failedStatus = null;
+
+/** What went wrong reaching this gym, or null if nothing did. */
+export function brandingFailure() {
+  return failedStatus;
+}
+
 function hexToRgba(hex, a) {
   const m = /^#?([0-9a-fA-F]{6})$/.exec(hex || '');
   if (!m) return null;
@@ -35,7 +49,12 @@ export function loadBranding() {
         applyBranding(cache);
         return cache;
       })
-      .catch(() => ({}));
+      .catch((err) => {
+        // Remembered, not hidden. loadBranding() still RESOLVES, so nothing
+        // that merely wanted a colour has to learn about error handling.
+        failedStatus = err?.status ?? null;
+        return {};
+      });
   }
   return inflight;
 }
