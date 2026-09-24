@@ -274,6 +274,10 @@ create table if not exists platform.password_resets (
 );
 create index if not exists password_resets_user_idx on platform.password_resets(user_id);
 
+-- An owner asking to close their account (store requirement). Recorded, not acted on:
+-- closing an account closes a gym, and a person must look at that.
+alter table platform.platform_users add column if not exists closure_requested_at timestamptz;
+
 
 -- -----------------------------------------------------------------------------
 -- gym_connections — how the platform reaches ONE gym's Supabase project.

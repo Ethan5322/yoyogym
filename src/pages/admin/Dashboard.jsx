@@ -31,6 +31,13 @@ export default function Dashboard() {
         <>
           {/* Alert banners — each links to the filtered work queue it refers to */}
           <div className="mt-4 space-y-2">
+            {/* A legal request (POPIA), so it comes first — one banner per
+                member, each opening the page where the erasure is done. */}
+            {(d.deletion_requests || []).map((m) => (
+              <Banner key={m.id} tone="error" to={`/admin/members/${m.id}`}>
+                {m.full_name} asked for their data to be deleted.
+              </Banner>
+            ))}
             {d.failed_payments > 0 && (
               <Banner tone="error" to="/admin/payments?status=failed">{d.failed_payments} failed payment(s) need attention.</Banner>
             )}

@@ -300,6 +300,7 @@ export async function handlePlatformApi(req, res, deps, { path, method, url }) {
             current_period_end: view.subscription.current_period_end,
           }
         : null,
+      closure_requested_at: view.closureRequestedAt ?? null,
       documents: (view.documents || []).map((d) => ({
         id: d.id,
         type: d.doc_type,
@@ -372,6 +373,18 @@ export async function handlePlatformApi(req, res, deps, { path, method, url }) {
     });
 
     return json(res, 201, { ok: true, document_id: row?.id ?? null }), true;
+  }
+
+  // ---- close my account (owners) — store requirement ----------------------
+  // The same dependency as the website's /platform/my-gym/close. Records the
+  // request; deletes nothing (see requestClosure in deps.js).
+  if (path === 'api/my-gym/close' && method === 'POST') {
+    try {
+      await deps.requestClosure(session.sub);
+    } catch {
+      return json(res, 500, { error: 'Your request was not saved. Please try again.' }), true;
+    }
+    return json(res, 202, { ok: true, message: 'We will contact you to confirm before anything is switched off.' }), true;
   }
 
   // Not an API path this module knows. The caller falls through to the

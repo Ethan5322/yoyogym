@@ -873,6 +873,7 @@ export function ownerDashboardPage({
   subscription = null,
   documents = [],
   csrfToken = '',
+  closureRequestedAt = null,
 } = {}) {
   const docRows = documents.length
     ? `<table>
@@ -1011,6 +1012,26 @@ ${documents
 </div>`
       : `<div class="empty">No application found for this account.</div>`;
 
+  // Closing the account. Required by both stores, and ordinary decency: a
+  // person who wants to leave should not have to find an email address.
+  // Recorded, not instant — closing an account closes a gym with members in
+  // it, and the page says exactly what happens next.
+  const closure = closureRequestedAt
+    ? `<div class="card">
+  <h2>Closing your account</h2>
+  <p>You asked to close your account on ${h(when(closureRequestedAt))}. We will contact you to confirm
+  before anything is switched off.</p>
+</div>`
+    : `<details class="card">
+  <summary>Close my account</summary>
+  <p>We will contact you to confirm. Then your gym is closed to members, your sign-in is switched
+  off, and your gym's data is deleted 90 days later. <b>Download anything you want to keep first.</b></p>
+  <form method="post" action="/platform/my-gym/close">
+    <input type="hidden" name="csrf" value="${h(csrfToken)}">
+    <button type="submit">Ask to close my account</button>
+  </form>
+</details>`;
+
   return layout({
     title: 'Your gym',
     user,
@@ -1019,7 +1040,47 @@ ${status}
 
 <h2>Documents</h2>
 ${docRows}
-${upload}`,
+${upload}
+
+${closure}`,
+  });
+}
+
+/**
+ * How to delete your account and data — the web route both stores require,
+ * reachable without the app installed.
+ *
+ * It explains rather than acts: deleting a member's data is done by their gym
+ * (the gym holds it, POPIA makes the gym responsible), and proving who you are
+ * is done by signing in the way you already do. A form here that deleted
+ * anything on a membership number and phone would let anyone who knew those
+ * two things erase somebody else.
+ */
+export function deleteAccountPage() {
+  return layout({
+    title: 'Delete your account',
+    indexable: true,
+    body: `
+<div class="card">
+  <h1>Delete your account and data</h1>
+
+  <h2>If you are a gym member</h2>
+  <ol>
+    <li><a href="/platform/find">Find your gym</a> and sign in with your membership number and phone number.</li>
+    <li>On the <b>Status</b> screen, scroll to the bottom and choose <b>Request data deletion</b>.</li>
+    <li>Your gym is told straight away and deletes your records — your details, check-ins, bookings,
+    health answers and any face data.</li>
+  </ol>
+  <p class="muted">Cannot sign in? Ask your gym directly. They hold your records and can delete them.</p>
+
+  <h2>If you own a gym</h2>
+  <ol>
+    <li><a href="/platform/login">Sign in</a> and open <b>Your gym</b>.</li>
+    <li>Choose <b>Close my account</b>. We contact you to confirm, close the gym to members and switch
+    off your sign-in. Your gym's data is deleted 90 days later.</li>
+  </ol>
+  <p class="muted">Forgot your password? <a href="/platform/forgot">Reset it</a> first.</p>
+</div>`,
   });
 }
 
@@ -1183,7 +1244,9 @@ ${owners
       <td>${h(o.full_name || '—')}</td>
       <td>${h(o.email)}</td>
       <td>${h(o.gym_count ?? 0)}</td>
-      <td>${statusTag(o.is_active === false ? 'suspended' : 'active')}</td>
+      <td>${statusTag(o.is_active === false ? 'suspended' : 'active')}${
+        o.closure_requested_at && o.is_active !== false ? ` ${statusTag('asked to close')}` : ''
+      }</td>
       <td><form method="post" action="/platform/owners/${h(o.id)}/${
         o.is_active === false ? 'reactivate' : 'deactivate'
       }">
@@ -1771,9 +1834,21 @@ export function dashboardPage({
   currency = 'ZAR',
   trialsEndingSoon = [],
   driftFindings = null,
+  closureRequests = 0,
 } = {}) {
   // Ordered by what it costs to ignore, not by what is interesting.
   const needsYou = [];
+
+  // Someone asked to leave. The stores require it to be honoured, and an
+  // owner still being billed after asking to close is a complaint waiting.
+  if (closureRequests) {
+    needsYou.push({
+      urgency: 'high',
+      text: `${count(closureRequests, 'owner')} asked to close their account.`,
+      href: '/platform/owners',
+      action: 'Contact them',
+    });
+  }
 
   if (unpricedPlans.length) {
     needsYou.push({

@@ -6,6 +6,8 @@ import { allowMethods, readJsonBody, ok, badRequest, serverError } from '../../l
 import { requireRole } from '../../lib/auth.js';
 import { loadCompliance, expectedVisits, adherence } from '../../lib/compliance.js';
 import { recordAudit } from '../../lib/audit.js';
+import { unindexMember } from '../../lib/member-index.js';
+import { currentGym } from '../../lib/tenancy.js';
 
 export default async function handler(req, res) {
   if (!allowMethods(req, res, ['GET', 'PATCH', 'DELETE'])) return;
@@ -22,11 +24,42 @@ export default async function handler(req, res) {
 
   try {
     if (req.method === 'DELETE') {
+      // Read BEFORE deleting: the number and phone are what the platform's
+      // routing index is keyed on, and they are gone once the row is.
+      const { data: doomed } = await supabase
+        .from('members')
+        .select('membership_number, phone')
+        .eq('id', id)
+        .maybeSingle();
+
       // POPIA erasure: cascading FKs remove memberships, parq, checkins, etc.
       const { error } = await supabase.from('members').delete().eq('id', id);
       if (error) return serverError(res, error.message);
-      await recordAudit(supabase, admin, { action: 'member.delete', entity: 'member', entity_id: id });
-      return ok(res, { deleted: true });
+
+      // ...and the copy OUTSIDE this gym's schema. The platform's "which gym
+      // did I join?" index kept a pointer to the person after their data was
+      // erased, which made the erasure incomplete. Reported, not hidden: the
+      // owner is carrying out a legal request and must know if part of it
+      // failed.
+      const unfiled = doomed
+        ? await unindexMember({
+            membershipNumber: doomed.membership_number,
+            phone: doomed.phone,
+            gymSlug: currentGym()?.gym?.slug ?? null,
+          })
+        : { ok: true };
+
+      await recordAudit(supabase, admin, {
+        action: 'member.delete',
+        entity: 'member',
+        entity_id: id,
+        detail: unfiled.ok ? null : `platform index not cleared: ${unfiled.reason}`,
+      });
+      return ok(res, {
+        deleted: true,
+        index_cleared: unfiled.ok,
+        ...(unfiled.ok ? {} : { warning: 'The member was deleted, but their gym lookup entry could not be removed. Please tell Yoyo Gyms support.' }),
+      });
     }
 
     if (req.method === 'PATCH') {

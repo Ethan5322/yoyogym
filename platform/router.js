@@ -41,6 +41,7 @@ import {
   forgotPage,
   resetPage,
   resetDonePage,
+  deleteAccountPage,
   applicationsPage,
   applicationDetailPage,
   signupPage,
@@ -559,6 +560,31 @@ async function handleExtraRoutes(req, res, deps, { url, path, method }) {
     return true;
   }
 
+  // ---- the owner asks to close their account ---------------------------------
+  // Records the request; deletes nothing (see requestClosure in deps.js).
+  if (path === 'my-gym/close' && method === 'POST') {
+    const form = await readFormBody(req);
+    const session = requireSession(req, res, { csrfToken: form.csrf });
+    if (!session) return true;
+
+    try {
+      await deps.requestClosure(session.sub);
+    } catch {
+      html(res, 500, problemPage({
+        title: 'We could not record that',
+        message: 'Your request to close your account was not saved. Please try again, or contact us.',
+      }));
+      return true;
+    }
+    return redirect(res, '/platform/my-gym'), true;
+  }
+
+  // ---- how to delete your account — the web route the stores require -------
+  if (path === 'delete-account' && method === 'GET') {
+    html(res, 200, deleteAccountPage());
+    return true;
+  }
+
   // ---- the owner pays their subscription ------------------------------------
   // ON THE WEB, NEVER IN THE APP (D-060). Apple and Google take 15-30% of a
   // digital subscription bought inside an app; Paystack takes about 3%. The
@@ -826,11 +852,12 @@ async function handleExtraRoutes(req, res, deps, { url, path, method }) {
       }
     };
 
-    const [applications, allGyms, finance, entries] = await Promise.all([
+    const [applications, allGyms, finance, entries, closureRequests] = await Promise.all([
       safe(() => deps.listApplications(), []),
       safe(() => deps.listGyms({ limit: 500 }), []),
       safe(() => deps.financeSummary(), {}),
       safe(() => deps.listAuditLog({ limit: 500 }), []),
+      safe(() => deps.countClosureRequests(), 0),
     ]);
 
     const waiting = applications.filter((a) =>
@@ -843,6 +870,7 @@ async function handleExtraRoutes(req, res, deps, { url, path, method }) {
       gyms: allGyms.length,
       activeGyms: allGyms.filter((g) => g.status === 'active').length,
       alerts: findAlerts(entries, { now: new Date() }).length,
+      closureRequests,
       unpricedPlans: finance.unpriced_plans || [],
       outstandingCents: finance.outstanding_cents ?? 0,
       currency: finance.currency || 'ZAR',

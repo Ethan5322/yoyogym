@@ -42,7 +42,10 @@ export default function MemberDetail() {
   async function deleteMember() {
     if (!confirm('Permanently delete this member and ALL their data? This cannot be undone (POPIA erasure).')) return;
     try {
-      await apiFetch(`/admin/member?id=${id}`, { method: 'DELETE' });
+      const result = await apiFetch(`/admin/member?id=${id}`, { method: 'DELETE' });
+      // Said, not swallowed: if part of an erasure did not happen, the owner
+      // carrying out the request has to know.
+      if (result?.warning) alert(result.warning);
       navigate('/admin/members', { replace: true });
     } catch (e) {
       setError(e.message);

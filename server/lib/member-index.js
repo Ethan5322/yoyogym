@@ -28,7 +28,7 @@
 // losing a row is that one member cannot use a shortcut; the cost of throwing
 // is a registration that looks broken after it succeeded.
 import { createClient } from '@supabase/supabase-js';
-import { directoryRow } from '../../shared/member-directory.js';
+import { directoryRow, lookupHash } from '../../shared/member-directory.js';
 
 let _client = null;
 
@@ -78,6 +78,41 @@ export async function indexMember({ membershipNumber, phone, gymSlug }) {
     // Deliberately swallowed. See the header: a convenience index must never
     // turn a completed registration into an error on the member's screen.
     console.error('member directory index failed:', err?.message);
+    return { ok: false, reason: err?.message || 'failed' };
+  }
+}
+
+/**
+ * Remove a member from the routing index — part of erasing them.
+ *
+ * Deleting a member used to leave this row behind, so after "erase all data"
+ * the platform could still say which gym that number and phone belonged to.
+ * An erasure that leaves a pointer to the person is not an erasure.
+ *
+ * Unlike indexMember() this REPORTS failure rather than hiding it: the caller
+ * is carrying out a legal request, and must know if part of it did not happen.
+ * Scoped to this gym's row, so erasing someone at one gym cannot unfile them
+ * at another.
+ *
+ * @returns {Promise<{ok: boolean, reason?: string}>} — never throws.
+ */
+export async function unindexMember({ membershipNumber, phone, gymSlug }) {
+  try {
+    if (!gymSlug) return { ok: true, reason: 'no_gym_in_scope' }; // single-gym: nothing was filed
+
+    const db = platformClient();
+    if (!db) return { ok: false, reason: 'platform_not_configured' };
+
+    const hash = lookupHash({ membershipNumber, phone });
+    if (!hash) return { ok: true, reason: 'incomplete_details' }; // could never have been filed
+
+    const { data: gym } = await db.from('gyms').select('id').eq('slug', gymSlug).maybeSingle();
+    if (!gym) return { ok: false, reason: 'gym_not_in_registry' };
+
+    const { error } = await db.from('member_directory').delete().eq('lookup_hash', hash).eq('gym_id', gym.id);
+    if (error) return { ok: false, reason: error.message };
+    return { ok: true };
+  } catch (err) {
     return { ok: false, reason: err?.message || 'failed' };
   }
 }

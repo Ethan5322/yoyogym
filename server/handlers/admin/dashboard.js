@@ -130,6 +130,17 @@ export default async function handler(req, res) {
       classesFull = todays.filter((cl) => (counts[cl.id] || 0) >= cl.max_capacity * 0.9).length;
     }
 
+    // Members who have asked for their data to be erased (POPIA; the stores
+    // require it too). The request used to surface ONLY on that member's own
+    // page, which nobody opens unprompted — so a request could sit unanswered
+    // indefinitely. Named here so the owner can act on each one.
+    const { data: deletionRequests } = await supabase
+      .from('members')
+      .select('id, full_name, updated_at')
+      .eq('data_deletion_requested', true)
+      .order('updated_at', { ascending: true })
+      .limit(20);
+
     // Recent activity feed (last ~10 events, spec 4.2)
     const feed = [
       ...(recent.data || []).map((m) => ({ type: 'registration', text: `${m.full_name} registered`, at: m.created_at })),
@@ -159,6 +170,7 @@ export default async function handler(req, res) {
       outstanding_total: outstandingTotal,
       unread_messages: unreadMessages,
       recent_registrations: recent.data || [],
+      deletion_requests: deletionRequests || [],
       activity: feed,
     });
   } catch (err) {

@@ -1133,13 +1133,16 @@ export function ownerDeps(db = platformDb()) {
         .eq('owner_user_id', userId)
         .maybeSingle();
 
-      const [{ data: subscription }, { data: documents }] = await Promise.all([
+      const [{ data: subscription }, { data: documents }, { data: me }] = await Promise.all([
         gym
           ? db.from('platform_subscriptions').select('*').eq('gym_id', gym.id).maybeSingle()
           : Promise.resolve({ data: null }),
         application
           ? db.from('application_documents').select('*').eq('application_id', application.id)
           : Promise.resolve({ data: [] }),
+        // Before the migration adds the column this errors; the page then
+        // simply shows no pending request, rather than failing to load.
+        db.from('platform_users').select('closure_requested_at').eq('id', userId).maybeSingle(),
       ]);
 
       return {
@@ -1147,7 +1150,32 @@ export function ownerDeps(db = platformDb()) {
         gym: gym ?? null,
         subscription: subscription ?? null,
         documents: documents ?? [],
+        closureRequestedAt: me?.closure_requested_at ?? null,
       };
+    },
+
+    /**
+     * An owner asks to close their account (store requirement: account
+     * deletion from inside the app and on the web).
+     *
+     * RECORDS THE REQUEST; DELETES NOTHING. Closing an owner's account means
+     * closing a gym that has members, payments and legal records — a person
+     * must look at it. It appears on the platform's home page and owner list,
+     * and is carried out with the switches that already exist: deactivate the
+     * owner, suspend the gym, and D-071's deletion after 90 suspended days.
+     */
+    requestClosure: async (userId) => {
+      const { error } = await db
+        .from('platform_users')
+        .update({ closure_requested_at: new Date().toISOString() })
+        .eq('id', userId)
+        .is('closure_requested_at', null); // asking twice does not reset the clock
+      if (error) throw new Error(`Could not record the request: ${error.message}`);
+      await audit(db, {
+        action: 'platform.owner.closure_requested',
+        actor_kind: 'gym_owner',
+        actor_user_id: userId,
+      });
     },
 
     /**
@@ -1331,18 +1359,27 @@ export function platformControlDeps(db = platformDb()) {
 
     // ---- gym owners -------------------------------------------------------
     listOwners: async ({ query = '', from = 0, to = 49 } = {}) => {
-      let q = db
-        .from('platform_users')
-        .select('id, email, full_name, is_active, created_at', { count: 'exact' })
-        .eq('kind', 'gym_owner')
-        .order('created_at', { ascending: false })
-        .range(from, to);
+      const build = (columns) => {
+        let q = db
+          .from('platform_users')
+          .select(columns, { count: 'exact' })
+          .eq('kind', 'gym_owner')
+          .order('created_at', { ascending: false })
+          .range(from, to);
+        // `or` rather than two queries: a search that only matched email would
+        // fail every time someone typed a name, which is what people type.
+        if (query) q = q.or(`email.ilike.%${query}%,full_name.ilike.%${query}%`);
+        return q;
+      };
 
-      // `or` rather than two queries: a search that only matched email would
-      // fail every time someone typed a name, which is what people type.
-      if (query) q = q.or(`email.ilike.%${query}%,full_name.ilike.%${query}%`);
+      const BASE = 'id, email, full_name, is_active, created_at';
+      let result = await build(`${BASE}, closure_requested_at`);
+      // Before 2026-09-24-account-closure.sql runs the column does not exist.
+      // Without this retry the query fails and the owner list comes back
+      // EMPTY — a list that looks complete and says there are no owners.
+      if (result.error) result = await build(BASE);
 
-      const { data, count: total } = await q;
+      const { data, count: total } = result;
       const owners = data ?? [];
       owners.total = Number.isInteger(total) ? total : null;
       if (!owners.length) return owners;
@@ -1358,6 +1395,17 @@ export function platformControlDeps(db = platformDb()) {
       const withCounts = owners.map((o) => ({ ...o, gym_count: counts.get(o.id) ?? 0 }));
       withCounts.total = owners.total;
       return withCounts;
+    },
+
+    /** Owners who have asked to close their account and are still active. */
+    countClosureRequests: async () => {
+      const { count, error } = await db
+        .from('platform_users')
+        .select('id', { count: 'exact', head: true })
+        .not('closure_requested_at', 'is', null)
+        .eq('is_active', true);
+      if (error) throw new Error(error.message);
+      return count ?? 0;
     },
 
     /**
