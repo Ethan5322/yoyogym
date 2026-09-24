@@ -1858,7 +1858,10 @@ export function dashboardPage({
   // Can this server create a gym? Said on the home page — by setting NAME,
   // never a value — so "is it set up?" is answered by signing in, before
   // anyone presses Approve and wonders why nothing happened.
-  if (provisioning && !provisioning.ready) {
+  // A to-do only when it is a mistake (switched on, not set up) or it is in
+  // someone's way (switched off, applications waiting). Deliberately off with
+  // nothing waiting is not a problem; the status line below still says it.
+  if (provisioning && !provisioning.ready && (provisioning.live || waiting)) {
     needsYou.push({
       urgency: 'high',
       text:

@@ -128,7 +128,8 @@ test('THE STAFF HOME SAYS WHETHER THIS SERVER CAN CREATE GYMS, AND WHAT IS MISSI
 
   const off = provisioningReadiness({});
   assert.equal(off.ready, false);
-  assert.match(dashboardPage({ provisioning: off }), /Creating gyms is switched off/);
+  assert.match(dashboardPage({ provisioning: off, waiting: 1 }), /Creating gyms is switched off/, 'in the way of a waiting application');
+  assert.ok(!/Creating gyms is switched off/.test(dashboardPage({ provisioning: off, waiting: 0 })), 'deliberately off and nothing waiting is not a to-do');
 
   // Switched on, but the project ID was never added — the user's situation.
   const partial = provisioningReadiness({
