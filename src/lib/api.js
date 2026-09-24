@@ -5,16 +5,29 @@
 
 import { currentGymSlug } from './gym.js';
 
-const TOKEN_KEY = 'gym_admin_token';
+/**
+ * Where this gym's session is kept.
+ *
+ * ONE PER GYM. Every gym is served from the same origin, so a single fixed key
+ * meant one session for the whole platform: signing in to gym B signed you
+ * out of gym A, and a trainer working at two gyms could never have both open.
+ * Single-gym mode keeps the original key, so an existing deployment's
+ * sessions are exactly where they always were.
+ */
+export function tokenKey(base, gym = currentGymSlug()) {
+  return gym ? `${base}:${gym}` : base;
+}
+
+const ADMIN_TOKEN = 'gym_admin_token';
 
 export function getToken() {
-  return localStorage.getItem(TOKEN_KEY);
+  return localStorage.getItem(tokenKey(ADMIN_TOKEN));
 }
 export function setToken(token) {
-  if (token) localStorage.setItem(TOKEN_KEY, token);
+  if (token) localStorage.setItem(tokenKey(ADMIN_TOKEN), token);
 }
 export function clearToken() {
-  localStorage.removeItem(TOKEN_KEY);
+  localStorage.removeItem(tokenKey(ADMIN_TOKEN));
 }
 
 /**

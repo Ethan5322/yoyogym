@@ -46,6 +46,22 @@ test('an existing token with no gym claim stays in single-gym mode', () => {
   assert.equal(gymForRequest(req({ headers: { authorization: `Bearer ${token}` } })), null);
 });
 
+test('A TOKEN WITH NO GYM CANNOT PICK ONE WITH A HEADER', () => {
+  // Reproduced before the fix: a claimless admin token (the unslugged
+  // /admin/login still issues them, against the default gym's staff) plus
+  // X-Gym-Slug: rival-gym resolved to rival-gym — admin of another gym.
+  for (const token of [
+    signToken({ id: 'a1', username: 'ann', role: 'owner' }),
+    signMemberToken({ id: 'm1', membership_number: 'GYM-2026-1' }),
+  ]) {
+    assert.throws(
+      () => gymForRequest(req({ headers: { authorization: `Bearer ${token}`, 'x-gym-slug': 'rival-gym' } })),
+      (err) => err instanceof GymContextError && err.status === 401,
+      'a gym-less token is good for single-gym mode only'
+    );
+  }
+});
+
 // ---------------------------------------------------------------------------
 // 2. The gym comes from the token
 // ---------------------------------------------------------------------------

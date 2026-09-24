@@ -102,9 +102,23 @@ export function gymForRequest(req) {
 
   const claimed = payload.gym ? String(payload.gym).toLowerCase() : null;
 
-  // An old token, from before gyms were stamped into them. Single-gym mode,
-  // which is exactly what that token was issued for.
-  if (!claimed) return asked === null ? null : asked;
+  // A token with no gym in it. It was issued in single-gym mode — by a login
+  // that named no gym, which today means the DEFAULT schema's gym — so it is
+  // good for single-gym mode and nothing else.
+  //
+  // THIS USED TO RETURN `asked`, and that was a cross-gym hole: a token that
+  // names no gym, plus a header that names any gym, resolved to that gym. The
+  // unslugged /admin/login still issues such tokens, so any member of the
+  // default gym's staff could send X-Gym-Slug: <any gym> and be that gym's
+  // admin. The "backward compatibility" it bought was a wildcard.
+  //
+  // Refused rather than resolved. The cost, stated: a session opened before
+  // gyms were stamped into tokens, used under /g/<slug>/, must sign in once
+  // more — and then carries its gym like every other.
+  if (!claimed) {
+    if (asked === null) return null;
+    throw new GymContextError(401, 'Your session has expired. Please sign in again.');
+  }
 
   if (!SAFE_SLUG.test(claimed)) {
     throw new GymContextError(401, 'Invalid or expired session.');

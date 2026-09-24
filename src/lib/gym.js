@@ -71,6 +71,17 @@ export function captureGym(pathname) {
 export function currentGymSlug() {
   if (cached) return cached;
 
+  // The address first. captureGym() runs in App's effect, which React runs
+  // AFTER the children's first render — so a protected page reading its
+  // session on that first render would otherwise ask before the gym was
+  // known, and look in the wrong gym's slot.
+  try {
+    const fromPath = slugFromPath(window.location.pathname);
+    if (fromPath) return captureGym(window.location.pathname);
+  } catch {
+    // No window (tests, server). Fall through.
+  }
+
   try {
     const stored = window.sessionStorage.getItem(KEY);
     if (stored && SAFE_SLUG.test(stored)) {
@@ -91,4 +102,21 @@ export function clearGym() {
   } catch {
     /* nothing to do */
   }
+}
+
+/**
+ * The header that names this tab's gym, or nothing in single-gym mode.
+ *
+ * EVERY request from the gym app must carry it. Three did not — the member
+ * portal client, the QR-scan logger and the public profile page — and a
+ * request without it is single-gym mode, which reads the DEFAULT schema. Under
+ * /g/<slug>/ that is another gym's data: a member of any gym but the first
+ * was checked against the first gym's members when signing in.
+ *
+ * One helper, so "remember to send the gym" is a single import rather than a
+ * rule each new fetch has to rediscover.
+ */
+export function gymHeaders() {
+  const gym = currentGymSlug();
+  return gym ? { 'X-Gym-Slug': gym } : {};
 }

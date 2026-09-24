@@ -1,13 +1,19 @@
 // Member-portal API client (separate token from admin). The browser only ever
 // talks to /api functions, never Supabase directly.
-const TOKEN_KEY = 'gym_member_token';
+import { gymHeaders } from './gym.js';
+import { tokenKey } from './api.js';
 
-export const getMemberToken = () => localStorage.getItem(TOKEN_KEY);
-export const setMemberToken = (t) => t && localStorage.setItem(TOKEN_KEY, t);
-export const clearMemberToken = () => localStorage.removeItem(TOKEN_KEY);
+// One session per gym — see tokenKey() in api.js.
+const MEMBER_TOKEN = 'gym_member_token';
+
+export const getMemberToken = () => localStorage.getItem(tokenKey(MEMBER_TOKEN));
+export const setMemberToken = (t) => t && localStorage.setItem(tokenKey(MEMBER_TOKEN), t);
+export const clearMemberToken = () => localStorage.removeItem(tokenKey(MEMBER_TOKEN));
 
 export async function memberFetch(path, { method = 'GET', body, auth = true } = {}) {
-  const headers = { 'Content-Type': 'application/json' };
+  // WHICH GYM — see gymHeaders(). Missing here, a member at /g/<slug>/member
+  // signed in against the default schema: another gym's members.
+  const headers = { 'Content-Type': 'application/json', ...gymHeaders() };
   if (auth) {
     const t = getMemberToken();
     if (t) headers.Authorization = `Bearer ${t}`;

@@ -2,6 +2,7 @@
 // lands here and sees ONLY name, photo, role, and a valid-member badge.
 import { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
+import { gymHeaders } from '../lib/gym.js';
 
 export default function PublicProfile() {
   const { type, key } = useParams(); // type: 'm' | 't' | 's'
@@ -15,7 +16,9 @@ export default function PublicProfile() {
         : type === 's'
         ? `type=staff&id=${encodeURIComponent(key)}`
         : `type=member&key=${encodeURIComponent(key)}`;
-    fetch(`/api/public-profile?${qs}`)
+    // The gym, or /g/<slug>/p/m/<key> looks the member up in the default
+    // schema — another gym's members.
+    fetch(`/api/public-profile?${qs}`, { headers: gymHeaders() })
       .then((r) => r.json())
       .then(setData)
       .catch(() => setError('Could not load profile.'));
