@@ -93,8 +93,11 @@ test('THE SCHEMA IS IMPORTED, NOT READ FROM DISK', async () => {
   // Comments stripped, for the second time today: the file explains at length
   // why a readFileSync is wrong here, and that prose must not be what fails a
   // test looking for the fix.
+  // \r?\n, not \n: a fresh Windows checkout has CRLF line endings, and `.`
+  // does not match \r — so a comment line was not stripped and its prose
+  // about readFileSync failed this test on Windows only.
   const source = read('platform/schema-runner.js', 'utf8')
-    .split('\n')
+    .split(/\r?\n/)
     .map((line) => line.replace(/^\s*(\/\/|\*|\/\*).*$/, ''))
     .join('\n');
 
