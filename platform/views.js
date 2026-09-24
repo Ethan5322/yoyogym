@@ -823,14 +823,18 @@ ${error ? `<p class="err">${h(error)}</p>` : ''}
   <label>Choose a password
     <input type="password" name="password" required minlength="10" autocomplete="new-password">
   </label>
-  <p class="muted">At least 10 characters. You will use this to sign in from now on.</p>
+  <p class="muted">At least 10 characters. You will use it for your Yoyo Gyms account and your gym admin panel.</p>
+  <label class="check">
+    <input type="checkbox" name="accept_terms" value="yes" required>
+    I have read and accept the <a href="/platform/terms" target="_blank" rel="noopener">Gym Owner Agreement</a>.
+  </label>
   <button type="submit">Activate</button>
 </form>`,
   });
 }
 
 /** Activation done. Says plainly what is true, including what is not yet true. */
-export function activateSuccessPage({ gymActivated = false, gymSlug = '', gymUsername = '' } = {}) {
+export function activateSuccessPage({ gymActivated = false, gymSlug = '', gymUsername = '', ownerRef = '' } = {}) {
   // THE TWO ACCOUNTS, SAID PLAINLY.
   //
   // An owner now has a platform login (their email — billing, documents, the
@@ -852,7 +856,9 @@ export function activateSuccessPage({ gymActivated = false, gymSlug = '', gymUse
     title: 'Account activated',
     body: `<div class="card">
   <h1>Your account is active</h1>
-  <p>You can now sign in with your email and the password you just chose.</p>
+  ${ownerRef ? `<p>Your <b>Owner ID</b> is <b style="font-size:1.2em;letter-spacing:.05em">${h(ownerRef)}</b>. Keep it — quote it whenever you contact us.</p>` : ''}
+  <p>You can now sign in with your email and the password you just chose. Your signed
+  <b>Gym Owner Agreement</b> is on your owner page as a PDF, to download any time.</p>
   ${
     gymActivated
       ? `<p><b>Your gym is open.</b> Your members can find it and sign in from now on.</p>
@@ -886,7 +892,19 @@ export function ownerDashboardPage({
   documents = [],
   csrfToken = '',
   closureRequestedAt = null,
+  ownerRef = '',
 } = {}) {
+  // The owner's ID and their signed agreement, once there is a gym to agree
+  // about. The PDF is built fresh each time from the account and the audit
+  // log, so it always matches what was accepted.
+  const agreementCard = gym
+    ? `<div class="card">
+  <h2>Your agreement</h2>
+  <p>Owner ID: <b style="letter-spacing:.05em">${h(ownerRef)}</b></p>
+  <p><a href="/platform/my-gym/agreement.pdf">Download your Gym Owner Agreement (PDF) →</a></p>
+  <p class="muted"><a href="/platform/terms">Read the agreement online</a></p>
+</div>`
+    : '';
   const docRows = documents.length
     ? `<table>
   <thead><tr><th>Document</th><th>File</th><th>Status</th></tr></thead>
@@ -1050,6 +1068,7 @@ ${documents
     user,
     body: `<h1>Your gym</h1>
 ${status}
+${agreementCard}
 
 <h2>Documents</h2>
 ${docRows}
@@ -2139,5 +2158,20 @@ export function welcomePage() {
 
 <p>Already applied, or already running your gym here? <a href="/platform/login">Sign in</a></p>
 <p class="muted"><a href="/platform/privacy">Privacy policy</a> · <a href="/platform/delete-account">Delete your account</a> · <a href="/platform/login">Yoyo staff sign in</a></p>`,
+  });
+}
+
+
+/** The Gym Owner Agreement, as a page — the same text as the PDF. */
+export function termsPage({ sections = [], version = '', approved = false } = {}) {
+  return layout({
+    title: 'Gym Owner Agreement',
+    indexable: approved,
+    body: `<div class="card">
+  ${approved ? '' : '<p class="err">DRAFT — under review and not yet in force.</p>'}
+  <h1>Gym Owner Agreement</h1>
+  <p class="muted">Version ${h(version)}</p>
+  ${sections.map((x) => `<h2>${h(x.heading)}</h2><p>${h(x.body)}</p>`).join('')}
+</div>`,
   });
 }

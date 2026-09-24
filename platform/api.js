@@ -23,6 +23,7 @@ import { validateUploadRequest, pathBelongsTo, documentRow } from './documents.j
 import { lookupHash, routeMember } from './member-directory.js';
 import { decideLogin, INVALID, LOCKED } from './login.js';
 import { requestReset, completeReset } from './password-reset.js';
+import { AGREEMENT_VERSION, ownerId } from './agreement.js';
 
 const json = (res, status, body) => {
   res.writeHead(status, {
@@ -227,6 +228,12 @@ export async function handlePlatformApi(req, res, deps, { path, method, url }) {
     const body = await readJson(req);
     if (!body) return json(res, 400, { error: 'Malformed request.' }), true;
 
+    // Same rule as the website: the Gym Owner Agreement is accepted first,
+    // before anything changes and without consuming the link.
+    if (body.accept_terms !== true) {
+      return json(res, 400, { error: 'Please read and accept the Gym Owner Agreement.', terms_url: '/platform/terms' }), true;
+    }
+
     const result = await completeActivation(
       deps,
       { token: body.token, code: body.code, password: body.password },
@@ -235,7 +242,16 @@ export async function handlePlatformApi(req, res, deps, { path, method, url }) {
 
     if (!result.ok) return json(res, 400, { error: result.reason }), true;
 
-    return json(res, 200, { ok: true, gym_activated: result.gymActivated }), true;
+    await deps.audit({
+      action: 'platform.owner.agreement_accepted',
+      actor_kind: 'gym_owner',
+      actor_user_id: result.userId,
+      entity: 'gym',
+      entity_id: result.gymId,
+      detail: { version: AGREEMENT_VERSION, via: 'app' },
+    });
+
+    return json(res, 200, { ok: true, gym_activated: result.gymActivated, owner_id: ownerId(result.userId) }), true;
   }
 
   // ---- forgot password (owners and staff) ---------------------------------

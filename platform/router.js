@@ -37,6 +37,9 @@ import { handlePlatformApi } from './api.js';
 import { decideLogin, INVALID, LOCKED } from './login.js';
 import { applyAppCors } from '../shared/cors.js';
 import { provisioningReadiness } from './provisioning-config.js';
+import { AGREEMENT_VERSION, agreementTerms, agreementPdf, ownerId, termsApproved } from './agreement.js';
+import { platformBaseUrl } from './base-url.js';
+import { OWNER_USERNAME } from './gym-admin.js';
 import { requestReset, completeReset } from './password-reset.js';
 import {
   loginPage,
@@ -45,6 +48,7 @@ import {
   resetDonePage,
   deleteAccountPage,
   welcomePage,
+  termsPage,
   privacyPage,
   applicationsPage,
   applicationDetailPage,
@@ -543,6 +547,15 @@ async function handleExtraRoutes(req, res, deps, { url, path, method }) {
 
     if (method === 'POST') {
       const form = await readFormBody(req);
+
+      // The Gym Owner Agreement is accepted HERE, before anything changes —
+      // checked on the server too, since a browser's `required` is a courtesy.
+      // Refused without consuming the link, so the owner can tick and retry.
+      if (form.accept_terms !== 'yes') {
+        html(res, 400, activatePage({ token: form.token, error: 'Please read and accept the Gym Owner Agreement.' }));
+        return true;
+      }
+
       // Q-46 ANSWERED (D-124, user, 2026-09-22): verifying your email is what
       // opens the gym, not paying. D-049 is superseded. This is the only way
       // "30 days free" is a true sentence.
@@ -564,10 +577,21 @@ async function handleExtraRoutes(req, res, deps, { url, path, method }) {
       // their own panel rather than leaving them to find it.
       const activated = (await deps.getGym?.(result.gymId)) || {};
 
+      // The evidence of what was agreed, and when: the version the owner saw.
+      await deps.audit({
+        action: 'platform.owner.agreement_accepted',
+        actor_kind: 'gym_owner',
+        actor_user_id: result.userId,
+        entity: 'gym',
+        entity_id: result.gymId,
+        detail: { version: AGREEMENT_VERSION },
+      });
+
       html(res, 200, activateSuccessPage({
         gymActivated: result.gymActivated,
         gymSlug: activated.slug || '',
         gymUsername: result.gymUsername || '',
+        ownerRef: ownerId(result.userId) || '',
       }));
       return true;
     }
@@ -618,6 +642,57 @@ async function handleExtraRoutes(req, res, deps, { url, path, method }) {
 
   if (path === 'delete-account' && method === 'GET') {
     html(res, 200, deleteAccountPage());
+    return true;
+  }
+
+  // ---- the Gym Owner Agreement — a draft until someone approves it ----------
+  if (path === 'terms' && method === 'GET') {
+    html(res, 200, termsPage({ sections: agreementTerms(), version: AGREEMENT_VERSION, approved: termsApproved() }));
+    return true;
+  }
+
+  // ---- the owner's own copy of it, as a PDF --------------------------------
+  // Signed-in owners only, and only ever THEIR gym: everything below is keyed
+  // on the session, never on anything in the URL.
+  if (path === 'my-gym/agreement.pdf' && method === 'GET') {
+    const session = requireSession(req, res);
+    if (!session) return true;
+
+    const view = (await deps.ownerDashboard(session.sub)) || {};
+    const gym = view.gym;
+    if (!gym) {
+      html(res, 404, problemPage({ title: 'No agreement yet', message: 'Your agreement is issued when your gym is approved and you activate your account.' }));
+      return true;
+    }
+
+    const plans = (await deps.listPlans?.().catch(() => [])) || [];
+    const plan = plans.find((p) => p.key === gym.plan_key);
+    const accepted = ((await deps.listAuditLog?.({ action: 'platform.owner.agreement_accepted', limit: 200 }).catch(() => [])) || [])
+      .find((e) => e.actor_user_id === session.sub);
+
+    const pdf = await agreementPdf({
+      ownerId: ownerId(session.sub),
+      ownerName: view.ownerName || '',
+      ownerEmail: session.email,
+      gymName: gym.search_name,
+      gymAddress: `${platformBaseUrl()}/g/${gym.slug}/admin/login`,
+      gymUsername: OWNER_USERNAME,
+      planLabel: plan?.label || gym.plan_key || '',
+      priceText: Number.isFinite(Number(plan?.price_cents)) && plan?.price_cents !== null
+        ? `${plan.currency || 'ZAR'} ${(Number(plan.price_cents) / 100).toFixed(2)} a month`
+        : 'price set on your owner page',
+      trialEndsAt: view.subscription?.trial_ends_at ?? null,
+      acceptedAt: accepted?.created_at ?? null,
+      acceptedVersion: accepted?.detail?.version ?? null,
+      approved: termsApproved(),
+    });
+
+    res.writeHead(200, {
+      'Content-Type': 'application/pdf',
+      'Content-Disposition': `attachment; filename="Yoyo-Gyms-Agreement-${ownerId(session.sub) || 'owner'}.pdf"`,
+      'Cache-Control': 'private, no-store',
+    });
+    res.end(pdf);
     return true;
   }
 

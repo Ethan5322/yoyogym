@@ -329,7 +329,7 @@ test('the cron still returns its billing result when the drift report fails', as
 import { issueActivation } from '../platform/activation.js';
 
 function activationDeps() {
-  const issued = issueActivation({ userId: 'u1', gymId: 'gym-1', now: new Date() });
+  const issued = issueActivation({ userId: '3f9a12c4-0b1e-4c5d-9e8f-1a2b3c4d5e6f', gymId: 'gym-1', now: new Date() });
   const calls = { passwords: [], used: [], gyms: [], audits: [] };
   return {
     issued,
@@ -361,7 +361,7 @@ test('activating with the right code sets the password', async () => {
     req({
       method: 'POST',
       url: '/platform/activate',
-      body: `token=${d.issued.token}&code=${d.issued.code}&password=a-long-enough-password`,
+      body: `token=${d.issued.token}&code=${d.issued.code}&password=a-long-enough-password&accept_terms=yes`,
     }),
     r,
     d
@@ -370,6 +370,28 @@ test('activating with the right code sets the password', async () => {
   assert.equal(r.statusCode, 200);
   assert.equal(d.calls.passwords.length, 1);
   assert.match(r.body, /account is active/i);
+  assert.match(r.body, /Owner ID/, 'the owner leaves with their ID');
+});
+
+test('ACTIVATION WITHOUT ACCEPTING THE AGREEMENT IS REFUSED, AND THE LINK STILL WORKS', async () => {
+  const d = activationDeps();
+  let r = res();
+  await handlePlatform(
+    req({ method: 'POST', url: '/platform/activate', body: `token=${d.issued.token}&code=${d.issued.code}&password=a-long-enough-password` }),
+    r,
+    d
+  );
+  assert.equal(r.statusCode, 400);
+  assert.match(r.body, /Gym Owner Agreement/);
+  assert.equal(d.calls.passwords.length, 0, 'nothing changed');
+
+  r = res();
+  await handlePlatform(
+    req({ method: 'POST', url: '/platform/activate', body: `token=${d.issued.token}&code=${d.issued.code}&password=a-long-enough-password&accept_terms=yes` }),
+    r,
+    d
+  );
+  assert.equal(r.statusCode, 200, 'the same link still works once accepted');
 });
 
 test('a wrong code re-renders the form and keeps the token', async () => {

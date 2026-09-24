@@ -15,6 +15,28 @@ occurrence is answered from notes rather than rediscovered.
 
 ---
 
+## 2026-09-24 — Preview testing by the user: sign-in, registration, the owner journey, faces
+
+The user tested the preview and hit these problems:
+- **Member sign-in always failed.** Phones are stored `+27…` and members type `082…`. Proven on a real member; fixed with `phoneMatches()`.
+- **Registration appeared frozen.** The answer area grew past the bottom of the chat. It now scrolls.
+- **No way to reach owner or member registration from the website.** `/` now opens `/platform/welcome`.
+
+**The owner journey, made complete:**
+- An application under an existing account now requires that account's password; before this, anyone could file one in someone else's name.
+- A confirmation email is sent on applying.
+- **Approve refuses, and records nothing, unless the server can actually create a gym.** `provisioningReadiness()` checks the settings by name, and flags a token that isn't `sbp_…` or a project ID that looks like a URL. Before this, a missing setting left the application "approved" with no gym, and approval can't be repeated.
+- A refused decision is shown with its reason. The staff home says "Creating new gyms: Ready / Not ready".
+- The server function limit is now 60 s, because creating a gym runs inside the Approve request. Vercel's docs allow Hobby up to 300 s with Fluid compute and 60 s without.
+- **Activation now requires accepting the Gym Owner Agreement.** The acceptance and its version are recorded in the audit log. The owner gets an **Owner ID** (`YG-OWN-XXXXXXXX`, derived from the account id) and can download a **PDF agreement** from the owner page.
+- The terms are written from `TRIAL_DAYS` and `GRACE_DAYS`, and stay a **DRAFT** until `PLATFORM_TERMS_APPROVED=true`.
+
+**Faces:** member face galleries keep enrolment anchors plus a rolling window of learned appearances. But learning happened only on face sign-in from the member's own phone, never at the reception door scanner, so most members' galleries froze at enrolment. `admin/face-learn` fixes this: the scanner *suggests* a member, and the server re-identifies the face against every member and learns only if it agrees. That stops a reception login from planting one person's face on another's record.
+
+**Lesson recorded.** *A preview tested by a person finds what tests written against assumptions cannot.* All three of the user's failures passed every automated test.
+
+---
+
 ## 2026-09-24 — Full wiring audit: every button, link, API call and column
 
 Asked for before user testing: *is every button built and working?* Checked mechanically, not by

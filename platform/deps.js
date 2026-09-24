@@ -28,6 +28,7 @@ import { chargeAuthorization, paystackConfigured, initializeSubscriptionPayment,
 import { makeLimiter } from './ratelimit.js';
 import { platformBaseUrl } from './base-url.js';
 import { provisioningReadiness } from './provisioning-config.js';
+import { ownerId } from './agreement.js';
 import {
   coordinate, haversineKm, nearestGyms, likeTerm, RESULT_LIMIT, BOX_FETCH,
 } from './gym-search.js';
@@ -1186,7 +1187,7 @@ export function ownerDeps(db = platformDb()) {
         .eq('owner_user_id', userId)
         .maybeSingle();
 
-      const [{ data: subscription }, { data: documents }, { data: me }] = await Promise.all([
+      const [{ data: subscription }, { data: documents }, { data: me }, { data: named }] = await Promise.all([
         gym
           ? db.from('platform_subscriptions').select('*').eq('gym_id', gym.id).maybeSingle()
           : Promise.resolve({ data: null }),
@@ -1196,6 +1197,8 @@ export function ownerDeps(db = platformDb()) {
         // Before the migration adds the column this errors; the page then
         // simply shows no pending request, rather than failing to load.
         db.from('platform_users').select('closure_requested_at').eq('id', userId).maybeSingle(),
+        // Separate from the line above, which fails until its migration runs.
+        db.from('platform_users').select('full_name').eq('id', userId).maybeSingle(),
       ]);
 
       return {
@@ -1204,6 +1207,8 @@ export function ownerDeps(db = platformDb()) {
         subscription: subscription ?? null,
         documents: documents ?? [],
         closureRequestedAt: me?.closure_requested_at ?? null,
+        ownerName: named?.full_name ?? '',
+        ownerRef: ownerId(userId),
       };
     },
 
