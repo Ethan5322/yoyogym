@@ -64,4 +64,21 @@
 
     <!-- The app is useful without a camera, so this must not filter devices. -->
     <uses-feature android:name="android.hardware.camera" android:required="false" />
+
+    <!--
+      Location, for "Use my location" on the gym picker — nearest gyms first.
+
+      WITHOUT THESE, THAT BUTTON COULD NEVER WORK. Android refuses a permission
+      the manifest does not declare, silently and without a dialog, so every
+      member who pressed it was told "No problem, search by name instead".
+
+      BOTH are declared because Capacitor's WebView asks for both together, and
+      on Android 11 and below it treats anything short of both as a refusal.
+      Android 12+ still lets the member choose "approximate", which is all a
+      gym picker needs. Asked only when the button is pressed; never in the
+      background.
+    -->
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+    <uses-feature android:name="android.hardware.location" android:required="false" />
 </manifest>

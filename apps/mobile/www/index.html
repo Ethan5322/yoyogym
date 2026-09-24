@@ -157,6 +157,15 @@
 
     <!-- ============ 1. Which side are you on? ============ -->
     <div id="home">
+      <!-- Shown only once a gym has been picked on this phone. A member opens
+           their gym many times a week and picks it once; the second time
+           should be one tap, not a search. -->
+      <div class="card hidden" id="mine">
+        <p class="sub" style="margin:0">Your gym</p>
+        <h2 id="mine-name"></h2>
+        <button type="button" id="mine-open">Open my gym</button>
+        <button type="button" class="link" id="mine-forget">Not your gym? Choose another</button>
+      </div>
       <div class="card">
         <h2>I'm a gym member</h2>
         <p class="sub">Join a gym, or sign in to the one you already belong to.</p>

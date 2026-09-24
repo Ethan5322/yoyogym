@@ -178,6 +178,18 @@ test('a phone with no camera can still install the app', () => {
   assert.match(manifest, /android\.hardware\.camera"\s+android:required="false"/);
 });
 
+test('"USE MY LOCATION" CAN ACTUALLY GET A LOCATION', () => {
+  // The button shipped with no location permission declared. Android refuses
+  // an undeclared permission without a dialog, so every member was told
+  // "search by name instead". Capacitor asks for both, and below Android 12
+  // treats anything short of both as a refusal.
+  const manifest = readFileSync('apps/mobile/android/app/src/main/AndroidManifest.xml', 'utf8');
+  assert.match(manifest, /android\.permission\.ACCESS_COARSE_LOCATION/);
+  assert.match(manifest, /android\.permission\.ACCESS_FINE_LOCATION/);
+  assert.ok(!/ACCESS_BACKGROUND_LOCATION/.test(manifest), 'a gym picker never needs background location');
+  assert.match(manifest, /android\.hardware\.location"\s+android:required="false"/);
+});
+
 test('THE ALLOW LIST REACHED THE NATIVE PROJECT', (t) => {
   // shell.config.json is the source of truth, capacitor.config.ts reads it,
   // and `cap sync` copies the result into the app. If that chain breaks, the
@@ -200,4 +212,37 @@ test('THE ALLOW LIST REACHED THE NATIVE PROJECT', (t) => {
   assert.equal(native.server.androidScheme, 'https', 'a gym wi-fi is not a trusted network');
   assert.equal(native.android.allowMixedContent, false);
   assert.equal(native.android.webContentsDebuggingEnabled, false, 'never in a shipped build');
+});
+
+// ---------------------------------------------------------------------------
+// "My gym" — the second visit is one tap
+// ---------------------------------------------------------------------------
+
+test('THE APP REMEMBERS THE GYM A MEMBER PICKED', () => {
+  // Every launch used to start at "Which gym?" and a search.
+  const app = readFileSync('apps/mobile/www/app.js', 'utf8');
+  const html = readFileSync('apps/mobile/www/index.html', 'utf8');
+
+  assert.match(html, /id="mine"/, 'the home screen has a "your gym" card');
+  assert.match(app, /rememberGym\(slug, button\.dataset\.name\)/, 'picking from search remembers it');
+  assert.match(app, /rememberGym\(payload\.slug/, 'scanning a gym code remembers it');
+});
+
+test('only the gym\'s public identity is remembered, never a session', () => {
+  const app = readFileSync('apps/mobile/www/app.js', 'utf8');
+  const remember = app.slice(app.indexOf('function rememberGym'), app.indexOf('function myGym'));
+
+  assert.match(remember, /slug: slug, name:/);
+  assert.ok(!/token|membership|phone/i.test(remember), 'nothing private goes in');
+});
+
+test('a remembered gym can be forgotten, for a shared or handed-down phone', () => {
+  const app = readFileSync('apps/mobile/www/app.js', 'utf8');
+  assert.match(app, /getElementById\('mine-forget'\)[\s\S]{0,200}forgetGym\(\)/);
+});
+
+test('a stored value that is not a slug is ignored, not followed', () => {
+  const app = readFileSync('apps/mobile/www/app.js', 'utf8');
+  const read = app.slice(app.indexOf('function myGym'), app.indexOf('function forgetGym'));
+  assert.match(read, /\[a-z0-9\]\[a-z0-9-\]\{0,47\}/);
 });

@@ -43,7 +43,67 @@
     });
     note.textContent = '';
     note.className = 'note';
+    if (name === 'home') renderMine();
   }
+
+  // -------------------------------------------------------------------------
+  // "My gym" — remembered on this phone
+  // -------------------------------------------------------------------------
+  //
+  // A member opens their gym several times a week and picks it once. Without
+  // this, every launch began at "Which gym?" and a search.
+  //
+  // Only the gym's PUBLIC identity is kept — its slug and name, the same
+  // things search shows a stranger. Never a session, never a membership
+  // number: those belong to the gym's own screens. Storage can be refused
+  // (private mode, a locked-down device); the app then simply asks again.
+
+  var MINE = 'yoyo.mygym';
+
+  function rememberGym(slug, name) {
+    try {
+      localStorage.setItem(MINE, JSON.stringify({ slug: slug, name: name || slug }));
+    } catch (e) {
+      /* not remembered; asked again next time */
+    }
+  }
+
+  function myGym() {
+    try {
+      var saved = JSON.parse(localStorage.getItem(MINE) || 'null');
+      // The same rule the server applies to a slug. A value that is not one
+      // was not written by this app.
+      return saved && /^[a-z0-9][a-z0-9-]{0,47}$/.test(saved.slug) ? saved : null;
+    } catch (e) {
+      return null;
+    }
+  }
+
+  function forgetGym() {
+    try {
+      localStorage.removeItem(MINE);
+    } catch (e) {
+      /* nothing to forget */
+    }
+  }
+
+  function renderMine() {
+    var mine = myGym();
+    document.getElementById('mine').classList.toggle('hidden', !mine);
+    if (mine) document.getElementById('mine-name').textContent = mine.name;
+  }
+
+  document.getElementById('mine-open').addEventListener('click', function () {
+    var mine = myGym();
+    if (mine) go('/g/' + encodeURIComponent(mine.slug) + '/member');
+  });
+
+  document.getElementById('mine-forget').addEventListener('click', function () {
+    // On a shared or handed-down phone, the next person must not land in the
+    // previous owner's gym.
+    forgetGym();
+    renderMine();
+  });
 
   /**
    * Is this somewhere the WebView will actually open?
@@ -87,7 +147,7 @@
     var where = [g.city, g.country].filter(Boolean).map(esc).join(', ');
     var far = g.distance_km == null ? '' : ' · ' + esc(g.distance_km) + ' km away';
     return (
-      '<button class="gym" type="button" data-slug="' + esc(g.slug) + '">' +
+      '<button class="gym" type="button" data-slug="' + esc(g.slug) + '" data-name="' + esc(g.name) + '">' +
       '<b>' + esc(g.name) + '</b><span>' + where + far + '</span></button>'
     );
   }
@@ -191,6 +251,7 @@
     var button = e.target.closest('.gym');
     if (!button) return;
     var slug = button.dataset.slug;
+    rememberGym(slug, button.dataset.name);
     go(intent === 'register' ? '/g/' + encodeURIComponent(slug) + '/register'
                              : '/g/' + encodeURIComponent(slug) + '/member');
   });
@@ -319,6 +380,15 @@
       }
 
       stopScanner();
+      // A scanned code names the gym by slug only. Keep a name already known
+      // for it; otherwise "bos-gym" reads as "Bos Gym" until the member next
+      // picks it from search.
+      var known = myGym();
+      if (!known || known.slug !== payload.slug) {
+        rememberGym(payload.slug, payload.slug.split('-').map(function (w) {
+          return w.charAt(0).toUpperCase() + w.slice(1);
+        }).join(' '));
+      }
       go(window.YOYO_QR.pathForPayload(payload));
     } catch (err) {
       scanFailed('The camera could not start. Search by name instead.', true);
