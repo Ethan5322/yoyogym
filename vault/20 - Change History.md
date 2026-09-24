@@ -15,6 +15,38 @@ occurrence is answered from notes rather than rediscovered.
 
 ---
 
+## 2026-09-24 — Full wiring audit: every button, link, API call and column
+
+Asked for before user testing: *is every button built and working?* Checked mechanically, not by
+reading screens:
+
+| Surface | Checked | Result |
+|---|---|---|
+| Platform panel | 38 link/form targets vs 55 routes | all resolve |
+| Gym app (admin + member portal) | 116 API calls vs router keys, 35 links vs 36 pages | all resolve |
+| Buttons | every `<button>` in the React app and the app shell | all have an action |
+| **Database columns** | **959 column references vs the real schemas** | **3 real faults** |
+
+**The three faults.** All three failed silently, because PostgREST returns an error object instead
+of throwing, and each test's fake database accepted any column name:
+1. **`members.data_deletion_requested` was never created.** No schema file or migration adds it,
+   so every member's "Request data deletion" failed. Migration
+   `db/migrations/2026-09-24-member-deletion-request.sql` is written and **not run**. The column is
+   now also in `db/schema.sql` for new gyms.
+2. **`checkins.created_at` does not exist.** The platform's per-gym "check-ins this month" and
+   "last activity" were blank for every gym. It now reads `checked_in_at`, and a failed query
+   shows as "unreachable" rather than blank figures.
+3. **`settings.id` does not exist.** `/api/health` reported a healthy database as "DB error".
+
+`tests/schema-columns.test.js` now reads the real schema and fails on any query naming a column
+that does not exist. The only exceptions are the two `gym_secrets` columns of unwired project
+mode, each listed with its reason.
+
+**Lesson recorded.** *A fake that accepts anything proves nothing about names.* The same shape as
+the scanner bug: tests mocked what the code assumed, not what exists.
+
+---
+
 ## 2026-09-24 — Stage 8 opened: the app's own screens, and four things that never worked
 
 **800 tests pass.** Not deployed, and **not yet run on a real device**: no emulator or device is

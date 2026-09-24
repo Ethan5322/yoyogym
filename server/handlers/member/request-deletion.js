@@ -14,7 +14,13 @@ export default async function handler(req, res) {
       .from('members')
       .update({ data_deletion_requested: true, updated_at: new Date().toISOString() })
       .eq('id', auth.sub);
-    if (error) return serverError(res, error.message);
+    if (error) {
+      // Never the raw database message — a member was once shown "column
+      // members.data_deletion_requested does not exist". The cause goes to the
+      // log; the member gets a way that still works.
+      console.error('request-deletion error:', error.message);
+      return serverError(res, 'We could not record your request online. Please ask your gym directly — they can delete your data.');
+    }
     return ok(res, { requested: true, message: 'Your data deletion request has been recorded. Our team will action it.' });
   } catch (err) {
     console.error('request-deletion error:', err.message);

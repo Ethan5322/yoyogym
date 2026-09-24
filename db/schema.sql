@@ -180,6 +180,10 @@ create table if not exists gym.members (
   arcface_templates    jsonb,                            -- ArcFace 512-D gallery [{v,src,at}] (multi-pose + learned)
   biometric_enrolled   boolean not null default false,
   popia_consent_at     timestamptz,
+  -- The member asked for their data to be erased (POPIA; store requirement).
+  -- The gym owner carries it out. Used by member/request-deletion.js since
+  -- the start, but never created until 2026-09-24 — so every request failed.
+  data_deletion_requested boolean not null default false,
   created_at           timestamptz not null default now(),
   updated_at           timestamptz not null default now()
 );

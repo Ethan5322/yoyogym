@@ -16,6 +16,9 @@ const OPTIONAL_COLUMNS = {
     face_templates: '2026-07-10-face-galleries.sql',
     arcface_templates: '2026-07-10-face-galleries.sql',
     nationality: '2026-07-11-international-members.sql',
+    // Without it a member's "Request data deletion" fails outright — a
+    // store requirement and a POPIA right.
+    data_deletion_requested: '2026-09-24-member-deletion-request.sql',
   },
   admin_users: {
     face_templates: '2026-07-10-face-galleries.sql',
@@ -47,7 +50,11 @@ export default async function handler(req, res) {
   try {
     const supabase = getSupabase();
     // Cheap query against the gym schema to prove the connection + schema work.
-    const { error } = await supabase.from('settings').select('id', { count: 'exact', head: true });
+    //
+    // `key`, not `id`: gym.settings is keyed by `key` and has no id column, so
+    // counting `id` was refused by PostgREST and this endpoint answered
+    // "DB error" for a perfectly healthy database.
+    const { error } = await supabase.from('settings').select('key', { count: 'exact', head: true });
     if (error) return serverError(res, `DB error: ${error.message}`);
 
     const missing = await missingColumns(supabase);

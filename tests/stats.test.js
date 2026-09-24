@@ -13,6 +13,12 @@ import { gymStats, overPlanLimit, FORBIDDEN_COLUMNS, READABLE_COLUMNS } from '..
 
 const NOW = new Date('2026-09-22T12:00:00Z');
 
+/** Columns as they exist in db/schema.sql. */
+const REAL_COLUMNS = {
+  members: ['status', 'created_at'],
+  checkins: ['checked_in_at', 'checked_out_at', 'member_id'],
+};
+
 /** A client that records exactly what was asked of it. */
 function spyClient({ counts = { members: 87, checkins: 412 }, lastAt = '2026-09-21T18:00:00Z', fail = false } = {}) {
   const calls = [];
@@ -26,16 +32,20 @@ function spyClient({ counts = { members: 87, checkins: 412 }, lastAt = '2026-09-
           return q;
         },
         eq: () => q,
-        gte: () => q,
-        order: () => q,
+        // THE REAL COLUMNS. This fake used to accept any name, which is how
+        // a query on a column gym.checkins does not have passed its tests.
+        gte: (col) => { if (!REAL_COLUMNS[table]?.includes(col)) q._error = `no column ${col}`; return q; },
+        order: (col) => { if (!REAL_COLUMNS[table]?.includes(col)) q._error = `no column ${col}`; return q; },
         limit: () => q,
         maybeSingle: async () => {
           if (fail) throw new Error('unreachable');
-          return { data: { created_at: lastAt } };
+          if (q._error) return { data: null, error: { message: q._error } };
+          return { data: { checked_in_at: lastAt } };
         },
         then(resolve, reject) {
           if (fail) return reject(new Error('unreachable'));
           const count = table === 'members' ? counts.members : counts.checkins;
+          if (q._error) return resolve({ count: null, data: null, error: { message: q._error } });
           return resolve({ count, data: null });
         },
       };
@@ -73,7 +83,7 @@ test('NOT ONE FORBIDDEN COLUMN IS EVER NAMED', async () => {
 });
 
 test('the only column read by name is a timestamp', () => {
-  assert.deepEqual(READABLE_COLUMNS, ['created_at']);
+  assert.deepEqual(READABLE_COLUMNS, ['checked_in_at']);
   for (const column of READABLE_COLUMNS) {
     assert.ok(!FORBIDDEN_COLUMNS.includes(column));
   }
@@ -152,4 +162,25 @@ test('NOTHING HERE BLOCKS ANYTHING', () => {
 
   assert.ok(!('block' in result));
   assert.ok(!('suspend' in result));
+});
+
+test('THE ACTIVITY FIGURES READ A COLUMN THE CHECK-INS TABLE ACTUALLY HAS', async () => {
+  const { readFileSync } = await import('node:fs');
+  const schema = readFileSync('db/schema.sql', 'utf8');
+  const table = schema.slice(schema.indexOf('create table if not exists gym.checkins'), schema.indexOf(');', schema.indexOf('create table if not exists gym.checkins')));
+  for (const column of READABLE_COLUMNS) {
+    assert.ok(table.split(/\s+/).includes(column), `gym.checkins has a column called ${column}`);
+  }
+
+  const stats = await gymStats(spyClient({ lastAt: '2026-09-21T18:00:00Z' }), { now: NOW });
+  assert.equal(stats.checkinsThisMonth, 412);
+  assert.equal(stats.lastActivityAt, '2026-09-21T18:00:00Z');
+});
+
+test('a query that fails is reported as unreadable, not as blank figures', async () => {
+  const client = spyClient();
+  const from = client.from.bind(client);
+  client.from = (table) => { const q = from(table); q._error = 'boom'; return q; };
+  const stats = await gymStats(client, { now: NOW });
+  assert.equal(stats.reachable, false);
 });

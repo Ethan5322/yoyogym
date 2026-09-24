@@ -31,8 +31,15 @@
 // conversation that earns the upgrade. It is also how a gym that has stopped
 // being used becomes visible before its renewal, rather than after.
 
-/** The only columns this module will ever read. Fixed here, never passed in. */
-export const READABLE_COLUMNS = Object.freeze(['created_at']);
+/**
+ * The only columns this module will ever read. Fixed here, never passed in.
+ *
+ * `checked_in_at`, NOT `created_at`: gym.checkins has no created_at column, so
+ * "check-ins this month" and "last activity" were blank for every gym from the
+ * day they were built. PostgREST returns an error object rather than
+ * throwing, and the blank read as "reachable, no figures".
+ */
+export const READABLE_COLUMNS = Object.freeze(['checked_in_at']);
 
 /**
  * Columns that must never appear in a query from the platform.
@@ -83,21 +90,26 @@ export async function gymStats(client, { now = new Date() } = {}) {
       client
         .from('checkins')
         .select('*', { count: 'exact', head: true })
-        .gte('created_at', startOfMonth(now)),
+        .gte('checked_in_at', startOfMonth(now)),
 
       // The one query that returns a row, and it is one timestamp.
       client
         .from('checkins')
         .select(READABLE_COLUMNS.join(','))
-        .order('created_at', { ascending: false })
+        .order('checked_in_at', { ascending: false })
         .limit(1)
         .maybeSingle(),
     ]);
 
+    // A query that failed is not a count of nothing. Reported as "could not
+    // read", which the screen says, rather than blank figures beside a gym
+    // that looks fine.
+    if (members?.error || checkins?.error || last?.error) return empty;
+
     return {
       activeMembers: Number.isFinite(members?.count) ? members.count : null,
       checkinsThisMonth: Number.isFinite(checkins?.count) ? checkins.count : null,
-      lastActivityAt: last?.data?.created_at ?? null,
+      lastActivityAt: last?.data?.checked_in_at ?? null,
       reachable: true,
     };
   } catch {
