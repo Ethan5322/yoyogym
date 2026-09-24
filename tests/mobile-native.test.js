@@ -6,7 +6,7 @@
 // CapacitorBarcodeScanner.scanBarcode(). These tests drive the installed API.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { readFileSync, existsSync } from 'node:fs';
 import { JSDOM, VirtualConsole } from 'jsdom';
 import { TextEncoder, TextDecoder } from 'node:util';
 
@@ -72,15 +72,27 @@ test('THE SCANNER CALLS THE PLUGIN THAT IS INSTALLED, FOR QR CODES', async () =>
   assert.equal(scanCalls[0].hint, 0, 'QR_CODE');
 });
 
-test('the code and the installed plugin agree on the API', () => {
-  const pkg = JSON.parse(readFileSync('apps/mobile/node_modules/@capacitor/barcode-scanner/package.json', 'utf8'));
-  const defs = readFileSync('apps/mobile/node_modules/@capacitor/barcode-scanner/dist/esm/definitions.d.ts', 'utf8');
-  assert.match(defs, /scanBarcode\(options/);
-  assert.ok(Number(pkg.version.split('.')[0]) >= 3, 'the Capacitor 8 line of the plugin');
+test('the code and the installed plugin agree on the API', (t) => {
+  // The VERSION comes from the committed lock file, so this runs everywhere —
+  // including CI, which installs only the root project and has no
+  // apps/mobile/node_modules. (Reading node_modules here failed CI once.)
+  const lock = JSON.parse(readFileSync('apps/mobile/package-lock.json', 'utf8'));
+  const locked = lock.packages?.['node_modules/@capacitor/barcode-scanner']?.version;
+  assert.ok(locked, 'the scanner plugin is in the mobile lock file');
+  assert.ok(Number(locked.split('.')[0]) >= 3, `the Capacitor 8 line of the plugin (locked: ${locked})`);
 
   const code = read('app.js').replace(/\/\/.*$/gm, '');
   assert.match(code, /Plugins\.CapacitorBarcodeScanner/);
   assert.ok(!/Plugins\.BarcodeScanner\b/.test(code), 'no call to another plugin\'s API');
+
+  // The plugin's OWN type definitions, where they are installed: the check
+  // that would have caught the scanner calling another plugin's API.
+  const defsPath = 'apps/mobile/node_modules/@capacitor/barcode-scanner/dist/esm/definitions.d.ts';
+  if (!existsSync(defsPath)) {
+    t.diagnostic('apps/mobile is not installed here; the API check against the plugin\'s own definitions ran where it is.');
+    return;
+  }
+  assert.match(readFileSync(defsPath, 'utf8'), /scanBarcode\(options/);
 });
 
 test('A GYM POSTER OPENS THAT GYM, OFFERING SIGN-IN AND JOINING', async () => {
