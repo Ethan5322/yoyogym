@@ -11,10 +11,25 @@
 // database; losing that because a mail API timed out would be the wrong trade
 // by an enormous margin. Every function here reports failure and returns.
 
+import { platformBaseUrl } from './base-url.js';
+
 const BREVO_URL = 'https://api.brevo.com/v3/smtp/email';
 
-const FROM_EMAIL = process.env.PLATFORM_FROM_EMAIL || 'no-reply@yoyogyms.com';
-const FROM_NAME = process.env.PLATFORM_FROM_NAME || 'Yoyo Gyms';
+/**
+ * Who platform email is FROM, read at send time.
+ *
+ * Brevo delivers only from a sender it has verified. The old default,
+ * no-reply@yoyogyms.com, is on a domain nobody has registered, so with
+ * PLATFORM_FROM_EMAIL unset every password-reset and activation email was
+ * refused. The gym side's BREVO_SENDER_EMAIL is verified — its emails arrive —
+ * so it is the fallback.
+ */
+export function platformSender(env = process.env) {
+  return {
+    email: env.PLATFORM_FROM_EMAIL || env.BREVO_SENDER_EMAIL || 'no-reply@yoyogyms.com',
+    name: env.PLATFORM_FROM_NAME || 'Yoyo Gyms',
+  };
+}
 
 /** Read at call time so tests need no environment (D-080). */
 export const emailConfigured = () => Boolean(process.env.BREVO_API_KEY);
@@ -42,7 +57,7 @@ export async function sendEmail({ to, subject, html, text }) {
         accept: 'application/json',
       },
       body: JSON.stringify({
-        sender: { email: FROM_EMAIL, name: FROM_NAME },
+        sender: platformSender(),
         to: [{ email: to }],
         subject,
         htmlContent: html,
@@ -188,7 +203,7 @@ export function billingEmail(kind, { gymName = 'your gym', amountCents = null, c
   return {
     subject: m.subject,
     html: `<p>${m.body}</p><p><a href="${escapeHtml(
-      process.env.PLATFORM_BASE_URL || ''
+      platformBaseUrl()
     )}/platform/my-gym">Open your Yoyo Gyms account</a></p>`,
     text: stripTags(m.body),
   };

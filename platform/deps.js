@@ -26,6 +26,7 @@ import { reconcileSchemas } from './reconciliation.js';
 import { GRACE_DAYS } from './billing.js';
 import { chargeAuthorization, paystackConfigured, initializeSubscriptionPayment, verifyTransaction } from './paystack.js';
 import { makeLimiter } from './ratelimit.js';
+import { platformBaseUrl } from './base-url.js';
 import {
   coordinate, haversineKm, nearestGyms, likeTerm, RESULT_LIMIT, BOX_FETCH,
 } from './gym-search.js';
@@ -717,7 +718,7 @@ export function platformOpsDeps(db = platformDb()) {
         amountCents,
         reference,
         metadata,
-        callbackUrl: `${process.env.PLATFORM_BASE_URL || ''}/platform/pay/callback`,
+        callbackUrl: `${platformBaseUrl()}/platform/pay/callback`,
       }),
 
     /** Asked of Paystack directly. The browser's word is not evidence. */
@@ -1038,7 +1039,7 @@ export function activationDeps(db = platformDb()) {
     },
 
     sendResetEmail: async ({ to, token }) => {
-      const base = process.env.PLATFORM_BASE_URL || '';
+      const base = platformBaseUrl(); // absolute — see platform/base-url.js
       const link = `${base}/platform/reset?token=${encodeURIComponent(token)}`;
       return sendEmail({ to, ...passwordResetEmail({ link }) });
     },
@@ -1064,7 +1065,7 @@ export function activationDeps(db = platformDb()) {
       const { error } = await db.from('owner_activations').insert(row);
       if (error) throw new Error(`Could not create the activation: ${error.message}`);
 
-      const base = process.env.PLATFORM_BASE_URL || '';
+      const base = platformBaseUrl(); // absolute — see platform/base-url.js
       const link = `${base}/platform/activate?token=${encodeURIComponent(token)}`;
 
       // Recorded WITHOUT the token or the code. An audit log that contains a
