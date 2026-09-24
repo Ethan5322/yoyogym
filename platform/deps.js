@@ -27,6 +27,7 @@ import { GRACE_DAYS } from './billing.js';
 import { chargeAuthorization, paystackConfigured, initializeSubscriptionPayment, verifyTransaction } from './paystack.js';
 import { makeLimiter } from './ratelimit.js';
 import { platformBaseUrl } from './base-url.js';
+import { provisioningReadiness } from './provisioning-config.js';
 import {
   coordinate, haversineKm, nearestGyms, likeTerm, RESULT_LIMIT, BOX_FETCH,
 } from './gym-search.js';
@@ -274,7 +275,20 @@ export function platformDeps() {
 
       const dryRun = process.env.PLATFORM_PROVISION_LIVE !== 'true';
 
-      if (action === 'approve') return approveApplication(applicationId, actor, appDeps, { dryRun });
+      if (action === 'approve') {
+        // Switched on but not fully set up: refused BEFORE the decision is
+        // recorded, naming what is missing. Otherwise the first provisioning
+        // step fails after "approved" is written, and the owner is stranded.
+        const readiness = provisioningReadiness();
+        if (readiness.live && !readiness.ready) {
+          return {
+            ok: false,
+            notReady: true,
+            error: 'Nothing was approved: this server is not fully set up to create gyms. ' + readiness.problems.join(' '),
+          };
+        }
+        return approveApplication(applicationId, actor, appDeps, { dryRun });
+      }
       if (action === 'reject') return rejectApplication(applicationId, actor, reason, appDeps);
       return requestMoreInfo(applicationId, actor, reason, appDeps);
     },

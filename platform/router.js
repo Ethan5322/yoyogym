@@ -36,6 +36,7 @@ import { timingSafeEqual } from 'node:crypto';
 import { handlePlatformApi } from './api.js';
 import { decideLogin, INVALID, LOCKED } from './login.js';
 import { applyAppCors } from '../shared/cors.js';
+import { provisioningReadiness } from './provisioning-config.js';
 import { requestReset, completeReset } from './password-reset.js';
 import {
   loginPage,
@@ -336,12 +337,16 @@ export async function handlePlatform(req, res, deps) {
         res,
         409,
         problemPage({
-          title: outcome.dryRun ? 'Creating gyms is switched off' : 'That decision did not go through',
+          title: outcome.dryRun
+            ? 'Creating gyms is switched off'
+            : outcome.notReady
+              ? 'Creating gyms is not fully set up'
+              : 'That decision did not go through',
           message: outcome.error || 'Nothing was changed.',
           // Plain text: problemPage escapes it, as it should.
-          fix: outcome.dryRun
-            ? 'In Vercel, open Settings → Environment Variables and set PLATFORM_PROVISION_LIVE to true, ' +
-              'plus SUPABASE_PROJECT_REF and SUPABASE_MANAGEMENT_TOKEN. Redeploy, then approve the application again.'
+          fix: outcome.dryRun || outcome.notReady
+            ? 'In Vercel, open Settings → Environment Variables and fix what is listed above. ' +
+              'Redeploy, then approve the application again — it is still waiting.'
             : null,
         })
       );
@@ -911,7 +916,7 @@ async function handleExtraRoutes(req, res, deps, { url, path, method }) {
       activeGyms: allGyms.filter((g) => g.status === 'active').length,
       alerts: findAlerts(entries, { now: new Date() }).length,
       closureRequests,
-      provisioningOff: process.env.PLATFORM_PROVISION_LIVE !== 'true',
+      provisioning: provisioningReadiness(),
       unpricedPlans: finance.unpriced_plans || [],
       outstandingCents: finance.outstanding_cents ?? 0,
       currency: finance.currency || 'ZAR',

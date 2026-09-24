@@ -123,10 +123,48 @@ test('AN EXISTING ACCOUNT MUST BE PROVEN BEFORE AN APPLICATION IS FILED UNDER IT
   assert.ok(fn.indexOf('verifyPassword') < fn.indexOf("from('gym_applications')"), 'checked before anything is filed');
 });
 
-test('WITH GYM CREATION OFF, THE STAFF HOME SAYS SO BEFORE ANYONE PRESSES APPROVE', () => {
-  const page = dashboardPage({ waiting: 1, provisioningOff: true });
-  assert.match(page, /Creating gyms is switched off/);
-  assert.ok(!/Creating gyms is switched off/.test(dashboardPage({ waiting: 1, provisioningOff: false })));
+test('THE STAFF HOME SAYS WHETHER THIS SERVER CAN CREATE GYMS, AND WHAT IS MISSING', async () => {
+  const { provisioningReadiness } = await import('../platform/provisioning-config.js');
+
+  const off = provisioningReadiness({});
+  assert.equal(off.ready, false);
+  assert.match(dashboardPage({ provisioning: off }), /Creating gyms is switched off/);
+
+  // Switched on, but the project ID was never added — the user's situation.
+  const partial = provisioningReadiness({
+    PLATFORM_PROVISION_LIVE: 'true', SUPABASE_MANAGEMENT_TOKEN: 'sbp_abc123',
+    SUPABASE_URL: 'https://x.supabase.co', SUPABASE_SERVICE_ROLE_KEY: 'k',
+  });
+  assert.equal(partial.ready, false);
+  assert.match(partial.problems.join(' '), /SUPABASE_PROJECT_REF is missing/);
+  assert.match(dashboardPage({ provisioning: partial }), /not fully set up/);
+  assert.match(dashboardPage({ provisioning: partial }), /Not ready/);
+
+  const ready = provisioningReadiness({
+    PLATFORM_PROVISION_LIVE: 'true', SUPABASE_MANAGEMENT_TOKEN: 'sbp_abc123', SUPABASE_PROJECT_REF: 'abcdefghijklmnopqrst',
+    SUPABASE_URL: 'https://x.supabase.co', SUPABASE_SERVICE_ROLE_KEY: 'k',
+  });
+  assert.equal(ready.ready, true);
+  assert.match(dashboardPage({ provisioning: ready }), /✅ Ready/);
+});
+
+test('A PLACEHOLDER PASTED AS THE TOKEN, OR A URL AS THE PROJECT ID, IS CAUGHT', async () => {
+  const { provisioningReadiness } = await import('../platform/provisioning-config.js');
+  const r = provisioningReadiness({
+    PLATFORM_PROVISION_LIVE: 'true', SUPABASE_MANAGEMENT_TOKEN: 'the sbp_… token from step 1',
+    SUPABASE_PROJECT_REF: 'https://abc.supabase.co', SUPABASE_URL: 'u', SUPABASE_SERVICE_ROLE_KEY: 'k',
+  });
+  assert.equal(r.ready, false);
+  assert.match(r.problems.join(' '), /does not look like a Supabase access token/);
+  assert.match(r.problems.join(' '), /does not look like a project ID/);
+  // Names only — a value never appears in what is shown on screen.
+  assert.ok(!r.problems.join(' ').includes('abc.supabase.co'));
+});
+
+test('APPROVAL IS REFUSED, AND NOTHING RECORDED, WHILE CREATION IS NOT FULLY SET UP', () => {
+  const deps = readFileSync('platform/deps.js', 'utf8');
+  const decide = deps.slice(deps.indexOf('decide: async'), deps.indexOf('createApplication: async'));
+  assert.ok(decide.indexOf('provisioningReadiness()') < decide.indexOf('return approveApplication'), 'checked before approving');
 });
 
 test('a refused decision is shown, not silently redirected', () => {

@@ -1850,19 +1850,24 @@ export function dashboardPage({
   trialsEndingSoon = [],
   driftFindings = null,
   closureRequests = 0,
-  provisioningOff = false,
+  provisioning = null,
 } = {}) {
   // Ordered by what it costs to ignore, not by what is interesting.
   const needsYou = [];
 
-  // Applications are waiting and approving them CANNOT work: said before
+  // Can this server create a gym? Said on the home page — by setting NAME,
+  // never a value — so "is it set up?" is answered by signing in, before
   // anyone presses Approve and wonders why nothing happened.
-  if (provisioningOff && waiting) {
+  if (provisioning && !provisioning.ready) {
     needsYou.push({
       urgency: 'high',
-      text: 'Creating gyms is switched off on this server, so approving an application cannot open a gym yet.',
+      text:
+        (provisioning.live
+          ? 'Creating gyms is switched on but not fully set up: '
+          : 'Creating gyms is switched off: ') +
+        provisioning.problems.map((p) => h(p)).join(' '),
       href: '/platform/applications',
-      action: 'See what is waiting',
+      action: waiting ? 'See what is waiting' : 'Applications',
     });
   }
 
@@ -1965,6 +1970,14 @@ ${todo}
         <td><a href="/platform/owners">Gym owners</a></td>
         <td><a href="/platform/owners">Manage →</a></td>
       </tr>
+      ${
+        provisioning
+          ? `<tr>
+        <td>Creating new gyms</td>
+        <td>${provisioning.ready ? '<b>✅ Ready</b> <span class="muted">· approving an application opens the gym</span>' : '<b>❌ Not ready</b> <span class="muted">· see above</span>'}</td>
+      </tr>`
+          : ''
+      }
       <tr>
         <td><a href="/platform/audit">Audit log</a></td>
         <td><a href="/platform/audit">Everything that happened →</a></td>
