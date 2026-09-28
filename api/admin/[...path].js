@@ -4,6 +4,7 @@ import { json } from '../../server/lib/http.js';
 import { withGym } from '../../server/lib/gymcontext.js';
 import { enforceEntitlement } from '../../server/lib/entitlements.js';
 import { captureError } from '../../server/lib/observability.js';
+import { checkLongSession } from '../../server/lib/sessions.js';
 import dashboard from '../../server/handlers/admin/dashboard.js';
 import verify from '../../server/handlers/admin/verify.js';
 import members from '../../server/handlers/admin/members.js';
@@ -98,7 +99,16 @@ export default async function handler(req, res) {
   // checked before it, every request looked like single-gym mode and every
   // plan was allowed everything.
   try {
-    return await withGym(req, res, () => (enforceEntitlement(seg, res, json) ? fn(req, res) : undefined), json);
+    // A long ("stay signed in") session is checked against the account's
+    // current session_version first — a reset, a disabled account, or the
+    // owner's "sign out everywhere" ends it (server/lib/sessions.js).
+    return await withGym(
+      req,
+      res,
+      async () =>
+        (await checkLongSession(req, res, 'admin', json)) && enforceEntitlement(seg, res, json) ? fn(req, res) : undefined,
+      json
+    );
   } catch (err) {
     captureError(`api/admin/${seg}`, err, { method: req.method });
     if (!res.headersSent) return json(res, 500, { error: 'Something went wrong. Please try again.' });

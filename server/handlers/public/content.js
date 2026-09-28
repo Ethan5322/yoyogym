@@ -56,6 +56,14 @@ export default async function handler(req, res) {
         accent_color: profile.accent_color || null,
         logo_url: profile.logo_url || null,
         welcome_message: profile.welcome_message || null,
+        // The gym's home in the app (CLAUDE.md §38.1 Q4): what the owner chose
+        // to show its members. All of it is what a gym shows the public.
+        cover_url: profile.cover_url || null,
+        notice: profile.notice || null,
+        operating_hours: profile.operating_hours || null,
+        phone: profile.phone || null,
+        email: profile.email || null,
+        address: profile.address || null,
       },
       indemnity_text: (map.indemnity_text?.text || DEFAULTS.indemnity_text).replaceAll(
         '[GYM NAME]',

@@ -4,6 +4,7 @@ import { withGym } from '../../server/lib/gymcontext.js';
 import { enforceEntitlement } from '../../server/lib/entitlements.js';
 import { AUTH_ROUTE_FEATURES } from '../../shared/features.js';
 import { captureError } from '../../server/lib/observability.js';
+import { checkLongSession } from '../../server/lib/sessions.js';
 import login from '../../server/handlers/auth/login.js';
 import me from '../../server/handlers/auth/me.js';
 import faceLogin from '../../server/handlers/auth/face-login.js';
@@ -21,7 +22,10 @@ export default async function handler(req, res) {
     return await withGym(
       req,
       res,
-      () => (enforceEntitlement(seg, res, json, AUTH_ROUTE_FEATURES) ? fn(req, res) : undefined),
+      async () =>
+        (await checkLongSession(req, res, 'admin', json)) && enforceEntitlement(seg, res, json, AUTH_ROUTE_FEATURES)
+          ? fn(req, res)
+          : undefined,
       json
     );
   } catch (err) {

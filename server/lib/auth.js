@@ -9,6 +9,7 @@
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { unauthorized, forbidden } from './http.js';
+import { REMEMBER_FOR } from './session-length.js';
 
 const JWT_SECRET = process.env.JWT_SECRET;
 const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || '8h';
@@ -40,7 +41,7 @@ export async function verifyPassword(plain, hash) {
  * issued has no gym claim, and must keep working — requiring one would log out
  * every signed-in staff member the moment this deploys.
  */
-export function signToken(adminUser, { gym = null } = {}) {
+export function signToken(adminUser, { gym = null, remember = false } = {}) {
   const claims = {
     sub: adminUser.id,
     username: adminUser.username,
@@ -53,6 +54,12 @@ export function signToken(adminUser, { gym = null } = {}) {
   // it was before this change.
   if (gym) claims.gym = String(gym).toLowerCase();
 
+  // "Stay signed in until you sign out", in the app (§38.1 Q3). Ended early by
+  // raising the account's session_version (sessions.js).
+  if (remember) {
+    claims.sv = Number(adminUser.session_version || 0);
+    return jwt.sign(claims, JWT_SECRET, { expiresIn: REMEMBER_FOR });
+  }
   return jwt.sign(claims, JWT_SECRET, { expiresIn: JWT_EXPIRES_IN });
 }
 

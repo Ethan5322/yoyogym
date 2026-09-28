@@ -2,6 +2,8 @@
 //   action = "checkin"          -> log a manual check-in
 //          | "regenerate_code"  -> issue a new verification code
 //          | "renew"            -> extend the current membership
+//          | "sign_out_everywhere" -> end the member's app sessions on every phone
+//                                  ("lost phone", CLAUDE.md §38.1 Q2)
 // Owner/Manager (reception may also do manual check-in).
 import { getSupabase } from '../../lib/supabase.js';
 import { allowMethods, readJsonBody, ok, badRequest, serverError } from '../../lib/http.js';
@@ -9,6 +11,7 @@ import { requireRole } from '../../lib/auth.js';
 import { generateVerificationCode } from '../../lib/identifiers.js';
 import { DURATION_MONTHS, computeMembership } from '../../../shared/pricing.js';
 import { recordAudit } from '../../lib/audit.js';
+import { signOutEverywhere } from '../../lib/sessions.js';
 
 const isoDate = (d) => d.toISOString().slice(0, 10);
 function addMonths(date, n) {
@@ -114,6 +117,13 @@ export default async function handler(req, res) {
         .eq('id', membership.id);
       await recordAudit(supabase, admin, { action: 'member.change_plan', entity: 'member', entity_id: id, detail: `→ ${plan.name}` });
       return ok(res, { message: `Plan changed to ${plan.name}.` });
+    }
+
+    if (action === 'sign_out_everywhere') {
+      const result = await signOutEverywhere(supabase, 'member', id);
+      if (!result.ok) return serverError(res, result.error.message);
+      await recordAudit(supabase, admin, { action: 'member.sign_out_everywhere', entity: 'member', entity_id: id });
+      return ok(res, { message: 'Signed out of the app on every phone. They sign in again with their number and phone.' });
     }
 
     return badRequest(res, 'Unknown action.');

@@ -156,6 +156,11 @@ export default function Staff() {
                   <div className="flex flex-wrap gap-2">
                     <button className="btn-outline px-2 py-1 text-xs" onClick={() => patch(s.id, { is_active: !s.is_active }, 'Updated.')}>{s.is_active ? 'Disable' : 'Enable'}</button>
                     <button className="btn-outline px-2 py-1 text-xs" onClick={() => resetPw(s.id, s.username)}>Reset pw</button>
+                    {/* Ends every app session this person has, on every phone (§38.1 Q3). */}
+                    <button className="btn-outline px-2 py-1 text-xs" title="Sign this person out of the app on every phone"
+                      onClick={() => window.confirm(`Sign ${s.username} out of the app on every phone?`) && patch(s.id, { sign_out_everywhere: true }, `${s.username} is signed out everywhere.`)}>
+                      Sign out everywhere
+                    </button>
                     <button className="btn-outline px-2 py-1 text-xs" onClick={() => remove(s.id, s.username)}>Delete</button>
                   </div>
                 </td>

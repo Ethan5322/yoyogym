@@ -146,3 +146,15 @@ test('A GYM LOGO IS A PNG, JPG OR WEBP (OR AN HTTPS LINK), AND SMALL', async () 
   assert.match(logoProblem('https://x/"><script>'), /PNG, JPG or WebP/);
   assert.match(logoProblem('data:image/png;base64,' + 'A'.repeat(400 * 1024)), /too large/);
 });
+
+test('A COVER PICTURE MUST BE ONE UPLOADED FOR THIS GYM (§38.1 Q5)', async () => {
+  process.env.JWT_SECRET ||= 'test-secret-for-cover';
+  const { coverProblem } = await import('../server/handlers/admin/settings.js');
+  const KOM = 'https://x.supabase.co/storage/v1/object/public/gym-branding/kom/';
+  assert.equal(coverProblem('', KOM), null, 'no cover is fine');
+  assert.equal(coverProblem(`${KOM}cover-1759000000000.jpg`, KOM), null);
+  assert.match(coverProblem('https://x.supabase.co/storage/v1/object/public/gym-branding/other/cover-1.jpg', KOM), /not one uploaded for this gym/, 'never another gym\'s folder');
+  assert.match(coverProblem(`${KOM}../other/cover-1.jpg`, KOM), /not valid/);
+  assert.match(coverProblem(`${KOM}cover-1.jpg?"><script>`, KOM), /not valid/);
+  assert.match(coverProblem('https://evil.example/a.jpg', KOM), /not one uploaded/);
+});

@@ -106,6 +106,11 @@ export default function MemberDetail() {
           <button className="btn-primary px-3 py-2 text-sm" onClick={() => action('checkin')}>Check in</button>
           <button className="btn-outline px-3 py-2 text-sm" onClick={() => action('renew')}>Renew</button>
           <button className="btn-outline px-3 py-2 text-sm" onClick={() => action('regenerate_code')}>New code</button>
+          {/* "Lost phone": ends the member's app sessions everywhere (§38.1 Q2). */}
+          <button className="btn-outline px-3 py-2 text-sm" title="Sign this member out of the app on every phone"
+            onClick={() => window.confirm('Sign this member out of the app on every phone? They sign in again with their number and phone.') && action('sign_out_everywhere')}>
+            Sign out of app
+          </button>
           {m.phone && (
             <a className="btn-outline px-3 py-2 text-sm" href={`https://wa.me/${m.phone.replace(/[^0-9]/g, '')}`} target="_blank" rel="noreferrer">WhatsApp</a>
           )}

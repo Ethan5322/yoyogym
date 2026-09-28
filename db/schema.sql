@@ -57,6 +57,8 @@ create table if not exists gym.admin_users (
   contract_end      date,                        -- employment end (blank = ongoing)
   failed_logins     integer not null default 0,
   locked_until      timestamptz,
+  -- Raised to sign this person out everywhere (CLAUDE.md §38.1 Q3).
+  session_version   integer not null default 0,
   last_login_at     timestamptz,
   created_at        timestamptz not null default now(),
   updated_at        timestamptz not null default now()
@@ -184,6 +186,8 @@ create table if not exists gym.members (
   -- The gym owner carries it out. Used by member/request-deletion.js since
   -- the start, but never created until 2026-09-24 — so every request failed.
   data_deletion_requested boolean not null default false,
+  -- Raised to sign this member out everywhere (CLAUDE.md §38.1 Q2).
+  session_version integer not null default 0,
   created_at           timestamptz not null default now(),
   updated_at           timestamptz not null default now()
 );

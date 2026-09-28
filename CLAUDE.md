@@ -1877,3 +1877,59 @@ rules, never for text.
   the gym's name printed beside it. *This replaces Q2's "a gym's own logo wins everywhere" for
   documents: documents always carry the Yoyo Gyms logo.*
 - **Q8 — someone new** (no gym chosen yet, member or owner) sees the **Yoyo Gyms** front page.
+
+---
+
+## 38. Each gym's own app — after a member or owner belongs to a gym (user instruction, 2026-09-28)
+
+> The user's words, word for word, from three messages on 2026-09-28. Clarified one question at a
+> time in §38.1, which wins over the text above it. Not built until §38.1 is answered.
+
+> also once person registar as spcific gym it must save his identity there and keep and desplay
+> that gym on app not yoyo gym, my supposed treat each gym owners as their gym they ca what to
+> desplay on app front mean landing page or front page, even member once register as specific gym
+> and then signed in he keep sign in untill sign out, when he come check next day the app display
+> his gym icon and picture, mean that once gym owner registerd and signed in as owner the app is
+> his app yoyo gym logo desplay only neded place
+
+> but for new member or gym owner it display as yoyo gym profetional apprance
+
+> also during gym member regestration on choosed gym the specific gym icon must seen not yoyo gym
+> ogo  *(built: §37.1 Q7)*
+
+### 38.1 Clarifications — answered by the user, one at a time
+
+Checked against the code on 2026-09-28:
+- **Already true:** the app remembers the gym chosen on the phone (`yoyo.mygym`), and a member's
+  session is kept per gym on the phone; someone new sees the Yoyo Gyms front page (§37.1 Q8).
+- **Not yet true:** the app always OPENS on the Yoyo Gyms front page, even for a signed-in member.
+- **A member session lasts 12 hours** (§9) and **a gym admin session 8 hours** (§8): "signed in until
+  sign out" changes the protected authentication model (§32) and needs the user's decision.
+- **There is no gym picture yet**, and no object storage is in use (§5, §30): a gym's cover
+  picture needs a storage decision.
+- **Q1 — a member opening the app again** goes **straight to their gym's home**: the gym's picture
+  and icon at the top, then their status, one-tap check-in, card and classes. No Yoyo screen.
+  "Switch gym" and "Sign out" live in their profile.
+- **Q2 — a member stays signed in on their phone until they sign out** (was 12 hours; a deliberate
+  change to the protected sign-in, §9/§32). Safeguards: the gym can sign a member out from its admin
+  panel (lost phone); a suspended or cancelled membership still loses access; app only, not a shared
+  browser.
+- **Q3 — a gym owner (and staff) opening the app again** go **straight to their gym's admin panel**
+  and **stay signed in until they sign out** (was 8 hours; a deliberate change, §8/§32). The owner can
+  sign any staff device out from Staff settings; staff on shared front-desk devices still sign out
+  at the end of a shift.
+- **Q4 — what an owner sets for their gym's home in the app:** all four — a **cover picture**
+  (uploaded in Settings); the **logo, name, colour and tagline**; a **welcome message and notices**
+  (e.g. "Closed on Friday"); **opening hours and contact** (with call / map buttons).
+- **Q5 — cover pictures live in Supabase Storage**, a public `gym-branding` bucket in the existing
+  project (the platform already uses Supabase Storage for owner documents). Resolves the §30 open
+  item "object storage" for gym branding images only — member photos and biometric templates are
+  untouched and still undecided.
+
+All five answered 2026-09-28. The user ran the SQL the same day (verified read-only: both
+`session_version` columns and the public `gym-branding` bucket exist). **Built 2026-09-28** — vault
+D-160: long sessions (app only) checked in the three routers against `session_version`; "sign out
+everywhere" for members (member page) and staff (Staff page), and automatically on a staff password
+reset or disable; the app reopens a member into their gym's home (cover, icon, notice, hours,
+Call / Directions / Email) and an owner into their admin panel; Settings gains Cover picture
+(uploaded straight to Storage with a one-time link) and Notice.

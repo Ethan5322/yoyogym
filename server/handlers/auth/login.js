@@ -67,7 +67,7 @@ export default async function handler(req, res) {
   if (!(await rateLimit(req, res, { key: 'admin-login', limit: 10, windowMs: 60_000 }))) return;
 
   try {
-    const { username, password } = await readJsonBody(req);
+    const { username, password, remember } = await readJsonBody(req);
     if (!username || !password) {
       return badRequest(res, 'Username and password are required');
     }
@@ -114,7 +114,8 @@ export default async function handler(req, res) {
       })
       .eq('id', user.id);
 
-    const token = signToken(user, { gym: gymSlug() });
+    // `remember`: the app keeps staff signed in until they sign out (§38.1 Q3).
+    const token = signToken(user, { gym: gymSlug(), remember: remember === true });
     return ok(res, {
       token,
       user: {

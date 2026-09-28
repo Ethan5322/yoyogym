@@ -9,6 +9,7 @@ import { requireRole, hashPassword, ROLES } from '../../lib/auth.js';
 import { recordAudit } from '../../lib/audit.js';
 import { generateStaffNumber, generateStaffCode } from '../../lib/identifiers.js';
 import { enrolmentGallery } from '../../lib/facematch.js';
+import { signOutEverywhere } from '../../lib/sessions.js';
 
 export default async function handler(req, res) {
   if (!allowMethods(req, res, ['GET', 'POST', 'PATCH', 'DELETE'])) return;
@@ -129,8 +130,17 @@ export default async function handler(req, res) {
       }
       const { error } = await supabase.from('admin_users').update(patch).eq('id', id);
       if (error) return serverError(res, error.message);
-      await recordAudit(supabase, admin, { action: 'staff.update', entity: 'admin_user', entity_id: id, detail: b.password ? 'password reset' : 'profile/role updated' });
-      return ok(res, { updated: true });
+
+      // A new password, a disabled account, or the owner's own "sign out
+      // everywhere" ends every long app session this person has (§38.1 Q3).
+      const signOut = Boolean(b.password) || b.is_active === false || b.sign_out_everywhere === true;
+      if (signOut) {
+        const result = await signOutEverywhere(supabase, 'admin', id);
+        if (!result.ok) return serverError(res, result.error.message);
+      }
+      const detail = b.password ? 'password reset' : b.sign_out_everywhere === true ? 'signed out everywhere' : 'profile/role updated';
+      await recordAudit(supabase, admin, { action: 'staff.update', entity: 'admin_user', entity_id: id, detail });
+      return ok(res, { updated: true, signed_out: signOut });
     }
 
     if (req.method === 'DELETE') {

@@ -16,7 +16,7 @@ export default async function handler(req, res) {
   if (!allowMethods(req, res, ['POST'])) return;
   if (!(await rateLimit(req, res, { key: 'member-login', limit: 10, windowMs: 60_000 }))) return;
   try {
-    const { membership_number, phone } = await readJsonBody(req);
+    const { membership_number, phone, remember } = await readJsonBody(req);
     if (!membership_number || !phone) {
       return badRequest(res, 'Membership number and phone number are required.');
     }
@@ -24,7 +24,7 @@ export default async function handler(req, res) {
     const supabase = getSupabase();
     const { data: member, error } = await supabase
       .from('members')
-      .select('id, full_name, membership_number, phone, status')
+      .select('id, full_name, membership_number, phone, status, session_version')
       .eq('membership_number', membership_number.trim().toUpperCase())
       .maybeSingle();
     if (error) return serverError(res, error.message);
@@ -36,7 +36,8 @@ export default async function handler(req, res) {
     }
 
     return ok(res, {
-      token: signMemberToken(member, { gym: gymSlug() }),
+      // `remember`: the app keeps its members signed in until they sign out (§38.1 Q2).
+      token: signMemberToken(member, { gym: gymSlug(), remember: remember === true }),
       member: {
         id: member.id,
         full_name: member.full_name,

@@ -5,6 +5,7 @@ import { useAuth } from '../../lib/auth.jsx';
 import { apiFetch } from '../../lib/api.js';
 import FaceCapture from '../../chatbot/components/FaceCapture.jsx';
 import BrandLogo from '../../components/BrandLogo.jsx';
+import { captureInApp, inApp } from '../../lib/inApp.js';
 
 export default function AdminLogin() {
   const { user, login, applySession, homeFor } = useAuth();
@@ -16,6 +17,10 @@ export default function AdminLogin() {
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
   const [faceMode, setFaceMode] = useState(false);
+
+  // Opened from the phone app? Then sign-in stays until sign-out (§38.1 Q3).
+  captureInApp(location.search);
+  const app = inApp();
 
   if (user) return <Navigate to={homeFor()} replace />;
 
@@ -29,7 +34,7 @@ export default function AdminLogin() {
     setError('');
     setBusy(true);
     try {
-      go(await login(username.trim(), password));
+      go(await login(username.trim(), password, { remember: Boolean(app) }));
     } catch (err) {
       setError(err.message || 'Login failed');
     } finally {
@@ -45,7 +50,7 @@ export default function AdminLogin() {
     setError('');
     setBusy(true);
     try {
-      const { token, user } = await apiFetch('/auth/face-login', { method: 'POST', auth: false, body: { descriptor: result.descriptor } });
+      const { token, user } = await apiFetch('/auth/face-login', { method: 'POST', auth: false, body: { descriptor: result.descriptor, remember: Boolean(app) } });
       go(applySession(token, user));
     } catch (err) {
       setError(err.message || 'Face not recognised.');
@@ -58,6 +63,9 @@ export default function AdminLogin() {
   return (
     <div className="flex min-h-screen items-center justify-center bg-bg px-6">
       <div className="w-full max-w-sm animate-fade-up">
+        {app?.back && (
+          <a href={app.back} className="mb-6 inline-block text-sm text-muted hover:text-body">← Yoyo Gyms app</a>
+        )}
         <div className="mb-8 text-center">
           <BrandLogo className="mx-auto mb-6 h-20 w-auto" />
           <h1 className="text-3xl font-bold uppercase text-body">Admin Access</h1>

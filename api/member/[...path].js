@@ -5,6 +5,7 @@ import { enforceEntitlement } from '../../server/lib/entitlements.js';
 import { MEMBER_ROUTE_FEATURES } from '../../shared/features.js';
 import { applyAppCors } from '../../shared/cors.js';
 import { captureError } from '../../server/lib/observability.js';
+import { checkLongSession } from '../../server/lib/sessions.js';
 import login from '../../server/handlers/member/login.js';
 import faceLogin from '../../server/handlers/member/face-login.js';
 import status from '../../server/handlers/member/status.js';
@@ -57,8 +58,13 @@ export default async function handler(req, res) {
     return await withGym(
       req,
       res,
-      () =>
-        enforceEntitlement(seg, res, json, MEMBER_ROUTE_FEATURES, { forMembers: true }) ? fn(req, res) : undefined,
+      // A long ("stay signed in") session is checked against the member's
+      // current session_version first — the gym's "sign out everywhere".
+      async () =>
+        (await checkLongSession(req, res, 'member', json)) &&
+        enforceEntitlement(seg, res, json, MEMBER_ROUTE_FEATURES, { forMembers: true })
+          ? fn(req, res)
+          : undefined,
       json
     );
   } catch (err) {

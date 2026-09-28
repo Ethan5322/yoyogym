@@ -45,11 +45,14 @@ export default function Settings() {
       <Section title="Gym Profile" saved={savedKey === 'gym_profile'}
         note="Your brand identity. The name and accent colour appear on the splash screen, membership card, emails and PDFs."
         initial={{ ...DEFAULTS.gym_profile, ...(s.gym_profile || {}) }}
-        fields={[['name', 'Gym name'], ['tagline', 'Tagline (shown on the splash screen)'], ['accent_color', 'Brand accent colour (hex — Yoyo lime is #BFF642)'], ['phone', 'Contact phone'], ['email', 'Contact email'], ['website', 'Website (optional)'], ['address', 'Physical address'], ['operating_hours', 'Operating hours'], ['welcome_message', 'Welcome message (splash screen)']]}
+        fields={[['name', 'Gym name'], ['tagline', 'Tagline (shown on the splash screen)'], ['accent_color', 'Brand accent colour (hex — Yoyo lime is #BFF642)'], ['phone', 'Contact phone'], ['email', 'Contact email'], ['website', 'Website (optional)'], ['address', 'Physical address'], ['operating_hours', 'Operating hours'], ['welcome_message', 'Welcome message (splash screen)'], ['notice', 'Notice for members, e.g. “Closed on Friday” — shown on your gym’s home in the app (leave empty for none)']]}
         onSave={(v) => save('gym_profile', v, 'gym_profile')} />
 
       <LogoSection profile={{ ...DEFAULTS.gym_profile, ...(s.gym_profile || {}) }} saved={savedKey === 'gym_profile_logo'}
         onSave={(profile) => save('gym_profile', profile, 'gym_profile').then(() => setSavedKey('gym_profile_logo'))} />
+
+      <CoverSection profile={{ ...DEFAULTS.gym_profile, ...(s.gym_profile || {}) }} saved={savedKey === 'gym_profile_cover'}
+        onSave={(profile) => save('gym_profile', profile, 'gym_profile').then(() => setSavedKey('gym_profile_cover'))} />
 
       <Section title="Owner Notifications" saved={savedKey === 'notifications'}
         initial={s.notifications || {}}
@@ -482,6 +485,98 @@ function LogoSection({ profile, onSave, saved }) {
         {saved && <span className="text-sm text-success">Saved ✓</span>}
       </div>
       <p className="mt-2 text-xs text-muted">PNG, JPG or WebP. A square logo on a transparent background looks best.</p>
+      {err && <p className="mt-2 text-sm text-error">{err}</p>}
+    </div>
+  );
+}
+
+/** Widest cover picture, in pixels. Shrunk in the browser to a JPEG this size. */
+const COVER_PX = 1600;
+
+/** Shrink a photo to at most COVER_PX wide, as a JPEG blob — well under the bucket's 2 MB. */
+function shrinkCover(file) {
+  return new Promise((resolve, reject) => {
+    if (!/^image\/(png|jpeg|webp)$/.test(file.type)) return reject(new Error('Choose a PNG, JPG or WebP photo.'));
+    const url = URL.createObjectURL(file);
+    const img = new Image();
+    img.onload = () => {
+      const scale = Math.min(1, COVER_PX / img.naturalWidth);
+      const c = document.createElement('canvas');
+      c.width = Math.max(1, Math.round(img.naturalWidth * scale));
+      c.height = Math.max(1, Math.round(img.naturalHeight * scale));
+      const ctx = c.getContext('2d');
+      ctx.fillStyle = '#070C10'; // a transparent PNG gets the app's ground, not black
+      ctx.fillRect(0, 0, c.width, c.height);
+      ctx.drawImage(img, 0, 0, c.width, c.height);
+      URL.revokeObjectURL(url);
+      c.toBlob((blob) => (blob ? resolve(blob) : reject(new Error('That photo could not be prepared.'))), 'image/jpeg', 0.82);
+    };
+    img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('That file could not be read as a photo.')); };
+    img.src = url;
+  });
+}
+
+/**
+ * The gym's cover picture (CLAUDE.md §38.1 Q4, Q5): the big photo at the top of
+ * its home in the app. Sent straight to storage with a one-time link — it
+ * never passes through our server — then saved on the gym's profile.
+ */
+function CoverSection({ profile, onSave, saved }) {
+  const [busy, setBusy] = useState('');
+  const [err, setErr] = useState('');
+  const cover = profile.cover_url || '';
+
+  async function choose(e) {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file) return;
+    setErr('');
+    try {
+      setBusy('Preparing…');
+      const blob = await shrinkCover(file);
+      setBusy('Uploading…');
+      const target = await apiFetch('/admin/settings?upload=cover', { method: 'POST' });
+      const put = await fetch(target.upload_url, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'image/jpeg', Authorization: `Bearer ${target.token}` },
+        body: blob,
+      });
+      if (!put.ok) throw new Error('The upload did not finish. Please try again.');
+      setBusy('Saving…');
+      await onSave({ ...profile, cover_url: target.public_url });
+    } catch (x) {
+      setErr(x.message);
+    } finally {
+      setBusy('');
+    }
+  }
+
+  return (
+    <div className="card mt-6">
+      <h2 className="mb-1 font-display uppercase text-body">Cover picture</h2>
+      <p className="mb-4 text-xs text-muted">
+        The big photo at the top of your gym's home in the app — what your members see every time they open it. A wide
+        photo of your gym floor or your team works best.
+      </p>
+      {cover ? (
+        <img src={cover} alt="Your gym's cover" className="mb-4 aspect-[16/9] w-full max-w-md rounded-xl object-cover" />
+      ) : (
+        <div className="mb-4 flex aspect-[16/9] w-full max-w-md items-center justify-center rounded-xl border border-dashed border-white/15 text-sm text-muted">
+          No cover picture yet
+        </div>
+      )}
+      <div className="flex flex-wrap items-center gap-4">
+        <label className="btn-primary cursor-pointer px-4 py-2 text-sm">
+          {busy || (cover ? 'Change cover picture' : 'Upload cover picture')}
+          <input type="file" accept="image/png,image/jpeg,image/webp" className="hidden" onChange={choose} disabled={Boolean(busy)} />
+        </label>
+        {cover && !busy && (
+          <button className="text-sm text-muted hover:text-error" onClick={() => onSave({ ...profile, cover_url: '' })}>
+            Remove cover picture
+          </button>
+        )}
+        {saved && <span className="text-sm text-success">Saved ✓</span>}
+      </div>
       {err && <p className="mt-2 text-sm text-error">{err}</p>}
     </div>
   );

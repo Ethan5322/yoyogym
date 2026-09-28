@@ -30,13 +30,22 @@
   var SAFE_SLUG = /^[a-z0-9][a-z0-9-]{0,47}$/;
 
   var root = document.getElementById('member');
-  var state = { slug: null, gymName: '', logo: '', token: null, status: null, features: null, tab: 'home', prefill: '' };
+  var state = { slug: null, gymName: '', logo: '', brand: {}, token: null, status: null, features: null, tab: 'home', prefill: '' };
 
   // -------------------------------------------------------------------------
   // Storage — per gym, so a member of two gyms keeps two sessions
   // -------------------------------------------------------------------------
 
   function key(name) { return 'yoyo.member.' + name + ':' + state.slug; }
+
+  // Which side of the app this phone was last on — app.js opens it again next
+  // time (CLAUDE.md §38.1 Q1). Only 'member' or nothing; never who.
+  function setLastRole(role) {
+    try {
+      if (role) localStorage.setItem('yoyo.lastrole', role);
+      else localStorage.removeItem('yoyo.lastrole');
+    } catch (e) { /* not remembered: the app opens on the Yoyo front page */ }
+  }
 
   function load(name) {
     try { return JSON.parse(localStorage.getItem(key(name)) || 'null'); } catch (e) { return null; }
@@ -160,6 +169,19 @@
     // The gym's own logo, if it uploaded one — the same rule the server applies.
     var logo = branding && branding.logo_url;
     state.logo = typeof logo === 'string' && /^(data:image\/(png|jpeg|webp);base64,|https:\/\/)/.test(logo) ? logo : '';
+
+    // What the owner chose to show on the gym's home (§38.1 Q4). Text is
+    // escaped where it is drawn; the cover is only ever the gym's own https URL.
+    var b = branding || {};
+    var text = function (v) { return typeof v === 'string' ? v.trim().slice(0, 500) : ''; };
+    state.brand = {
+      cover: typeof b.cover_url === 'string' && /^https:\/\/[^\s"'<>]+$/.test(b.cover_url) ? b.cover_url : '',
+      notice: text(b.notice),
+      hours: text(b.operating_hours),
+      phone: text(b.phone),
+      email: text(b.email),
+      address: text(b.address),
+    };
   }
 
   /**
@@ -217,9 +239,13 @@
     loadBrand().then(function () {
       root.querySelectorAll('[data-gym-name]').forEach(function (el) { el.textContent = state.gymName || el.textContent; });
       paintIcons();
+      // Signed in: redraw so the gym's own cover, notice and contact appear.
+      // (Never the sign-in form, which may hold what the member is typing.)
+      if (state.token && root.querySelector('.m-main')) render();
     });
 
     if (state.token) {
+      setLastRole('member');
       render();
       refresh();
     } else {
@@ -298,10 +324,12 @@
       btn.disabled = true;
       btn.textContent = 'Signing in…';
       err.textContent = '';
-      api('/member/login', { method: 'POST', auth: false, body: { membership_number: mn, phone: ph } })
+      // remember: members stay signed in on their phone until they sign out (§38.1 Q2).
+      api('/member/login', { method: 'POST', auth: false, body: { membership_number: mn, phone: ph, remember: true } })
         .then(function (d) {
           state.token = d.token;
           save('token', d.token);
+          setLastRole('member');
           state.tab = 'home';
           render();
           refresh();
@@ -330,6 +358,9 @@
 
   function render() {
     if (!visibleTabs().some(function (t) { return t.id === state.tab; })) state.tab = 'home';
+    // On the home the gym's own hero carries its name and icon, so the small
+    // header does not repeat them.
+    root.classList.toggle('m-on-home', state.tab === 'home');
 
     root.innerHTML =
       '<header class="m-top">' +
@@ -390,8 +421,12 @@
     var pct = expected ? Math.min(100, Math.round((visits / expected) * 100)) : 0;
 
     main.innerHTML =
+      gymHero() +
       '<section class="m-hello"><p class="m-eyebrow">Hi ' + esc(firstName(s.member && s.member.full_name)) + '</p>' +
       '<h1>' + esc(line.plan) + '</h1></section>' +
+      (state.brand.notice
+        ? '<section class="m-card m-notice" role="note"><b>From ' + esc(state.gymName || 'your gym') + '</b><p>' + esc(state.brand.notice) + '</p></section>'
+        : '') +
 
       '<section class="m-card m-status is-' + line.tone + '">' +
       '  <span class="m-dot" aria-hidden="true"></span>' +
@@ -414,7 +449,8 @@
       '  <div class="m-progress__top"><span>Last 30 days</span><b class="m-num">' + visits + (expected ? '<small> / ' + expected + '</small>' : '') + '</b></div>' +
       '  <div class="m-bar"><i style="width:' + pct + '%"></i></div>' +
       '  <span class="m-sub">' + esc(visits === 1 ? '1 visit' : visits + ' visits') + (a.label ? ' · ' + esc(a.label) : '') + '</span>' +
-      '</section>';
+      '</section>' +
+      gymContact();
 
     var btn = document.getElementById('m-checkin');
 
@@ -538,6 +574,39 @@
 
   // ---- Profile -------------------------------------------------------------
 
+  /**
+   * The top of the gym's home: its cover picture (if the owner uploaded one),
+   * its icon and its name. The member is in THEIR gym's app (§38.1 Q1).
+   */
+  function gymHero() {
+    var cover = state.brand.cover;
+    return '<section class="m-gymhero' + (cover ? ' has-cover' : '') + '">' +
+      (cover ? '<img class="m-gymhero__img" src="' + esc(cover) + '" alt="">' : '') +
+      '<div class="m-gymhero__id"><span data-gym-icon="48">' + gymIcon(48) + '</span>' +
+      '<b data-gym-name>' + esc(state.gymName || 'Your gym') + '</b></div>' +
+      '</section>';
+  }
+
+  /**
+   * Opening hours and one-tap contact, as the owner set them (§38.1 Q4). The
+   * links leave the app for the phone's dialler, maps and mail.
+   */
+  function gymContact() {
+    var b = state.brand;
+    if (!b.hours && !b.phone && !b.email && !b.address) return '';
+    var tel = b.phone.replace(/[^\d+]/g, '');
+    var actions =
+      (tel ? '<a class="m-action" href="tel:' + esc(tel) + '">Call</a>' : '') +
+      (b.address ? '<a class="m-action" href="https://www.google.com/maps/search/?api=1&amp;query=' + encodeURIComponent(b.address) + '">Directions</a>' : '') +
+      (/^[^\s@<>"]+@[^\s@<>"]+$/.test(b.email) ? '<a class="m-action" href="mailto:' + esc(b.email) + '">Email</a>' : '');
+    return '<section class="m-card m-contact">' +
+      '<h2>' + esc(state.gymName || 'Your gym') + '</h2>' +
+      (b.hours ? '<p class="m-contact__row"><span class="m-sub">Opening hours</span><b>' + esc(b.hours) + '</b></p>' : '') +
+      (b.address ? '<p class="m-contact__row"><span class="m-sub">Address</span><b>' + esc(b.address) + '</b></p>' : '') +
+      (actions ? '<div class="m-actions">' + actions + '</div>' : '') +
+      '</section>';
+  }
+
   function renderProfile(main) {
     var m = (state.status && state.status.member) || {};
     main.innerHTML =
@@ -590,8 +659,8 @@
       case 'join': return go('/g/' + encodeURIComponent(state.slug) + '/register');
       case 'web': return go('/g/' + encodeURIComponent(state.slug) + '/member');
       case 'privacy': return go('/platform/privacy');
-      case 'switch': return close();
-      case 'signout': return signOut(false);
+      case 'switch': setLastRole(''); return close();
+      case 'signout': setLastRole(''); return signOut(false);
       case 'delete': return requestDeletion();
       case 'scan-card': return scanCard();
       case 'help':

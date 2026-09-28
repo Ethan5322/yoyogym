@@ -3,6 +3,7 @@
 // phone number. Lower-stakes than admin, but still gated by two factors.
 import jwt from 'jsonwebtoken';
 import { unauthorized } from './http.js';
+import { REMEMBER_FOR } from './session-length.js';
 
 const SECRET = process.env.JWT_SECRET;
 const EXPIRES_IN = '12h';
@@ -15,10 +16,16 @@ if (!SECRET) throw new Error('Missing JWT_SECRET environment variable.');
  * Optional, and omitting it is single-gym mode, so existing member sessions
  * are unaffected.
  */
-export function signMemberToken(member, { gym = null } = {}) {
+export function signMemberToken(member, { gym = null, remember = false } = {}) {
   const claims = { sub: member.id, membership_number: member.membership_number };
   if (gym) claims.gym = String(gym).toLowerCase();
 
+  // "Stay signed in until you sign out" — the app asks for it (§38.1 Q2). The
+  // session_version it carries is what can end it early (sessions.js).
+  if (remember) {
+    claims.sv = Number(member.session_version || 0);
+    return jwt.sign(claims, SECRET, { expiresIn: REMEMBER_FOR, audience: AUDIENCE });
+  }
   return jwt.sign(claims, SECRET, { expiresIn: EXPIRES_IN, audience: AUDIENCE });
 }
 

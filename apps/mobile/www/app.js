@@ -155,8 +155,63 @@
 
   document.getElementById('admin-mine').addEventListener('click', function () {
     var mine = myGym(ADMIN_MINE);
-    if (mine) go(adminPath(mine.slug));
+    if (mine) goAdmin(mine.slug);
   });
+
+  // -------------------------------------------------------------------------
+  // "Your gym's app" — reopening where this phone was last (CLAUDE.md §38.1)
+  // -------------------------------------------------------------------------
+  //
+  // Someone new sees the Yoyo Gyms front page (Q8). A member who joined a gym
+  // opens straight into THAT gym's home (Q1); an owner or staff member opens
+  // straight into their gym's admin panel (Q3). Only the side is remembered
+  // ('member' / 'owner'), never who — the sessions themselves live with the
+  // member area and with the gym's admin panel.
+
+  var LASTROLE = 'yoyo.lastrole';
+
+  function lastRole() {
+    try { return localStorage.getItem(LASTROLE) || ''; } catch (e) { return ''; }
+  }
+
+  function setLastRole(role) {
+    try {
+      if (role) localStorage.setItem(LASTROLE, role);
+      else localStorage.removeItem(LASTROLE);
+    } catch (e) { /* not remembered: the app opens on the Yoyo front page */ }
+  }
+
+  /** The app's own front page, where "← Yoyo Gyms app" on the web sign-in returns. */
+  function appHome() {
+    return window.location.origin + window.location.pathname + '?home=1';
+  }
+
+  /**
+   * Into a gym's own admin panel — its existing sign-in, which moves straight
+   * on when the owner is still signed in. `app=1` makes that sign-in stay until
+   * sign-out, and `back` is the way home to this app.
+   */
+  function goAdmin(slug) {
+    setLastRole('owner');
+    go(adminPath(slug) + '?app=1&back=' + encodeURIComponent(appHome()));
+  }
+
+  /** On opening: back to this phone's gym, or the Yoyo front page for someone new. */
+  function resumeLast() {
+    if (new URLSearchParams(window.location.search).get('home') === '1') {
+      // The owner chose "← Yoyo Gyms app": stay here, and next time too.
+      setLastRole('');
+      return;
+    }
+    var role = lastRole();
+    if (role === 'member') {
+      var mine = myGym();
+      if (mine && window.YOYO_MEMBER.hasSession(mine.slug)) window.YOYO_MEMBER.open(mine.slug, { name: mine.name });
+    } else if (role === 'owner') {
+      var admin = myGym(ADMIN_MINE);
+      if (admin) goAdmin(admin.slug);
+    }
+  }
 
   // -------------------------------------------------------------------------
   // A gym has been chosen
@@ -380,7 +435,7 @@
     if (pickMode === 'owner') {
       // The gym's OWN admin sign-in, unchanged (§36.1 Q2). Never the Yoyo panel.
       rememberGym(slug, button.dataset.name, ADMIN_MINE);
-      return go(adminPath(slug));
+      return goAdmin(slug);
     }
     rememberGym(slug, button.dataset.name);
     chooseGym(slug, button.dataset.name);
@@ -620,6 +675,7 @@
   }
 
   show('home');
+  resumeLast();
 
   // Only now: the first screen is drawn, so hiding the splash shows it, not a
   // blank page.

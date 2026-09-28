@@ -15,6 +15,7 @@ import { faceServiceConfigured, embedFace } from '../../lib/faceservice.js';
 import { ARCFACE, FACEAPI, arcfaceSimilarity, faceApiSimilarity, templatesOf, identify } from '../../lib/facematch.js';
 import { selectFaceRows } from '../../lib/facedb.js';
 import { currentGym } from '../../lib/tenancy.js';
+import { withSessionVersion } from '../../lib/sessions.js';
 
 // The gym this login happened in, stamped into the token so every later
 // request carries it in a signature the client cannot edit. null in
@@ -28,7 +29,7 @@ export default async function handler(req, res) {
   if (!(await rateLimit(req, res, { key: 'face-login', limit: 10, windowMs: 60_000 }))) return;
 
   try {
-    const { descriptor, image } = await readJsonBody(req);
+    const { descriptor, image, remember } = await readJsonBody(req);
     const supabase = getSupabase();
 
     const useArcface = faceServiceConfigured() && typeof image === 'string' && image.startsWith('data:image');
@@ -68,7 +69,7 @@ export default async function handler(req, res) {
     const best = person.row;
 
     await supabase.from('admin_users').update({ last_login_at: new Date().toISOString() }).eq('id', best.id);
-    const token = signToken(best, { gym: gymSlug() });
+    const token = signToken(await withSessionVersion(supabase, 'admin_users', best, remember), { gym: gymSlug(), remember: remember === true });
     return ok(res, {
       token,
       user: { id: best.id, username: best.username, full_name: best.full_name, email: best.email, role: best.role, trainer_id: best.trainer_id },

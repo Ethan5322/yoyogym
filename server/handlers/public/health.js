@@ -19,8 +19,11 @@ const OPTIONAL_COLUMNS = {
     // Without it a member's "Request data deletion" fails outright — a
     // store requirement and a POPIA right.
     data_deletion_requested: '2026-09-24-member-deletion-request.sql',
+    // Without it the gym cannot sign a member out everywhere ("lost phone").
+    session_version: '2026-09-28-stay-signed-in.sql',
   },
   admin_users: {
+    session_version: '2026-09-28-stay-signed-in.sql',
     face_templates: '2026-07-10-face-galleries.sql',
     arcface_templates: '2026-07-10-face-galleries.sql',
     arcface_embedding: '2026-07-10-face-galleries.sql',

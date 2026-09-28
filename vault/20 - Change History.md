@@ -15,6 +15,33 @@ occurrence is answered from notes rather than rediscovered.
 
 ---
 
+## 2026-09-28 — Each gym's own app (D-160)
+
+**Asked:** once someone belongs to a gym, the app is that gym's app — it remembers them, keeps them
+signed in, and shows the gym's own picture and icon; the owner decides what the front shows.
+Recorded as `CLAUDE.md` §38 word for word, then five questions (§38.1).
+
+**The user ran the SQL** (session_version on members and admin_users in every registry schema; the
+public `gym-branding` bucket). The first paste failed with `syntax error at or near "The"` — the
+explanation text around the SQL was pasted too; Supabase ran nothing. Resent as SQL only. Lesson:
+give SQL to paste on its own, with no prose in the same block.
+
+**Design choices worth remembering:**
+- The long-session check sits in the **three routers**, not in 50+ handlers — the same "one place"
+  rule as plan enforcement. Short tokens carry no `sv` and never cost a query.
+- `withGym` passes the router's callback result straight through, so the callback can be async.
+- The web admin sign-in knows it is inside the app only because the app opens it with
+  `?app=1&back=…` (`src/lib/inApp.js`); `back` is accepted only for the app's own local origins.
+- A cover picture is validated as `cover-<digits>.jpg` inside the gym's OWN folder — a looser
+  pattern first allowed `..`, caught before commit.
+- An unescaped apostrophe in a JSX string (`gym's`) passed every test and failed the production
+  build: tests do not compile the React screens. The build is part of "verified".
+
+**Verified.** 901+ tests (new: `tests/sessions.test.js`, `tests/gym-app-home.test.js`, cover checks);
+production build; the app's gym home screenshotted with a canned signed-in KOM member.
+
+---
+
 ## 2026-09-28 — "IDs and PDFs still carry the old name" (D-159)
 
 **Investigated** (§27.1). Two causes, both confirmed by reading the data and the code:

@@ -27,6 +27,7 @@ import {
 } from '../../lib/facematch.js';
 import { selectFaceRows, updateFaceRow } from '../../lib/facedb.js';
 import { currentGym } from '../../lib/tenancy.js';
+import { withSessionVersion } from '../../lib/sessions.js';
 
 // The gym this login happened in, stamped into the token so every later
 // request carries it in a signature the client cannot edit. null in
@@ -55,7 +56,7 @@ export default async function handler(req, res) {
   if (!(await rateLimit(req, res, { key: 'member-face-login', limit: 12, windowMs: 60_000 }))) return;
 
   try {
-    const { image, descriptor } = await readJsonBody(req);
+    const { image, descriptor, remember } = await readJsonBody(req);
     const supabase = getSupabase();
 
     const useArcface = faceServiceConfigured() && typeof image === 'string' && image.startsWith('data:image');
@@ -114,7 +115,7 @@ export default async function handler(req, res) {
     }
 
     return ok(res, {
-      token: signMemberToken(member, { gym: gymSlug() }),
+      token: signMemberToken(await withSessionVersion(supabase, 'members', member, remember), { gym: gymSlug(), remember: remember === true }),
       member: {
         id: member.id,
         full_name: member.full_name,

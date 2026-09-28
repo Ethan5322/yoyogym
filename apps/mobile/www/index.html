@@ -331,6 +331,25 @@
                    background: var(--m-accent); color: var(--m-accent-ink); font-weight: 800; line-height: 1; }
       .m-gymicon--img { width: auto; max-width: 180px; object-fit: contain; background: none; }
       .m-hero__icon { margin-bottom: 16px; }
+
+      /* The gym's own home (CLAUDE.md §38.1): cover, icon and name; its notice;
+         its hours and one-tap contact. */
+      #member.m-on-home .m-top { display: none; }
+      .m-gymhero { position: relative; margin: 0 -24px 8px; padding: max(24px, env(safe-area-inset-top)) 24px 16px; }
+      .m-gymhero.has-cover { min-height: 220px; display: flex; align-items: flex-end; overflow: hidden; }
+      .m-gymhero__img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+      .m-gymhero.has-cover::after { content: ''; position: absolute; inset: 0;
+                                    background: linear-gradient(rgba(14, 20, 22, 0.1), var(--m-ground) 96%); }
+      .m-gymhero__id { position: relative; z-index: 1; display: flex; align-items: center; gap: 12px; }
+      .m-gymhero__id b { font-size: 20px; }
+      .m-notice { border-color: color-mix(in srgb, var(--m-accent) 45%, transparent); }
+      .m-notice b { display: block; font-size: 13px; color: var(--m-muted); margin-bottom: 4px; }
+      .m-notice p { margin: 0; white-space: pre-line; }
+      .m-contact h2 { margin-bottom: 8px; }
+      .m-contact__row { display: flex; flex-direction: column; margin: 0 0 12px; }
+      .m-actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 4px; }
+      .m-action { flex: 1; min-width: 88px; min-height: 44px; display: inline-flex; align-items: center; justify-content: center;
+                  border-radius: 22px; background: rgba(255, 255, 255, 0.08); color: #fff; text-decoration: none; font-weight: 700; }
       .m-main { flex: 1; padding: 0 24px calc(96px + env(safe-area-inset-bottom)); }
       .m-hello { margin: 8px 0 24px; }
 

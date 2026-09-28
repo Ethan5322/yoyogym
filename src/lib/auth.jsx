@@ -54,10 +54,11 @@ export function AuthProvider({ children }) {
     };
   }, []);
 
-  const login = useCallback(async (username, password) => {
+  // `remember`: in the phone app, stay signed in until signing out (§38.1 Q3).
+  const login = useCallback(async (username, password, { remember = false } = {}) => {
     const { token, user } = await apiFetch('/auth/login', {
       method: 'POST',
-      body: { username, password },
+      body: { username, password, remember },
       auth: false,
     });
     setToken(token);

@@ -82,7 +82,8 @@ async function signIn(routes = SIGNED_IN_ROUTES) {
 test('SIGNING IN USES THE SAME NUMBER + PHONE, AT THE RIGHT GYM', async () => {
   const { calls } = await signIn();
   const login = calls.find((c) => c.path === '/api/member/login');
-  assert.deepEqual(login.body, { membership_number: 'GYM-2026-ABC123', phone: '0821234567' });
+  // `remember`: the app keeps members signed in until they sign out (CLAUDE.md §38.1 Q2).
+  assert.deepEqual(login.body, { membership_number: 'GYM-2026-ABC123', phone: '0821234567', remember: true });
   assert.equal(login.headers['X-Gym-Slug'], 'bos-gym', 'the gym travels with the request');
   assert.equal(login.headers.Authorization, undefined, 'no token before signing in');
 });
