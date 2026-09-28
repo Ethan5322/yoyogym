@@ -10,6 +10,7 @@ import IdCardButton from '../components/IdCardButton.jsx';
 import FaceCapture from '../chatbot/components/FaceCapture.jsx';
 import GymIcon from '../components/GymIcon.jsx';
 import GymBackdrop from '../components/GymBackdrop.jsx';
+import GymOffer from '../components/GymOffer.jsx';
 
 /**
  * The URL a member's own QR card should contain.
@@ -41,8 +42,11 @@ const TABS = [
   ['contact', 'Contact', 'messaging'],
 ];
 
-export function visibleTabs(features) {
-  return TABS.filter(([, , needs]) => !features || !needs || features.includes(needs));
+export function visibleTabs(features, off = []) {
+  // Not in the plan, or switched off by the owner (CLAUDE.md §41): not shown.
+  return TABS.filter(
+    ([, , needs]) => !needs || ((!features || features.includes(needs)) && !(off || []).includes(needs))
+  );
 }
 
 export default function MemberPortal() {
@@ -53,12 +57,19 @@ export default function MemberPortal() {
   // Asked for once the member is signed in; a failure shows every tab, and
   // the server still refuses what the plan does not include.
   const [features, setFeatures] = useState(null);
+  // What the owner has chosen not to offer (§41) — hidden like a plan gap.
+  const [off, setOff] = useState([]);
 
   useEffect(() => logQrScan('existing_member'), []);
 
   useEffect(() => {
     if (!token) return;
-    memberFetch('/member/status').then((d) => setFeatures(d.features ?? null)).catch(() => {});
+    memberFetch('/member/status')
+      .then((d) => {
+        setFeatures(d.features ?? null);
+        setOff(Array.isArray(d.services_off) ? d.services_off : []);
+      })
+      .catch(() => {});
   }, [token]);
 
   function onLoggedIn(t, m) {
@@ -89,9 +100,9 @@ export default function MemberPortal() {
 
       <nav
         className="grid border-b border-white/5 bg-surface text-xs"
-        style={{ gridTemplateColumns: `repeat(${visibleTabs(features).length}, minmax(0, 1fr))` }}
+        style={{ gridTemplateColumns: `repeat(${visibleTabs(features, off).length}, minmax(0, 1fr))` }}
       >
-        {visibleTabs(features).map(([key, label]) => (
+        {visibleTabs(features, off).map(([key, label]) => (
           <button
             key={key}
             onClick={() => setTab(key)}
@@ -105,7 +116,15 @@ export default function MemberPortal() {
       </nav>
 
       <main className="flex-1 overflow-y-auto px-4 py-5">
-        {tab === 'status' && <StatusTab />}
+        {tab === 'status' && (
+          <>
+            <StatusTab />
+            {/* What the gym offers, after joining too (CLAUDE.md §41.1 Q1). */}
+            <div className="mt-8">
+              <GymOffer heading="Your gym offers" />
+            </div>
+          </>
+        )}
         {tab === 'checkin' && <CheckInTab />}
         {tab === 'classes' && <ClassesTab />}
         {tab === 'progress' && <ProgressTab />}

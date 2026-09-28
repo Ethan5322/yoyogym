@@ -8,6 +8,9 @@ import FaceCapture from '../../chatbot/components/FaceCapture.jsx';
 import IdPhotoUpload from '../../components/IdPhotoUpload.jsx';
 import CredentialActions from '../../components/CredentialActions.jsx';
 import { DEFAULT_ACCENT } from '../../../shared/brand.js';
+import { OWNER_SWITCHABLE, SERVICE_INFO } from '../../../shared/features.js';
+import { FACILITIES, MAX_CUSTOM_FACILITIES, MAX_CUSTOM_LENGTH } from '../../../shared/facilities.js';
+import { useAuth } from '../../lib/auth.jsx';
 
 export default function Settings() {
   const [s, setS] = useState(null);
@@ -71,6 +74,10 @@ export default function Settings() {
         onSave={(v) => save('contract_discounts', v, 'payment')} />
 
       <ComplianceSection initial={s.compliance} saved={savedKey === 'compliance'} onSave={(v) => save('compliance', v, 'access')} />
+
+      <MemberServicesSection initial={s.member_services} saved={savedKey === 'member_services'} onSave={(v) => save('member_services', v, 'services')} />
+
+      <FacilitiesSection initial={s.facilities} saved={savedKey === 'facilities'} onSave={(v) => save('facilities', v, 'services')} />
 
       <PasswordSection />
 
@@ -142,6 +149,135 @@ const DEFAULT_COMPLIANCE = {
     vip: { access: 'anytime', classes_per_month: -1 },
   },
 };
+
+// ---------------------------------------------------------------------------
+// What the gym offers its members (CLAUDE.md §41)
+// ---------------------------------------------------------------------------
+
+/**
+ * The owner's own on/off for the services their members use. Only what the
+ * gym's Yoyo plan includes can be switched on; the rest is shown, named, with
+ * what it would take — never as a switch that does nothing.
+ */
+function MemberServicesSection({ initial, onSave, saved }) {
+  const { hasFeature } = useAuth();
+  const [off, setOff] = useState(() => (Array.isArray(initial?.off) ? initial.off : []));
+  useEffect(() => {
+    setOff(Array.isArray(initial?.off) ? initial.off : []);
+  }, [JSON.stringify(initial)]); // eslint-disable-line
+
+  const flip = (f) => setOff((cur) => (cur.includes(f) ? cur.filter((x) => x !== f) : [...cur, f]));
+
+  return (
+    <div className="card mt-6">
+      <h2 className="mb-1 font-body text-lg font-bold text-body">Services for your members</h2>
+      <p className="mb-4 text-sm text-muted">
+        Choose what your members can use in the app and on the web. Switching a service off hides it from them at once;
+        your own admin screens are not affected. Your core services — joining, check-in, payments and the membership card —
+        are always on.
+      </p>
+      <div className="grid gap-2">
+        {OWNER_SWITCHABLE.map((f) => {
+          const inPlan = hasFeature(f);
+          const on = inPlan && !off.includes(f);
+          return (
+            <label
+              key={f}
+              className={`flex min-h-[56px] items-center gap-4 rounded-2xl border px-4 py-3 ${
+                inPlan ? 'cursor-pointer border-white/10 bg-white/[0.02] hover:border-accent/40' : 'border-white/5 opacity-60'
+              }`}
+            >
+              <input
+                type="checkbox"
+                className="h-6 w-6 flex-none accent-[var(--accent)]"
+                checked={on}
+                disabled={!inPlan}
+                onChange={() => flip(f)}
+                aria-describedby={`svc-${f}`}
+              />
+              <span className="min-w-0 flex-1">
+                <span className="block font-semibold text-body">{SERVICE_INFO[f].label}</span>
+                <span id={`svc-${f}`} className="block text-sm text-muted">
+                  {inPlan ? SERVICE_INFO[f].forMembers : 'Not in your Yoyo Gyms plan — upgrade to offer it.'}
+                </span>
+              </span>
+              <span className={`flex-none text-sm font-semibold ${on ? 'text-success' : 'text-muted'}`}>{on ? 'Offered' : 'Off'}</span>
+            </label>
+          );
+        })}
+      </div>
+      <div className="mt-4 flex items-center gap-3">
+        <button className="btn-primary min-h-[44px] px-6 text-sm" onClick={() => onSave({ off })}>Save</button>
+        {saved && <span className="text-sm text-success">Saved ✓</span>}
+      </div>
+    </div>
+  );
+}
+
+/** The gym's free facilities, ticked and in the owner's own words. */
+function FacilitiesSection({ initial, onSave, saved }) {
+  const [items, setItems] = useState(() => initial?.items || []);
+  const [custom, setCustom] = useState(() => initial?.custom || []);
+  const [draft, setDraft] = useState('');
+  useEffect(() => {
+    setItems(initial?.items || []);
+    setCustom(initial?.custom || []);
+  }, [JSON.stringify(initial)]); // eslint-disable-line
+
+  const toggle = (k) => setItems((cur) => (cur.includes(k) ? cur.filter((x) => x !== k) : [...cur, k]));
+  const add = () => {
+    const text = draft.replace(/\s+/g, ' ').trim().slice(0, MAX_CUSTOM_LENGTH);
+    if (!text || custom.some((c) => c.toLowerCase() === text.toLowerCase()) || custom.length >= MAX_CUSTOM_FACILITIES) return;
+    setCustom([...custom, text]);
+    setDraft('');
+  };
+
+  return (
+    <div className="card mt-6">
+      <h2 className="mb-1 font-body text-lg font-bold text-body">Facilities</h2>
+      <p className="mb-4 text-sm text-muted">
+        What your members get for free at your gym. Shown on your gym&apos;s page in the app and on the web, beside your
+        membership plans and add-ons.
+      </p>
+      <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+        {FACILITIES.map(([k, label]) => (
+          <label key={k} className="flex min-h-[48px] cursor-pointer items-center gap-3 rounded-xl border border-white/10 px-4 py-2 hover:border-accent/40">
+            <input type="checkbox" className="h-5 w-5 accent-[var(--accent)]" checked={items.includes(k)} onChange={() => toggle(k)} />
+            <span className="text-body">{label}</span>
+          </label>
+        ))}
+      </div>
+      <div className="mt-4">
+        <p className="mb-2 text-sm font-semibold text-body">Your own</p>
+        <div className="flex flex-wrap gap-2">
+          {custom.map((c) => (
+            <span key={c} className="inline-flex min-h-[36px] items-center gap-2 rounded-full border border-white/15 px-3 text-sm text-body">
+              {c}
+              <button type="button" className="text-muted hover:text-error" aria-label={`Remove ${c}`} onClick={() => setCustom(custom.filter((x) => x !== c))}>
+                ×
+              </button>
+            </span>
+          ))}
+        </div>
+        <div className="mt-2 flex gap-2">
+          <input
+            className="field"
+            value={draft}
+            maxLength={MAX_CUSTOM_LENGTH}
+            placeholder="e.g. Boxing ring"
+            onChange={(e) => setDraft(e.target.value)}
+            onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), add())}
+          />
+          <button type="button" className="btn-outline min-h-[44px] flex-none px-5 text-sm" onClick={add}>Add</button>
+        </div>
+      </div>
+      <div className="mt-4 flex items-center gap-3">
+        <button className="btn-primary min-h-[44px] px-6 text-sm" onClick={() => onSave({ items, custom })}>Save</button>
+        {saved && <span className="text-sm text-success">Saved ✓</span>}
+      </div>
+    </div>
+  );
+}
 
 function ComplianceSection({ initial, onSave, saved }) {
   const [c, setC] = useState({ ...DEFAULT_COMPLIANCE, ...(initial || {}), peak_hours: { ...DEFAULT_COMPLIANCE.peak_hours, ...(initial?.peak_hours || {}) }, plan_rules: { ...DEFAULT_COMPLIANCE.plan_rules, ...(initial?.plan_rules || {}) } });

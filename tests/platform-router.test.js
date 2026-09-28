@@ -241,7 +241,8 @@ test('the apply page is public and shows all three plans', async () => {
 
   assert.equal(r.statusCode, 200, 'no session required — this is the front door');
   for (const label of ['Basic', 'Medium', 'Prime']) assert.match(r.body, new RegExp(label));
-  assert.match(r.body, /What your members can do/, 'leads with member benefits, not admin screens');
+  assert.match(r.body, /Your members get/, 'leads with member benefits, not admin screens');
+  assert.match(r.body, /name="accept_terms"[^>]*required/, 'the agreement is accepted at registration (§41.1 Q5)');
   assert.match(r.body, /anything your gym needs/i, 'the demand-evidence question is asked');
 });
 
@@ -250,7 +251,7 @@ test('an application without a plan is refused', async () => {
   const r = res();
   await handlePlatform(
     req({ method: 'POST', url: '/platform/apply',
-          body: 'owner_name=A&email=a@b.co&password=longenough1&gym_name=Bos+Gym' }),
+          body: 'owner_name=A&email=a@b.co&password=longenough1&phone=%2B27821234567&gym_name=Bos+Gym&address=1+A+St&accept_terms=yes' }),
     r, d
   );
   assert.equal(r.statusCode, 400);
@@ -276,7 +277,7 @@ test('a valid application is submitted and confirmed', async () => {
   const r = res();
   await handlePlatform(
     req({ method: 'POST', url: '/platform/apply',
-          body: 'owner_name=Ann&email=ANN@Bos.co&password=longenough1&phone=%2B27+82+123+4567&gym_name=BOS+GYM&address=12+Main+Rd&city=Cape+Town&country=za&plan=medium&needs=SMS+reminders' }),
+          body: 'owner_name=Ann&email=ANN@Bos.co&password=longenough1&phone=%2B27+82+123+4567&gym_name=BOS+GYM&address=12+Main+Rd&city=Cape+Town&country=za&plan=medium&needs=SMS+reminders&accept_terms=yes' }),
     r, d
   );
 
@@ -294,7 +295,7 @@ test('a rejected application redisplays the form without losing what was typed',
   const r = res();
   await handlePlatform(
     req({ method: 'POST', url: '/platform/apply',
-          body: 'owner_name=Ann&email=a@b.co&password=longenough1&phone=%2B27821234567&gym_name=BOS+GYM&address=1+A+St&plan=basic' }),
+          body: 'owner_name=Ann&email=a@b.co&password=longenough1&phone=%2B27821234567&gym_name=BOS+GYM&address=1+A+St&plan=basic&accept_terms=yes' }),
     r, d
   );
 

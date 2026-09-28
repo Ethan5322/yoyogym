@@ -17,7 +17,7 @@
 // Platform staff use the website. There is deliberately no JSON route here
 // that approves an application or suspends a gym.
 import { readAnySession, signPlatformToken } from './http.js';
-import { PLANS, ownerFacingPlan } from './plans.js';
+import { livePlansForOwners } from './plans.js';
 import { completeActivation } from './activation.js';
 import { validateUploadRequest, pathBelongsTo, documentRow } from './documents.js';
 import { lookupHash, routeMember } from './member-directory.js';
@@ -187,7 +187,8 @@ export async function handlePlatformApi(req, res, deps, { path, method, url }) {
 
   // ---- the plans, for the signup screen -----------------------------------
   if (path === 'api/plans' && method === 'GET') {
-    return json(res, 200, { plans: PLANS.map((p) => ownerFacingPlan(p)) }), true;
+    // The live plans, as on the website's registration page (§41).
+    return json(res, 200, { plans: await livePlansForOwners(deps) }), true;
   }
 
   // ---- apply (owners) -----------------------------------------------------

@@ -22,7 +22,7 @@
 // enforce what this file defines and neither side may import the other (D-081).
 // One definition, two readers.
 export { FEATURES, featureForRoute } from '../shared/features.js';
-import { FEATURES, featureForRoute } from '../shared/features.js';
+import { FEATURES, featureForRoute, SERVICE_INFO } from '../shared/features.js';
 
 
 const CORE = [
@@ -179,44 +179,83 @@ export function checkMemberLimit(plan, currentActiveMembers) {
  * Deliberately leads with what their MEMBERS can do, because that is what an
  * owner is actually buying — not a list of admin screens.
  */
-export function ownerFacingPlan(plan) {
-  const index = PLANS.findIndex((p) => p.key === plan.key);
-  const next = PLANS[index + 1] ?? null;
-
-  const labelFor = {
-    [FEATURES.MEMBERS]: 'Member registration and records',
-    [FEATURES.CHECKIN]: 'Check-in and door verification',
-    [FEATURES.PAYMENTS]: 'Payment records, receipts and arrears',
-    [FEATURES.CATALOG]: 'Your own membership plans and add-ons',
-    [FEATURES.SETTINGS]: 'Your gym name, logo and colours',
-    [FEATURES.STAFF]: 'Staff accounts and roles',
-    [FEATURES.QR]: 'QR codes for your gym and members',
-    [FEATURES.CLASSES]: 'Classes, bookings and waitlists',
-    [FEATURES.TRAINERS]: 'Trainers and personal training',
-    [FEATURES.MESSAGING]: 'Announcements and member messaging',
-    [FEATURES.REPORTING]: 'Attendance and revenue reporting',
-    [FEATURES.PROGRESS]: 'Member progress tracking',
-    [FEATURES.DATA_IO]: 'Import and export your data',
-    [FEATURES.FACE]: 'Face recognition sign-in and door scanner',
-    [FEATURES.ACCESS_CONTROL]: 'Visitor passes and incident logging',
-    [FEATURES.ADVANCED_ANALYTICS]: 'Churn, retention, peak hours, board report',
-    [FEATURES.MARKETING]: 'Bulk email to your members',
-    [FEATURES.REFERRALS]: 'Member referral programme',
-    [FEATURES.AUDIT]: 'Full audit log of staff actions',
-  };
+/**
+ * A plan, as a GYM OWNER reads it — from the LIVE plan settings when given a
+ * row from platform_plans, so the registration page shows the services and
+ * the price the main admin actually set (CLAUDE.md §41), not a list written
+ * here. Given one of the PLANS above (no price, no row), it describes the
+ * defaults, and the price stays null: prices are data, never code.
+ *
+ * @param {object} plan  a platform_plans row, or one of PLANS
+ * @param {object[]} [all] every plan in order, to say what the next one adds
+ */
+export function ownerFacingPlan(plan, all = null) {
+  const known = planByKey(plan.key);
+  const features = Array.isArray(plan.features) ? plan.features : known?.features || [];
+  const ordered = Array.isArray(all) && all.length ? all : PLANS;
+  const index = ordered.findIndex((p) => p.key === plan.key);
+  const next = index >= 0 ? ordered[index + 1] ?? null : null;
+  const nextFeatures = next ? (Array.isArray(next.features) ? next.features : planByKey(next.key)?.features || []) : [];
+  const max = plan.max_active_members ?? plan.maxActiveMembers ?? null;
+  const label = (f) => SERVICE_INFO[f]?.label;
 
   return {
     key: plan.key,
-    label: plan.label,
-    summary: plan.summary,
-    memberLimit: `Up to ${plan.maxActiveMembers} active members`,
-    locations: plan.maxLocations,
-    included: plan.features.map((f) => labelFor[f]).filter(Boolean),
-    memberBenefits: plan.memberBenefits,
-    nextPlanAdds: next
-      ? next.features.filter((f) => !plan.features.includes(f)).map((f) => labelFor[f]).filter(Boolean)
-      : [],
-    // Never hard-coded. Read from platform_plans at runtime.
-    price: null,
+    label: plan.label || known?.label || plan.key,
+    summary: plan.summary || known?.summary || '',
+    memberLimit: max ? `Up to ${max} active members` : 'No member limit',
+    locations: plan.maxLocations ?? known?.maxLocations ?? 1,
+    included: features.map(label).filter(Boolean),
+    memberBenefits: features.map((f) => SERVICE_INFO[f]?.forMembers).filter(Boolean),
+    nextPlanAdds: nextFeatures.filter((f) => !features.includes(f)).map(label).filter(Boolean),
+    support: SUPPORT_BY_PLAN[plan.key] || SUPPORT_BY_PLAN.basic,
+    // Only a price someone SET, from platform_plans. Never a number written here.
+    price: Number.isInteger(plan.price_cents) && plan.price_cents > 0 ? plan.price_cents : null,
+    currency: plan.currency || 'ZAR',
   };
+}
+
+/**
+ * What Yoyo Gyms itself commits to, by plan (CLAUDE.md §41.1 Q6): promises
+ * a person on the user's team keeps, so they are stated once, here, and shown
+ * the same wherever they appear.
+ */
+export const SUPPORT_BY_PLAN = {
+  basic: ['Setup help for your first week', 'Email support'],
+  medium: ['Setup help for your first week', 'Email support with same-business-day replies'],
+  prime: [
+    'Setup help for your first week',
+    'Email support with same-business-day replies',
+    'A WhatsApp support line',
+    'A named account manager who checks in monthly',
+  ],
+};
+
+/** True of every plan, today, in the software (§41.1 Q6). */
+export const EVERY_PLAN_INCLUDES = [
+  ['Verified listing', 'Every gym is checked by a person before members can find it, so yours stands next to real gyms only.'],
+  ['Your own branded app', 'Members see your name, logo, colours, cover and poster, in the app and on the web.'],
+  ['Your data, kept apart', "Each gym's members live in their own separate area of the database. No other gym can reach them."],
+  ["Your members' privacy", "Yoyo staff see counts only, never your members' names, phone numbers or health answers."],
+  ['QR posters, ready to print', 'Join, sign-in and check-in codes for your walls and front desk.'],
+  ['Bring your members', 'We help you move your existing members across during setup.'],
+  ['30 days free', 'Nothing is charged during your 30-day trial.'],
+  ['A signed agreement', 'Your Gym Owner Agreement and Owner ID as a PDF, for your records.'],
+];
+
+/**
+ * The plans as a gym owner chooses them, from the LIVE settings (§41): only
+ * those offered to new gyms, in order, each described by ownerFacingPlan. If
+ * the plans cannot be read, the defaults in the code — without prices, which
+ * is honest — rather than an empty page.
+ */
+export async function livePlansForOwners(deps) {
+  let rows = [];
+  try {
+    rows = ((await deps.listPlans?.()) || []).filter((p) => p.is_enabled !== false && planByKey(p.key));
+  } catch {
+    rows = [];
+  }
+  const source = rows.length ? PLANS.map((d) => rows.find((r) => r.key === d.key)).filter(Boolean) : PLANS;
+  return source.map((p) => ownerFacingPlan(p, source));
 }

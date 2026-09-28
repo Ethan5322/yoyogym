@@ -120,7 +120,10 @@
     return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
   }
 
-  function has(feature) { return !state.features || state.features.indexOf(feature) !== -1; }
+  // In the gym's plan, and not switched off by its owner (CLAUDE.md §41).
+  function has(feature) {
+    return (!state.features || state.features.indexOf(feature) !== -1) && (state.off || []).indexOf(feature) === -1;
+  }
 
   function toast(text, tone) {
     var t = document.createElement('div');
@@ -212,9 +215,19 @@
   function loadBrand() {
     var cached = load('brand');
     if (cached) applyBrand(cached);
+    state.offer = load('offer');
+    state.catalog = load('catalog');
+    // The gym's plans and add-ons (CLAUDE.md §41.1 Q1) — kept, like the brand,
+    // so the home still shows them offline.
+    api('/catalog', { auth: false }).then(function (d) {
+      state.catalog = { plans: d.plans || [], addons: d.addons || [] };
+      save('catalog', state.catalog);
+    }, function () { /* the kept copy, or nothing, is fine */ });
     return api('/content', { auth: false }).then(function (d) {
       save('brand', d.branding || null);
       applyBrand(d.branding);
+      state.offer = d.offer || null;
+      save('offer', state.offer);
     }, function () { /* the cached brand, or the default, is fine */ });
   }
 
@@ -236,6 +249,7 @@
     state.token = load('token');
     state.status = load('status');
     state.features = state.status ? state.status.features || null : null;
+    state.off = state.status && Array.isArray(state.status.services_off) ? state.status.services_off : [];
     state.tab = 'home';
 
     document.body.classList.add('in-member');
@@ -392,6 +406,7 @@
     return api('/member/status').then(function (d) {
       state.status = d;
       state.features = d.features || null;
+      state.off = Array.isArray(d.services_off) ? d.services_off : [];
       save('status', d);
       if (root.querySelector('.m-main')) render();
     }, function (e) {
@@ -415,6 +430,53 @@
     var st = map[member.status] || { tone: 'warn', text: member.status || 'Unknown' };
     var until = ms.end_date ? 'until ' + dateText(ms.end_date) : '';
     return { tone: st.tone, text: st.text, plan: ms.plan_name || 'Membership', until: until };
+  }
+
+  function money(n) {
+    return 'R' + Number(n || 0).toLocaleString('en-ZA', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  }
+
+  /**
+   * What the gym offers (CLAUDE.md §41.1 Q1): its plans and prices, add-ons,
+   * the services members can use, and its facilities — the same as its page
+   * on the web. A section with nothing in it is left out.
+   */
+  function gymOffer() {
+    var o = state.offer || {};
+    var c = state.catalog || {};
+    var plans = c.plans || [];
+    var addons = c.addons || [];
+    var services = o.services || [];
+    var facilities = o.facilities || [];
+    if (!plans.length && !addons.length && !services.length && !facilities.length) return '';
+    return '<section class="m-offer" aria-label="What we offer">' +
+      '<h2 class="m-offer__title">What ' + esc(state.gymName || 'your gym') + ' offers</h2>' +
+      (plans.length
+        ? '<h3 class="m-offer__h">Membership plans</h3>' + plans.map(function (p) {
+            return '<div class="m-card m-plan">' + (p.is_featured ? '<span class="m-plan__tag">Most popular</span>' : '') +
+              '<b>' + esc(p.name) + '</b>' +
+              '<span class="m-plan__price">' + esc(money(p.monthly_price)) + '<small> / month</small></span>' +
+              (Number(p.joining_fee) > 0 ? '<span class="m-sub">Joining fee ' + esc(money(p.joining_fee)) + '</span>' : '') +
+              (p.description ? '<p class="m-sub">' + esc(p.description) + '</p>' : '') + '</div>';
+          }).join('')
+        : '') +
+      (addons.length
+        ? '<h3 class="m-offer__h">Add-on services</h3><div class="m-card m-list">' + addons.map(function (a) {
+            return '<div class="m-list__row"><span><b>' + esc(a.name) + '</b>' + (a.description ? '<small>' + esc(a.description) + '</small>' : '') +
+              '</span><b>' + esc(money(a.price)) + '</b></div>';
+          }).join('') + '</div>'
+        : '') +
+      (services.length
+        ? '<h3 class="m-offer__h">In your app</h3><ul class="m-checks">' + services.map(function (x) {
+            return '<li>' + esc(x.text) + '</li>';
+          }).join('') + '</ul>'
+        : '') +
+      (facilities.length
+        ? '<h3 class="m-offer__h">Facilities</h3><div class="m-chips">' + facilities.map(function (f) {
+            return '<span>' + esc(f) + '</span>';
+          }).join('') + '</div>'
+        : '') +
+      '</section>';
   }
 
   function renderHome(main) {
@@ -457,7 +519,8 @@
       '  <div class="m-bar"><i style="width:' + pct + '%"></i></div>' +
       '  <span class="m-sub">' + esc(visits === 1 ? '1 visit' : visits + ' visits') + (a.label ? ' · ' + esc(a.label) : '') + '</span>' +
       '</section>' +
-      gymContact();
+      gymContact() +
+      gymOffer();
 
     var btn = document.getElementById('m-checkin');
 

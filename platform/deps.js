@@ -37,8 +37,9 @@ import { chargeAuthorization, paystackConfigured, initializeSubscriptionPayment,
 import { makeLimiter } from './ratelimit.js';
 import { platformBaseUrl } from './base-url.js';
 import { provisioningReadiness } from './provisioning-config.js';
-import { ownerId } from './agreement.js';
+import { ownerId, AGREEMENT_VERSION } from './agreement.js';
 import { issueInvite, inviteLookupHash, roleLabel, INVITE_TTL_HOURS } from './team.js';
+import { ALL_SERVICES, CORE_FEATURES } from '../shared/features.js';
 import {
   coordinate, haversineKm, nearestGyms, likeTerm, RESULT_LIMIT, BOX_FETCH,
 } from './gym-search.js';
@@ -460,15 +461,21 @@ export function platformDeps() {
       // CLAUDE.md §40.1 Q2. Written separately so that, before
       // 2026-09-28-main-admin-panel.sql has run, the application is still
       // saved — without these two answers — rather than lost.
-      const contact = { owner_phone: input.phone || null, gym_address: input.address || null };
+      const contact = {
+        owner_phone: input.phone || null,
+        gym_address: input.address || null,
+        // Which Gym Owner Agreement they ticked, and when (§41.1 Q5).
+        terms_version: input.accepted_terms ? AGREEMENT_VERSION : null,
+        terms_accepted_at: input.accepted_terms ? new Date().toISOString() : null,
+      };
 
       let { data: application, error: appErr } = await db
         .from('gym_applications')
         .insert({ ...row, ...contact })
         .select('id')
         .single();
-      if (appErr && /owner_phone|gym_address/.test(appErr.message || '')) {
-        console.error('gym_applications has no contact columns yet — run 2026-09-28-main-admin-panel.sql');
+      if (appErr && /owner_phone|gym_address|terms_version|terms_accepted_at/.test(appErr.message || '')) {
+        console.error('gym_applications is missing new columns — run the latest platform migrations');
         ({ data: application, error: appErr } = await db.from('gym_applications').insert(row).select('id').single());
       }
 
@@ -485,7 +492,7 @@ export function platformDeps() {
         actor_user_id: user.id,
         entity: 'application',
         entity_id: application.id,
-        detail: { gym_name: input.gym_name, plan: input.plan_key },
+        detail: { gym_name: input.gym_name, plan: input.plan_key, terms_version: input.accepted_terms ? AGREEMENT_VERSION : null },
       });
 
       // A confirmation, saying what happens next and where to upload the
@@ -641,7 +648,7 @@ export function platformOpsDeps(db = platformDb()) {
     /** Read per request. Revoking a role must take effect now, not in 8 hours. */
     permissionsFor: (session) => permissionsFor(db, session.sub),
 
-    listGyms: async ({ query = '', status = '', from = 0, to = 49, limit = null } = {}) => {
+    listGyms: async ({ query = '', status = '', setup = false, from = 0, to = 49, limit = null } = {}) => {
       // `count: 'exact'` alongside the rows: the reader is told how many gyms
       // exist, not just how many fitted on this page. A list that ENDS looks
       // finished, and somebody would conclude a gym does not exist because it
@@ -658,6 +665,7 @@ export function platformOpsDeps(db = platformDb()) {
       const term = searchText(query);
       if (term) q = q.or(`search_name.ilike.%${term}%,slug.ilike.%${term}%,city.ilike.%${term}%`);
       if (status) q = q.eq('status', status);
+      if (setup) q = q.not('setup_help_requested_at', 'is', null).is('setup_help_done_at', null);
 
       const { data, count: total } = await q;
       const gyms = data ?? [];
@@ -691,7 +699,7 @@ export function platformOpsDeps(db = platformDb()) {
             ? db.from('platform_users').select('id, full_name, email, is_active, last_login_at').eq('id', gym.owner_user_id).maybeSingle()
             : Promise.resolve({ data: null }),
           gym.plan_key
-            ? db.from('platform_plans').select('key, label, max_active_members, price_cents, currency').eq('key', gym.plan_key).maybeSingle()
+            ? db.from('platform_plans').select('key, label, max_active_members, price_cents, currency, features').eq('key', gym.plan_key).maybeSingle()
             : Promise.resolve({ data: null }),
           db.from('gym_applications').select('id, owner_phone').eq('slug', gym.slug).order('submitted_at', { ascending: false }).limit(1).maybeSingle(),
         ]);
@@ -1538,6 +1546,7 @@ export function ownerDeps(db = platformDb()) {
 export function platformControlDeps(db = platformDb()) {
   return {
     ...teamAndActivityDeps(db),
+    ...servicesAndSupportDeps(db),
     // ---- plans and prices -------------------------------------------------
     listPlans: async () => {
       const { data } = await db.from('platform_plans').select('*').order('max_active_members', { ascending: true });
@@ -1992,6 +2001,125 @@ function teamAndActivityDeps(db) {
         .select('id', { count: 'exact', head: true })
         .eq('kind', 'gym_owner');
       return count ?? 0;
+    },
+  };
+}
+
+// ---------------------------------------------------------------------------
+// One gym's services, its account manager, setup help, and Yoyo's support
+// contacts (CLAUDE.md §41)
+// ---------------------------------------------------------------------------
+
+/** Where support is reached, until the platform owner types otherwise (§41.1 Q7). */
+export const DEFAULT_SUPPORT = { email: 'hello@mulesoo.com', whatsapp: '' };
+
+/** Support contacts, cleaned: an email that looks like one, a phone in +digits. */
+export function cleanSupport(value = {}) {
+  const email = String(value.email ?? '').trim().toLowerCase();
+  const digits = String(value.whatsapp ?? '').trim().replace(/[\s().-]/g, '').replace(/^00/, '+');
+  return {
+    email: /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) ? email : DEFAULT_SUPPORT.email,
+    whatsapp: /^\+\d{7,15}$/.test(digits) ? digits : '',
+  };
+}
+
+async function readSupport(db) {
+  const { data, error } = await db.from('platform_settings').select('value').eq('key', 'support').maybeSingle();
+  // No table yet, or nothing saved: the defaults, never an error page.
+  return error || !data ? { ...DEFAULT_SUPPORT } : cleanSupport(data.value);
+}
+
+function servicesAndSupportDeps(db) {
+  return {
+    getSupportContacts: () => readSupport(db),
+
+    saveSupportContacts: async (value, by) => {
+      const clean = cleanSupport(value);
+      const { error } = await db
+        .from('platform_settings')
+        .upsert({ key: 'support', value: clean, updated_by: by, updated_at: new Date().toISOString() }, { onConflict: 'key' });
+      if (error) throw new Error(`Could not save the support contacts: ${error.message}`);
+      return clean;
+    },
+
+    /**
+     * What the platform added or took away for ONE gym, on top of its plan
+     * (§41.1 Q2). Only real, non-core service keys are stored.
+     */
+    setGymServices: async (gymId, { added = [], removed = [] }) => {
+      const ok = (list) => ALL_SERVICES.filter((f) => !CORE_FEATURES.includes(f) && list.includes(f));
+      const { error } = await db
+        .from('gyms')
+        .update({ features_added: ok(added), features_removed: ok(removed), updated_at: new Date().toISOString() })
+        .eq('id', gymId);
+      if (error) throw new Error(`Could not save this gym's services: ${error.message}`);
+    },
+
+    /** A named Yoyo contact for a gym (§41.1 Q6) — a staff member, or nobody. */
+    setAccountManager: async (gymId, staffId) => {
+      if (staffId) {
+        const { data: staff } = await db
+          .from('platform_users')
+          .select('id')
+          .eq('id', staffId)
+          .eq('kind', 'platform_staff')
+          .eq('is_active', true)
+          .maybeSingle();
+        if (!staff) throw new Error('That person is not an active member of the Yoyo team.');
+      }
+      const { error } = await db.from('gyms').update({ account_manager_id: staffId || null }).eq('id', gymId);
+      if (error) throw new Error(`Could not save the account manager: ${error.message}`);
+    },
+
+    markSetupDone: async (gymId) => {
+      const { error } = await db.from('gyms').update({ setup_help_done_at: new Date().toISOString() }).eq('id', gymId);
+      if (error) throw new Error(`Could not record that: ${error.message}`);
+    },
+
+    /** Gyms waiting for the setup help they asked for — a to-do on Today. */
+    countSetupRequests: async () => {
+      const { count, error } = await db
+        .from('gyms')
+        .select('id', { count: 'exact', head: true })
+        .not('setup_help_requested_at', 'is', null)
+        .is('setup_help_done_at', null);
+      if (error) return 0;
+      return count ?? 0;
+    },
+
+    /** What an owner's page needs about their own support (§41.1 Q6, Q7). */
+    ownerSupport: async (gym) => {
+      const support = await readSupport(db);
+      const { data: extra } = await db
+        .from('gyms')
+        .select('account_manager_id, setup_help_requested_at, setup_help_done_at')
+        .eq('id', gym.id)
+        .maybeSingle();
+      let manager = null;
+      if (extra?.account_manager_id) {
+        const { data } = await db.from('platform_users').select('full_name, email').eq('id', extra.account_manager_id).maybeSingle();
+        manager = data ?? null;
+      }
+      return {
+        email: support.email,
+        whatsapp: support.whatsapp,
+        manager,
+        setupRequestedAt: extra?.setup_help_requested_at ?? null,
+        setupDoneAt: extra?.setup_help_done_at ?? null,
+      };
+    },
+
+    /** The owner asks for setup help. Only THEIR gym, found by the session. */
+    requestSetupHelp: async (userId) => {
+      const { data: gym } = await db.from('gyms').select('id').eq('owner_user_id', userId).maybeSingle();
+      if (!gym) throw new Error('No gym found for this account.');
+      const { error } = await db
+        .from('gyms')
+        .update({ setup_help_requested_at: new Date().toISOString(), setup_help_done_at: null })
+        .eq('id', gym.id);
+      if (error) throw new Error(`Could not record the request: ${error.message}`);
+      await audit(db, { action: 'platform.owner.setup_help_requested', actor_kind: 'gym_owner', actor_user_id: userId, entity: 'gym', entity_id: gym.id });
+      return gym.id;
     },
   };
 }

@@ -4,6 +4,7 @@ import { getSupabase } from '../../lib/supabase.js';
 import { allowMethods, ok, serverError } from '../../lib/http.js';
 import { authenticateMember } from '../../lib/memberauth.js';
 import { currentGym } from '../../lib/tenancy.js';
+import { servicesOff } from '../../lib/member-services.js';
 import { loadCompliance, expectedVisits, adherence } from '../../lib/compliance.js';
 
 export default async function handler(req, res) {
@@ -50,6 +51,9 @@ export default async function handler(req, res) {
       // What this gym's plan includes, so the portal shows only what works
       // here. null in single-gym mode: everything shown, exactly as before.
       features: Array.isArray(currentGym()?.features) ? currentGym().features : null,
+      // What the OWNER has chosen not to offer (§41), hidden from the portal
+      // and the app the same way.
+      services_off: await servicesOff(supabase),
     });
   } catch (err) {
     console.error('member status error:', err.message);

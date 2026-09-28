@@ -4,6 +4,21 @@
 import { getSupabase } from '../../lib/supabase.js';
 import { allowMethods, ok, serverError } from '../../lib/http.js';
 import { currentGym } from '../../lib/tenancy.js';
+import { readOff, MEMBER_SERVICES_KEY } from '../../lib/member-services.js';
+import { FACILITIES_KEY, facilityLabels } from '../../../shared/facilities.js';
+import { SERVICE_INFO, ALL_SERVICES } from '../../../shared/features.js';
+
+/**
+ * The services a member of this gym can use, in words. `features` is null in
+ * a standalone deployment (no plan, everything available), as elsewhere.
+ */
+export function offeredServices(features, off = []) {
+  const available = Array.isArray(features) ? features : ALL_SERVICES;
+  return ALL_SERVICES.filter((f) => available.includes(f) && !off.includes(f) && SERVICE_INFO[f]?.forMembers).map((f) => ({
+    key: f,
+    text: SERVICE_INFO[f].forMembers,
+  }));
+}
 
 const DEFAULTS = {
   gym_name: 'Your Gym',
@@ -37,7 +52,7 @@ export default async function handler(req, res) {
     const { data, error } = await supabase
       .from('settings')
       .select('key, value')
-      .in('key', ['gym_profile', 'indemnity_text', 'contract_text', 'popia_text', 'contract_terms_version']);
+      .in('key', ['gym_profile', 'indemnity_text', 'contract_text', 'popia_text', 'contract_terms_version', FACILITIES_KEY, MEMBER_SERVICES_KEY]);
 
     if (error) return serverError(res, error.message);
 
@@ -74,6 +89,14 @@ export default async function handler(req, res) {
       contract_text: map.contract_text?.text || DEFAULTS.contract_text,
       popia_text: map.popia_text?.text || DEFAULTS.popia_text,
       contract_terms_version: map.contract_terms_version?.value || DEFAULTS.contract_terms_version,
+      // WHAT THIS GYM OFFERS ITS MEMBERS (CLAUDE.md §41): the services its plan
+      // allows and its owner has not switched off, and the facilities the
+      // owner listed. Its membership plans and add-ons, with prices, come from
+      // /api/catalog, as they always have.
+      offer: {
+        services: offeredServices(currentGym()?.features, readOff(map[MEMBER_SERVICES_KEY])),
+        facilities: facilityLabels(map[FACILITIES_KEY]),
+      },
     });
   } catch (err) {
     console.error('content error:', err.message);

@@ -5,6 +5,7 @@ import { Link, useParams } from 'react-router-dom';
 import { useBranding } from '../lib/branding.js';
 import GymIcon from '../components/GymIcon.jsx';
 import GymBackdrop from '../components/GymBackdrop.jsx';
+import GymOffer from '../components/GymOffer.jsx';
 
 export default function Splash() {
   const b = useBranding();
@@ -42,6 +43,12 @@ export default function Splash() {
         <p className="mt-10 text-xs text-muted">
           Secure &amp; private registration · POPIA compliant
         </p>
+      </div>
+
+      {/* The gym's plans, add-ons, services and facilities (CLAUDE.md §41.1 Q1),
+          below the two choices — someone deciding whether to join reads them. */}
+      <div className="mx-auto mt-14 w-full max-w-3xl pb-16">
+        <GymOffer heading={`What ${name} offers`} />
       </div>
     </div>
   );

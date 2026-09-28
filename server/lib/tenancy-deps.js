@@ -10,6 +10,7 @@
 // a dependency: the platform owns those tables, and this reads them the same
 // way any other consumer would.
 import { createClient } from '@supabase/supabase-js';
+import { effectiveFeatures } from '../../shared/features.js';
 
 /**
  * A short-lived cache of resolved gyms.
@@ -142,6 +143,21 @@ export function tenancyDeps() {
           .maybeSingle();
         if (error) throw new Error(`Could not read the gym's plan: ${error.message}`);
         plan = data ?? null;
+      }
+
+      // THIS GYM'S OWN ADDITIONS AND REMOVALS (CLAUDE.md §41 Q2), on top of
+      // its plan. Read on their own: before 2026-09-28-services.sql runs the
+      // columns do not exist, and the gym must then work exactly as it did —
+      // on its plan alone — rather than fail to resolve.
+      if (plan && Array.isArray(plan.features)) {
+        const { data: overrides, error: oErr } = await db
+          .from('gyms')
+          .select('features_added, features_removed')
+          .eq('id', gym.id)
+          .maybeSingle();
+        if (!oErr && overrides) {
+          plan = { ...plan, features: effectiveFeatures(plan.features, overrides.features_added, overrides.features_removed) };
+        }
       }
 
       const value = { gym, connection, plan };

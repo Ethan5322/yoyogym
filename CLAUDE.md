@@ -2078,3 +2078,94 @@ document; the Team page with one-time invitations that set a password and an aut
 read-only Settings page; a switched-off staff member loses access on the next click. SQL:
 `platform/migrations/2026-09-28-main-admin-panel.sql` (two columns, one table).
 
+---
+
+## 41. Services by plan, toggled per gym, chosen by the owner — and a panel that works end to end (user instruction, 2026-09-28)
+
+> The user's words, word for word, from two messages on 2026-09-28 (the second arrived cut off, as
+> shown). Clarified one question at a time in §41.1, which wins over the text above it. Not built
+> until §41.1 is answered.
+
+> also inside yoyo gyms admin pannel the control buttons are to small search deap down and add what
+> needed to be added be sure that each button track and work properly with each gyms no false data
+> track real data it must be 10/10
+
+> also inside yoyo gyms admin pannel add more service that controlled for each members of gyms by
+> turning togle on and off based on their plan so main admin can add or mainus as they want so you
+> should search deap down what service in adtion yoyo gyms provide for society of gym that can
+> attract so depend on plan we provide, also this when turning on and off togle of services listed
+> for each gym must shaw during gym owner register and also gym owner must have its own togle on and
+> off what service he can provide for his gym member so allow gym owner to write gym services and
+> write the plan of gym so that it
+
+> add more to look corporate lavel service yoyo gyms provide
+
+### 41.1 Clarifications — answered by the user, one at a time
+
+Checked against the code on 2026-09-28:
+- **Already exists:** a gym owner writes their gym's own membership plans and add-on services in
+  their gym admin panel (Catalog → `gym.plans`, `gym.addon_services`), per gym.
+- **Already exists:** 19 services ("features", `shared/features.js`) — members, check-in, payments,
+  catalog, settings, staff, QR, classes, trainers, messaging, reporting, progress, import/export, face
+  recognition, access control, advanced analytics, marketing, referrals, audit. Each Yoyo plan has a
+  list of them in `platform_plans.features`, and the gym's API refuses what its plan does not include
+  (402, §18.4).
+- **Missing:** no screen changes which services a plan includes; no per-gym on/off; no owner on/off
+  for their members; the apply page's plan list is written in the code (`platform/plans.js`), not read
+  from the live plan settings.
+- **Not a service yet:** anything not in that list. A toggle for a service that does not exist would
+  be exactly the false data the instruction forbids — new services are built, then toggled.
+- **Q1 — the cut-off sentence:** the services and membership plans an owner writes are **shown to
+  members** — on the gym's page in the app and on the web — before joining and after.
+- **Q2 — what the main admin switches (the user's words: "each gym's services … including plan and
+  gym itself"):** BOTH. Each plan (Basic / Medium / Prime) has an on/off switch per service, and each
+  gym can have a service added or removed for that gym alone. Claude researches which further
+  services Yoyo Gyms should offer, and they become switchable too. **Also asked for:** the gym-owner
+  registration page must present the services attractively ("mouth-watering") and carry the terms
+  and conditions, so owners are encouraged to register and trust Yoyo Gyms. Every service shown must
+  exist — no promise the product does not keep.
+- **Q3 — four NEW member services are built** (chosen from research into what keeps gym members:
+  loyalty programmes, gamification, flexible holds, family plans): **Rewards and streaks** (points and
+  badges for visits; the owner sets rewards claimed at the gym); **Challenges and leaderboard**
+  (owner-run challenges; an opt-in leaderboard, first names only); **Pause my membership** (members
+  pause from the app within the owner's rules; the end date moves automatically); **Family and group
+  memberships** (one payer, several linked members, each with their own card and check-in). Each is a
+  service like the existing ones: switchable per plan, per gym, and by the owner.
+- **Q4 — where the new services start:** Basic gets Pause my membership; Medium adds Rewards and
+  streaks, and Family and group; Prime adds Challenges and leaderboard. All changeable with the
+  switches.
+- **Q5 — terms at registration:** the registration page shows the key terms of the Gym Owner
+  Agreement and requires an "I agree" tick; the agreement stays marked DRAFT until the user (or a
+  lawyer) has read the full wording and says to approve it (`PLATFORM_TERMS_APPROVED`). It is
+  accepted again at activation, as today.
+- **Q6 — what Yoyo Gyms promises owners (the corporate-level list):** everything already true
+  (verified listing, the gym's own branded app, each gym's data kept separate and secure, member
+  import, QR posters, face check-in, audit trail, 30-day free trial, the owner agreement PDF), PLUS
+  three commitments the user's team keeps: **setup help** for every new gym; **support levels by
+  plan** (email for all; same-business-day replies for Medium and Prime; a WhatsApp line for Prime);
+  a **named account manager for Prime** who checks in monthly.
+- **Q7 — the Prime WhatsApp number is added later**, typed by the platform owner on the Settings
+  page (so Settings gains an editable "Support contacts" section, stored in the platform database).
+  Until a number is saved, Prime owners are shown the support email (hello@mulesoo.com).
+- **Q8 — facilities:** besides the priced add-ons they already write, owners tick their gym's free
+  facilities (showers, lockers, parking, sauna, Wi-Fi, towels, café, childcare …) and can add their
+  own. Shown to members on the gym's page in the app and on the web.
+
+All eight answered 2026-09-28. **The build, in two parts:**
+1. **Control** — services as data with three switches: the plan's (main admin, Plans and prices),
+   the gym's own additions or removals (main admin, the gym's page), and the owner's on/off for their
+   members (gym admin → Settings), which can only switch off what plan and gym allow. The gym's API
+   enforces the result; the menus follow it. The registration page presents the services and the
+   corporate promises (Q6) with the key terms and a required "I agree" (Q5). Settings gains editable
+   support contacts (Q7). Every control button at least 44 px tall. Facilities (Q8).
+2. **The four new services** (Q3), each end to end — database, API, gym admin screen, member web
+   and app screens — and each behind its switch.
+Each part is tested, checked on screen, then deployed to the PREVIEW first (it touches the gym admin
+panel and the app, D-163); production when the user says.
+
+**Part 1 built 2026-09-28** — vault D-164: the three switches (plan on the Plans page, one gym on its
+page, the owner in their Settings), enforced by the gym's API; the registration page from the live
+plans, with what every plan includes, support by plan, the key terms and a required "I agree"; owner
+facilities; each gym's plans, add-ons, services and facilities shown to members on the web, in the
+portal and in the app; setup help tracked; support contacts editable; every control at least 44 px.
+SQL: `platform/migrations/2026-09-28-services.sql`. **Part 2 — the four new services — next.**

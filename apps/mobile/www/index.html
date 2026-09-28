@@ -367,6 +367,28 @@
       .m-actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 4px; }
       .m-action { flex: 1; min-width: 88px; min-height: 44px; display: inline-flex; align-items: center; justify-content: center;
                   border-radius: 22px; background: rgba(255, 255, 255, 0.08); color: #fff; text-decoration: none; font-weight: 700; }
+      /* What the gym offers (CLAUDE.md §41.1 Q1). */
+      .m-offer { margin-top: 32px; }
+      .m-offer__title { font-size: 20px; margin: 0 0 4px; }
+      .m-offer__h { font-size: 12px; font-weight: 800; letter-spacing: 0.14em; text-transform: uppercase;
+                    color: var(--m-muted); margin: 20px 0 10px; }
+      .m-plan { position: relative; display: flex; flex-direction: column; gap: 2px; margin-bottom: 12px; }
+      .m-plan b { font-size: 16px; padding-right: 96px; }
+      .m-plan__price { font-size: 24px; font-weight: 800; margin-top: 4px; }
+      .m-plan__price small { font-size: 13px; font-weight: 500; color: var(--m-muted); }
+      .m-plan__tag { position: absolute; top: 18px; right: 18px; font-size: 11px; font-weight: 800; padding: 3px 10px;
+                     border-radius: 99px; background: var(--m-accent); color: var(--m-accent-ink); }
+      .m-plan p { margin: 6px 0 0; }
+      .m-list { padding: 4px 20px; }
+      .m-list__row { display: flex; justify-content: space-between; gap: 16px; padding: 14px 0; border-top: 1px solid var(--m-line); }
+      .m-list__row:first-child { border-top: 0; }
+      .m-list__row small { display: block; color: var(--m-muted); font-size: 13px; font-weight: 400; margin-top: 2px; }
+      .m-checks { list-style: none; padding: 0; margin: 0; display: grid; gap: 10px; }
+      .m-checks li { display: flex; gap: 10px; align-items: flex-start; }
+      .m-checks li::before { content: '✓'; color: var(--m-accent); font-weight: 800; }
+      .m-chips { display: flex; flex-wrap: wrap; gap: 8px; }
+      .m-chips span { border: 1px solid var(--m-line); border-radius: 99px; padding: 6px 12px; font-size: 14px;
+                      background: rgba(255, 255, 255, 0.03); }
       .m-main { flex: 1; padding: 0 24px calc(96px + env(safe-area-inset-bottom)); }
       .m-hello { margin: 8px 0 24px; }
 

@@ -9,6 +9,8 @@ import { allowMethods, readJsonBody, ok, badRequest, serverError } from '../../l
 import { requireRole } from '../../lib/auth.js';
 import { recordAudit } from '../../lib/audit.js';
 import { currentGym } from '../../lib/tenancy.js';
+import { MEMBER_SERVICES_KEY, readOff, forgetServicesOff } from '../../lib/member-services.js';
+import { FACILITIES_KEY, cleanFacilities } from '../../../shared/facilities.js';
 
 /** The most a gym's logo may weigh: it is sent to every member on every visit. */
 const LOGO_MAX_CHARS = 300 * 1024;
@@ -92,10 +94,17 @@ export default async function handler(req, res) {
           pictureProblem('poster', value?.poster_url, folderPrefix());
         if (problem) return badRequest(res, problem);
       }
+      // The owner's own on/off for member services, and the gym's facilities
+      // (CLAUDE.md §41): stored CLEANED, never as sent — an unknown service or
+      // facility key is dropped rather than stored and shown to members.
+      let stored = value ?? {};
+      if (key === MEMBER_SERVICES_KEY) stored = { off: readOff(value) };
+      if (key === FACILITIES_KEY) stored = cleanFacilities(value);
       const { error } = await supabase.from('settings').upsert(
-        { key, value: value ?? {}, category: category || null, updated_by: admin.sub, updated_at: new Date().toISOString() },
+        { key, value: stored, category: category || null, updated_by: admin.sub, updated_at: new Date().toISOString() },
         { onConflict: 'key' }
       );
+      if (!error && key === MEMBER_SERVICES_KEY) forgetServicesOff();
       if (error) return serverError(res, error.message);
       await recordAudit(supabase, admin, { action: 'settings.save', entity: 'settings', entity_id: key });
       return ok(res, { saved: true });

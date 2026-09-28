@@ -47,6 +47,7 @@ export function readApplication(raw = {}) {
     estimated_members: Number(raw.estimated_members) || null,
     plan_key: raw.plan,
     needs: text(raw.needs) || null,
+    accepted_terms: raw.accept_terms === 'yes' || raw.accept_terms === true,
   };
 
   const error =
@@ -57,6 +58,9 @@ export function readApplication(raw = {}) {
     (!input.gym_name && 'What is your gym called?') ||
     (!input.address && "Please give the gym's street address.") ||
     (!planByKey(input.plan_key) && 'Please choose a plan.') ||
+    // The Gym Owner Agreement, accepted at registration (§41.1 Q5): the
+    // website sends "yes" from the tick box, the app sends true.
+    (!input.accepted_terms && 'Please read and accept the Gym Owner Agreement.') ||
     null;
 
   return { input, error };

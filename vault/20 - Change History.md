@@ -15,6 +15,42 @@ occurrence is answered from notes rather than rediscovered.
 
 ---
 
+## 2026-09-28 — The outage, and services as data (D-164)
+
+**THE OUTAGE, and the fault was ours.** The user reported "Request failed (500)" inside the admin
+panel. Reproduced on production: the WHOLE admin API and the whole member API answered
+`FUNCTION_INVOCATION_FAILED`, even signed out. Loading the router locally gave the real error:
+`sessions.js does not provide an export named 'consumeSession'`. `efedc0b` (stay signed in) had
+written its code into a NEW `server/lib/sessions.js` and so replaced the file of that name, which
+held `consumeSession` for session packs. A router loads all its handlers at once, so one missing
+export took both APIs down — on the preview since that morning, on production since the 16:30
+deploy. **Fixed in `3f81eff`**: the function restored word for word in `session-packs.js`, and
+`tests/routers-load.test.js` now loads every router, handler and library module. **Why 957 tests
+passed:** no test had ever imported a router. Lesson: *before creating a file, check the name is
+free* — and a test suite that never loads the entry points cannot see them break.
+
+**"The application page says fail".** Rendered locally with the real code and data for the staff
+account: it opens. The only account that could not open it is the gym-owner account that APPLIED —
+which, before `bb49f5f`, was shown the staff menu. Stated to the user as the likely cause, not a
+proven one.
+
+**Found while building Part 1:** the registration page built its plans from the code with
+`price: null`, so it said "Contact us" for plans with prices set — the page now reads the live
+plans. Three of our own registration promises were not fully true (the app is not in the stores yet;
+self-service import and the audit-log screen are not on every plan) and were rewritten before
+anyone saw them.
+
+**Escaping, twice more.** Two Python patches wrote a real line break where the code needed `\n`, and
+one failed to match; every patch asserts before writing, so nothing half-applied. The editor fixed
+each one. The rule stands: code containing backslashes goes through the editor or a file.
+
+**Verified.** 998 tests (31 in `tests/services.test.js`; `tests/panel-links.test.js` follows every
+link and form on every panel page through the real router — none leads nowhere). Screens checked at
+computer and phone width: registration page, plan switches, a gym's services, owner support card,
+the owner's Settings, and a gym's "What we offer" on a phone.
+
+---
+
 ## 2026-09-28 — The main admin panel, corporate level (D-162, D-163)
 
 **Production deployed first**, with the user's go-ahead: `main` caught up with the preview

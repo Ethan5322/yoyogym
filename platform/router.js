@@ -42,6 +42,7 @@ import { platformBaseUrl } from './base-url.js';
 import { OWNER_USERNAME } from './gym-admin.js';
 import { requestReset, completeReset } from './password-reset.js';
 import { readApplication } from './application-form.js';
+import { ALL_SERVICES, CORE_FEATURES } from '../shared/features.js';
 import { STAFF_ROLES, inviteProblem, teamChangeProblem, checkInvite, INVITE_REFUSED } from './team.js';
 import { emailConfigured } from './email.js';
 import { paystackConfigured } from './paystack.js';
@@ -93,7 +94,7 @@ import { startCheckout, completeCheckout } from './checkout.js';
 import { completeActivation } from './activation.js';
 import { validateUploadRequest, pathBelongsTo, documentRow } from './documents.js';
 import { verifySignature } from './paystack.js';
-import { PLANS, planByKey, ownerFacingPlan } from './plans.js';
+import { PLANS, planByKey, EVERY_PLAN_INCLUDES, livePlansForOwners, SUPPORT_BY_PLAN } from './plans.js';
 import {
   requireSession,
   readSession,
@@ -157,9 +158,20 @@ export async function handlePlatform(req, res, deps) {
   // No session required: this is the front door. Anyone may apply; nobody is
   // approved without a human reading it (D-048).
   if (path === 'apply') {
-    const plans = PLANS.map((p) => ownerFacingPlan(p));
+    // The LIVE plans (§41): the services and prices the main admin set, not a
+    // list written in the code — which is how the page said "Contact us" for
+    // plans that had prices.
+    const plans = await livePlansForOwners(deps);
+    const page = (extra = {}) =>
+      signupPage({
+        plans,
+        terms: agreementTerms(),
+        termsApproved: termsApproved(),
+        includes: EVERY_PLAN_INCLUDES,
+        ...extra,
+      });
 
-    if (method === 'GET') return html(res, 200, signupPage({ plans }));
+    if (method === 'GET') return html(res, 200, page());
 
     if (method === 'POST') {
       const form = await readFormBody(req);
@@ -175,9 +187,9 @@ export async function handlePlatform(req, res, deps) {
         country: form.country,
         estimated_members: form.estimated_members,
         needs: form.needs,
+        accept_terms: form.accept_terms,
       };
-      const fail = (message) =>
-        html(res, 400, signupPage({ plans, values, error: message, selectedPlan: form.plan }));
+      const fail = (message) => html(res, 400, page({ values, error: message, selectedPlan: form.plan }));
 
       // One rule for this form and the app's JSON twin (platform/application-form.js).
       const { input, error } = readApplication(form);
@@ -671,8 +683,13 @@ async function handleExtraRoutes(req, res, deps, { url, path, method }) {
     if (!session) return true;
 
     const view = (await deps.ownerDashboard(session.sub)) || {};
+    // What Yoyo Gyms commits to for this owner's plan, and how to reach it
+    // (§41.1 Q6, Q7). Best-effort: the page loads without it.
+    const support = view.gym ? await deps.ownerSupport?.(view.gym).catch(() => null) : null;
     html(res, 200, ownerDashboardPage({
       ...view,
+      support,
+      planSupport: view.gym ? SUPPORT_BY_PLAN[view.gym.plan_key] || SUPPORT_BY_PLAN.basic : null,
       user: await viewer(deps, session),
       csrfToken: issueCsrfToken(session.sub),
     }));
@@ -970,10 +987,15 @@ async function handleExtraRoutes(req, res, deps, { url, path, method }) {
     const priceCents = Math.round(price * 100);
     const maxMembers = Number.parseInt(form.max_active_members, 10);
 
+    // THE PLAN'S SERVICES (§41.1 Q2), from its switches. Core services are
+    // always kept on, whatever was sent: a gym without them is not running.
+    const features = ALL_SERVICES.filter((f) => CORE_FEATURES.includes(f) || form[`svc_${f}`] === '1');
+
     await deps.updatePlan(planUpdate[1], {
       price_cents: priceCents,
       max_active_members: Number.isInteger(maxMembers) && maxMembers > 0 ? maxMembers : null,
       is_enabled: form.is_enabled === '1',
+      features,
     });
 
     // Audited because this single number decides what every gym on the plan
@@ -984,7 +1006,7 @@ async function handleExtraRoutes(req, res, deps, { url, path, method }) {
       actor_user_id: session.sub,
       entity: 'plan',
       entity_id: planUpdate[1],
-      detail: { price_cents: priceCents, max_active_members: maxMembers, is_enabled: form.is_enabled === '1' },
+      detail: { price_cents: priceCents, max_active_members: maxMembers, is_enabled: form.is_enabled === '1', features },
     });
 
     redirect(res, '/platform/plans');
@@ -1067,6 +1089,7 @@ async function handleExtraRoutes(req, res, deps, { url, path, method }) {
       safe(() => deps.countGyms?.(), null),
       may(deps, session, 'subscription.manage'),
     ]);
+    const setupRequests = await safe(() => deps.countSetupRequests?.(), 0);
 
     // To review (the reviewer's move) and waiting on the owner (theirs) are
     // different queues, so Today counts them apart.
@@ -1095,6 +1118,7 @@ async function handleExtraRoutes(req, res, deps, { url, path, method }) {
       mrrCents: seesMoney ? finance.mrr_cents ?? null : null,
       currency: finance.currency || 'ZAR',
       trialsEndingSoon: (finance.trials_ending || []).map((t) => ({ ...t, name: names.get(t.gym_id) || 'A gym' })),
+      setupRequests,
       recent: entries,
     }));
     return true;
@@ -1414,6 +1438,8 @@ async function handleExtraRoutes(req, res, deps, { url, path, method }) {
     const filter = {
       query: (url.searchParams.get('q') || '').trim(),
       status: (url.searchParams.get('status') || '').trim(),
+      // Gyms waiting for the setup help they asked for (Today links here).
+      setup: url.searchParams.get('setup') === '1',
       from: paging.from,
       to: paging.to,
     };
@@ -1466,7 +1492,13 @@ async function handleExtraRoutes(req, res, deps, { url, path, method }) {
       console.error('gym stats failed:', err?.message);
     }
 
-    const NOTICES = { activation: 'A new activation link was emailed to the owner. The old link no longer works.' };
+    const NOTICES = {
+      activation: 'A new activation link was emailed to the owner. The old link no longer works.',
+      services: "This gym's services are saved. The gym sees the change within a minute.",
+      manager: 'The account manager is saved.',
+      setup: 'Setup help is recorded as given.',
+    };
+    const canManage = await may(deps, session, 'platform.manage');
 
     html(res, 200, gymDetailPage({
       ...view,
@@ -1477,6 +1509,9 @@ async function handleExtraRoutes(req, res, deps, { url, path, method }) {
       canSuspend: await may(deps, session, 'gym.suspend'),
       canOnboard: await may(deps, session, 'application.approve'),
       canBill,
+      canManage,
+      // Who can be a gym's account manager: active staff who have set up.
+      staff: canManage ? ((await deps.listStaff?.().catch(() => [])) || []).filter((m) => m.is_active !== false && m.set_up) : [],
       // Only fetched for someone who may act on it.
       plans: canBill ? PLANS.map((p) => ({ key: p.key, label: p.label })) : [],
     }));
@@ -1914,7 +1949,118 @@ async function handleExtraRoutes(req, res, deps, { url, path, method }) {
       },
     ];
 
-    html(res, 200, settingsPage({ switches, baseUrl: platformBaseUrl(), user: await viewer(deps, session) }));
+    html(res, 200, settingsPage({
+      switches,
+      baseUrl: platformBaseUrl(),
+      support: (await deps.getSupportContacts?.().catch(() => null)) || null,
+      saved: url.searchParams.get('saved') === 'support',
+      csrfToken: issueCsrfToken(session.sub),
+      user: await viewer(deps, session),
+    }));
+    return true;
+  }
+
+  // ---- one gym's own services, on top of its plan (CLAUDE.md §41.1 Q2) ------
+  const gymServices = /^registry\/([A-Za-z0-9-]+)\/services$/.exec(path);
+  if (gymServices && method === 'POST') {
+    const form = await readFormBody(req);
+    const session = requireSession(req, res, { csrfToken: form.csrf });
+    if (!session) return true;
+    // What a gym gets for its money: the same permission as its plan.
+    if (!(await may(deps, session, 'subscription.manage'))) {
+      forbid(res, "You do not have permission to change a gym's services.");
+      return true;
+    }
+    // Each switchable service arrives as plan / add / remove.
+    const added = ALL_SERVICES.filter((f) => form[`svc_${f}`] === 'add');
+    const removed = ALL_SERVICES.filter((f) => form[`svc_${f}`] === 'remove');
+    await deps.setGymServices(gymServices[1], { added, removed });
+    await deps.audit({
+      action: 'platform.gym.services_changed',
+      actor_user_id: session.sub,
+      entity: 'gym',
+      entity_id: gymServices[1],
+      detail: { added, removed },
+    });
+    redirect(res, `/platform/registry/${gymServices[1]}?sent=services`);
+    return true;
+  }
+
+  // ---- a gym's named Yoyo contact (§41.1 Q6) --------------------------------
+  const manager = /^registry\/([A-Za-z0-9-]+)\/account-manager$/.exec(path);
+  if (manager && method === 'POST') {
+    const form = await readFormBody(req);
+    const session = requireSession(req, res, { csrfToken: form.csrf });
+    if (!session) return true;
+    if (!(await may(deps, session, 'platform.manage'))) {
+      forbid(res, 'You do not have permission to assign account managers.');
+      return true;
+    }
+    try {
+      await deps.setAccountManager(manager[1], (form.staff_id || '').trim() || null);
+    } catch (err) {
+      html(res, 400, problemPage({
+        title: 'That was not saved',
+        message: err.message,
+        back: { href: `/platform/registry/${manager[1]}`, label: 'Back to the gym' },
+        user: await viewer(deps, session),
+      }));
+      return true;
+    }
+    await deps.audit({
+      action: 'platform.gym.account_manager_set',
+      actor_user_id: session.sub,
+      entity: 'gym',
+      entity_id: manager[1],
+      detail: { staff_id: form.staff_id || null },
+    });
+    redirect(res, `/platform/registry/${manager[1]}?sent=manager`);
+    return true;
+  }
+
+  // ---- setup help given (§41.1 Q6) -----------------------------------------
+  const setupDone = /^registry\/([A-Za-z0-9-]+)\/setup-done$/.exec(path);
+  if (setupDone && method === 'POST') {
+    const form = await readFormBody(req);
+    const session = requireSession(req, res, { csrfToken: form.csrf });
+    if (!session) return true;
+    if (!(await may(deps, session, 'application.approve'))) {
+      forbid(res, 'You do not have permission to record setup help.');
+      return true;
+    }
+    await deps.markSetupDone(setupDone[1]);
+    await deps.audit({ action: 'platform.gym.setup_help_given', actor_user_id: session.sub, entity: 'gym', entity_id: setupDone[1] });
+    redirect(res, `/platform/registry/${setupDone[1]}?sent=setup`);
+    return true;
+  }
+
+  // ---- the owner asks for setup help (§41.1 Q6) ------------------------------
+  if (path === 'my-gym/setup-help' && method === 'POST') {
+    const form = await readFormBody(req);
+    const session = requireSession(req, res, { csrfToken: form.csrf });
+    if (!session) return true;
+    try {
+      await deps.requestSetupHelp(session.sub);
+    } catch (err) {
+      html(res, 400, problemPage({ title: 'We could not record that', message: err.message, back: { href: '/platform/my-gym', label: 'Back to your gym' } }));
+      return true;
+    }
+    redirect(res, '/platform/my-gym');
+    return true;
+  }
+
+  // ---- Yoyo's support contacts (§41.1 Q7) -----------------------------------
+  if (path === 'settings/support' && method === 'POST') {
+    const form = await readFormBody(req);
+    const session = requireSession(req, res, { csrfToken: form.csrf });
+    if (!session) return true;
+    if (!(await may(deps, session, 'platform.manage'))) {
+      forbid(res, 'You do not have permission to change the platform settings.');
+      return true;
+    }
+    const saved = await deps.saveSupportContacts({ email: form.email, whatsapp: form.whatsapp }, session.sub);
+    await deps.audit({ action: 'platform.settings.support_changed', actor_user_id: session.sub, entity: 'settings', entity_id: 'support', detail: saved });
+    redirect(res, '/platform/settings?saved=support');
     return true;
   }
 

@@ -136,7 +136,7 @@ test('Q2 a phone number keeps its country code; "00" is the prefix written out',
 });
 
 test('Q2 an application without a phone, or without the gym address, is refused with a reason', () => {
-  const base = { owner_name: 'Ann', email: 'a@b.co', password: 'longenough1', gym_name: 'Bos', plan: 'basic' };
+  const base = { owner_name: 'Ann', email: 'a@b.co', password: 'longenough1', gym_name: 'Bos', plan: 'basic', accept_terms: 'yes' };
   assert.match(readApplication({ ...base, address: '1 A St' }).error, /phone number/);
   assert.match(readApplication({ ...base, phone: '+27821234567' }).error, /street address/);
   const ok = readApplication({ ...base, phone: '+27821234567', address: ' 1 A St ' });

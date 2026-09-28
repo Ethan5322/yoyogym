@@ -175,6 +175,10 @@ create index if not exists gym_applications_submitted_idx on platform.gym_applic
 -- The owner's phone and the gym's street address (CLAUDE.md §40.1 Q2).
 alter table platform.gym_applications add column if not exists owner_phone text;
 alter table platform.gym_applications add column if not exists gym_address text;
+
+-- Which Gym Owner Agreement was ticked at registration, and when (§41.1 Q5).
+alter table platform.gym_applications add column if not exists terms_version text;
+alter table platform.gym_applications add column if not exists terms_accepted_at timestamptz;
 create unique index if not exists gym_applications_slug_idx on platform.gym_applications(slug) where slug is not null;
 
 -- -----------------------------------------------------------------------------
@@ -265,6 +269,14 @@ create index if not exists gyms_country_idx on platform.gyms(country);
 create index if not exists gyms_search_idx  on platform.gyms(search_name);
 create index if not exists gyms_geo_idx     on platform.gyms(latitude, longitude);
 
+-- One gym's own additions to, and removals from, its plan (CLAUDE.md §41.1 Q2).
+alter table platform.gyms add column if not exists features_added   jsonb not null default '[]'::jsonb;
+alter table platform.gyms add column if not exists features_removed jsonb not null default '[]'::jsonb;
+-- A named Yoyo contact, and setup help asked for and given (§41.1 Q6).
+alter table platform.gyms add column if not exists account_manager_id uuid references platform.platform_users(id) on delete set null;
+alter table platform.gyms add column if not exists setup_help_requested_at timestamptz;
+alter table platform.gyms add column if not exists setup_help_done_at timestamptz;
+
 -- -----------------------------------------------------------------------------
 -- owner_activations — the verification link + code step.
 -- HASHES ONLY. Never the raw token or code, for the same reason passwords are
@@ -312,6 +324,17 @@ create table if not exists platform.staff_invites (
   created_at  timestamptz not null default now()
 );
 create index if not exists staff_invites_user_idx on platform.staff_invites(user_id);
+
+-- -----------------------------------------------------------------------------
+-- platform_settings — platform-wide values edited in the panel (§41.1 Q7):
+-- today the support contacts owners see.
+-- -----------------------------------------------------------------------------
+create table if not exists platform.platform_settings (
+  key        text primary key,
+  value      jsonb not null default '{}'::jsonb,
+  updated_by uuid references platform.platform_users(id) on delete set null,
+  updated_at timestamptz not null default now()
+);
 
 -- An owner asking to close their account (store requirement). Recorded, not acted on:
 -- closing an account closes a gym, and a person must look at that.
@@ -559,6 +582,7 @@ create index if not exists migration_runs_mig_idx    on platform.migration_runs(
 alter table platform.platform_users            enable row level security;
 alter table platform.password_resets          enable row level security;
 alter table platform.staff_invites            enable row level security;
+alter table platform.platform_settings        enable row level security;
 alter table platform.platform_roles            enable row level security;
 alter table platform.platform_permissions      enable row level security;
 alter table platform.platform_role_permissions enable row level security;

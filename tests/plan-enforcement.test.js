@@ -329,7 +329,8 @@ test('the member portal shows only the tabs the gym\'s plan includes', () => {
   assert.match(portal, /\['classes', 'Classes', 'classes'\]/);
   assert.match(portal, /\['progress', 'Progress', 'progress'\]/);
   assert.match(portal, /\['contact', 'Contact', 'messaging'\]/);
-  assert.match(portal, /visibleTabs\(features\)\.map/);
+  // The plan's services, and what the owner switched off (CLAUDE.md §41).
+  assert.match(portal, /visibleTabs\(features, off\)\.map/);
   const status = readFileSync('server/handlers/member/status.js', 'utf8');
   assert.match(status, /features: Array\.isArray\(currentGym\(\)\?\.features\)/);
 });
