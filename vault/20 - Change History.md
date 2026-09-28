@@ -15,6 +15,19 @@ occurrence is answered from notes rather than rediscovered.
 
 ---
 
+## 2026-09-28 — "It does not recognise KOM's owner email and password" (D-158)
+
+**Investigated, not guessed** (§27.1). The gym admin sign-in (`/api/auth/login`) looked accounts up
+by `username` only. Read-only check of KOM's `gym.admin_users`: the owner's username is `owner`,
+active, not locked, **0 failed attempts** — so the attempts never matched an account at all, which
+is exactly what typing an email into a username-only box produces. (The same email is also a Yoyo
+*staff* account on `/platform/login`, where 2FA is on, so a code is required there.)
+
+**Fixed, with approval:** email or username (D-158). Verified against KOM's live accounts,
+read-only: username → `owner`; the email in capitals with spaces → `owner`; `%@gmail.com` → no match.
+
+---
+
 ## 2026-09-28 — The website's front page, made to match the app (D-156 follow-up)
 
 **Reported by the user on the preview:** "I can't see where the gym owner signs in — it only asks to

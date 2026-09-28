@@ -78,7 +78,7 @@ export default function AdminLogin() {
           <>
             <form onSubmit={handleSubmit} className="card space-y-4">
               <div>
-                <label className="mb-1 block text-sm text-muted">Username</label>
+                <label className="mb-1 block text-sm text-muted">Email or username</label>
                 <input className="field" type="text" autoComplete="username" value={username} onChange={(e) => setUsername(e.target.value)} required />
               </div>
               <div>

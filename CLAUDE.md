@@ -1813,6 +1813,12 @@ given. Nothing in §36 is built until these are answered.
   the Yoyo logo **already on it**, and the **logo on its own**. **Never add a second logo or
   wordmark over the photograph.** The standalone logo is used where there is no photo (other
   screens, app icon source). Building was approved the same day.
+- **Q12 — owner login accepts the email (2026-09-28).** Testing the preview, the user signed in
+  with KOM's owner EMAIL and was refused: the gym admin sign-in matched by username only (KOM's owner
+  is `owner`). Approved: the sign-in box is now **"Email or username"** — username first, exactly as
+  before, then the account's email (exact, any capitals), and only when exactly one account has it.
+  Lockout, disabled accounts and the generic refusal are unchanged. A deliberate change to the
+  protected gym admin login (§32), backward compatible.
 
 All clarifications answered 2026-09-28. The build is the app's Yoyo screens
 (`apps/mobile/www/`) plus the restyled admin-website login. Every gym's own screens, the member

@@ -729,7 +729,7 @@ const FINDER_NEXT = {
   signin: { title: 'Member sign in', sub: 'Find your gym, then sign in with your membership number and phone.', path: '/member' },
   admin: {
     title: 'Gym owner login',
-    sub: 'Choose your gym, then sign in with your admin username and password. Your staff use the same sign-in.',
+    sub: 'Choose your gym, then sign in with your admin email or username and password. Your staff use the same sign-in.',
     path: '/admin/login',
   },
 };

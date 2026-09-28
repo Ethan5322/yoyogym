@@ -262,7 +262,7 @@
     var owner = mode === 'owner';
     pickTitle.textContent = owner ? 'Gym owner login' : 'Find my gym';
     pickSub.textContent = owner
-      ? 'Choose your gym, then sign in with your admin username and password. Your staff use the same sign-in.'
+      ? 'Choose your gym, then sign in with your admin email or username and password. Your staff use the same sign-in.'
       : 'Search by name, or use your location to see the closest gyms first.';
     // The recovery route is for members; the password help is for owners.
     forgotBtn.classList.toggle('hidden', owner);
