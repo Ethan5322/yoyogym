@@ -6,7 +6,7 @@ import TypingIndicator from './components/TypingIndicator.jsx';
 import ProgressBar from './components/ProgressBar.jsx';
 import Controls from './components/Controls.jsx';
 import { formatAnswer } from './format.js';
-import BrandLogo from '../components/BrandLogo.jsx';
+import GymIcon from '../components/GymIcon.jsx';
 
 export default function ChatWindow({ engine, completeView }) {
   const {
@@ -35,7 +35,7 @@ export default function ChatWindow({ engine, completeView }) {
       <div className="chat-header">
         <div className="flex items-center justify-between px-4 pt-3">
           <span className="flex items-center gap-2 font-display text-lg uppercase tracking-wider text-body">
-            <BrandLogo alt="" className="h-7 w-auto" />
+            <GymIcon size={28} alt="" />
             Registration
           </span>
           <button onClick={startOver} className="text-xs text-muted hover:text-error">

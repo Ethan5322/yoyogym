@@ -1861,3 +1861,19 @@ are retired as the default. One source of truth: `shared/brand.js`.
 on light colours such as lime, white on dark ones such as red — so a gym's own colour never makes
 its buttons unreadable. On white paper (PDFs, receipts), a light accent is used for bands and
 rules, never for text.
+
+- **Q5 — every gym's own NAME, everywhere (2026-09-28).** IDs, PDFs and screens still said "Yoyo
+  GYM": KOM's own Settings held the old single-gym name, and ~20 places in the code had it written
+  in. With the user's approval KOM's saved name became **"KOM"**, and "Yoyo GYM" became "KOM" in its
+  saved welcome message, indemnity waiver and privacy policy (only the name; nothing else in the
+  texts). In the code, a gym with no saved name shows its **Yoyo registry name**; defaults and
+  printouts use the gym's own name. "Yoyo Gyms" is only ever the platform.
+- **Q6 — a gym without a logo** shows a **letter badge** (its first letter in its own colour), and
+  owners get an **Upload logo** button in Settings → Gym logo (PNG / JPG / WebP, shrunk to 256 px;
+  the server refuses anything else, SVG included, and anything over 300 KB).
+- **Q7 — which logo where.** The **gym's own icon on everything its members see**: the gym's
+  welcome page, member registration, member sign-in, the member portal and the app's member
+  screens. The **Yoyo Gyms logo stays on IDs, PDFs, the gym's admin panel and admin login**, with
+  the gym's name printed beside it. *This replaces Q2's "a gym's own logo wins everywhere" for
+  documents: documents always carry the Yoyo Gyms logo.*
+- **Q8 — someone new** (no gym chosen yet, member or owner) sees the **Yoyo Gyms** front page.

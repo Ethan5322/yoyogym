@@ -32,6 +32,7 @@ export default function Settings() {
 
   if (error) return <AdminShell><p className="text-error">{error}</p></AdminShell>;
   if (!s) return <AdminShell><p className="text-muted">Loading…</p></AdminShell>;
+  const DEFAULTS = defaultsFor(s.gym_profile?.name);
 
   return (
     <AdminShell>
@@ -44,8 +45,11 @@ export default function Settings() {
       <Section title="Gym Profile" saved={savedKey === 'gym_profile'}
         note="Your brand identity. The name and accent colour appear on the splash screen, membership card, emails and PDFs."
         initial={{ ...DEFAULTS.gym_profile, ...(s.gym_profile || {}) }}
-        fields={[['name', 'Gym name'], ['tagline', 'Tagline (shown on the splash screen)'], ['accent_color', 'Brand accent colour (hex — Yoyo lime is #BFF642)'], ['logo_url', 'Logo image URL (splash screen, ID cards and PDFs — blank uses the Yoyo Gyms logo)'], ['phone', 'Contact phone'], ['email', 'Contact email'], ['website', 'Website (optional)'], ['address', 'Physical address'], ['operating_hours', 'Operating hours'], ['welcome_message', 'Welcome message (splash screen)']]}
+        fields={[['name', 'Gym name'], ['tagline', 'Tagline (shown on the splash screen)'], ['accent_color', 'Brand accent colour (hex — Yoyo lime is #BFF642)'], ['phone', 'Contact phone'], ['email', 'Contact email'], ['website', 'Website (optional)'], ['address', 'Physical address'], ['operating_hours', 'Operating hours'], ['welcome_message', 'Welcome message (splash screen)']]}
         onSave={(v) => save('gym_profile', v, 'gym_profile')} />
+
+      <LogoSection profile={{ ...DEFAULTS.gym_profile, ...(s.gym_profile || {}) }} saved={savedKey === 'gym_profile_logo'}
+        onSave={(profile) => save('gym_profile', profile, 'gym_profile').then(() => setSavedKey('gym_profile_logo'))} />
 
       <Section title="Owner Notifications" saved={savedKey === 'notifications'}
         initial={s.notifications || {}}
@@ -76,14 +80,18 @@ export default function Settings() {
   );
 }
 
-const DEFAULTS = {
+// The pre-filled texts, in THIS gym's name — never the old single-gym name
+// (CLAUDE.md §37.1). A gym with no saved name yet reads "the gym".
+function defaultsFor(gymName) {
+  const gym = String(gymName || '').trim() || 'the gym';
+  return {
   gym_profile: {
-    name: 'Yoyo GYM',
+    name: '',
     tagline: 'Train harder. Live stronger.',
     accent_color: DEFAULT_ACCENT,
     logo_url: '',
     operating_hours: 'Mon–Fri 05:00–21:00 · Sat–Sun 07:00–18:00',
-    welcome_message: 'Welcome to Yoyo GYM — your journey to a stronger, healthier you starts here. Scan, register, and let’s get moving.',
+    welcome_message: `Welcome to ${gym} — your journey to a stronger, healthier you starts here. Scan, register, and let’s get moving.`,
     website: '',
   },
   gym_rules: `1. Always carry and present your membership for access.
@@ -96,7 +104,7 @@ const DEFAULTS = {
 8. The gym reserves the right to suspend membership for serious misconduct.`,
   indemnity_text:
     'I acknowledge that physical exercise carries inherent risks including injury or illness. ' +
-    'I confirm that I am physically capable of participating in a gym environment. I indemnify Yoyo GYM and ' +
+    `I confirm that I am physically capable of participating in a gym environment. I indemnify ${gym} and ` +
     'its staff against any injury, illness, loss, or damage arising from my use of the facilities, to the extent ' +
     'permitted by South African law.',
   contract_text:
@@ -110,10 +118,11 @@ const DEFAULTS = {
     '7. Personal information is processed in line with POPIA (see privacy policy).',
   popia_text:
     'PRIVACY POLICY (POPIA)\n\n' +
-    'Yoyo GYM processes your personal information solely to administer your membership, payments, health & safety ' +
+    `${gym} processes your personal information solely to administer your membership, payments, health & safety ` +
     'screening, and communications. Your data is stored securely and is never sold. You may request access to, ' +
     'correction of, or deletion of your personal information at any time. (Protection of Personal Information Act, 2013.)',
 };
+}
 
 const TIERS = ['basic', 'standard', 'premium', 'vip'];
 const DEFAULT_COMPLIANCE = {
@@ -387,6 +396,93 @@ function Section({ title, fields, initial, numeric, note, onSave, saved }) {
         <button className="btn-primary px-4 py-2 text-sm" onClick={() => onSave(v)}>Save</button>
         {saved && <span className="text-sm text-success">Saved ✓</span>}
       </div>
+    </div>
+  );
+}
+
+/** Largest logo side, in pixels, and the most a saved logo may weigh. */
+const LOGO_PX = 256;
+const LOGO_MAX_BYTES = 300 * 1024;
+
+/**
+ * Shrink an image file to fit LOGO_PX × LOGO_PX, as a PNG data URL (PNG keeps
+ * a transparent background). Done in the browser, so what is saved is small:
+ * it travels to every member on every visit.
+ */
+function shrinkLogo(file) {
+  return new Promise((resolve, reject) => {
+    if (!/^image\/(png|jpeg|webp)$/.test(file.type)) return reject(new Error('Choose a PNG, JPG or WebP image.'));
+    const url = URL.createObjectURL(file);
+    const img = new Image();
+    img.onload = () => {
+      const scale = Math.min(1, LOGO_PX / Math.max(img.naturalWidth, img.naturalHeight));
+      const c = document.createElement('canvas');
+      c.width = Math.max(1, Math.round(img.naturalWidth * scale));
+      c.height = Math.max(1, Math.round(img.naturalHeight * scale));
+      c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+      URL.revokeObjectURL(url);
+      const data = c.toDataURL('image/png');
+      if (data.length > LOGO_MAX_BYTES) return reject(new Error('That image is too detailed to use as a logo. Try a simpler one.'));
+      resolve(data);
+    };
+    img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('That file could not be read as an image.')); };
+    img.src = url;
+  });
+}
+
+/**
+ * The gym's own logo (CLAUDE.md §37.1 Q6): what its MEMBERS see — the welcome
+ * page, registration, sign-in, the member portal and the app. Until one is
+ * uploaded they see the gym's first letter in its colour. IDs and PDFs keep the
+ * Yoyo Gyms logo with the gym's name.
+ */
+function LogoSection({ profile, onSave, saved }) {
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState('');
+  const logo = profile.logo_url || '';
+  const initial = (String(profile.name || '').trim()[0] || '·').toUpperCase();
+
+  async function choose(e) {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file) return;
+    setErr('');
+    setBusy(true);
+    try {
+      await onSave({ ...profile, logo_url: await shrinkLogo(file) });
+    } catch (x) {
+      setErr(x.message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="card mt-6">
+      <h2 className="mb-1 font-display uppercase text-body">Gym logo</h2>
+      <p className="mb-4 text-xs text-muted">
+        Your members see it on your welcome page, registration, sign-in and in the app. Until you upload one they see
+        your gym's first letter in your colour. IDs and PDFs carry the Yoyo Gyms logo with your gym's name.
+      </p>
+      <div className="flex flex-wrap items-center gap-4">
+        {logo ? (
+          <img src={logo} alt="Your gym logo" className="h-20 w-auto rounded-lg bg-elevated object-contain p-2" />
+        ) : (
+          <span className="inline-flex h-20 w-20 items-center justify-center rounded-2xl bg-accent font-display text-4xl font-bold text-accent-ink">{initial}</span>
+        )}
+        <label className="btn-primary cursor-pointer px-4 py-2 text-sm">
+          {busy ? 'Saving…' : logo ? 'Change logo' : 'Upload logo'}
+          <input type="file" accept="image/png,image/jpeg,image/webp" className="hidden" onChange={choose} disabled={busy} />
+        </label>
+        {logo && !busy && (
+          <button className="text-sm text-muted hover:text-error" onClick={() => onSave({ ...profile, logo_url: '' })}>
+            Remove logo
+          </button>
+        )}
+        {saved && <span className="text-sm text-success">Saved ✓</span>}
+      </div>
+      <p className="mt-2 text-xs text-muted">PNG, JPG or WebP. A square logo on a transparent background looks best.</p>
+      {err && <p className="mt-2 text-sm text-error">{err}</p>}
     </div>
   );
 }

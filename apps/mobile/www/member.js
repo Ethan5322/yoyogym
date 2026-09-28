@@ -30,7 +30,7 @@
   var SAFE_SLUG = /^[a-z0-9][a-z0-9-]{0,47}$/;
 
   var root = document.getElementById('member');
-  var state = { slug: null, gymName: '', token: null, status: null, features: null, tab: 'home', prefill: '' };
+  var state = { slug: null, gymName: '', logo: '', token: null, status: null, features: null, tab: 'home', prefill: '' };
 
   // -------------------------------------------------------------------------
   // Storage — per gym, so a member of two gyms keeps two sessions
@@ -157,6 +157,27 @@
       root.style.removeProperty('--m-accent-ink');
     }
     if (branding && branding.name) state.gymName = branding.name;
+    // The gym's own logo, if it uploaded one — the same rule the server applies.
+    var logo = branding && branding.logo_url;
+    state.logo = typeof logo === 'string' && /^(data:image\/(png|jpeg|webp);base64,|https:\/\/)/.test(logo) ? logo : '';
+  }
+
+  /**
+   * The GYM's own icon (CLAUDE.md §37.1 Q7): its logo, or its first letter in
+   * its colour. Members see their gym here, not the Yoyo Gyms logo.
+   */
+  function gymIcon(size) {
+    if (state.logo) {
+      return '<img class="m-gymicon m-gymicon--img" src="' + esc(state.logo) + '" alt="" style="height:' + size + 'px">';
+    }
+    var letter = (String(state.gymName || '').trim().charAt(0) || '·').toUpperCase();
+    return '<span class="m-gymicon" aria-hidden="true" style="width:' + size + 'px;height:' + size + 'px;font-size:' +
+      Math.round(size * 0.55) + 'px;border-radius:' + Math.round(size * 0.28) + 'px">' + esc(letter) + '</span>';
+  }
+
+  /** Redraw every gym icon on screen, once the gym's brand has arrived. */
+  function paintIcons() {
+    root.querySelectorAll('[data-gym-icon]').forEach(function (el) { el.innerHTML = gymIcon(Number(el.dataset.gymIcon)); });
   }
 
   function loadBrand() {
@@ -195,6 +216,7 @@
     // member had already started typing.
     loadBrand().then(function () {
       root.querySelectorAll('[data-gym-name]').forEach(function (el) { el.textContent = state.gymName || el.textContent; });
+      paintIcons();
     });
 
     if (state.token) {
@@ -242,6 +264,7 @@
       '<div class="m-signin">' +
       '  <button type="button" class="m-back" data-m="leave" aria-label="Back">← Back</button>' +
       '  <div class="m-hero">' +
+      '    <div class="m-hero__icon" data-gym-icon="72">' + gymIcon(72) + '</div>' +
       '    <p class="m-eyebrow">Sign in to</p>' +
       '    <h1 data-gym-name>' + esc(state.gymName || 'your gym') + '</h1>' +
       '  </div>' +
@@ -310,7 +333,8 @@
 
     root.innerHTML =
       '<header class="m-top">' +
-      '  <span class="m-gym" data-gym-name>' + esc(state.gymName || 'My gym') + '</span>' +
+      '  <span class="m-gymhead"><span data-gym-icon="32">' + gymIcon(32) + '</span>' +
+      '  <span class="m-gym" data-gym-name>' + esc(state.gymName || 'My gym') + '</span></span>' +
       '</header>' +
       '<main class="m-main" id="m-main"></main>' +
       '<nav class="m-tabs" aria-label="Sections">' +

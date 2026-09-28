@@ -3,9 +3,12 @@
 import { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { gymHeaders } from '../lib/gym.js';
+import GymIcon from '../components/GymIcon.jsx';
+import { useBranding } from '../lib/branding.js';
 
 export default function PublicProfile() {
   const { type, key } = useParams(); // type: 'm' | 't' | 's'
+  const gymName = useBranding().name || 'Your gym';
   const [data, setData] = useState(null);
   const [error, setError] = useState('');
 
@@ -27,7 +30,10 @@ export default function PublicProfile() {
   return (
     <div className="flex min-h-[100dvh] flex-col items-center justify-center bg-bg px-6 text-center">
       <div className="w-full max-w-sm animate-fade-up">
-        <div className="mb-6 font-display text-2xl uppercase tracking-wider text-accent">Yoyo GYM</div>
+        <div className="mb-6 flex flex-col items-center gap-3">
+          <GymIcon size={64} />
+          <span className="font-display text-2xl uppercase tracking-wider text-accent">{gymName}</span>
+        </div>
 
         {error && <p className="text-error">{error}</p>}
         {!data && !error && <p className="text-muted">Loading…</p>}
@@ -35,7 +41,7 @@ export default function PublicProfile() {
         {data && !data.found && (
           <div className="card">
             <div className="text-5xl">❌</div>
-            <p className="mt-3 text-body">No matching Yoyo GYM profile.</p>
+            <p className="mt-3 text-body">No matching {gymName} profile.</p>
           </div>
         )}
 
@@ -62,7 +68,7 @@ export default function PublicProfile() {
           </div>
         )}
 
-        <p className="mt-6 text-xs text-muted">Scan verified by Yoyo GYM</p>
+        <p className="mt-6 text-xs text-muted">Scan verified by {gymName}</p>
       </div>
     </div>
   );

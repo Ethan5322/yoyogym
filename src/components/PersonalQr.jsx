@@ -3,8 +3,13 @@
 import { useEffect, useRef } from 'react';
 import QRCode from 'qrcode';
 import { downloadCanvas } from '../lib/download.js';
+import { useBranding } from '../lib/branding.js';
+
+// The gym's name goes into a document written as raw HTML: escaped.
+const escHtml = (v) => String(v ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
 export default function PersonalQr({ url, name = 'profile', label }) {
+  const gymName = useBranding().name || 'Your gym';
   const canvasRef = useRef(null);
 
   useEffect(() => {
@@ -22,7 +27,7 @@ export default function PersonalQr({ url, name = 'profile', label }) {
     const dataUrl = canvasRef.current.toDataURL('image/png');
     const w = window.open('', '_blank');
     w.document.write(`<html><body style="text-align:center;font-family:sans-serif;padding:40px">
-      <h1>YOYO GYM</h1><h2>${name}</h2><img src="${dataUrl}" style="width:240px"/>
+      <h1>${escHtml(gymName.toUpperCase())}</h1><h2>${name}</h2><img src="${dataUrl}" style="width:240px"/>
       <p style="color:#888;font-size:12px">Scan to verify membership</p></body></html>`);
     w.document.close();
     w.print();

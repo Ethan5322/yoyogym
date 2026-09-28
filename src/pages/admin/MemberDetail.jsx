@@ -174,7 +174,7 @@ export default function MemberDetail() {
                     onClick={() => {
                       try {
                         downloadReceiptPdf({
-                          gymName: branding.name || 'Yoyo GYM',
+                          gymName: branding.name || 'Your gym',
                           accent: accentOrDefault(branding.accent_color),
                           payment: p,
                           member: { full_name: m.full_name, membership_number: m.membership_number },

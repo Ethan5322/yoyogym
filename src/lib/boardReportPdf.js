@@ -9,7 +9,7 @@ import { DEFAULT_ACCENT } from '../../shared/brand.js';
 
 const zar = (n) => 'R ' + Number(n || 0).toLocaleString('en-ZA', { minimumFractionDigits: 0 });
 
-export function downloadBoardReportPdf({ gymName = 'Yoyo GYM', accent = DEFAULT_ACCENT, dashboard = {}, analytics = {}, finance = {} }) {
+export function downloadBoardReportPdf({ gymName = 'Your gym', accent = DEFAULT_ACCENT, dashboard = {}, analytics = {}, finance = {} }) {
   const doc = new jsPDF({ unit: 'pt', format: 'a4' });
   const W = doc.internal.pageSize.getWidth();
   const H = doc.internal.pageSize.getHeight();

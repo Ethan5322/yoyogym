@@ -9,7 +9,7 @@ import { DEFAULT_ACCENT } from '../../shared/brand.js';
 const zar = (n) => 'R ' + Number(n || 0).toLocaleString('en-ZA', { minimumFractionDigits: 2 });
 const fmt = (d) => (d ? new Date(d).toLocaleDateString('en-ZA', { day: 'numeric', month: 'long', year: 'numeric' }) : '—');
 
-export function downloadReceiptPdf({ gymName = 'Yoyo GYM', accent = DEFAULT_ACCENT, payment, member = {} }) {
+export function downloadReceiptPdf({ gymName = 'Your gym', accent = DEFAULT_ACCENT, payment, member = {} }) {
   const doc = new jsPDF({ unit: 'pt', format: 'a4' });
   const W = doc.internal.pageSize.getWidth();
   const M = 48;

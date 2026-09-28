@@ -30,7 +30,7 @@ function loadDataUrl(src) {
 }
 
 export async function downloadCredentialPdf({
-  gymName = 'Yoyo GYM',
+  gymName = 'Your gym',
   accent = DEFAULT_ACCENT,
   roleLabel = 'STAFF',
   subtitle = 'STAFF CREDENTIAL',

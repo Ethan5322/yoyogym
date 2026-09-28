@@ -15,7 +15,7 @@ export default function CredentialActions({ person, className = '' }) {
   const [busy, setBusy] = useState('');
   const [err, setErr] = useState('');
   const branding = useBranding();
-  const gymName = branding.name || 'Yoyo GYM';
+  const gymName = branding.name || 'Your gym';
   const accent = accentOrDefault(branding.accent_color);
 
   const isTrainer = person.kind === 'trainer';

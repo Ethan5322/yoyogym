@@ -27,7 +27,7 @@ export default function Analytics() {
         d ? Promise.resolve(d) : apiFetch('/admin/analytics'),
         apiFetch('/admin/finance').catch(() => ({})),
       ]);
-      downloadBoardReportPdf({ gymName: branding.name || 'Yoyo GYM', accent: accentOrDefault(branding.accent_color), dashboard, analytics, finance });
+      downloadBoardReportPdf({ gymName: branding.name || 'Your gym', accent: accentOrDefault(branding.accent_color), dashboard, analytics, finance });
     } catch (e) {
       toast.error(e.message);
     } finally {

@@ -75,7 +75,7 @@ const GROUPS = [
 export default function AdminShell({ children }) {
   const { user, logout, hasFeature } = useAuth();
   const branding = useBranding();
-  const gymName = branding.name || 'Yoyo GYM';
+  const gymName = branding.name || 'Your gym';
   const navigate = useNavigate();
   const { pathname } = useLocation();
   const [open, setOpen] = useState(false);

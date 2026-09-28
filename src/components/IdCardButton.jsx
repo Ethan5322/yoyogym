@@ -38,7 +38,7 @@ export default function IdCardButton({ member, className = 'btn-primary w-full' 
   // change (tier, photo, details) is reflected the moment it is downloaded.
   function payload() {
     return {
-      gymName: branding.name || 'Yoyo GYM',
+      gymName: branding.name || 'Your gym',
       accent: accentOrDefault(branding.accent_color),
       name: member.full_name,
       membershipNumber: member.membership_number,

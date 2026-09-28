@@ -325,6 +325,12 @@
         background: linear-gradient(var(--m-ground) 70%, transparent);
       }
       .m-gym { font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; font-size: 13px; color: var(--m-muted); }
+      /* The gym's own icon (member.js gymIcon): its logo, or its letter in its colour. */
+      .m-gymhead { display: inline-flex; align-items: center; gap: 12px; }
+      .m-gymicon { display: inline-flex; align-items: center; justify-content: center; flex: none;
+                   background: var(--m-accent); color: var(--m-accent-ink); font-weight: 800; line-height: 1; }
+      .m-gymicon--img { width: auto; max-width: 180px; object-fit: contain; background: none; }
+      .m-hero__icon { margin-bottom: 16px; }
       .m-main { flex: 1; padding: 0 24px calc(96px + env(safe-area-inset-bottom)); }
       .m-hello { margin: 8px 0 24px; }
 

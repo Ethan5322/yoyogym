@@ -8,7 +8,7 @@ import { currentGymSlug } from '../lib/gym.js';
 import PersonalQr from '../components/PersonalQr.jsx';
 import IdCardButton from '../components/IdCardButton.jsx';
 import FaceCapture from '../chatbot/components/FaceCapture.jsx';
-import BrandLogo from '../components/BrandLogo.jsx';
+import GymIcon from '../components/GymIcon.jsx';
 
 /**
  * The URL a member's own QR card should contain.
@@ -77,7 +77,7 @@ export default function MemberPortal() {
     <div className="mx-auto flex min-h-[100dvh] max-w-md flex-col bg-bg">
       <header className="flex items-center justify-between border-b border-white/5 bg-surface px-4 py-3">
         <span className="flex items-center gap-2 font-display text-lg uppercase tracking-wider text-body">
-          <BrandLogo alt="" className="h-7 w-auto" />
+          <GymIcon size={28} alt="" />
           My Gym
         </span>
         <button onClick={logout} className="text-xs text-muted hover:text-error">
@@ -191,7 +191,7 @@ function MemberLogin({ onLoggedIn }) {
     <div className="flex min-h-[100dvh] items-center justify-center bg-bg px-6">
       <div className="w-full max-w-sm animate-fade-up space-y-4">
         <div className="text-center">
-          <BrandLogo className="mx-auto mb-5 h-20 w-auto" />
+          <div className="mb-5 flex justify-center"><GymIcon size={80} /></div>
           <h1 className="text-2xl font-bold uppercase text-body">Member Sign In</h1>
           <p className="mt-2 text-sm text-muted">
             {faceMode ? 'Look at the camera to sign in' : 'Use your face, or your membership number.'}

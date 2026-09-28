@@ -40,7 +40,7 @@ const CLAUSES = [
 ];
 
 export async function downloadStaffContract({
-  gymName = 'Yoyo GYM',
+  gymName = 'Your gym',
   accent = DEFAULT_ACCENT,
   employee = {},
   issued = new Date(),

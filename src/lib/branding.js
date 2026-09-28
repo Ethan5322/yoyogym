@@ -50,12 +50,6 @@ export function loadBranding() {
       .then((c) => {
         cache = c?.branding || {};
         applyBranding(cache);
-        // Fetched now so a PDF made later can carry it (pdf/brand.js). Loaded
-        // on demand: the embedded Yoyo logo it brings is no weight for a
-        // member who is only registering.
-        if (cache.logo_url) {
-          import('./pdf/brand.js').then((m) => m.preloadGymLogo(cache.logo_url)).catch(() => {});
-        }
         return cache;
       })
       .catch((err) => {

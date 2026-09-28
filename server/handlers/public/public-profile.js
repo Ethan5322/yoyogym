@@ -1,6 +1,6 @@
 // GET /api/public-profile?type=member&key=<membership_number>
 //                         ?type=trainer&id=<uuid>
-// Public "is this a valid Yoyo GYM person?" profile (QR Type B). NO auth.
+// Public "is this a valid person at this gym?" profile (QR Type B). NO auth.
 // Returns ONLY non-sensitive fields: name, photo, role, status badge.
 import { getSupabase } from '../../lib/supabase.js';
 import { allowMethods, ok, badRequest, serverError } from '../../lib/http.js';
@@ -79,7 +79,8 @@ export default async function handler(req, res) {
       role: 'Member',
       subrole: membership?.plans?.name || (membership?.tier ? membership.tier.toUpperCase() : null),
       valid: VALID.has(m.status),
-      status_label: VALID.has(m.status) ? 'Valid Yoyo GYM Member' : 'Membership not active',
+      // The gym's own name is on the page itself (PublicProfile.jsx).
+      status_label: VALID.has(m.status) ? 'Valid Member' : 'Membership not active',
     });
   } catch (err) {
     console.error('public-profile error:', err.message);

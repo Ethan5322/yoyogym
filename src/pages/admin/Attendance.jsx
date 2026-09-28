@@ -4,6 +4,7 @@
 import { useEffect, useRef, useState } from 'react';
 import AdminShell from '../../components/AdminShell.jsx';
 import { apiFetch } from '../../lib/api.js';
+import { useBranding } from '../../lib/branding.js';
 
 const TIER = {
   basic: 'bg-gray-500 text-white',
@@ -28,7 +29,11 @@ const FILTERS = {
 const dur = (m) => (m == null ? '—' : `${Math.floor(m / 60)}h ${m % 60}m`);
 const time = (d) => (d ? new Date(d).toLocaleTimeString('en-ZA', { hour: '2-digit', minute: '2-digit' }) : null);
 
+// The gym's name goes into a document written as raw HTML: escaped.
+const escHtml = (v) => String(v ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+
 export default function Attendance() {
+  const gymName = useBranding().name || 'Your gym';
   const [tab, setTab] = useState('live');
   return (
     <AdminShell>
@@ -87,7 +92,7 @@ function LiveBoard() {
       <style>body{font-family:Arial,sans-serif;padding:24px}h1{margin:0}h2{color:#666;font-weight:normal;margin:2px 0 16px}
       table{width:100%;border-collapse:collapse;font-size:13px}th,td{border:1px solid #ccc;padding:6px;text-align:left}
       th{background:#f2f2f2}</style></head><body>
-      <h1>YOYO GYM — Daily Attendance</h1><h2>${today} · ${data.checked_in_today} checked in · ${data.inside_count} inside</h2>
+      <h1>${escHtml(gymName.toUpperCase())} — Daily Attendance</h1><h2>${today} · ${data.checked_in_today} checked in · ${data.inside_count} inside</h2>
       <table><thead><tr><th>Member</th><th>Tier</th><th>Slot</th><th>In</th><th>Out</th><th>Hours</th><th>Status</th></tr></thead>
       <tbody>${rowsHtml}</tbody></table></body></html>`);
     w.document.close();

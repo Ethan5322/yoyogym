@@ -7,8 +7,10 @@ import { Link } from 'react-router-dom';
 import { apiFetch } from '../../lib/api.js';
 import { beep, soundEnabled, setSoundEnabled } from '../../lib/sound.js';
 import { MemberAccessCard, TrainerCard, Unidentified } from './scan/AccessCards.jsx';
+import { useBranding } from '../../lib/branding.js';
 
 export default function FaceScan() {
+  const gymName = useBranding().name || 'Your gym';
   const videoRef = useRef(null);
   const streamRef = useRef(null);
   const loopRef = useRef(false);
@@ -311,7 +313,7 @@ export default function FaceScan() {
 
       {/* header */}
       <div className="flex items-center justify-between px-4 py-3 text-body">
-        <span className="font-display text-lg uppercase tracking-wider text-accent">Yoyo GYM · Access</span>
+        <span className="font-display text-lg uppercase tracking-wider text-accent">{gymName} · Access</span>
         <div className="flex items-center gap-3">
           <button
             onClick={() => { const n = !sound; setSound(n); setSoundEnabled(n); }}

@@ -1,20 +1,7 @@
-// The logo on a gym's own screens (CLAUDE.md §37): the gym's logo when it has
-// set one in Settings → Gym Profile, otherwise the Yoyo Gyms logo. A gym logo
-// that fails to load falls back to Yoyo's rather than a broken image.
-import { useState } from 'react';
-import { useBranding } from '../lib/branding.js';
+// The Yoyo Gyms logo, on the gym's admin screens (CLAUDE.md §37.1 Q7). What a
+// gym's MEMBERS see carries the gym's own icon instead: see GymIcon.
 import { LOGO_ON_DARK } from '../../shared/brand.js';
 
-export default function BrandLogo({ className = 'h-12 w-auto', alt }) {
-  const b = useBranding();
-  const [failed, setFailed] = useState(false);
-  const src = b.logo_url && !failed ? b.logo_url : LOGO_ON_DARK;
-  return (
-    <img
-      src={src}
-      alt={alt ?? (b.name || 'Yoyo Gyms')}
-      className={`object-contain ${className}`}
-      onError={() => setFailed(true)}
-    />
-  );
+export default function BrandLogo({ className = 'h-12 w-auto', alt = 'Yoyo Gyms' }) {
+  return <img src={LOGO_ON_DARK} alt={alt} className={`object-contain ${className}`} />;
 }

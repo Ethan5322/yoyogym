@@ -341,7 +341,7 @@ async function drawCard(ctx, o) {
 
 function normalise(o) {
   return {
-    gymName: 'YOYO GYM',
+    gymName: 'YOUR GYM',
     accent: DEFAULT_ACCENT,
     name: '',
     membershipNumber: '',

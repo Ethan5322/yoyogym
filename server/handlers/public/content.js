@@ -3,6 +3,7 @@
 // and falls back to compliant defaults so the flow works before configuration.
 import { getSupabase } from '../../lib/supabase.js';
 import { allowMethods, ok, serverError } from '../../lib/http.js';
+import { currentGym } from '../../lib/tenancy.js';
 
 const DEFAULTS = {
   gym_name: 'Your Gym',
@@ -42,7 +43,9 @@ export default async function handler(req, res) {
 
     const map = Object.fromEntries((data || []).map((r) => [r.key, r.value]));
     const profile = map.gym_profile || {};
-    const gymName = profile.name || DEFAULTS.gym_name;
+    // The gym's own saved name; else its name in the Yoyo registry; else a
+    // neutral default — never another gym's, or the old single-gym name.
+    const gymName = profile.name || currentGym()?.gym?.search_name || DEFAULTS.gym_name;
 
     return ok(res, {
       gym_name: gymName,

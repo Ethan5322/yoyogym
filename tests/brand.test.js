@@ -102,6 +102,47 @@ test('every PDF and the ID card draw the logo through the one brand helper', () 
 
 test('the embedded logo is loaded only where documents are made, not on every page', () => {
   const branding = readFileSync('src/lib/branding.js', 'utf8');
-  assert.ok(!/^import .*pdf\/brand\.js/m.test(branding), 'no static import: registration must not carry it');
-  assert.match(branding, /import\('\.\/pdf\/brand\.js'\)/);
+  assert.ok(!/pdf\/brand\.js|yoyo-logo/.test(branding), 'registration must not carry the document logo');
+});
+
+test('IDS AND PDFS ALWAYS CARRY THE YOYO GYMS LOGO; MEMBERS SEE THE GYM\'S OWN ICON', () => {
+  // CLAUDE.md §37.1 Q7.
+  const docs = readFileSync('src/lib/pdf/brand.js', 'utf8');
+  assert.ok(!/logo_url|gymLogo|preloadGymLogo/.test(docs), 'a gym logo never replaces the Yoyo logo on a document');
+  for (const f of ['src/pages/Splash.jsx', 'src/chatbot/ChatWindow.jsx', 'src/pages/MemberPortal.jsx', 'src/pages/PublicProfile.jsx']) {
+    const src = readFileSync(f, 'utf8');
+    assert.match(src, /<GymIcon/, f);
+    assert.ok(!/<BrandLogo/.test(src), `${f}: no Yoyo logo on a member screen`);
+  }
+  for (const f of ['src/components/AdminShell.jsx', 'src/pages/admin/Login.jsx']) {
+    assert.match(readFileSync(f, 'utf8'), /<BrandLogo/, f);
+  }
+});
+
+test('NO SCREEN, ID OR PDF PRINTS THE OLD SINGLE-GYM NAME', () => {
+  const offenders = [];
+  for (const p of [...files('src'), ...files('server')]) {
+    // Comments may mention the history; only code and markup count.
+    const code = readFileSync(p, 'utf8').replace(/\/\/.*$/gm, '').replace(/\/\*[\s\S]*?\*\//g, '');
+    if (/Yoyo GYM\b/i.test(code)) offenders.push(p); // "Yoyo Gyms", the platform, is right
+  }
+  assert.deepEqual(offenders, []);
+});
+
+// ---------------------------------------------------------------------------
+// The gym's logo upload (CLAUDE.md §37.1 Q6)
+// ---------------------------------------------------------------------------
+
+test('A GYM LOGO IS A PNG, JPG OR WEBP (OR AN HTTPS LINK), AND SMALL', async () => {
+  process.env.JWT_SECRET ||= 'test-secret-for-logo';
+  const { logoProblem } = await import('../server/handlers/admin/settings.js');
+  assert.equal(logoProblem(''), null, 'no logo is fine');
+  assert.equal(logoProblem('data:image/png;base64,iVBORw0KGgo='), null);
+  assert.equal(logoProblem('data:image/webp;base64,UklGRg=='), null);
+  assert.equal(logoProblem('https://kom.co.za/logo.png'), null);
+  assert.match(logoProblem('data:image/svg+xml;base64,PHN2Zz4='), /PNG, JPG or WebP/, 'SVG can carry script');
+  assert.match(logoProblem('javascript:alert(1)'), /PNG, JPG or WebP/);
+  assert.match(logoProblem('http://kom.co.za/logo.png'), /https/);
+  assert.match(logoProblem('https://x/"><script>'), /PNG, JPG or WebP/);
+  assert.match(logoProblem('data:image/png;base64,' + 'A'.repeat(400 * 1024)), /too large/);
 });

@@ -15,6 +15,28 @@ occurrence is answered from notes rather than rediscovered.
 
 ---
 
+## 2026-09-28 — "IDs and PDFs still carry the old name" (D-159)
+
+**Investigated** (§27.1). Two causes, both confirmed by reading the data and the code:
+1. **Data.** KOM's `gym.settings.gym_profile.name` was still **"Yoyo GYM"** — KOM *is* the old
+   single gym, attached as tenant #1 without moving data (D-146), so its Settings kept the old name.
+   The registry already called it "KOM" (`platform.gyms.search_name`). Its saved welcome message,
+   indemnity waiver and privacy policy also said "Yoyo GYM".
+2. **Code.** ~20 places printed "Yoyo GYM" as a fallback or as fixed text (door-scanner header,
+   public profile page, QR and attendance printouts, Settings defaults, PDF/ID defaults).
+
+**Changed with the user's approval, name only, verified field by field:** the saved name → "KOM"
+(1 of 9 profile fields changed); the three texts each got exactly 5 characters shorter
+("Yoyo GYM" → "KOM"), nothing else touched.
+
+**Also:** `FaceScan.jsx` and `PersonalQr.jsx` had Windows line endings (the first committed so in
+`adec371`, the second only on disk) — normalised to LF, matching production.
+
+**Lesson.** A gym attached from before the platform carries single-gym data. Anything the old
+deployment wrote with its own name in it is now that gym's data, and needs the same check.
+
+---
+
 ## 2026-09-28 — "It does not recognise KOM's owner email and password" (D-158)
 
 **Investigated, not guessed** (§27.1). The gym admin sign-in (`/api/auth/login`) looked accounts up
