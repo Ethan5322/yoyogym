@@ -4,7 +4,7 @@
 import { getSupabase } from '../../lib/supabase.js';
 import { allowMethods, ok, badRequest, serverError } from '../../lib/http.js';
 import { authenticateMember } from '../../lib/memberauth.js';
-import { consumeSession } from '../../lib/sessions.js';
+import { consumeSession } from '../../lib/session-packs.js';
 import { notifyMemberEmail } from '../../lib/notify/index.js';
 
 export default async function handler(req, res) {

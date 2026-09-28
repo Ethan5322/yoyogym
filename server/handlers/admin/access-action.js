@@ -9,7 +9,7 @@ import { requireRole } from '../../lib/auth.js';
 import { loadCompliance, evaluateAccess } from '../../lib/compliance.js';
 import { notifyOwner, notifyMemberEmail } from '../../lib/notify/index.js';
 import { ownerTemplates } from '../../lib/notify/templates.js';
-import { consumeSession } from '../../lib/sessions.js';
+import { consumeSession } from '../../lib/session-packs.js';
 
 const startOfDay = () => {
   const d = new Date();
