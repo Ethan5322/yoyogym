@@ -16,7 +16,16 @@ import { schemaRunnerDeps, gymSchemaChecksum, runSql } from './schema-runner.js'
 import { runBilling } from './billing-runner.js';
 import { issueActivation, activationLookupHash } from './activation.js';
 import { DOCUMENT_BUCKET } from './documents.js';
-import { sendEmail, activationEmail, billingEmail, emailConfigured, passwordResetEmail, applicationReceivedEmail } from './email.js';
+import {
+  sendEmail,
+  activationEmail,
+  billingEmail,
+  emailConfigured,
+  passwordResetEmail,
+  applicationReceivedEmail,
+  decisionEmail,
+  staffInviteEmail,
+} from './email.js';
 import { purgeExpiredDocuments } from './retention.js';
 import { directoryRow } from './member-directory.js';
 import { fileFacts } from './forensics.js';
@@ -29,6 +38,7 @@ import { makeLimiter } from './ratelimit.js';
 import { platformBaseUrl } from './base-url.js';
 import { provisioningReadiness } from './provisioning-config.js';
 import { ownerId } from './agreement.js';
+import { issueInvite, inviteLookupHash, roleLabel, INVITE_TTL_HOURS } from './team.js';
 import {
   coordinate, haversineKm, nearestGyms, likeTerm, RESULT_LIMIT, BOX_FETCH,
 } from './gym-search.js';
@@ -46,6 +56,22 @@ const findGymLimiter = makeLimiter({ key: 'find-gym', limit: 5, windowMs: 10 * 6
 // Password-reset requests: each one sends an email, so without a limit the
 // form is a way to flood someone's inbox from our address.
 const resetLimiter = makeLimiter({ key: 'password-reset', limit: 5, windowMs: 15 * 60_000 });
+
+/**
+ * Search text that is safe inside a PostgREST `or(...)` filter.
+ *
+ * The staff search boxes build `name.ilike.%text%,city.ilike.%text%`. A comma
+ * or a bracket in what was typed changes the SHAPE of that filter — a search
+ * for "a,status.eq.x" becomes a second condition — so everything but letters,
+ * digits, spaces and the characters of a name or an email is dropped.
+ */
+export function searchText(raw) {
+  return String(raw ?? '')
+    .replace(/[^\p{L}\p{N}\s@.'-]/gu, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .slice(0, 80);
+}
 
 /** The platform database client, scoped to the `platform` schema. */
 export function platformDb() {
@@ -85,6 +111,13 @@ async function audit(db, entry) {
 
 /** The permissions granted to a platform user, via their roles. */
 async function permissionsFor(db, userId) {
+  // A SWITCHED-OFF ACCOUNT HOLDS NOTHING. Switching someone off used to stop
+  // only their next sign-in: an open session kept every role for up to eight
+  // hours. Checked here, where every permission is read, so it applies to the
+  // next click (CLAUDE.md §40.1 Q4).
+  const { data: account } = await db.from('platform_users').select('is_active').eq('id', userId).maybeSingle();
+  if (!account || account.is_active === false) return [];
+
   const { data } = await db
     .from('platform_user_roles')
     .select('platform_roles(platform_role_permissions(platform_permissions(key)))')
@@ -218,25 +251,40 @@ export function platformDeps() {
     },
 
     // ---- applications ----------------------------------------------------
-    listApplications: async () => {
-      const { data } = await db
+    listApplications: async ({ status = '', query = '' } = {}) => {
+      let q = db
         .from('gym_applications')
-        .select('id, proposed_gym_name, status, city, country, submitted_at')
+        .select('id, proposed_gym_name, status, city, country, requested_plan_key, submitted_at')
         .order('submitted_at', { ascending: false, nullsFirst: false })
         .limit(200);
+      if (status) q = q.in('status', String(status).split(','));
+      const term = searchText(query);
+      if (term) q = q.or(`proposed_gym_name.ilike.%${term}%,city.ilike.%${term}%`);
+      const { data } = await q;
       return data ?? [];
+    },
+
+    /** How many applications are in each state, for the queue's tabs. */
+    countApplications: async () => {
+      const { data } = await db.from('gym_applications').select('status').limit(10000);
+      const counts = {};
+      for (const a of data ?? []) counts[a.status] = (counts[a.status] ?? 0) + 1;
+      return counts;
     },
 
     getApplicationView: async (id) => {
       const { data: application } = await db.from('gym_applications').select('*').eq('id', id).maybeSingle();
       if (!application) return null;
 
-      const [{ data: documents }, { data: events }] = await Promise.all([
+      const [{ data: documents }, { data: events }, { data: applicant }] = await Promise.all([
         db.from('application_documents').select('*').eq('application_id', id),
         db.from('application_events').select('*').eq('application_id', id).order('created_at', { ascending: false }),
+        // WHO applied (CLAUDE.md §40.1 F-40.3): the reviewer could see the
+        // gym's name and city and nothing about the person asking for it.
+        db.from('platform_users').select('full_name, email').eq('id', application.applicant_user_id).maybeSingle(),
       ]);
 
-      return { application, documents: documents ?? [], events: events ?? [] };
+      return { application, applicant: applicant ?? null, documents: documents ?? [], events: events ?? [] };
     },
 
     /**
@@ -267,6 +315,14 @@ export function platformDeps() {
           return e;
         },
         issueActivation: activationDeps(db).issueActivation,
+        // The documents the approval rule reads (CLAUDE.md §40.1 Q3).
+        listDocuments: async (id) => {
+          const { data, error } = await db.from('application_documents').select('doc_type, status').eq('application_id', id);
+          // A read that failed is not "no documents": say so, rather than
+          // refusing with a list of documents that may well be there.
+          if (error) throw new Error(`Could not read the documents: ${error.message}`);
+          return data ?? [];
+        },
         setDocumentRetention: async (applicationId, until) => {
           await db.from('application_documents').update({ retention_until: until }).eq('application_id', applicationId);
         },
@@ -290,8 +346,46 @@ export function platformDeps() {
         }
         return approveApplication(applicationId, actor, appDeps, { dryRun });
       }
-      if (action === 'reject') return rejectApplication(applicationId, actor, reason, appDeps);
-      return requestMoreInfo(applicationId, actor, reason, appDeps);
+
+      const outcome =
+        action === 'reject'
+          ? await rejectApplication(applicationId, actor, reason, appDeps)
+          : await requestMoreInfo(applicationId, actor, reason, appDeps);
+      if (!outcome.ok) return outcome;
+
+      // TELL THE OWNER (CLAUDE.md §40.1 F-40.5). The email for both decisions
+      // was written and never sent: a rejected owner, or one asked for more,
+      // heard nothing and saw nothing. A failed send does not undo the
+      // decision; the reviewer is told, with the address to contact by hand.
+      const { data: applicant } = await db
+        .from('platform_users')
+        .select('email')
+        .eq('id', outcome.application.applicant_user_id)
+        .maybeSingle();
+      const mail = decisionEmail({
+        gymName: outcome.application.proposed_gym_name,
+        decision: action === 'reject' ? 'rejected' : 'info_requested',
+        reason,
+        signInUrl: `${platformBaseUrl()}/platform/login?as=owner`,
+      });
+      let sent = { ok: false, reason: 'no email address on the account' };
+      if (applicant?.email) {
+        try {
+          sent = await sendEmail({ to: applicant.email, ...mail });
+        } catch (err) {
+          sent = { ok: false, reason: err?.message || 'the email could not be sent' };
+        }
+      }
+      if (!sent.ok) {
+        await audit(db, {
+          action: 'platform.application.decision_email_failed',
+          actor_user_id: session.sub,
+          entity: 'application',
+          entity_id: applicationId,
+          detail: { decision: action, reason: sent.reason ?? null },
+        });
+      }
+      return { ...outcome, emailed: Boolean(sent.ok), emailTo: applicant?.email ?? null, emailReason: sent.reason ?? null };
     },
 
     // ---- public: a gym owner applying ------------------------------------
@@ -351,22 +445,32 @@ export function platformDeps() {
         user = created;
       }
 
-      const { data: application, error: appErr } = await db
+      const row = {
+        applicant_user_id: user.id,
+        status: 'submitted',
+        proposed_gym_name: input.gym_name,
+        slug,
+        city: input.city || null,
+        country: input.country || null,
+        estimated_members: input.estimated_members,
+        requested_plan_key: input.plan_key,
+        owner_needs: input.needs,
+        submitted_at: new Date().toISOString(),
+      };
+      // CLAUDE.md §40.1 Q2. Written separately so that, before
+      // 2026-09-28-main-admin-panel.sql has run, the application is still
+      // saved — without these two answers — rather than lost.
+      const contact = { owner_phone: input.phone || null, gym_address: input.address || null };
+
+      let { data: application, error: appErr } = await db
         .from('gym_applications')
-        .insert({
-          applicant_user_id: user.id,
-          status: 'submitted',
-          proposed_gym_name: input.gym_name,
-          slug,
-          city: input.city || null,
-          country: input.country || null,
-          estimated_members: input.estimated_members,
-          requested_plan_key: input.plan_key,
-          owner_needs: input.needs,
-          submitted_at: new Date().toISOString(),
-        })
+        .insert({ ...row, ...contact })
         .select('id')
         .single();
+      if (appErr && /owner_phone|gym_address/.test(appErr.message || '')) {
+        console.error('gym_applications has no contact columns yet — run 2026-09-28-main-admin-panel.sql');
+        ({ data: application, error: appErr } = await db.from('gym_applications').insert(row).select('id').single());
+      }
 
       if (appErr) return { ok: false, error: 'We could not submit your application.' };
 
@@ -551,7 +655,8 @@ export function platformOpsDeps(db = platformDb()) {
 
       // A list capped at 500 with no search is not a registry at ten thousand
       // gyms — it is the newest 500 gyms.
-      if (query) q = q.or(`search_name.ilike.%${query}%,slug.ilike.%${query}%,city.ilike.%${query}%`);
+      const term = searchText(query);
+      if (term) q = q.or(`search_name.ilike.%${term}%,slug.ilike.%${term}%,city.ilike.%${term}%`);
       if (status) q = q.eq('status', status);
 
       const { data, count: total } = await q;
@@ -577,14 +682,30 @@ export function platformOpsDeps(db = platformDb()) {
       const { data: gym } = await db.from('gyms').select('*').eq('id', gymId).maybeSingle();
       if (!gym) return null;
 
-      const [{ data: subscription }, { data: invoices }] = await Promise.all([
-        db.from('platform_subscriptions').select('*').eq('gym_id', gymId).maybeSingle(),
-        db.from('platform_invoices').select('*').eq('gym_id', gymId).order('issued_at', { ascending: false }).limit(24),
-      ]);
+      const [{ data: subscription }, { data: invoices }, { data: owner }, { data: plan }, { data: application }] =
+        await Promise.all([
+          db.from('platform_subscriptions').select('*').eq('gym_id', gymId).maybeSingle(),
+          db.from('platform_invoices').select('*').eq('gym_id', gymId).order('issued_at', { ascending: false }).limit(24),
+          // WHO runs it (F-40.7): the registry named a gym and never its owner.
+          gym.owner_user_id
+            ? db.from('platform_users').select('id, full_name, email, is_active, last_login_at').eq('id', gym.owner_user_id).maybeSingle()
+            : Promise.resolve({ data: null }),
+          gym.plan_key
+            ? db.from('platform_plans').select('key, label, max_active_members, price_cents, currency').eq('key', gym.plan_key).maybeSingle()
+            : Promise.resolve({ data: null }),
+          db.from('gym_applications').select('id, owner_phone').eq('slug', gym.slug).order('submitted_at', { ascending: false }).limit(1).maybeSingle(),
+        ]);
 
       // Note what is NOT selected: gym_connections and gym_secrets. Nobody
       // reviewing a gym's billing needs its schema name or its keys (D-044).
-      return { gym, subscription: subscription ?? null, invoices: invoices ?? [] };
+      return {
+        gym,
+        subscription: subscription ?? null,
+        invoices: invoices ?? [],
+        owner: owner ?? null,
+        plan: plan ?? null,
+        application: application ?? null,
+      };
     },
 
     setGymStatus: async (gymId, status, reason = '') => {
@@ -1112,6 +1233,16 @@ export function activationDeps(db = platformDb()) {
      * anywhere. If the email is not sent, they are gone and a new activation
      * must be issued — which is the correct behaviour, not a limitation.
      */
+    /** Old links stop working when a new one is sent (F-40.9). */
+    retireActivations: async (userId, gymId) => {
+      await db
+        .from('owner_activations')
+        .update({ used_at: new Date().toISOString() })
+        .eq('user_id', userId)
+        .eq('gym_id', gymId)
+        .is('used_at', null);
+    },
+
     issueActivation: async ({ userId, gymId }) => {
       const { row, token, code } = issueActivation({ userId, gymId });
 
@@ -1268,6 +1399,30 @@ export function ownerDeps(db = platformDb()) {
       return { token: data.token, uploadUrl: data.signedUrl, path: data.path ?? path };
     },
 
+    /**
+     * The owner answered a request for more: the application returns to the
+     * review queue. Only THEIR application, and only from info_requested, so
+     * it cannot reopen a decided one.
+     */
+    resumeReview: async (applicationId, userId) => {
+      const now = new Date().toISOString();
+      const { data } = await db
+        .from('gym_applications')
+        .update({ status: 'under_review', updated_at: now })
+        .eq('id', applicationId)
+        .eq('applicant_user_id', userId)
+        .eq('status', 'info_requested')
+        .select('id');
+      if (data?.length) {
+        await db.from('application_events').insert({
+          application_id: applicationId,
+          event: 'documents_received',
+          actor_user_id: userId,
+          created_at: now,
+        });
+      }
+    },
+
     recordDocument: async (row) => {
       const { data, error } = await db.from('application_documents').insert(row).select('*').single();
       if (error) throw new Error(`Could not record the document: ${error.message}`);
@@ -1366,8 +1521,10 @@ export function ownerDeps(db = platformDb()) {
     },
 
     /** A short-lived read link, for the reviewer only. Minutes, not days. */
-    signedDocumentUrl: async (storageRef, seconds = 300) => {
-      const { data, error } = await db.storage.from(DOCUMENT_BUCKET).createSignedUrl(storageRef, seconds);
+    signedDocumentUrl: async (storageRef, seconds = 300, { download = null } = {}) => {
+      const { data, error } = await db.storage
+        .from(DOCUMENT_BUCKET)
+        .createSignedUrl(storageRef, seconds, download ? { download } : undefined);
       if (error) return null;
       return data?.signedUrl ?? null;
     },
@@ -1380,6 +1537,7 @@ export function ownerDeps(db = platformDb()) {
 
 export function platformControlDeps(db = platformDb()) {
   return {
+    ...teamAndActivityDeps(db),
     // ---- plans and prices -------------------------------------------------
     listPlans: async () => {
       const { data } = await db.from('platform_plans').select('*').order('max_active_members', { ascending: true });
@@ -1427,7 +1585,8 @@ export function platformControlDeps(db = platformDb()) {
           .range(from, to);
         // `or` rather than two queries: a search that only matched email would
         // fail every time someone typed a name, which is what people type.
-        if (query) q = q.or(`email.ilike.%${query}%,full_name.ilike.%${query}%`);
+        const term = searchText(query);
+        if (term) q = q.or(`email.ilike.%${term}%,full_name.ilike.%${term}%`);
         return q;
       };
 
@@ -1564,8 +1723,8 @@ export function platformControlDeps(db = platformDb()) {
     financeSummary: async () => {
       const [{ data: invoices }, { data: subs }, { data: plans }] = await Promise.all([
         db.from('platform_invoices').select('status, amount_cents, currency').limit(5000),
-        db.from('platform_subscriptions').select('status'),
-        db.from('platform_plans').select('key, price_cents, is_enabled'),
+        db.from('platform_subscriptions').select('status, plan_id, gym_id, trial_ends_at'),
+        db.from('platform_plans').select('id, key, price_cents, is_enabled'),
       ]);
 
       let paid = 0;
@@ -1584,13 +1743,255 @@ export function platformControlDeps(db = platformDb()) {
         .filter((p) => p.is_enabled !== false && (!Number.isInteger(p.price_cents) || p.price_cents <= 0))
         .map((p) => p.key);
 
+      // What the platform earns a month from gyms that are paying now: each
+      // active (or late) subscription at its plan's price. Trials are counted
+      // separately — they pay nothing yet.
+      const priceOf = new Map((plans ?? []).map((p) => [p.id, Number.isInteger(p.price_cents) ? p.price_cents : 0]));
+      let mrr = 0;
+      const soon = Date.now() + 7 * 86_400_000;
+      const trialsEnding = [];
+      for (const sub of subs ?? []) {
+        if (sub.status === 'active' || sub.status === 'past_due') mrr += priceOf.get(sub.plan_id) ?? 0;
+        if (sub.status === 'trialing' && sub.trial_ends_at && new Date(sub.trial_ends_at).getTime() <= soon) {
+          trialsEnding.push({ gym_id: sub.gym_id, trial_ends_at: sub.trial_ends_at });
+        }
+      }
+
       return {
         currency: invoices?.[0]?.currency || 'ZAR',
         paid_cents: paid,
         outstanding_cents: outstanding,
+        mrr_cents: mrr,
         gyms_by_status: byStatus,
         unpriced_plans: unpriced,
+        trials_ending: trialsEnding,
       };
+    },
+  };
+}
+
+// ---------------------------------------------------------------------------
+// The staff team, and what the panel shows about every gym at once
+// (CLAUDE.md §40.1 Q4, F-40.7)
+// ---------------------------------------------------------------------------
+
+function teamAndActivityDeps(db) {
+  /** Role keys per user id, for the given users. */
+  const rolesFor = async (userIds) => {
+    if (!userIds.length) return new Map();
+    const { data } = await db
+      .from('platform_user_roles')
+      .select('user_id, platform_roles(key)')
+      .in('user_id', userIds);
+    const roles = new Map();
+    for (const r of data ?? []) {
+      const key = r.platform_roles?.key;
+      if (!key) continue;
+      roles.set(r.user_id, [...(roles.get(r.user_id) ?? []), key]);
+    }
+    return roles;
+  };
+
+  const roleId = async (key) => {
+    const { data } = await db.from('platform_roles').select('id').eq('key', key).maybeSingle();
+    if (!data) throw new Error(`No such role: ${key}`);
+    return data.id;
+  };
+
+  const sendInvite = async ({ user, role, token }) => {
+    const link = `${platformBaseUrl()}/platform/join?token=${encodeURIComponent(token)}`;
+    let sent = { ok: false, reason: 'no email address' };
+    try {
+      sent = await sendEmail({
+        to: user.email,
+        ...staffInviteEmail({ name: user.full_name, roleLabel: roleLabel(role), link, expiresInHours: INVITE_TTL_HOURS }),
+      });
+    } catch (err) {
+      sent = { ok: false, reason: err?.message || 'send failed' };
+    }
+    return { link, emailed: Boolean(sent.ok), emailReason: sent.reason ?? null, to: user.email };
+  };
+
+  return {
+    /** Everyone on the Yoyo staff, with their roles and whether they have finished setting up. */
+    listStaff: async () => {
+      const { data } = await db
+        .from('platform_users')
+        .select('id, email, full_name, is_active, totp_enabled, password_hash, last_login_at, created_at')
+        .eq('kind', 'platform_staff')
+        .order('created_at', { ascending: true });
+      const staff = data ?? [];
+      const roles = await rolesFor(staff.map((s) => s.id));
+      // The hash itself never leaves this function: only whether one exists.
+      return staff.map(({ password_hash, ...s }) => ({ ...s, set_up: Boolean(password_hash), roles: roles.get(s.id) ?? [] }));
+    },
+
+    staffMember: async (userId) => {
+      const { data } = await db
+        .from('platform_users')
+        .select('id, email, full_name, is_active, password_hash')
+        .eq('id', userId)
+        .eq('kind', 'platform_staff')
+        .maybeSingle();
+      if (!data) return null;
+      const roles = await rolesFor([data.id]);
+      const { password_hash, ...member } = data;
+      return { ...member, set_up: Boolean(password_hash), roles: roles.get(data.id) ?? [] };
+    },
+
+    /** Active accounts holding platform_owner — the rule that keeps one always. */
+    countActiveOwners: async () => {
+      const id = await roleId('platform_owner');
+      const { data } = await db.from('platform_user_roles').select('user_id').eq('role_id', id);
+      const ids = (data ?? []).map((r) => r.user_id);
+      if (!ids.length) return 0;
+      const { count } = await db
+        .from('platform_users')
+        .select('id', { count: 'exact', head: true })
+        .in('id', ids)
+        .eq('is_active', true);
+      return count ?? 0;
+    },
+
+    /**
+     * Invite a person: an account with NO password, their role, and a
+     * one-time link to set the password and the authenticator.
+     */
+    inviteStaff: async ({ email, fullName, role, invitedBy }) => {
+      const address = String(email).trim().toLowerCase();
+      const { data: existing } = await db.from('platform_users').select('id').eq('email', address).maybeSingle();
+      if (existing) return { ok: false, error: 'That email already has a Yoyo Gyms account.' };
+
+      const { data: user, error } = await db
+        .from('platform_users')
+        .insert({ email: address, full_name: String(fullName).trim(), kind: 'platform_staff', is_active: true })
+        .select('id, email, full_name')
+        .single();
+      if (error) return { ok: false, error: 'The account could not be created.' };
+
+      await db.from('platform_user_roles').insert({ user_id: user.id, role_id: await roleId(role), granted_by: invitedBy });
+
+      const { row, token } = issueInvite({ userId: user.id, invitedBy });
+      const { error: invErr } = await db.from('staff_invites').insert(row);
+      if (invErr) return { ok: false, error: `The invitation could not be saved: ${invErr.message}` };
+
+      await audit(db, {
+        action: 'platform.staff.invited',
+        actor_user_id: invitedBy,
+        entity: 'platform_user',
+        entity_id: user.id,
+        detail: { email: address, role },
+      });
+      return { ok: true, userId: user.id, ...(await sendInvite({ user, role, token })) };
+    },
+
+    /** A new link for someone who has not set up yet. Older links stop working. */
+    resendStaffInvite: async (userId, invitedBy) => {
+      const { data: user } = await db
+        .from('platform_users')
+        .select('id, email, full_name, password_hash')
+        .eq('id', userId)
+        .eq('kind', 'platform_staff')
+        .maybeSingle();
+      if (!user) return { ok: false, error: 'That person is not on the team.' };
+      if (user.password_hash) return { ok: false, error: 'They have already set up their account.' };
+
+      const now = new Date().toISOString();
+      await db.from('staff_invites').update({ used_at: now }).eq('user_id', userId).is('used_at', null);
+      const { row, token } = issueInvite({ userId, invitedBy });
+      const { error } = await db.from('staff_invites').insert(row);
+      if (error) return { ok: false, error: `The invitation could not be saved: ${error.message}` };
+
+      const roles = await rolesFor([userId]);
+      await audit(db, { action: 'platform.staff.invite_resent', actor_user_id: invitedBy, entity: 'platform_user', entity_id: userId });
+      return { ok: true, ...(await sendInvite({ user, role: (roles.get(userId) ?? [])[0], token })) };
+    },
+
+    /** The invite a link points at, with its account. */
+    findInvite: async (token) => {
+      if (!token) return null;
+      const { data: invite } = await db
+        .from('staff_invites')
+        .select('id, user_id, expires_at, used_at')
+        .eq('token_hash', inviteLookupHash(token))
+        .maybeSingle();
+      if (!invite) return null;
+      const { data: user } = await db.from('platform_users').select('*').eq('id', invite.user_id).maybeSingle();
+      return { invite, user: user ?? null };
+    },
+
+    markInviteUsed: async (inviteId) => {
+      await db.from('staff_invites').update({ used_at: new Date().toISOString() }).eq('id', inviteId);
+    },
+
+    /** One role per person: the Team page offers one, so one is what they hold. */
+    setStaffRole: async (userId, role, grantedBy) => {
+      const id = await roleId(role);
+      const { error: delErr } = await db.from('platform_user_roles').delete().eq('user_id', userId);
+      if (delErr) throw new Error(`Could not change the role: ${delErr.message}`);
+      const { error } = await db.from('platform_user_roles').insert({ user_id: userId, role_id: id, granted_by: grantedBy });
+      if (error) throw new Error(`Could not change the role: ${error.message}`);
+    },
+
+    setStaffActive: async (userId, active) => {
+      const { error } = await db
+        .from('platform_users')
+        .update({ is_active: active, updated_at: new Date().toISOString() })
+        .eq('id', userId)
+        .eq('kind', 'platform_staff');
+      if (error) throw new Error(`Could not change that account: ${error.message}`);
+    },
+
+    // ---- every gym at once -------------------------------------------------
+    /**
+     * Counts for a page of gyms (F-40.7) — the same counts-only reads as one
+     * gym's page (D-130), in parallel, with ONE audit entry for the page
+     * rather than one per gym.
+     */
+    gymStatsForMany: async (gyms, actorUserId = null) => {
+      const out = new Map();
+      if (!gyms.length) return out;
+      const { data: connections } = await db
+        .from('gym_connections')
+        .select('gym_id, schema_name, supabase_url')
+        .in('gym_id', gyms.map((g) => g.id));
+      const byGym = new Map((connections ?? []).map((c) => [c.gym_id, c]));
+
+      await Promise.all(
+        gyms.map(async (g) => {
+          const c = byGym.get(g.id);
+          if (!c?.schema_name) return out.set(g.id, { reachable: false });
+          const client = createClient(c.supabase_url || process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY, {
+            auth: { persistSession: false, autoRefreshToken: false },
+            db: { schema: c.schema_name },
+          });
+          return out.set(g.id, await gymStats(client));
+        })
+      );
+
+      await audit(db, {
+        action: 'platform.gym.stats_read',
+        actor_user_id: actorUserId,
+        entity: 'gym',
+        detail: { gyms: gyms.length, view: 'registry' },
+      });
+      return out;
+    },
+
+    /** How many gyms are in each state — for Today. */
+    countGyms: async () => {
+      const { data } = await db.from('gyms').select('status').limit(20000);
+      const counts = {};
+      for (const g of data ?? []) counts[g.status] = (counts[g.status] ?? 0) + 1;
+      return counts;
+    },
+
+    countOwners: async () => {
+      const { count } = await db
+        .from('platform_users')
+        .select('id', { count: 'exact', head: true })
+        .eq('kind', 'gym_owner');
+      return count ?? 0;
     },
   };
 }

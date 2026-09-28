@@ -231,13 +231,15 @@ test('a valid application is created and normalised identically', async () => {
 
   await handlePlatform(
     req({ method: 'POST', url: '/platform/api/apply',
-          body: { owner_name: 'Ann', email: 'ANN@Bos.co', password: 'longenough1', gym_name: 'BOS GYM', country: 'za', plan: 'medium' } }),
+          body: { owner_name: 'Ann', email: 'ANN@Bos.co', password: 'longenough1', phone: '0027 82 123 4567', gym_name: 'BOS GYM', address: '12 Main Rd', country: 'za', plan: 'medium' } }),
     r, d
   );
 
   assert.equal(r.statusCode, 201);
   assert.equal(d.calls.created[0].email, 'ann@bos.co');
   assert.equal(d.calls.created[0].country, 'ZA');
+  assert.equal(d.calls.created[0].phone, '+27821234567', '00 is the international prefix, written out');
+  assert.equal(d.calls.created[0].address, '12 Main Rd');
 });
 
 // ---------------------------------------------------------------------------

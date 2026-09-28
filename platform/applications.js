@@ -20,6 +20,7 @@
 
 /** Only an application awaiting a decision can be decided. */
 import { retentionDateFor } from './retention.js';
+import { missingRequiredDocuments, DOCUMENT_LABELS } from './documents.js';
 
 const DECIDABLE = new Set(['submitted', 'under_review', 'info_requested']);
 
@@ -61,6 +62,24 @@ export async function approveApplication(applicationId, actor, deps, options = {
       actor,
       `This application has already been decided (${application.status}).`
     );
+  }
+
+  // THE THREE REQUIRED DOCUMENTS, EACH ACCEPTED (CLAUDE.md §40.1 Q3).
+  //
+  // Checked here, where the decision is made, not only by greying out a
+  // button: the button is a courtesy, this is the rule. Fails CLOSED — a
+  // caller that cannot list the documents has shown none.
+  const documents = deps.listDocuments ? await deps.listDocuments(applicationId) : [];
+  const missing = missingRequiredDocuments(documents);
+  if (missing.length) {
+    const names = missing.map((t) => DOCUMENT_LABELS[t] || t).join(', ');
+    const refused = await refuse(
+      deps,
+      application,
+      actor,
+      `Nothing was approved: these documents still need to be uploaded and accepted — ${names}.`
+    );
+    return { ...refused, missingDocuments: missing };
   }
 
   // PROVISIONING SWITCHED OFF: REFUSE, AND RECORD NOTHING.

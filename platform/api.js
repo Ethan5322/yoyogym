@@ -17,13 +17,14 @@
 // Platform staff use the website. There is deliberately no JSON route here
 // that approves an application or suspends a gym.
 import { readAnySession, signPlatformToken } from './http.js';
-import { PLANS, ownerFacingPlan, planByKey } from './plans.js';
+import { PLANS, ownerFacingPlan } from './plans.js';
 import { completeActivation } from './activation.js';
 import { validateUploadRequest, pathBelongsTo, documentRow } from './documents.js';
 import { lookupHash, routeMember } from './member-directory.js';
 import { decideLogin, INVALID, LOCKED } from './login.js';
 import { requestReset, completeReset } from './password-reset.js';
 import { AGREEMENT_VERSION, ownerId } from './agreement.js';
+import { readApplication } from './application-form.js';
 
 const json = (res, status, body) => {
   res.writeHead(status, {
@@ -194,29 +195,12 @@ export async function handlePlatformApi(req, res, deps, { path, method, url }) {
     const body = await readJson(req);
     if (!body) return json(res, 400, { error: 'Malformed request.' }), true;
 
-    // The SAME validation as the web form. Duplicated rules would drift, and
-    // the app would quietly become the weaker door.
-    if (!String(body.owner_name || '').trim()) return json(res, 400, { error: 'Please give your name.' }), true;
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(body.email || '')) {
-      return json(res, 400, { error: 'A valid email is required.' }), true;
-    }
-    if (String(body.password || '').length < 10) {
-      return json(res, 400, { error: 'Choose a password of at least 10 characters.' }), true;
-    }
-    if (!String(body.gym_name || '').trim()) return json(res, 400, { error: 'What is your gym called?' }), true;
-    if (!planByKey(body.plan)) return json(res, 400, { error: 'Please choose a plan.' }), true;
+    // The SAME rule as the web form — literally the same function, so the app
+    // can never quietly become the weaker door.
+    const { input, error } = readApplication(body);
+    if (error) return json(res, 400, { error }), true;
 
-    const result = await deps.createApplication({
-      owner_name: String(body.owner_name).trim(),
-      email: String(body.email).trim().toLowerCase(),
-      password: body.password,
-      gym_name: String(body.gym_name).trim(),
-      city: String(body.city || '').trim(),
-      country: String(body.country || '').trim().toUpperCase(),
-      estimated_members: Number(body.estimated_members) || null,
-      plan_key: body.plan,
-      needs: String(body.needs || '').trim() || null,
-    });
+    const result = await deps.createApplication(input);
 
     if (!result.ok) return json(res, 400, { error: result.error || 'We could not submit that.' }), true;
 
@@ -387,6 +371,10 @@ export async function handlePlatformApi(req, res, deps, { path, method, url }) {
       entity_id: application.id,
       detail: { doc_type: body.doc_type, via: 'app' },
     });
+
+    // Asked for more, and it has arrived: back to the reviewer's queue, as the
+    // email promised (CLAUDE.md §40.1 F-40.5).
+    if (application.status === 'info_requested') await deps.resumeReview?.(application.id, session.sub);
 
     return json(res, 201, { ok: true, document_id: row?.id ?? null }), true;
   }

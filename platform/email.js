@@ -167,9 +167,12 @@ What happens next:
 }
 
 /** A decision email — approved without activation, rejected, or more info wanted. */
-export function decisionEmail({ gymName, decision, reason }) {
+export function decisionEmail({ gymName, decision, reason, signInUrl = '' }) {
   const safeName = escapeHtml(gymName || 'your gym');
   const safeReason = escapeHtml(reason || '');
+  // Where to act on it: the owner's own page, with their documents.
+  const link = signInUrl ? `<p><a href="${escapeHtml(signInUrl)}">Sign in to your owner account</a></p>` : '';
+  const linkText = signInUrl ? `\n\nSign in: ${signInUrl}` : '';
 
   if (decision === 'rejected') {
     return {
@@ -177,10 +180,11 @@ export function decisionEmail({ gymName, decision, reason }) {
       html: `<p>Thank you for applying to list <b>${safeName}</b>.</p>
 <p>We are not able to approve it at the moment.</p>
 ${safeReason ? `<p><b>Reason:</b> ${safeReason}</p>` : ''}
-<p>You are welcome to apply again once that is resolved.</p>`,
+<p>You are welcome to apply again once that is resolved.</p>
+${link}`,
       text: `We are not able to approve ${gymName || 'your gym'} at the moment.${
         reason ? `\n\nReason: ${reason}` : ''
-      }\n\nYou are welcome to apply again.`,
+      }\n\nYou are welcome to apply again.${linkText}`,
     };
   }
 
@@ -188,10 +192,27 @@ ${safeReason ? `<p><b>Reason:</b> ${safeReason}</p>` : ''}
     subject: `We need a bit more for ${gymName || 'your gym'}`,
     html: `<p>We are reviewing <b>${safeName}</b> and need something more before we can decide.</p>
 ${safeReason ? `<p>${safeReason}</p>` : ''}
-<p>Sign in and upload it, and we will pick the review back up.</p>`,
+<p>Sign in and upload it, and we will pick the review back up.</p>
+${link}`,
     text: `We need something more before we can decide on ${gymName || 'your gym'}.${
       reason ? `\n\n${reason}` : ''
-    }`,
+    }\n\nSign in and upload it, and we will pick the review back up.${linkText}`,
+  };
+}
+
+/** An invitation to the Yoyo staff team (CLAUDE.md §40.1 Q4). */
+export function staffInviteEmail({ name = '', roleLabel = '', link, expiresInHours = 72 }) {
+  const safeName = escapeHtml(name);
+  const safeRole = escapeHtml(roleLabel);
+  return {
+    subject: 'You have been invited to the Yoyo Gyms team',
+    html: `<p>${safeName ? `Hello ${safeName},` : 'Hello,'}</p>
+<p>You have been invited to run Yoyo Gyms${safeRole ? ` as <b>${safeRole}</b>` : ''}.</p>
+<p><a href="${escapeHtml(link)}">Set up your account</a></p>
+<p>You will choose a password and connect an authenticator app — a code from it is needed every
+time you sign in. The link works once and expires in ${expiresInHours} hours.</p>
+<p>If you were not expecting this, ignore it and nothing happens.</p>`,
+    text: `You have been invited to run Yoyo Gyms${roleLabel ? ` as ${roleLabel}` : ''}.\n\nSet up your account: ${link}\n\nThe link works once and expires in ${expiresInHours} hours. If you were not expecting this, ignore it.`,
   };
 }
 

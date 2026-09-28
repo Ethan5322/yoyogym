@@ -1978,3 +1978,103 @@ in a phone-width panel on a computer, and the app's landing stays phone-width on
 and avatar in the sidebar, a calm "Needs attention" list instead of red banners, icon stat cards,
 coloured status labels (green active, amber expiring, red suspended…) instead of red for everything,
 softer cards, rounded buttons and fields.
+
+---
+
+## 40. Main admin panel — corporate level, every tenant gym under its control (user instruction, 2026-09-28)
+
+> The user's words, word for word, from two messages on 2026-09-28. Clarified one question at a
+> time in §40.1, which wins over the text above it. Not built until §40.1 is answered.
+
+**Where things are deployed** (the user, 2026-09-28):
+
+> i did not have domain have now that why we running my app on preview so in prodiction its main
+> admin pannel for yyo gyms so when we fix issue related with main admin pannel of yoyo gyms we
+> deploy on production , when we fixing app side we deploy to preview
+
+Production (`yoyogym.vercel.app`) is the **Yoyo Gyms main admin panel**; the preview branch
+(`stage-8-app`) is where the **app** is tested, until a domain exists. Both are the SAME whole
+website, so one deploy carries every commit before it. Production caught up with the preview once,
+by the user's choice, on 2026-09-28 (`da6b0aa`). From then on: main-admin-panel fixes → production;
+app fixes → preview only.
+
+**The instruction:**
+
+> also check be sure that tenants of gyms controlled and managed by production side so search deap
+> down what main admin pannel of yoyo gyms button needed to be added what it should include, be
+> surthat the register are clearly get approved or suspended, pdf submited to it is open wihout
+> issue, corporate lavel admin pannel builted and no dead button or text and track real data admin
+> pannel arrangment and connectivity with tenant gym and work, everything must be 10/10
+
+### 40.1 Clarifications — answered by the user, one at a time
+
+Checked against the code AND the live data on 2026-09-28 (read-only, plus one throwaway test file
+uploaded to the private document bucket and deleted):
+
+- **Live data:** 1 application (`submitted`, **0 documents**), 1 gym (KOM, active, Prime), all three
+  plans priced, 1 Yoyo staff account, 1 owner account.
+- **Works, verified:** every link and form target in the panel resolves (36); approve / reject /
+  request-information, each permission-checked and audited, and a failed approve says why;
+  suspend / reactivate, plan change, owner switch-off, plans and prices, finances, security, audit.
+  **A PDF uploaded exactly as the owner page sends it opens for the reviewer**: stored as
+  `application/pdf`, served inline, nothing blocks the embedded viewer, bytes identical.
+- **F-40.1 — suspending KOM does not lock KOM.** A gym reached WITHOUT its slug (KOM at
+  `yoyogym.vercel.app/admin`, `/member`) never consults the registry (`gymcontext.js`: no slug → no
+  resolution), so the platform's suspend, and its plan, reach only `/g/kom/`. The Suspend button
+  promises "Members and staff will be locked out".
+- **F-40.2 — owners see the staff menu.** The owner page uses the staff layout: Today, Applications,
+  Gyms, Owners, Plans, Finances, Security, Audit — dead links for an owner (403), and **Today has no
+  permission check at all**, so any gym owner sees platform-wide figures.
+- **F-40.3 — the reviewer cannot see who applied.** The application page shows gym name, city and
+  status only: no owner name, email, chosen plan, expected members or stated needs. The form never
+  asks for a phone number or the gym's address.
+- **F-40.4 — nothing is required before Approve.** The live waiting application has no documents and
+  can be approved as it is. Which documents are required is `[undecided]` (§17, §30).
+- **F-40.5 — a rejected owner, or one asked for more, is never told.** `decisionEmail()` is written
+  and never called; the owner page shows neither the reason nor the request.
+- **F-40.6 — not corporate level.** A 900 px column, a row of nine text links, plain grey status tags
+  for every state, inline minimal styling.
+- **F-40.7 — no platform-wide activity view.** Members, check-ins and last activity exist per gym
+  (counts only, D-130) but only on each gym's own page; the gym list and Today show none of it.
+- **F-40.8 — PDFs on a phone.** An embedded PDF is blank in most phone browsers, and the
+  "open in a new tab" link only appears where it is not needed.
+- **Q1 — the platform controls the gym at the main address too (F-40.1).** Suspend locks KOM's
+  staff and members at `yoyogym.vercel.app/admin` and `/member` as well as `/g/kom/`, and KOM's plan
+  applies there. If the registry cannot be reached for a moment, the gym keeps working rather than
+  locking everyone out (fail open for availability, the registry answer cached as today).
+- **Q2 — the application also asks for the owner's phone and the gym's street address (F-40.3)**,
+  both required (phone with country code). The reviewer sees everything the owner gave: name,
+  email, phone, gym name, address, city, country, plan, expected members and stated needs. Needs two
+  new columns on `platform.gym_applications` — SQL given to the user on its own.
+- **Q3 — required documents (F-40.4; resolves the §17 / §30 open item "required documents").**
+  **ID, business registration and proof of address.** Approve stays unavailable until all three
+  are uploaded AND accepted by the reviewer; the page says which are missing. Tax clearance,
+  insurance, lease and "other" stay optional.
+- **Also found while asking (no question needed, they follow from what exists):**
+  **F-40.9** — no way to send an owner a NEW activation link: a lost email or an expired 48-hour link
+  leaves an approved gym stuck. A "Send a new activation link" button is added on the gym's page.
+  **F-40.10** — six staff roles exist as data (platform owner, admin, reviewer, billing, support,
+  read-only) but there is no screen to add a Yoyo staff member; only SQL can. Asked as Q4.
+- **Q4 — a Team page (F-40.10).** Only the platform owner sees it. Invite a Yoyo staff member by
+  email with a role; they set their password AND authenticator code from a one-time link (2FA stays
+  required for staff); change a role; switch someone off. Nobody can remove themselves or the last
+  platform owner. Everything audited.
+
+All four answered 2026-09-28. Also built, because they follow from what exists: a **Sign out** link
+(the panel had none), a read-only **Platform settings** page (§16) naming every switch and whether it
+is set — never a value — and the trial-ending reminders `dashboardPage` already supports but was
+never given.
+
+**Built 2026-09-28** — vault D-162 (and D-163, the deployment rule): the platform resolves the gym at
+the main address through the registry (suspend and plan apply to KOM everywhere; a registry fault
+fails open); a corporate panel — sidebar grouped by job, menu filtered by permission, Sign out,
+coloured status labels, number tiles; Today with live figures and recent activity (audit readers
+only); the review queue in tabs with search; the application page with the applicant's details, the
+three-document checklist and a greyed-out Approve until they are accepted (enforced server-side,
+failing closed); decision emails sent, and the reviewer told when one cannot be; an answered request
+returns to the queue; the gym list with members, check-ins and last check-in per gym (counts only);
+the gym page with its owner, plan limit and "Send a new activation link"; Open and Download on every
+document; the Team page with one-time invitations that set a password and an authenticator; a
+read-only Settings page; a switched-off staff member loses access on the next click. SQL:
+`platform/migrations/2026-09-28-main-admin-panel.sql` (two columns, one table).
+

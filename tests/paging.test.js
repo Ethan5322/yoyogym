@@ -158,8 +158,8 @@ routeTest('THE REGISTRY ASKS FOR A PAGE, NOT A HARD CAP', async () => {
   const seen = {};
   await get('/platform/registry?page=3', pagedDeps(seen));
 
-  assert.equal(seen.gyms.from, 100);
-  assert.equal(seen.gyms.to, 149);
+  assert.equal(seen.gyms.from, 50);
+  assert.equal(seen.gyms.to, 74);
   assert.equal(seen.gyms.limit, undefined, 'a cap would defeat the range');
 });
 
@@ -223,6 +223,7 @@ routeTest('a nonsense page number does not become a negative offset', async () =
   const seen = {};
   await get('/platform/registry?page=-5', pagedDeps(seen));
 
+  // 25 a page on the registry: each row carries live counts (CLAUDE.md §40.1 F-40.7).
   assert.equal(seen.gyms.from, 0);
-  assert.equal(seen.gyms.to, 49);
+  assert.equal(seen.gyms.to, 24);
 });

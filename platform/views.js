@@ -19,6 +19,8 @@ import { when, exact, until, money as fmtMoney, count } from './format.js';
 import { pageLink } from './paging.js';
 import { gymAdminPath, OWNER_USERNAME } from './gym-admin.js';
 import { BRAND, LOGO_ON_DARK } from '../shared/brand.js';
+import { REQUIRED_DOCUMENTS, DOCUMENT_LABELS, missingRequiredDocuments } from './documents.js';
+import { INVITE_TTL_HOURS } from './team.js';
 
 /** Escape text for safe interpolation into markup or an attribute. */
 export function escapeHtml(value) {
@@ -90,7 +92,180 @@ const STYLE = `
   body.auth .err { color:#ff6b5e; }
   body.auth .auth-links { text-align:center; margin:0; }
   body.auth .auth-foot { text-align:center; margin:24px 0 0; }
+
+  /* Every page's cards and status labels. */
+  .card { background:var(--card); border:1px solid var(--line); border-radius:16px; padding:20px 22px; margin:16px 0; }
+  .card > :first-child { margin-top:0; } .card > :last-child { margin-bottom:0; }
+  .tag { display:inline-block; font-size:12px; font-weight:700; padding:3px 10px; border-radius:99px;
+         border:1px solid var(--line); color:var(--muted); white-space:nowrap; text-transform:capitalize; }
+  .tag--good { color:#8ee07a; background:rgba(142,224,122,.1); border-color:rgba(142,224,122,.3); }
+  .tag--warn { color:#f5c451; background:rgba(245,196,81,.1); border-color:rgba(245,196,81,.3); }
+  .tag--bad  { color:#ff8a7e; background:rgba(255,107,94,.1); border-color:rgba(255,107,94,.32); }
+  .tag--info { color:#7cc4ff; background:rgba(124,196,255,.1); border-color:rgba(124,196,255,.3); }
+  .btn { display:inline-flex; align-items:center; gap:6px; font-weight:700; padding:9px 16px; border-radius:99px;
+         background:var(--accent); color:var(--accent-ink); text-decoration:none; }
+  .btn.ghost, button.ghost { background:transparent; color:var(--ink); border:1px solid var(--line); }
+  button.danger { background:var(--bad); color:#1a0503; }
+  button:disabled { opacity:.45; cursor:not-allowed; }
+  .lede { color:var(--muted); margin:0 0 8px; }
+  .card h2 { font-size:17px; margin:0 0 10px; }
+  input[type=checkbox], input[type=radio] { width:auto; accent-color:var(--accent); }
+  .two { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+  @media (max-width: 600px) { .two { grid-template-columns:1fr; } }
+  /* A row of fields and buttons stays a row; a field in it does not take the
+     whole width and push its button onto the next line. */
+  .row > input, .row > select { width:auto; flex:1 1 160px; }
+  .row > input[type=checkbox], .row > input[type=radio] { flex:none; }
+  body.panel form.card.row { display:flex; flex-wrap:wrap; align-items:flex-end; }
+  body.panel form.card.row > label { flex:1 1 220px; }
+  body.panel form.card > button, body.panel form.card > .row { justify-self:start; }
+
+  /* THE MAIN ADMIN PANEL (CLAUDE.md §40.1 F-40.6): a sidebar grouped by job,
+     showing only what this person may open; a phone gets the same menu behind
+     one button, with no script. */
+  body.panel { display:grid; grid-template-columns:252px minmax(0,1fr); min-height:100vh; }
+  .side { position:sticky; top:0; height:100vh; overflow-y:auto; overflow-x:hidden; background:#0a1115;
+          border-right:1px solid var(--line); padding:18px 12px; display:flex; flex-direction:column; }
+  .side .brand { display:block; padding:4px 10px 8px; }
+  .side .brand img { display:block; height:44px; width:auto; }
+  .navt { position:absolute; opacity:0; pointer-events:none; }
+  .navt-label { display:none; }
+  .side nav { display:flex; flex-direction:column; gap:2px; }
+  .side .grp { font-size:11px; font-weight:700; letter-spacing:.14em; text-transform:uppercase;
+               color:rgba(255,255,255,.38); margin:18px 12px 6px; }
+  .side nav a { display:flex; align-items:center; gap:10px; padding:9px 12px; border-radius:10px;
+                color:rgba(255,255,255,.74); text-decoration:none; font-weight:600; font-size:14px; }
+  .side nav a svg { width:18px; height:18px; flex:none; }
+  .side nav a:hover { background:rgba(255,255,255,.05); color:#fff; }
+  .side nav a.on { background:rgba(191,246,66,.12); color:var(--accent); }
+  .side .me { margin-top:auto; border-top:1px solid var(--line); padding:14px 12px 4px; display:flex;
+              flex-direction:column; gap:10px; font-size:13px; }
+  .side .me .who { color:var(--muted); word-break:break-all; }
+  .side .me a { display:flex; align-items:center; gap:8px; color:#fff; text-decoration:none; font-weight:600; }
+  .side .me a svg { width:16px; height:16px; }
+  body.panel main { max-width:1200px; margin:0; padding:32px 40px 80px; min-width:0; }
+  body.panel h1 { font-size:26px; letter-spacing:-.01em; margin:0 0 6px; }
+  body.panel h2 { font-size:15px; margin:0 0 10px; }
+  body.panel main > h2 { font-size:12px; text-transform:uppercase; letter-spacing:.14em; color:var(--muted); margin:32px 0 10px; }
+  body.panel form.card { max-width:none; margin:16px 0; }
+  body.panel table { background:var(--card); border:1px solid var(--line); border-radius:16px;
+                     border-collapse:separate; border-spacing:0; overflow:hidden; }
+  body.panel .card table { background:transparent; border:0; border-radius:0; margin-top:4px; }
+  body.panel th { background:rgba(255,255,255,.03); }
+  body.panel tbody tr:hover td { background:rgba(255,255,255,.025); }
+  body.panel tbody tr:last-child td { border-bottom:0; }
+  .kpis { display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:12px; margin:20px 0; }
+  .kpi { display:block; background:var(--card); border:1px solid var(--line); border-radius:16px; padding:16px 18px;
+         color:inherit; text-decoration:none; }
+  a.kpi:hover { border-color:rgba(191,246,66,.45); }
+  .kpi .lbl { font-size:12px; font-weight:600; color:var(--muted); }
+  .kpi .val { font-size:28px; font-weight:800; letter-spacing:-.02em; margin-top:6px; font-variant-numeric:tabular-nums;
+              overflow-wrap:anywhere; }
+  .kpi .sub { font-size:12px; color:var(--muted); margin-top:2px; }
+  .todo { display:flex; align-items:center; gap:12px; padding:14px 18px; border-top:1px solid var(--line);
+          color:inherit; text-decoration:none; }
+  .todo:first-of-type { border-top:0; }
+  .todo:hover { background:rgba(255,255,255,.03); }
+  .todo .dot { width:10px; height:10px; border-radius:50%; flex:none; background:#f5c451; }
+  .todo .dot.bad { background:var(--bad); }
+  .todo .go { margin-left:auto; color:var(--accent); font-weight:700; white-space:nowrap; }
+  .checklist { list-style:none; padding:0; margin:8px 0 0; display:grid; gap:6px; }
+  .checklist li::before { content:'○'; margin-right:8px; color:var(--muted); }
+  .checklist li.ok::before { content:'●'; color:#8ee07a; }
+  dl.facts { display:grid; grid-template-columns:minmax(120px,max-content) 1fr; gap:8px 18px; margin:0; }
+  dl.facts dt { color:var(--muted); font-size:13px; }
+  dl.facts dd { margin:0; overflow-wrap:anywhere; }
+  .grid2 { display:grid; grid-template-columns:repeat(auto-fit,minmax(320px,1fr)); gap:16px; }
+  .grid2 > .card { margin:0; }
+
+  /* An owner's own pages: the owner's menu, never the staff one (F-40.2). */
+  header nav.row a.on { color:var(--accent); }
+
+  @media (max-width: 900px) {
+    body.panel { display:block; }
+    .side { position:sticky; top:0; z-index:5; height:auto; flex-direction:row; flex-wrap:wrap; align-items:center;
+            padding:10px 16px; }
+    .side .brand { padding:0; }
+    .side .brand img { height:34px; }
+    .navt-label { display:inline-flex; margin-left:auto; border:1px solid var(--line); border-radius:99px;
+                  padding:7px 14px; font-weight:700; cursor:pointer; }
+    .side nav, .side .me { display:none; width:100%; }
+    .navt:checked ~ nav, .navt:checked ~ .me { display:flex; }
+    .navt:focus-visible + .navt-label { outline:2px solid var(--accent); }
+    body.panel main { padding:20px 16px 64px; }
+    body.panel table { display:block; overflow-x:auto; white-space:nowrap; }
+    header { flex-wrap:wrap; }
+  }
 `;
+
+// Line icons for the sidebar, 24-unit grid, drawn in the text colour.
+const ICON_PATHS = {
+  today: 'M3 11l9-7 9 7M5 10v10h5v-6h4v6h5V10',
+  applications: 'M9 3h6v3H9zM8 4.5H5.5v16h13v-16H16M8.5 11h7M8.5 15h5',
+  gyms: 'M3 21h18M5 21V8l7-4 7 4v13M9 21v-5h6v5M9 11h.01M15 11h.01',
+  owners: 'M16 20v-1a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v1M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM22 20v-1a4 4 0 0 0-3-3.9M16 3.1a4 4 0 0 1 0 7.8',
+  plans: 'M20.6 13.4l-7.2 7.2a2 2 0 0 1-2.8 0L3 13V3h10l7.6 7.6a2 2 0 0 1 0 2.8zM7.5 7.5h.01',
+  finance: 'M2 6h20v12H2zM12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM6 12h.01M18 12h.01',
+  security: 'M12 3l8 3v6c0 5-3.5 8.5-8 9.5C7.5 20.5 4 17 4 12V6zM9 12l2 2 4-4',
+  audit: 'M9 6h11M9 12h11M9 18h11M4.5 6h.01M4.5 12h.01M4.5 18h.01',
+  team: 'M15 19v-1a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v1M8.5 10.5a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7zM19 8v6M22 11h-6',
+  settings: 'M4 6h9M17 6h3M4 12h3M11 12h9M4 18h11M19 18h1M15 4v4M9 10v4M17 16v4',
+  account: 'M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM4 21a8 8 0 0 1 16 0',
+  signout: 'M15 12H3M7 8l-4 4 4 4M13 4h6v16h-6',
+};
+
+function icon(name) {
+  const d = ICON_PATHS[name];
+  return d
+    ? `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="${d}"/></svg>`
+    : '';
+}
+
+/**
+ * The staff menu, grouped by job. Each entry names the permission that opens
+ * it, and a person sees only what they may open — a link that answers
+ * "forbidden" is a dead button (CLAUDE.md §40.1 F-40.2). The routes check the
+ * same permissions again; hiding a link is tidiness, not security.
+ */
+const STAFF_NAV = [
+  ['Overview', [['home', '/platform/home', 'Today', null]]],
+  ['Onboarding', [['applications', '/platform/applications', 'Applications', 'application.view']]],
+  ['Gyms', [
+    ['registry', '/platform/registry', 'Gyms', 'gym.view'],
+    ['owners', '/platform/owners', 'Owners', 'platform.manage'],
+  ]],
+  ['Money', [
+    ['plans', '/platform/plans', 'Plans and prices', 'subscription.manage'],
+    ['finance', '/platform/finance', 'Finances', 'subscription.manage'],
+  ]],
+  ['Trust', [
+    ['security', '/platform/security', 'Security', 'audit.view'],
+    ['audit', '/platform/audit', 'Audit log', 'audit.view'],
+  ]],
+  ['Company', [
+    ['team', '/platform/team', 'Team', 'platform.manage'],
+    ['settings', '/platform/settings', 'Settings', 'platform.manage'],
+  ]],
+];
+
+const ICON_FOR = { home: 'today', registry: 'gyms' };
+
+function staffNav(user, active) {
+  // No permission list (a page rendered on its own, as the tests do): the
+  // whole menu, as before.
+  const may = (perm) => !perm || !Array.isArray(user.perms) || user.perms.includes(perm);
+  return STAFF_NAV.map(([group, items]) => {
+    const shown = items.filter(([, , , perm]) => may(perm));
+    if (!shown.length) return '';
+    return `<div class="grp">${h(group)}</div>
+${shown
+  .map(
+    ([key, href, label]) =>
+      `<a href="${href}"${key === active ? ' class="on" aria-current="page"' : ''}>${icon(ICON_FOR[key] || key)}${h(label)}</a>`
+  )
+  .join('\n')}`;
+  }).join('\n');
+}
 
 /**
  * The page shell.
@@ -98,12 +273,20 @@ const STYLE = `
  * `body` is inserted as-is: it is markup the caller has already built and
  * escaped. `title` is escaped, because it can carry a gym name.
  */
-export function layout({ title = 'Yoyo Gyms', body = '', user = null, indexable = false, bare = false, bodyClass = 'auth' }) {
+export function layout({
+  title = 'Yoyo Gyms',
+  body = '',
+  user = null,
+  indexable = false,
+  bare = false,
+  bodyClass = 'auth',
+  active = '',
+}) {
   // noindex is right for the staff panel and WRONG for the two public pages.
   // A signup page nobody can find is a signup page nobody uses, so `indexable`
   // is opt-in per page rather than a blanket rule.
   const robots = indexable ? 'index,follow' : 'noindex,nofollow';
-  return `<!doctype html>
+  const head = `<!doctype html>
 <html lang="en">
 <head>
 <meta charset="utf-8">
@@ -112,41 +295,62 @@ export function layout({ title = 'Yoyo Gyms', body = '', user = null, indexable 
 <title>${h(title)} · Yoyo Gyms</title>
 <style>${STYLE}</style>
 </head>
-${
+`;
+
   // A sign-in page stands alone: no panel header, the brand instead.
-  bare
-    ? `<body class="${bodyClass}">
+  if (bare) {
+    return `${head}<body class="${bodyClass}">
 <main>
 ${body}
 </main>
 </body>
-</html>`
-    : `<body>
+</html>`;
+  }
+
+  // Yoyo staff: the main admin panel.
+  if (user && user.kind !== 'gym_owner') {
+    return `${head}<body class="panel">
+<aside class="side">
+  <a class="brand" href="/platform/home"><img src="${LOGO_ON_DARK}" width="720" height="531" alt="Yoyo Gyms"></a>
+  <input type="checkbox" id="navt" class="navt" aria-label="Show the menu">
+  <label for="navt" class="navt-label">Menu</label>
+  <nav aria-label="Main admin panel">
+${staffNav(user, active)}
+  </nav>
+  <div class="me">
+    <span class="who">${h(user.email)}</span>
+    <a href="/platform/account"${active === 'account' ? ' aria-current="page"' : ''}>${icon('account')}Your account</a>
+    <a href="/platform/logout">${icon('signout')}Sign out</a>
+  </div>
+</aside>
+<main>
+${body}
+</main>
+</body>
+</html>`;
+  }
+
+  // A gym owner, or nobody signed in: the brand, and for an owner their own
+  // two links — never the staff menu (CLAUDE.md §40.1 F-40.2).
+  const owner = Boolean(user);
+  return `${head}<body>
 <header>
-  <a class="brand" href="${user ? '/platform/home' : '/platform/welcome'}"><img src="${LOGO_ON_DARK}" width="720" height="531" alt="Yoyo Gyms"></a>
+  <a class="brand" href="${owner ? '/platform/my-gym' : '/platform/welcome'}"><img src="${LOGO_ON_DARK}" width="720" height="531" alt="Yoyo Gyms"></a>
   ${
-    user
+    owner
       ? `<nav class="row">
-    <a href="/platform/home">Today</a>
-    <a href="/platform/applications">Applications</a>
-    <a href="/platform/registry">Gyms</a>
-    <a href="/platform/owners">Owners</a>
-    <a href="/platform/plans">Plans</a>
-    <a href="/platform/finance">Finances</a>
-    <a href="/platform/security">Security</a>
-    <a href="/platform/audit">Audit</a>
-    <a href="/platform/account">Account</a>
+    <a href="/platform/my-gym"${active === 'my-gym' ? ' class="on"' : ''}>My gym</a>
+    <a href="/platform/logout">Sign out</a>
   </nav>`
       : ''
   }
-  <span class="muted">${user ? h(user.email) : ''}</span>
+  <span class="muted">${owner ? h(user.email) : ''}</span>
 </header>
 <main>
 ${body}
 </main>
 </body>
-</html>`
-}`;
+</html>`;
 }
 
 /**
@@ -245,19 +449,54 @@ export function resetDonePage({ gymAccountsUpdated = 0 } = {}) {
   });
 }
 
-const statusTag = (status) => `<span class="tag">${h(status)}</span>`;
+// Coloured by what the state MEANS, so a healthy gym and a suspended one no
+// longer look the same at a glance (CLAUDE.md §40.1 F-40.6).
+const STATUS_TONE = {
+  active: 'good', approved: 'good', accepted: 'good', paid: 'good', healthy: 'good', ready: 'good',
+  submitted: 'warn', under_review: 'warn', info_requested: 'warn', pending: 'warn', past_due: 'warn', issued: 'warn',
+  invited: 'warn',
+  trialing: 'info',
+  rejected: 'bad', suspended: 'bad', cancelled: 'bad', failed: 'bad', overdue: 'bad', 'asked to close': 'bad',
+  'switched off': 'bad',
+};
 
-/** The review queue. */
-export function applicationsPage({ applications = [], user = null } = {}) {
+const statusTag = (status) =>
+  `<span class="tag${STATUS_TONE[status] ? ` tag--${STATUS_TONE[status]}` : ''}">${h(String(status ?? '').replace(/_/g, ' '))}</span>`;
+
+/**
+ * The review queue, in tabs by what each application is waiting for, with a
+ * search (CLAUDE.md §40.1 F-40.6).
+ */
+export const APPLICATION_TABS = [
+  ['review', 'To review', ['submitted', 'under_review']],
+  ['owner', 'Waiting on the owner', ['info_requested']],
+  ['approved', 'Approved', ['approved']],
+  ['rejected', 'Rejected', ['rejected']],
+  ['all', 'All', []],
+];
+
+export function applicationsPage({ applications = [], user = null, tab = 'review', counts = null, query = '' } = {}) {
+  const tabCount = (states) =>
+    counts ? (states.length ? states : Object.keys(counts)).reduce((n, s) => n + (counts[s] || 0), 0) : null;
+
+  const tabs = `<nav class="row" aria-label="Application states" style="margin:18px 0 4px">
+${APPLICATION_TABS.map(([key, label, states]) => {
+  const n = tabCount(states);
+  const href = `/platform/applications?tab=${key}${query ? `&q=${encodeURIComponent(query)}` : ''}`;
+  return `  <a class="btn${key === tab ? '' : ' ghost'}" href="${h(href)}">${h(label)}${n === null ? '' : ` <span>${h(n)}</span>`}</a>`;
+}).join('\n')}
+</nav>`;
+
   const body = applications.length
     ? `<table>
-  <thead><tr><th>Gym</th><th>City</th><th>Status</th><th>Submitted</th></tr></thead>
+  <thead><tr><th>Gym</th><th>City</th><th>Plan</th><th>Status</th><th>Submitted</th></tr></thead>
   <tbody>
 ${applications
   .map(
     (a) => `    <tr>
-      <td><a href="/platform/applications/${h(a.id)}">${h(a.proposed_gym_name || 'Unnamed')}</a></td>
-      <td>${h(a.city)}</td>
+      <td><a href="/platform/applications/${h(a.id)}"><b>${h(a.proposed_gym_name || 'Unnamed')}</b></a></td>
+      <td>${h(a.city)}${a.country ? ` <span class="muted">${h(a.country)}</span>` : ''}</td>
+      <td>${h(a.requested_plan_key || '—')}</td>
       <td>${statusTag(a.status)}</td>
       <td class="muted">${h(when(a.submitted_at))}</td>
     </tr>`
@@ -265,19 +504,57 @@ ${applications
   .join('\n')}
   </tbody>
 </table>`
-    : `<div class="empty">No applications waiting for review.</div>`;
+    : `<div class="empty">${
+        query
+          ? 'No applications match that search.'
+          : tab === 'review'
+            ? 'No applications waiting for review.'
+            : 'No applications here.'
+      }</div>`;
 
   return layout({
+    active: 'applications',
     title: 'Applications',
     user,
     body: `<h1>Applications</h1>
-<p class="muted">Every gym is reviewed by a person before it appears in app search.</p>
+<p class="lede">Every gym is reviewed by a person before it appears in app search. A gym is approved
+once its ID, business registration and proof of address have each been accepted.</p>
+${tabs}
+<form class="card row" method="get" action="/platform/applications">
+  <input type="hidden" name="tab" value="${h(tab)}">
+  <label style="flex:1">Search<input name="q" value="${h(query)}" placeholder="gym name or city"></label>
+  <button type="submit">Search</button>
+</form>
 ${body}`,
   });
 }
 
-/** One application: documents, history, and the decision. */
-export function applicationDetailPage({ application, documents = [], events = [], user = null, csrfToken = '' }) {
+/** One required document's line on the checklist. */
+function requiredLine(type, documents) {
+  const ofType = documents.filter((d) => d.doc_type === type);
+  const accepted = ofType.some((d) => d.status === 'accepted');
+  const waiting = ofType.some((d) => d.status === 'pending');
+  const state = accepted
+    ? 'accepted'
+    : waiting
+      ? 'uploaded — waiting for you to check it'
+      : ofType.length
+        ? 'rejected — waiting for a new file'
+        : 'not uploaded yet';
+  return `<li class="${accepted ? 'ok' : ''}"><b>${h(DOCUMENT_LABELS[type] || type)}</b> <span class="muted">· ${h(state)}</span></li>`;
+}
+
+/** One application: who applied, their documents, the history, and the decision. */
+export function applicationDetailPage({
+  application,
+  applicant = null,
+  documents = [],
+  events = [],
+  user = null,
+  csrfToken = '',
+}) {
+  const missing = missingRequiredDocuments(documents);
+
   const docs = documents.length
     ? `<table>
   <thead><tr><th>Document</th><th>File</th><th>Status</th><th>Decide</th></tr></thead>
@@ -285,8 +562,10 @@ export function applicationDetailPage({ application, documents = [], events = []
 ${documents
   .map(
     (d) => `    <tr>
-      <td>${h(d.doc_type)}</td>
-      <td><a href="/platform/documents/${h(d.id)}" target="_blank" rel="noopener">${h(d.filename || 'open')}</a></td>
+      <td>${h(DOCUMENT_LABELS[d.doc_type] || d.doc_type)}${
+        REQUIRED_DOCUMENTS.includes(d.doc_type) ? ' <span class="muted">· required</span>' : ''
+      }</td>
+      <td><a href="/platform/documents/${h(d.id)}">${h(d.filename || 'open')}</a></td>
       <td>${statusTag(d.status)}${d.reject_reason ? `<br><span class="muted">${h(d.reject_reason)}</span>` : ''}</td>
       <td>${
         d.status === 'pending'
@@ -294,7 +573,7 @@ ${documents
         <input type="hidden" name="csrf" value="${h(csrfToken)}">
         <button type="submit" name="action" value="accept">Accept</button>
         <input name="reason" placeholder="Reason, if rejecting">
-        <button type="submit" name="action" value="reject">Reject</button>
+        <button type="submit" name="action" value="reject" class="ghost">Reject</button>
       </form>`
           : '<span class="muted">decided</span>'
       }</td>
@@ -303,14 +582,15 @@ ${documents
   .join('\n')}
   </tbody>
 </table>
-<p class="muted">Opening a document is recorded in the audit log: who opened it, and when.</p>`
-    : `<div class="empty">No documents uploaded.</div>`;
+<p class="muted">Open a document to see it beside what the applicant told us. Opening one is recorded
+in the audit log: who opened it, and when.</p>`
+    : `<div class="empty">No documents uploaded yet.</div>`;
 
   const history = events.length
     ? `<ul class="events">
 ${events
   .map(
-    (e) => `  <li><b>${h(e.event)}</b> <span class="muted">${h(exact(e.created_at))}</span>${
+    (e) => `  <li><b>${h(String(e.event || '').replace(/_/g, ' '))}</b> <span class="muted">${h(exact(e.created_at))}</span>${
       e.reason ? `<br>${h(e.reason)}` : ''
     }</li>`
   )
@@ -319,37 +599,98 @@ ${events
     : `<p class="muted">No history yet.</p>`;
 
   const decided = ['approved', 'rejected'].includes(application.status);
+  const a = application;
+
+  const who = `<div class="card">
+  <h2>Applicant</h2>
+  <dl class="facts">
+    <dt>Owner</dt><dd>${h(applicant?.full_name || '—')}</dd>
+    <dt>Email</dt><dd>${applicant?.email ? `<a href="mailto:${h(applicant.email)}">${h(applicant.email)}</a>` : '—'}</dd>
+    <dt>Phone</dt><dd>${a.owner_phone ? `<a href="tel:${h(a.owner_phone)}">${h(a.owner_phone)}</a>` : '<span class="muted">not given</span>'}</dd>
+    <dt>Plan</dt><dd>${h(a.requested_plan_key || '—')}</dd>
+    <dt>Expected members</dt><dd>${h(a.estimated_members ?? '—')}</dd>
+    <dt>Applied</dt><dd>${h(exact(a.submitted_at)) || '—'}</dd>
+  </dl>
+</div>`;
+
+  const gym = `<div class="card">
+  <h2>Gym</h2>
+  <dl class="facts">
+    <dt>Name</dt><dd><b>${h(a.proposed_gym_name || '—')}</b></dd>
+    <dt>Street address</dt><dd>${h(a.gym_address) || '<span class="muted">not given</span>'}</dd>
+    <dt>City</dt><dd>${h(a.city) || '—'}${a.country ? `, ${h(a.country)}` : ''}</dd>
+    <dt>Search name</dt><dd class="muted">${h(a.slug || '—')}</dd>
+    <dt>What they need</dt><dd>${h(a.owner_needs) || '<span class="muted">nothing added</span>'}</dd>
+  </dl>
+</div>`;
+
+  const checklist = `<div class="card">
+  <h2>Required before approval</h2>
+  <ul class="checklist">
+    ${REQUIRED_DOCUMENTS.map((t) => requiredLine(t, documents)).join('\n    ')}
+  </ul>
+  ${
+    missing.length
+      ? '<p class="muted">Approve becomes available once all three are accepted.</p>'
+      : '<p class="muted">All three are accepted.</p>'
+  }
+</div>`;
+
+  const decision = decided
+    ? `<div class="card"><p class="muted">This application has been decided. Decisions are final; the owner
+may submit a new application.${
+        a.status === 'approved' && a.slug
+          ? ` <a href="/platform/registry?q=${h(encodeURIComponent(a.slug))}">Find the gym in the registry →</a>`
+          : ''
+      }</p></div>`
+    : `<form class="card" method="post" action="/platform/applications/${h(a.id)}/decide">
+  <input type="hidden" name="csrf" value="${h(csrfToken)}">
+  <h2>Decision</h2>
+  <label>Message to the owner
+    <textarea name="reason" rows="3" placeholder="Required to reject or to ask for more. The owner is emailed this."></textarea>
+  </label>
+  <div class="row">
+    <button type="submit" name="action" value="approve"${missing.length ? ' disabled' : ''}>Approve and provision</button>
+    <button type="submit" name="action" value="request_info" class="ghost">Request information</button>
+    <button type="submit" name="action" value="reject" class="danger">Reject</button>
+  </div>
+  <p class="muted">${
+    missing.length
+      ? `Approve is unavailable until the required documents are accepted: ${h(
+          missing.map((t) => DOCUMENT_LABELS[t] || t).join(', ')
+        )}.`
+      : 'Approving creates this gym and emails the owner their activation link.'
+  } Rejecting, or asking for more, emails the owner your message.</p>
+</form>`;
 
   return layout({
-    title: application.proposed_gym_name || 'Application',
+    active: 'applications',
+    title: a.proposed_gym_name || 'Application',
     user,
-    body: `<h1>${h(application.proposed_gym_name || 'Application')}</h1>
-<p class="row"><span class="muted">${h(application.city)} ${h(application.country)}</span> ${statusTag(application.status)}</p>
-${application.decision_reason ? `<p class="muted">Reason: ${h(application.decision_reason)}</p>` : ''}
+    body: `<p><a href="/platform/applications">← All applications</a></p>
+<h1>${h(a.proposed_gym_name || 'Application')}</h1>
+<p class="row">${statusTag(a.status)} <span class="muted">${h(a.city)} ${h(a.country)}</span></p>
+${a.decision_reason ? `<div class="card"><b>Reason given:</b> ${h(a.decision_reason)}</div>` : ''}
+${
+  a.status === 'info_requested' && a.review_notes
+    ? `<div class="card"><b>Asked of the owner:</b> ${h(a.review_notes)}</div>`
+    : ''
+}
+
+<div class="grid2">
+${who}
+${gym}
+</div>
+
+${checklist}
 
 <h2>Documents</h2>
 ${docs}
 
-<h2>History</h2>
-${history}
+${decision}
 
-${
-  decided
-    ? `<p class="muted">This application has been decided. Decisions are final; the owner may submit a new application.</p>`
-    : `<h2>Decision</h2>
-<form class="card" method="post" action="/platform/applications/${h(application.id)}/decide">
-  <input type="hidden" name="csrf" value="${h(csrfToken)}">
-  <label>Reason or message
-    <textarea name="reason" rows="3"></textarea>
-  </label>
-  <div class="row">
-    <button type="submit" name="action" value="approve">Approve and provision</button>
-    <button type="submit" name="action" value="request_info">Request information</button>
-    <button type="submit" name="action" value="reject">Reject</button>
-  </div>
-  <p class="muted">Approving creates this gym's database. Rejecting requires a reason.</p>
-</form>`
-}`,
+<h2>History</h2>
+${history}`,
   });
 }
 
@@ -428,29 +769,40 @@ ${error ? `<p class="err">${h(error)}</p>` : ''}
     </label>
   </div>
 
-  <label>Choose a password
-    <input type="password" name="password" required minlength="10" autocomplete="new-password">
-    <span class="muted">At least 10 characters. You will use it to follow your application and upload your documents.</span>
-  </label>
+  <div class="two">
+    <label>Choose a password
+      <input type="password" name="password" required minlength="10" autocomplete="new-password">
+      <span class="muted">At least 10 characters. You will use it to follow your application and upload your documents.</span>
+    </label>
+    <label>Your phone number
+      <input type="tel" name="phone" required autocomplete="tel" placeholder="+27 82 123 4567" value="${h(values.phone)}">
+      <span class="muted">With the country code. We call if anything needs checking.</span>
+    </label>
+  </div>
 
   <div class="two">
     <label>Gym name
       <input name="gym_name" required value="${h(values.gym_name)}">
       <span class="muted">This is the name your members will search for.</span>
     </label>
-    <label>City
-      <input name="city" required value="${h(values.city)}">
+    <label>Gym street address
+      <input name="address" required autocomplete="street-address" value="${h(values.address)}">
+      <span class="muted">Where members train. It should match your proof of address.</span>
     </label>
   </div>
 
   <div class="two">
+    <label>City
+      <input name="city" required value="${h(values.city)}">
+    </label>
     <label>Country
       <input name="country" maxlength="2" placeholder="ZA" required value="${h(values.country)}">
     </label>
-    <label>Roughly how many members?
-      <input type="number" name="estimated_members" min="0" value="${h(values.estimated_members)}">
-    </label>
   </div>
+
+  <label>Roughly how many members?
+    <input type="number" name="estimated_members" min="0" value="${h(values.estimated_members)}">
+  </label>
 
   <h2>Choose your plan</h2>
   <div class="plans">
@@ -458,12 +810,13 @@ ${error ? `<p class="err">${h(error)}</p>` : ''}
   </div>
 
   <label>Is there anything your gym needs that this does not do?
-    <textarea name="needs" rows="3" placeholder="Optional — but it genuinely shapes what we build next."></textarea>
+    <textarea name="needs" rows="3" placeholder="Optional — but it genuinely shapes what we build next.">${h(values.needs)}</textarea>
   </label>
 
   <button type="submit">Submit application</button>
-  <p class="muted">We will ask for your business registration, ID, proof of premises and tax
-  clearance before approving. Nothing is charged until your gym is live.</p>
+  <p class="muted">After you apply, you upload three documents from your account page: <b>your ID</b>,
+  <b>your business registration</b> and <b>proof of the gym's address</b>. Your gym is approved once
+  all three have been checked. Nothing is charged until your gym is live.</p>
 </form>`,
   });
 }
@@ -535,39 +888,55 @@ function pager(page, basePath, params = {}) {
 </p>`;
 }
 
-export function registryPage({ gyms = [], user = null, canSuspend = false, filter = {}, page = null } = {}) {
+/** A gym's counts, as a person reads them. */
+const statCell = (value) => (value === null || value === undefined ? '<span class="muted">—</span>' : h(value));
+
+/**
+ * Every gym, with what it is doing (CLAUDE.md §40.1 F-40.7): members,
+ * check-ins this month and the last check-in, read as COUNTS ONLY (D-130).
+ */
+export function registryPage({ gyms = [], user = null, canSuspend = false, filter = {}, page = null, stats = null } = {}) {
+  const of = (g) => (stats && typeof stats.get === 'function' ? stats.get(g.id) : null) || null;
+
   const body = gyms.length
     ? `<table>
-  <thead><tr><th>Gym</th><th>City</th><th>Plan</th><th>Status</th><th>Billing</th></tr></thead>
+  <thead><tr><th>Gym</th><th>Plan</th><th>Status</th><th>Billing</th><th>Active members</th><th>Check-ins this month</th><th>Last check-in</th></tr></thead>
   <tbody>
 ${gyms
-  .map(
-    (g) => `    <tr>
-      <td><a href="/platform/registry/${h(g.id)}">${h(g.search_name || g.slug)}</a></td>
-      <td>${h(g.city)}</td>
+  .map((g) => {
+    const s = of(g);
+    const unreachable = s && s.reachable === false;
+    return `    <tr>
+      <td><a href="/platform/registry/${h(g.id)}"><b>${h(g.search_name || g.slug)}</b></a><br><span class="muted">${h(g.city)}${
+        g.country ? `, ${h(g.country)}` : ''
+      }</span></td>
       <td>${h(g.plan_key || '—')}</td>
       <td>${statusTag(g.status)}</td>
       <td>${statusTag(g.subscription_status || 'none')}</td>
-    </tr>`
-  )
+      <td>${unreachable ? '<span class="tag tag--bad">unreachable</span>' : statCell(s?.activeMembers)}</td>
+      <td>${unreachable ? '' : statCell(s?.checkinsThisMonth)}</td>
+      <td class="muted">${s?.lastActivityAt ? h(when(s.lastActivityAt)) : unreachable ? '' : 'none yet'}</td>
+    </tr>`;
+  })
   .join('\n')}
   </tbody>
 </table>`
-    : `<div class="empty">No gyms have been provisioned yet.</div>`;
+    : `<div class="empty">${filter.query || filter.status ? 'No gyms match that search.' : 'No gyms have been provisioned yet.'}</div>`;
 
   return layout({
+    active: 'registry',
     title: 'Gyms',
     user,
     body: `<h1>Gyms</h1>
-<p class="muted">${
+<p class="lede">${
       page && page.total !== null
         ? `${h(count(page.total, 'gym'))} on the platform.`
         : `${h(count(gyms.length, 'gym'))} shown.`
-    }${canSuspend ? '' : ' You have read-only access.'}</p>
-<p><a href="/platform/reconcile">Check for drift →</a></p>
+    }${canSuspend ? '' : ' You have read-only access.'} Figures are counts only — the platform never
+reads a member's name, phone or health answers.</p>
 
 <form class="card row" method="get" action="/platform/registry">
-  <label>Search<input name="q" value="${h(filter.query)}" placeholder="gym name or slug"></label>
+  <label style="flex:1">Search<input name="q" value="${h(filter.query)}" placeholder="gym name, city or search name"></label>
   <label>Status
     <select name="status">
       <option value="">Any</option>
@@ -577,25 +946,32 @@ ${gyms
     </select>
   </label>
   <button type="submit">Search</button>
+  <a class="btn ghost" href="/platform/reconcile">Check for drift</a>
 </form>
 ${body}
 ${pager(page, '/platform/registry', { q: filter.query, status: filter.status })}`,
   });
 }
 
-/** One gym: what it is, what it pays, and the two buttons that change that. */
+/** One gym: what it is, who runs it, what it does, what it pays — and the controls. */
 export function gymDetailPage({
   gym,
   subscription = null,
   invoices = [],
+  owner = null,
+  plan = null,
+  application = null,
   user = null,
   csrfToken = '',
   canSuspend = false,
   canBill = false,
+  canOnboard = false,
   plans = [],
   stats = null,
+  notice = '',
 }) {
   const suspended = gym.status === 'suspended';
+  const limit = plan?.max_active_members ?? null;
 
   // The control is rendered only for someone who may use it. Hiding a button
   // is not the security boundary — the router checks the permission again —
@@ -603,18 +979,29 @@ export function gymDetailPage({
   const controls = canSuspend
     ? `<form class="card" method="post" action="/platform/registry/${h(gym.id)}/${
         suspended ? 'reactivate' : 'suspend'
-      }">
+      }" style="border-color:${suspended ? 'var(--line)' : 'rgba(255,107,94,.35)'}">
   <input type="hidden" name="csrf" value="${h(csrfToken)}">
   <h2>${suspended ? 'Reactivate this gym' : 'Suspend this gym'}</h2>
   <p class="muted">${
     suspended
-      ? 'Members and staff will be able to sign in again immediately.'
-      : 'Members and staff will be locked out until it is reactivated. <b>No data is deleted.</b>'
+      ? 'Members and staff will be able to sign in again within a minute.'
+      : 'Members and staff will be locked out within a minute — on the app and on every web address. <b>No data is deleted.</b>'
   }</p>
   <label>Reason<input name="reason" placeholder="Why?" ${suspended ? '' : 'required'}></label>
-  <button type="submit">${suspended ? 'Reactivate' : 'Suspend'}</button>
+  <button type="submit"${suspended ? '' : ' class="danger"'}>${suspended ? 'Reactivate' : 'Suspend'}</button>
 </form>`
     : '';
+
+  const resend =
+    canOnboard && gym.status === 'pending' && gym.owner_user_id
+      ? `<form class="card" method="post" action="/platform/registry/${h(gym.id)}/resend-activation">
+  <input type="hidden" name="csrf" value="${h(csrfToken)}">
+  <h2>The owner has not activated yet</h2>
+  <p class="muted">The gym opens when the owner uses the link and code from their activation email.
+  If it was lost or the 48 hours ran out, send a new one — the old link stops working.</p>
+  <button type="submit">Send a new activation link</button>
+</form>`
+      : '';
 
   const bills = invoices.length
     ? `<table>
@@ -630,33 +1017,69 @@ ${invoices
 </table>`
     : `<div class="empty">No invoices yet.</div>`;
 
+  const activity = stats
+    ? stats.reachable
+      ? `<div class="kpis">
+  <div class="kpi"><div class="lbl">Active members</div><div class="val">${h(stats.activeMembers ?? '—')}</div>
+    <div class="sub">${limit ? `of ${h(limit)} on ${h(plan?.label || gym.plan_key)}` : 'no plan limit'}</div></div>
+  <div class="kpi"><div class="lbl">Check-ins this month</div><div class="val">${h(stats.checkinsThisMonth ?? '—')}</div></div>
+  <div class="kpi"><div class="lbl">Last check-in</div><div class="val" style="font-size:18px">${
+    stats.lastActivityAt ? h(when(stats.lastActivityAt)) : 'none yet'
+  }</div></div>
+  <div class="kpi"><div class="lbl">Subscription</div><div class="val" style="font-size:18px">${
+    subscription ? statusTag(subscription.status) : statusTag('none')
+  }</div></div>
+</div>
+<p class="muted"><b>Counts only.</b> The platform never reads a member's name, phone,
+ID or health answers — only how many there are. Every one of these reads is
+written to the audit log with your name on it.</p>`
+      : `<div class="card" style="border-color:rgba(255,107,94,.35)"><p>⚠️ This gym's data could not be reached, so there are no counts.
+         That is worth looking into — it usually means the gym is not serving traffic either.</p></div>`
+    : '';
+
   return layout({
+    active: 'registry',
     title: gym.search_name || gym.slug,
     user,
     body: `<p><a href="/platform/registry">← All gyms</a></p>
 <h1>${h(gym.search_name || gym.slug)}</h1>
-<p class="muted">${h(gym.city)}${gym.country ? `, ${h(gym.country)}` : ''} · ${statusTag(gym.status)}</p>
+<p class="row">${statusTag(gym.status)} <span class="tag">${h(gym.plan_key || 'no plan')}</span>
+<span class="muted">${h(gym.city)}${gym.country ? `, ${h(gym.country)}` : ''}</span></p>
+${notice ? `<div class="card" style="border-color:rgba(142,224,122,.4)">${h(notice)}</div>` : ''}
 
-${
-  stats
-    ? `<div class="card">
-  <h2>Activity</h2>
+${activity}
+
+<div class="grid2">
+<div class="card">
+  <h2>Owner</h2>
   ${
-    stats.reachable
-      ? `<table><tbody>
-    <tr><td class="muted">Active members</td><td><b>${h(stats.activeMembers ?? '—')}</b></td></tr>
-    <tr><td class="muted">Check-ins this month</td><td>${h(stats.checkinsThisMonth ?? '—')}</td></tr>
-    <tr><td class="muted">Last check-in</td><td>${h(stats.lastActivityAt) || '<span class="muted">none yet</span>'}</td></tr>
-  </tbody></table>
-  <p class="muted"><b>Counts only.</b> The platform never reads a member's name, phone,
-  ID or health answers — only how many there are. Every one of these reads is
-  written to the audit log with your name on it.</p>`
-      : `<p class="muted">⚠️ This gym's data could not be reached, so there are no counts.
-         That is worth looking into — it usually means the gym is not serving traffic either.</p>`
+    owner
+      ? `<dl class="facts">
+    <dt>Name</dt><dd>${h(owner.full_name || '—')}</dd>
+    <dt>Email</dt><dd><a href="mailto:${h(owner.email)}">${h(owner.email)}</a></dd>
+    <dt>Phone</dt><dd>${
+      application?.owner_phone ? `<a href="tel:${h(application.owner_phone)}">${h(application.owner_phone)}</a>` : '<span class="muted">not given</span>'
+    }</dd>
+    <dt>Account</dt><dd>${statusTag(owner.is_active === false ? 'switched off' : 'active')}</dd>
+    <dt>Last sign-in</dt><dd class="muted">${owner.last_login_at ? h(when(owner.last_login_at)) : 'not yet'}</dd>
+  </dl>
+  <p><a href="/platform/owners?q=${h(encodeURIComponent(owner.email))}">Manage this owner →</a></p>`
+      : '<p class="muted">No owner is recorded for this gym.</p>'
   }
-</div>`
-    : ''
-}
+</div>
+<div class="card">
+  <h2>Gym</h2>
+  <dl class="facts">
+    <dt>Search name</dt><dd>${h(gym.slug)}</dd>
+    <dt>Admin sign-in</dt><dd><a href="${h(gymAdminPath(gym.slug))}" target="_blank" rel="noopener">${h(gymAdminPath(gym.slug))}</a></dd>
+    <dt>Plan</dt><dd>${h(plan?.label || gym.plan_key || '—')}${
+      plan && Number.isInteger(plan.price_cents) ? ` <span class="muted">· ${h(fmtMoney(plan.price_cents, plan.currency || 'ZAR'))} a month</span>` : ''
+    }</dd>
+    <dt>On the platform since</dt><dd class="muted">${h(when(gym.created_at)) || '—'}</dd>
+    ${application?.id ? `<dt>Application</dt><dd><a href="/platform/applications/${h(application.id)}">Open →</a></dd>` : ''}
+  </dl>
+</div>
+</div>
 
 <div class="card">
   <h2>Subscription</h2>
@@ -669,6 +1092,8 @@ ${
       : `<p class="muted">No subscription record.</p>`
   }
 </div>
+
+${resend}
 
 ${
   canBill && plans.length
@@ -831,6 +1256,7 @@ export function driftPage({ report, user = null, csrfToken = '' }) {
     items.length ? `<ul>${items.map(render).join('')}</ul>` : '<div class="empty">None.</div>';
 
   return layout({
+    active: 'registry',
     title: 'Drift report',
     user,
     body: `<p><a href="/platform/registry">← All gyms</a></p>
@@ -948,6 +1374,41 @@ ${gymLogin}`,
  * is only the things that are between the owner and Yoyo Gyms: the
  * application, the documents, the subscription, and the way in.
  */
+/**
+ * What an owner is told about their application, in words (CLAUDE.md §40.1
+ * F-40.5). The reviewer's request and the reason for a refusal used to live
+ * only on the staff screen; the owner saw a status word and nothing else.
+ */
+function ownerApplicationText(application) {
+  switch (application.status) {
+    case 'info_requested':
+      return `<p><b>We need something more from you:</b> ${h(application.review_notes) || 'please check your email.'}</p>
+  <p class="muted">Upload it below and the review carries on straight away.</p>`;
+    case 'rejected':
+      return `<p><b>Your application was not approved.</b>${
+        application.decision_reason ? ` Reason: ${h(application.decision_reason)}` : ''
+      }</p>
+  <p class="muted">You are welcome to apply again once that is resolved. <a href="/platform/apply">Apply again →</a></p>`;
+    default:
+      return `<p class="muted">A person is reviewing your application. Upload the three documents below —
+  your gym is approved once each has been checked. We email you as soon as there is a decision.</p>`;
+  }
+}
+
+/** One required document, as the owner sees it. */
+function ownerRequiredLine(type, documents) {
+  const ofType = documents.filter((d) => d.doc_type === type);
+  const accepted = ofType.some((d) => d.status === 'accepted');
+  const state = accepted
+    ? 'checked'
+    : ofType.some((d) => d.status === 'pending')
+      ? 'received — being checked'
+      : ofType.length
+        ? 'not accepted — please upload a new one'
+        : 'please upload';
+  return `<li class="${accepted ? 'ok' : ''}"><b>${h(DOCUMENT_LABELS[type] || type)}</b> <span class="muted">· ${h(state)}</span></li>`;
+}
+
 export function ownerDashboardPage({
   user = null,
   application = null,
@@ -991,9 +1452,9 @@ ${documents
   <input type="hidden" name="application_id" value="${h(application.id)}">
   <label>What is it?
     <select name="doc_type">
-      <option value="business_registration">Business registration</option>
-      <option value="id_document">Your ID</option>
-      <option value="proof_of_address">Proof of address</option>
+      <option value="id_document">Your ID (required)</option>
+      <option value="business_registration">Business registration (required)</option>
+      <option value="proof_of_address">Proof of the gym's address (required)</option>
       <option value="tax_clearance">Tax clearance</option>
       <option value="insurance">Insurance</option>
       <option value="lease_agreement">Lease agreement</option>
@@ -1102,7 +1563,15 @@ ${documents
       ? `<div class="card">
   <h2>${h(application.proposed_gym_name)}</h2>
   <p>${statusTag(application.status)}</p>
-  <p class="muted">A person is reading your application. We will email you when there is a decision.</p>
+  ${ownerApplicationText(application)}
+  ${
+    application.status === 'rejected'
+      ? ''
+      : `<h2 style="margin-top:18px">Before your gym can be approved</h2>
+  <ul class="checklist">
+    ${REQUIRED_DOCUMENTS.map((t) => ownerRequiredLine(t, documents)).join('\n    ')}
+  </ul>`
+  }
 </div>`
       : `<div class="empty">No application found for this account.</div>`;
 
@@ -1128,8 +1597,9 @@ ${documents
 </details>`;
 
   return layout({
+    active: 'my-gym',
     title: 'Your gym',
-    user,
+    user: user && { ...user, kind: 'gym_owner' },
     body: `<h1>Your gym</h1>
 ${status}
 ${agreementCard}
@@ -1184,17 +1654,7 @@ export function deleteAccountPage() {
 
 /** Turn a stored doc_type into something a person would say. */
 function readableDocType(key) {
-  return (
-    {
-      business_registration: 'Business registration',
-      id_document: 'ID document',
-      proof_of_address: 'Proof of address',
-      tax_clearance: 'Tax clearance',
-      insurance: 'Insurance',
-      lease_agreement: 'Lease agreement',
-      other_supporting: 'Supporting document',
-    }[key] || key
-  );
+  return DOCUMENT_LABELS[key] || key;
 }
 
 // ---------------------------------------------------------------------------
@@ -1216,6 +1676,7 @@ export function plansPage({ plans = [], user = null, csrfToken = '', error = '' 
   const unpriced = plans.filter((p) => !Number.isInteger(p.price_cents) || p.price_cents <= 0);
 
   return layout({
+    active: 'plans',
     title: 'Plans and prices',
     user,
     body: `<h1>Plans and prices</h1>
@@ -1294,6 +1755,7 @@ ${entries
     : `<div class="empty">Nothing matches that filter.</div>`;
 
   return layout({
+    active: 'audit',
     title: 'Audit log',
     user,
     body: `<h1>Audit log</h1>
@@ -1342,14 +1804,14 @@ ${owners
       <td>${h(o.full_name || '—')}</td>
       <td>${h(o.email)}</td>
       <td>${h(o.gym_count ?? 0)}</td>
-      <td>${statusTag(o.is_active === false ? 'suspended' : 'active')}${
+      <td>${statusTag(o.is_active === false ? 'switched off' : 'active')}${
         o.closure_requested_at && o.is_active !== false ? ` ${statusTag('asked to close')}` : ''
       }</td>
       <td><form method="post" action="/platform/owners/${h(o.id)}/${
         o.is_active === false ? 'reactivate' : 'deactivate'
       }">
         <input type="hidden" name="csrf" value="${h(csrfToken)}">
-        <button type="submit">${o.is_active === false ? 'Switch on' : 'Switch off'}</button>
+        <button type="submit"${o.is_active === false ? '' : ' class="danger"'}>${o.is_active === false ? 'Switch on' : 'Switch off'}</button>
       </form></td>
     </tr>`
   )
@@ -1359,6 +1821,7 @@ ${owners
     : `<div class="empty">No owners match that search.</div>`;
 
   return layout({
+    active: 'owners',
     title: 'Gym owners',
     user,
     body: `<h1>Gym owners</h1>
@@ -1385,6 +1848,7 @@ export function financePage({ summary = {}, user = null } = {}) {
   const unpriced = summary.unpriced_plans || [];
 
   return layout({
+    active: 'finance',
     title: 'Finances',
     user,
     body: `<h1>Finances</h1>
@@ -1439,8 +1903,9 @@ gyms — <b>never a member's payment to their gym</b>, which the platform does n
  * the reviewer navigates away without copying them, a new activation must be
  * issued, which is correct rather than inconvenient.
  */
-export function activationHandoverPage({ activation = {}, gymName = '', applicationId = '', user = null }) {
+export function activationHandoverPage({ activation = {}, gymName = '', applicationId = '', backHref = '', user = null }) {
   return layout({
+    active: 'applications',
     title: 'Send this to the owner',
     user,
     body: `<h1>Approved — now send this to the owner</h1>
@@ -1467,7 +1932,9 @@ export function activationHandoverPage({ activation = {}, gymName = '', applicat
   <p><b>This is shown once.</b> Only hashes are stored, so this page is the only
   place these values exist. If you navigate away without copying them, issue a new
   activation instead — nothing is lost, the owner simply gets a fresh link.</p>
-  <p><a href="/platform/applications/${h(applicationId)}">Back to the application →</a></p>
+  <p><a class="btn" href="${h(backHref || `/platform/applications/${applicationId}`)}">${
+    backHref ? 'Back to the gym' : 'Back to the application'
+  } →</a></p>
 </div>`,
   });
 }
@@ -1507,12 +1974,18 @@ export function documentReviewPage({
   // The document itself. An <object> for PDFs because it falls back cleanly
   // when the browser has no viewer, which is exactly when a reviewer needs to
   // be told rather than shown a blank rectangle.
+  // ALWAYS-VISIBLE controls (CLAUDE.md §40.1 F-40.8). Most phone browsers
+  // show an embedded PDF as a blank box, and the fallback inside <object>
+  // only appears where it is not needed.
+  const tools = `<p class="row">
+  <a class="btn" href="${src}" target="_blank" rel="noopener">Open in a new tab</a>
+  <a class="btn ghost" href="${src}?download=1">Download</a>
+</p>`;
   const viewer = isImage
-    ? `<img src="${src}" alt="${h(doc.filename)}" style="max-width:100%;border:1px solid var(--line);border-radius:8px">`
-    : `<object data="${src}" type="application/pdf" style="width:100%;height:78vh;border:1px solid var(--line);border-radius:8px">
+    ? `${tools}<img src="${src}" alt="${h(doc.filename)}" style="max-width:100%;border:1px solid var(--line);border-radius:12px">`
+    : `${tools}<object data="${src}" type="application/pdf" style="width:100%;height:78vh;border:1px solid var(--line);border-radius:12px;background:#fff">
   <div class="empty">
-    <p>Your browser cannot display this file inline.</p>
-    <p><a href="${src}" target="_blank" rel="noopener">Open it in a new tab →</a></p>
+    <p>This browser cannot show the PDF here. Use <b>Open in a new tab</b> or <b>Download</b> above.</p>
   </div>
 </object>`;
 
@@ -1554,7 +2027,7 @@ export function documentReviewPage({
     <tbody>
       <tr><td class="muted">Gym</td><td><b>${h(application.proposed_gym_name)}</b></td></tr>
       <tr><td class="muted">City</td><td>${h(application.city)} ${h(application.country)}</td></tr>
-      <tr><td class="muted">Document type</td><td>${h(doc.doc_type)}</td></tr>
+      <tr><td class="muted">Document type</td><td>${h(DOCUMENT_LABELS[doc.doc_type] || doc.doc_type)}</td></tr>
       <tr><td class="muted">Applied</td><td>${h(when(application.submitted_at))}</td></tr>
     </tbody>
   </table>
@@ -1573,7 +2046,7 @@ export function documentReviewPage({
   </label>
   <div class="row">
     <button type="submit" name="action" value="accept">Accept</button>
-    <button type="submit" name="action" value="reject">Reject</button>
+    <button type="submit" name="action" value="reject" class="ghost">Reject</button>
   </div>
 </form>`
       : `<div class="card"><p class="muted">${
@@ -1581,6 +2054,7 @@ export function documentReviewPage({
         }${doc.reject_reason ? ` ${h(doc.reject_reason)}` : ''}</p></div>`;
 
   return layout({
+    active: 'applications',
     title: doc.filename || 'Document',
     user,
     body: `<p><a href="/platform/applications/${h(doc.application_id)}">← Back to the application</a></p>
@@ -1663,6 +2137,7 @@ export function securityPage({ alerts = [], windowHours = 24, user = null }) {
 </div>`;
 
   return layout({
+    active: 'security',
     title: 'Security',
     user,
     body: `<h1>Security</h1>
@@ -1703,7 +2178,7 @@ function auditFilterFor(code) {
  * the two requests: there is no session yet, and a half-finished setup should
  * leave nothing behind. Reloading simply mints a new one.
  */
-export function setupPage({ token = '', email = '', secret = '', otpauth = '', error = '' } = {}) {
+export function setupPage({ token = '', email = '', secret = '', otpauth = '', error = '', action = '/platform/setup' } = {}) {
   return layout({
     title: 'Set up your account',
     body: `<h1>Set up your platform account</h1>
@@ -1720,7 +2195,7 @@ ${error ? `<p class="err">${h(error)}</p>` : ''}
   <p class="muted"><a href="${h(otpauth)}">Open in your authenticator app →</a></p>
 </div>
 
-<form class="card" method="post" action="/platform/setup">
+<form class="card" method="post" action="${h(action)}">
   <input type="hidden" name="token" value="${h(token)}">
   <input type="hidden" name="secret" value="${h(secret)}">
   <h2>2. Choose a password</h2>
@@ -1750,7 +2225,7 @@ ${error ? `<p class="err">${h(error)}</p>` : ''}
 }
 
 /** The recovery codes, shown once and never again. */
-export function setupDonePage({ recoveryCodes = [] } = {}) {
+export function setupDonePage({ recoveryCodes = [], invited = false } = {}) {
   return layout({
     title: 'Account ready',
     body: `<h1>Your account is ready</h1>
@@ -1769,9 +2244,13 @@ export function setupDonePage({ recoveryCodes = [] } = {}) {
 
 <div class="card">
   <p><a href="/platform/login">Sign in →</a></p>
-  <p class="muted">Remove <code>PLATFORM_SETUP_TOKEN</code> from your environment now.
+  ${
+    invited
+      ? ''
+      : `<p class="muted">Remove <code>PLATFORM_SETUP_TOKEN</code> from your environment now.
   It is no longer needed — this account already has a password, so the setup page
-  would refuse it anyway, but a secret nobody needs is a secret not worth keeping.</p>
+  would refuse it anyway, but a secret nobody needs is a secret not worth keeping.</p>`
+  }
 </div>`,
   });
 }
@@ -1830,13 +2309,17 @@ export function paymentResultPage({ ok = false, reason = '', alreadyPaid = false
  * variable, a seed that has not been run). Attacker-facing refusals still say
  * one generic thing and no more.
  */
-export function problemPage({ title = 'Something went wrong', message = '', fix = null } = {}) {
+export function problemPage({ title = 'Something went wrong', message = '', fix = null, back = null, user = null } = {}) {
   return layout({
     title,
+    // Inside the panel when a staff member hit it, so the way on is the menu
+    // they already know — not a dead end with four words on it.
+    user,
     body: `<div class="card">
   <h1>${h(title)}</h1>
   <p>${h(message)}</p>
   ${fix ? `<div class="card" style="border-left:4px solid #b7791f"><b>How to fix it</b><p>${h(fix)}</p></div>` : ''}
+  ${back ? `<p><a class="btn" href="${h(back.href)}">${h(back.label)} →</a></p>` : ''}
 </div>`,
   });
 }
@@ -1849,6 +2332,7 @@ export function problemPage({ title = 'Something went wrong', message = '', fix 
 export function accountPage({ user = null, remaining = 0, csrfToken = '', error = '', codes = null }) {
   if (codes) {
     return layout({
+    active: 'account',
       title: 'New recovery codes',
       user,
       body: `<h1>Your new recovery codes</h1>
@@ -1866,6 +2350,7 @@ export function accountPage({ user = null, remaining = 0, csrfToken = '', error 
   }
 
   return layout({
+    active: 'account',
     title: 'Your account',
     user,
     body: `<h1>Your account</h1>
@@ -1910,8 +2395,50 @@ ${error ? `<p class="err">${h(error)}</p>` : ''}
 // The front page
 // ---------------------------------------------------------------------------
 
+/** What an audit entry means, for the activity list on Today. */
+const ACTIVITY_TEXT = {
+  'application.submitted': 'New application',
+  'platform.login': 'Staff sign-in',
+  'platform.login.failed': 'Failed sign-in attempt',
+  'platform.login.locked': 'Account locked after failed sign-ins',
+  'platform.gym.suspended': 'Gym suspended',
+  'platform.gym.reactivated': 'Gym reactivated',
+  'platform.gym.plan_changed': 'Gym moved to another plan',
+  'platform.document.uploaded': 'Document uploaded',
+  'platform.document.viewed': 'Document opened',
+  'platform.document.accepted': 'Document accepted',
+  'platform.document.rejected': 'Document rejected',
+  'platform.owner.activation_issued': 'Activation link sent',
+  'platform.owner.activation_resent': 'New activation link sent',
+  'platform.owner.agreement_accepted': 'Owner activated their gym',
+  'platform.owner.closure_requested': 'Owner asked to close their account',
+  'platform.owner.deactivated': 'Owner switched off',
+  'platform.owner.reactivated': 'Owner switched back on',
+  'platform.plan.updated': 'Plan price changed',
+  'platform.staff.invited': 'Staff member invited',
+  'platform.staff.role_changed': 'Staff role changed',
+  'platform.staff.deactivated': 'Staff member switched off',
+  'platform.staff.joined': 'Staff member finished setting up',
+  'platform.application.decision_email_failed': 'Decision email could not be sent',
+};
+
+/** Entries worth reading on Today — reads of figures are not news. */
+const QUIET = new Set(['platform.gym.stats_read', 'platform.logout']);
+
+function activityLine(e) {
+  const text =
+    ACTIVITY_TEXT[e.action] ||
+    String(e.action || '')
+      .replace(/^platform\./, '')
+      .replace(/[._]/g, ' ');
+  const name = e.detail && typeof e.detail === 'object' ? e.detail.gym_name || e.detail.email || '' : '';
+  return `<li><b>${h(text)}</b>${name ? ` <span class="muted">· ${h(name)}</span>` : ''} <span class="muted" style="float:right">${h(
+    when(e.created_at)
+  )}</span></li>`;
+}
+
 /**
- * What needs you today.
+ * What needs you today — and the state of the platform at a glance.
  *
  * Signing in used to land on the applications queue — one list, chosen because
  * it was built first. A panel for running a business should open on the things
@@ -1924,17 +2451,27 @@ ${error ? `<p class="err">${h(error)}</p>` : ''}
 export function dashboardPage({
   user = null,
   waiting = 0,
+  waitingOnOwner = 0,
   gyms = 0,
   activeGyms = 0,
+  gymCounts = null,
+  owners = null,
   alerts = 0,
   unpricedPlans = [],
   outstandingCents = 0,
+  mrrCents = null,
   currency = 'ZAR',
   trialsEndingSoon = [],
   driftFindings = null,
   closureRequests = 0,
   provisioning = null,
+  recent = [],
 } = {}) {
+  // What this person may open. A tile or a link they would be refused is a
+  // dead button (CLAUDE.md §40.1 F-40.2); rendered on its own, with no
+  // permission list, the page shows everything, as before.
+  const can = (perm) => !Array.isArray(user?.perms) || user.perms.includes(perm);
+
   // Ordered by what it costs to ignore, not by what is interesting.
   const needsYou = [];
 
@@ -1952,8 +2489,9 @@ export function dashboardPage({
           ? 'Creating gyms is switched on but not fully set up: '
           : 'Creating gyms is switched off: ') +
         provisioning.problems.map((p) => h(p)).join(' '),
-      href: '/platform/applications',
-      action: waiting ? 'See what is waiting' : 'Applications',
+      href: '/platform/settings',
+      action: 'See settings',
+      perm: 'platform.manage',
     });
   }
 
@@ -1965,6 +2503,7 @@ export function dashboardPage({
       text: `${count(closureRequests, 'owner')} asked to close their account.`,
       href: '/platform/owners',
       action: 'Contact them',
+      perm: 'platform.manage',
     });
   }
 
@@ -1976,6 +2515,7 @@ export function dashboardPage({
       } no price, so ${unpricedPlans.length === 1 ? 'that plan bills' : 'those plans bill'} nobody.`,
       href: '/platform/plans',
       action: 'Set a price',
+      perm: 'subscription.manage',
     });
   }
 
@@ -1985,6 +2525,7 @@ export function dashboardPage({
       text: `${count(waiting, 'gym')} waiting for a decision.`,
       href: '/platform/applications',
       action: 'Review',
+      perm: 'application.view',
     });
   }
 
@@ -1994,6 +2535,7 @@ export function dashboardPage({
       text: `${count(alerts, 'security item')} worth a look in the last day.`,
       href: '/platform/security',
       action: 'Look',
+      perm: 'audit.view',
     });
   }
 
@@ -2003,6 +2545,7 @@ export function dashboardPage({
       text: `${count(driftFindings, 'gym')} out of step between the registry and the database.`,
       href: '/platform/reconcile',
       action: 'See the report',
+      perm: 'gym.view',
     });
   }
 
@@ -2012,68 +2555,273 @@ export function dashboardPage({
       text: `${h(t.name)}'s trial ends ${h(until(t.trial_ends_at))}.`,
       href: `/platform/registry/${h(t.gym_id)}`,
       action: 'Open',
+      perm: 'gym.view',
     });
   }
 
   const todo = needsYou.length
-    ? needsYou
-        .map(
-          (item) => `<div class="card" style="border-left:4px solid ${
-            item.urgency === 'high' ? 'var(--bad)' : '#b7791f'
-          }">
-  <p style="margin:0 0 0.6rem">${item.text}</p>
-  <p style="margin:0"><a href="${item.href}">${h(item.action)} →</a></p>
+    ? `<div class="card" style="padding:0;overflow:hidden">
+${needsYou
+  .map((item) =>
+    // Told, but not offered a door they would be refused at.
+    can(item.perm)
+      ? `  <a class="todo" href="${item.href}"><span class="dot${item.urgency === 'high' ? ' bad' : ''}"></span>
+    <span>${item.text}</span><span class="go">${h(item.action)} →</span></a>`
+      : `  <div class="todo"><span class="dot${item.urgency === 'high' ? ' bad' : ''}"></span><span>${item.text}</span></div>`
+  )
+  .join('\n')}
 </div>`
-        )
-        .join('\n')
     : `<div class="card">
   <h2>✅ Nothing needs you</h2>
   <p class="muted">No applications waiting, no security items, no plan billing nobody,
   and nothing out of step. Come back tomorrow.</p>
 </div>`;
 
+  const byStatus = gymCounts || {};
+  const tile = (href, label, value, sub = '', perm = null) =>
+    !can(perm)
+      ? ''
+      : `<a class="kpi" href="${href}"><div class="lbl">${h(label)}</div><div class="val">${value}</div>${
+      sub ? `<div class="sub">${sub}</div>` : ''
+    }</a>`;
+
+  // Whole units in a tile: a headline figure, not a statement. Finances keep
+  // the cents.
+  const kpiMoney = (cents) => {
+    try {
+      return new Intl.NumberFormat('en-ZA', { style: 'currency', currency, maximumFractionDigits: 0 }).format(
+        (Number(cents) || 0) / 100
+      );
+    } catch {
+      return fmtMoney(cents, currency);
+    }
+  };
+
+  const kpis = `<div class="kpis">
+  ${tile('/platform/applications', 'To review', h(waiting), waitingOnOwner ? `${h(waitingOnOwner)} waiting on the owner` : 'applications', 'application.view')}
+  ${tile(
+    '/platform/registry?status=active',
+    'Active gyms',
+    h(activeGyms),
+    `of ${h(gyms)}${byStatus.suspended ? ` · ${h(byStatus.suspended)} suspended` : ''}${byStatus.pending ? ` · ${h(byStatus.pending)} not activated` : ''}`,
+    'gym.view'
+  )}
+  ${owners === null ? '' : tile('/platform/owners', 'Gym owners', h(owners), '', 'platform.manage')}
+  ${mrrCents === null ? '' : tile('/platform/finance', 'Monthly revenue', h(kpiMoney(mrrCents)), 'from paying gyms', 'subscription.manage')}
+  ${outstandingCents === null ? '' : tile('/platform/finance', 'Outstanding', h(kpiMoney(outstandingCents)), 'invoiced, not yet paid', 'subscription.manage')}
+  ${tile('/platform/security', 'Security items', h(alerts), 'last 24 hours', 'audit.view')}
+</div>`;
+
+  const shown = (recent || []).filter((e) => !QUIET.has(e.action)).slice(0, 8);
+  // The audit log's own entries: only for someone who may read it.
+  const activity = !can('audit.view')
+    ? ''
+    : `<div class="card">
+  <h2>Recent activity</h2>
+  ${shown.length ? `<ul class="events">${shown.map(activityLine).join('\n')}</ul>` : '<p class="muted">Nothing has happened yet.</p>'}
+  <p><a href="/platform/audit">Everything that happened →</a></p>
+</div>`;
+
   return layout({
+    active: 'home',
     title: 'Yoyo Gyms',
     user,
     body: `<h1>Today</h1>
+<p class="lede">What needs a decision, and how the platform is doing.</p>
 
+${kpis}
+
+<h2>Needs you</h2>
 ${todo}
 
-<h2>The platform</h2>
+<div class="grid2" style="margin-top:16px">
+${activity}
 <div class="card">
-  <table>
-    <tbody>
-      <tr>
-        <td><a href="/platform/registry">Gyms</a></td>
-        <td><b>${h(gyms)}</b> ${gyms ? `<span class="muted">· ${h(activeGyms)} active</span>` : ''}</td>
-      </tr>
-      <tr>
-        <td><a href="/platform/finance">Outstanding</a></td>
-        <td><b>${h(fmtMoney(outstandingCents, currency))}</b>
-            <span class="muted">invoiced, not yet paid</span></td>
-      </tr>
-      <tr>
-        <td><a href="/platform/owners">Gym owners</a></td>
-        <td><a href="/platform/owners">Manage →</a></td>
-      </tr>
-      ${
-        provisioning
-          ? `<tr>
-        <td>Creating new gyms</td>
-        <td>${provisioning.ready ? '<b>✅ Ready</b> <span class="muted">· approving an application opens the gym</span>' : '<b>❌ Not ready</b> <span class="muted">· see above</span>'}</td>
-      </tr>`
-          : ''
-      }
-      <tr>
-        <td><a href="/platform/audit">Audit log</a></td>
-        <td><a href="/platform/audit">Everything that happened →</a></td>
-      </tr>
-    </tbody>
-  </table>
+  <h2>The platform</h2>
+  <dl class="facts">
+    ${
+      provisioning
+        ? `<dt>Creating new gyms</dt><dd>${
+            provisioning.ready
+              ? '<b>✅ Ready</b> <span class="muted">· approving an application opens the gym</span>'
+              : '<b>❌ Not ready</b> <span class="muted">· see above</span>'
+          }</dd>`
+        : ''
+    }
+    <dt>Gyms</dt><dd>${can('gym.view') ? `<a href="/platform/registry">${h(gyms)}</a>` : h(gyms)} <span class="muted">· ${h(activeGyms)} active</span></dd>
+    ${can('platform.manage') ? '<dt>Settings</dt><dd><a href="/platform/settings">Every switch, and whether it is set →</a></dd>' : ''}
+  </dl>
+</div>
 </div>
 
 <p class="muted">Counts only — the platform never reads a gym member's name,
 phone, ID or health answers.</p>`,
+  });
+}
+
+// ---------------------------------------------------------------------------
+// The Yoyo staff team (CLAUDE.md §40.1 Q4)
+// ---------------------------------------------------------------------------
+
+/**
+ * Who runs the main admin panel, and the controls to change that.
+ *
+ * Your own row has no controls: nobody changes their own role or switches
+ * themselves off (platform/team.js). The server refuses it too.
+ */
+export function teamPage({ staff = [], roles = [], user = null, me = '', csrfToken = '', error = '', notice = '' } = {}) {
+  const roleOptions = (current) =>
+    roles
+      .map(([key, label]) => `<option value="${h(key)}"${key === current ? ' selected' : ''}>${h(label)}</option>`)
+      .join('');
+
+  const state = (s) =>
+    s.is_active === false ? statusTag('switched off') : !s.set_up ? statusTag('invited') : statusTag('active');
+
+  const rows = staff.length
+    ? `<table>
+  <thead><tr><th>Person</th><th>Role</th><th>Status</th><th>Last sign-in</th><th></th></tr></thead>
+  <tbody>
+${staff
+  .map((s) => {
+    const self = s.id === me;
+    const role = (s.roles || [])[0] || '';
+    return `    <tr>
+      <td><b>${h(s.full_name || '—')}</b>${self ? ' <span class="muted">(you)</span>' : ''}<br><span class="muted">${h(s.email)}</span></td>
+      <td>${
+        self
+          ? h(roles.find(([k]) => k === role)?.[1] || role || '—')
+          : `<form method="post" action="/platform/team/${h(s.id)}/role" class="row">
+        <input type="hidden" name="csrf" value="${h(csrfToken)}">
+        <select name="role" aria-label="Role for ${h(s.email)}">${roleOptions(role)}</select>
+        <button type="submit" class="ghost">Save</button>
+      </form>`
+      }</td>
+      <td>${state(s)}${s.set_up && !s.totp_enabled ? ' <span class="tag tag--warn">no authenticator</span>' : ''}</td>
+      <td class="muted">${s.last_login_at ? h(when(s.last_login_at)) : 'never'}</td>
+      <td>${
+        self
+          ? ''
+          : `<div class="row">${
+              !s.set_up && s.is_active !== false
+                ? `<form method="post" action="/platform/team/${h(s.id)}/resend">
+          <input type="hidden" name="csrf" value="${h(csrfToken)}">
+          <button type="submit" class="ghost">New invite link</button>
+        </form>`
+                : ''
+            }<form method="post" action="/platform/team/${h(s.id)}/${s.is_active === false ? 'reactivate' : 'deactivate'}">
+          <input type="hidden" name="csrf" value="${h(csrfToken)}">
+          <button type="submit"${s.is_active === false ? '' : ' class="danger"'}>${s.is_active === false ? 'Switch on' : 'Switch off'}</button>
+        </form></div>`
+      }</td>
+    </tr>`;
+  })
+  .join('\n')}
+  </tbody>
+</table>`
+    : '<div class="empty">No staff yet.</div>';
+
+  return layout({
+    active: 'team',
+    title: 'Team',
+    user,
+    body: `<h1>Team</h1>
+<p class="lede">The Yoyo staff who run this panel. Everyone signs in with a password <b>and</b> an
+authenticator code. Switching someone off stops them signing in at once.</p>
+${error ? `<p class="err">${h(error)}</p>` : ''}
+${notice ? `<div class="card" style="border-color:rgba(142,224,122,.4)">${h(notice)}</div>` : ''}
+
+${rows}
+
+<form class="card" method="post" action="/platform/team/invite">
+  <input type="hidden" name="csrf" value="${h(csrfToken)}">
+  <h2>Invite someone</h2>
+  <div class="grid2" style="gap:12px">
+    <label>Name<input name="full_name" required autocomplete="off"></label>
+    <label>Email<input type="email" name="email" required autocomplete="off"></label>
+  </div>
+  <label>Role
+    <select name="role">${roleOptions('reviewer')}</select>
+  </label>
+  <button type="submit">Send invitation</button>
+  <p class="muted">They get a link that works once, for ${h(INVITE_TTL_HOURS)} hours, to choose a password
+  and connect an authenticator app.</p>
+</form>
+
+<div class="card">
+  <h2>What each role can do</h2>
+  <dl class="facts">
+    ${roles.map(([, label, what]) => `<dt>${h(label)}</dt><dd>${h(what)}</dd>`).join('\n    ')}
+  </dl>
+</div>`,
+  });
+}
+
+/** The invite link, shown once, when the email could not be sent. */
+export function inviteHandoverPage({ invite = {}, user = null } = {}) {
+  return layout({
+    active: 'team',
+    title: 'Send this invitation yourself',
+    user,
+    body: `<h1>Invitation created — send the link yourself</h1>
+<div class="card">
+  <p><b>⚠️ The invitation email could not be sent${invite.emailReason ? ` (${h(invite.emailReason)})` : ''}.</b></p>
+  <p class="muted">Send this link to <b>${h(invite.to || 'them')}</b> yourself. It works once and expires in
+  ${h(INVITE_TTL_HOURS)} hours. <b>It is shown only now</b> — only a hash of it is stored.</p>
+  <p><input readonly value="${h(invite.link)}" style="width:100%"></p>
+</div>
+<p><a class="btn" href="/platform/team">Back to the team →</a></p>`,
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Platform settings — every switch, read-only (CLAUDE.md §16, §40.1)
+// ---------------------------------------------------------------------------
+
+/**
+ * The switches that decide what this platform does, and whether each is set.
+ *
+ * NAMES AND STATES ONLY. Not one value is shown: several of these are secrets,
+ * and a settings page is exactly the screen that ends up in a screenshot. The
+ * switches themselves live in Vercel's environment, where changing them needs a
+ * redeploy — deliberately, for the ones that move money or create databases.
+ */
+export function settingsPage({ switches = [], baseUrl = '', user = null } = {}) {
+  const rows = switches
+    .map(
+      (s) => `    <tr>
+      <td><b>${h(s.label)}</b><br><span class="muted">${h(s.what)}</span></td>
+      <td>${s.on ? `<span class="tag tag--good">${h(s.onText || 'on')}</span>` : `<span class="tag tag--${s.warn ? 'bad' : 'warn'}">${h(s.offText || 'off')}</span>`}</td>
+      <td class="muted">${h(s.name)}${s.note ? `<br>${h(s.note)}` : ''}</td>
+    </tr>`
+    )
+    .join('\n');
+
+  return layout({
+    active: 'settings',
+    title: 'Settings',
+    user,
+    body: `<h1>Settings</h1>
+<p class="lede">Every switch that decides what the platform does, and whether it is set. Values are never
+shown here — several are secrets. They are changed in Vercel → Settings → Environment Variables, and take
+effect after a redeploy.</p>
+
+<table>
+  <thead><tr><th>Switch</th><th>State</th><th>Variable</th></tr></thead>
+  <tbody>
+${rows}
+  </tbody>
+</table>
+
+<div class="card">
+  <h2>Addresses</h2>
+  <dl class="facts">
+    <dt>This panel</dt><dd>${h(baseUrl)}/platform/login</dd>
+    <dt>Gym owner sign-up</dt><dd>${h(baseUrl)}/platform/apply</dd>
+    <dt>Privacy policy</dt><dd><a href="/platform/privacy">${h(baseUrl)}/platform/privacy</a></dd>
+    <dt>Gym Owner Agreement</dt><dd><a href="/platform/terms">${h(baseUrl)}/platform/terms</a></dd>
+  </dl>
+</div>`,
   });
 }
 

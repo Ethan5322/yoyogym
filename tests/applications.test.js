@@ -31,6 +31,13 @@ function deps(application) {
       return { ok: true, gym: { id: 'gym-1', slug: app.slug } };
     },
     audit: async () => {},
+    // The three required documents, each accepted (CLAUDE.md §40.1 Q3), so
+    // these tests describe a valid approval. The refusals are tested below.
+    listDocuments: async () => [
+      { doc_type: 'id_document', status: 'accepted' },
+      { doc_type: 'business_registration', status: 'accepted' },
+      { doc_type: 'proof_of_address', status: 'accepted' },
+    ],
   };
 }
 

@@ -152,6 +152,10 @@ create table if not exists platform.gym_applications (
 create index if not exists gym_applications_status_idx    on platform.gym_applications(status);
 create index if not exists gym_applications_applicant_idx on platform.gym_applications(applicant_user_id);
 create index if not exists gym_applications_submitted_idx on platform.gym_applications(submitted_at desc);
+
+-- The owner's phone and the gym's street address (CLAUDE.md §40.1 Q2).
+alter table platform.gym_applications add column if not exists owner_phone text;
+alter table platform.gym_applications add column if not exists gym_address text;
 create unique index if not exists gym_applications_slug_idx on platform.gym_applications(slug) where slug is not null;
 
 -- -----------------------------------------------------------------------------
@@ -273,6 +277,22 @@ create table if not exists platform.password_resets (
   created_at timestamptz not null default now()
 );
 create index if not exists password_resets_user_idx on platform.password_resets(user_id);
+
+-- -----------------------------------------------------------------------------
+-- staff_invites — joining the Yoyo staff team (CLAUDE.md §40.1 Q4).
+-- HASHES ONLY, 72 hours, single use (platform/team.js). The link sets a
+-- password AND an authenticator, like the first owner's setup.
+-- -----------------------------------------------------------------------------
+create table if not exists platform.staff_invites (
+  id          uuid primary key default gen_random_uuid(),
+  user_id     uuid not null references platform.platform_users(id) on delete cascade,
+  token_hash  text not null unique,
+  invited_by  uuid references platform.platform_users(id) on delete set null,
+  expires_at  timestamptz not null,
+  used_at     timestamptz,
+  created_at  timestamptz not null default now()
+);
+create index if not exists staff_invites_user_idx on platform.staff_invites(user_id);
 
 -- An owner asking to close their account (store requirement). Recorded, not acted on:
 -- closing an account closes a gym, and a person must look at that.
@@ -519,6 +539,7 @@ create index if not exists migration_runs_mig_idx    on platform.migration_runs(
 -- =============================================================================
 alter table platform.platform_users            enable row level security;
 alter table platform.password_resets          enable row level security;
+alter table platform.staff_invites            enable row level security;
 alter table platform.platform_roles            enable row level security;
 alter table platform.platform_permissions      enable row level security;
 alter table platform.platform_role_permissions enable row level security;

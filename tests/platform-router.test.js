@@ -276,7 +276,7 @@ test('a valid application is submitted and confirmed', async () => {
   const r = res();
   await handlePlatform(
     req({ method: 'POST', url: '/platform/apply',
-          body: 'owner_name=Ann&email=ANN@Bos.co&password=longenough1&gym_name=BOS+GYM&city=Cape+Town&country=za&plan=medium&needs=SMS+reminders' }),
+          body: 'owner_name=Ann&email=ANN@Bos.co&password=longenough1&phone=%2B27+82+123+4567&gym_name=BOS+GYM&address=12+Main+Rd&city=Cape+Town&country=za&plan=medium&needs=SMS+reminders' }),
     r, d
   );
 
@@ -284,6 +284,8 @@ test('a valid application is submitted and confirmed', async () => {
   assert.equal(received.country, 'ZA');
   assert.equal(received.plan_key, 'medium');
   assert.equal(received.needs, 'SMS reminders', 'demand evidence is captured');
+  assert.equal(received.phone, '+27821234567', 'the phone is kept with its country code, without spaces');
+  assert.equal(received.address, '12 Main Rd', 'the gym street address is captured');
   assert.match(r.body, /Application received/);
 });
 
@@ -292,12 +294,14 @@ test('a rejected application redisplays the form without losing what was typed',
   const r = res();
   await handlePlatform(
     req({ method: 'POST', url: '/platform/apply',
-          body: 'owner_name=Ann&email=a@b.co&password=longenough1&gym_name=BOS+GYM&plan=basic' }),
+          body: 'owner_name=Ann&email=a@b.co&password=longenough1&phone=%2B27821234567&gym_name=BOS+GYM&address=1+A+St&plan=basic' }),
     r, d
   );
 
   assert.match(r.body, /already listed/);
   assert.match(r.body, /value="BOS GYM"/, 'the gym name survives the round trip');
+  assert.match(r.body, /value="1 A St"/, 'so does the address');
+  assert.ok(!/longenough1/.test(r.body), 'never the password');
 });
 
 // ---------------------------------------------------------------------------

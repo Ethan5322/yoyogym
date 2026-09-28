@@ -139,17 +139,20 @@ export function gymForRequest(req) {
  * is what finally calls resolveGym() and runWithGym() — the pair that has been
  * built, tested and unused since Stage 4.
  *
- * Single-gym mode is the path of least resistance on purpose: no gym, no
- * resolution, no query, straight to the handler. An existing deployment pays
- * nothing for this and behaves exactly as it did.
+ * A request that names no gym is the deployment's own gym: resolved through
+ * the registry when the registry knows it (withHomeGym), and otherwise served
+ * exactly as a standalone deployment always was.
  *
  * @param {object} req
  * @param {object} res
  * @param {Function} run   the handler, called with no arguments
  * @param {Function} json  the JSON responder, so this file owes nothing to a
  *                         particular response helper
+ * @param {object} [options]
+ * @param {object} [options.tenancy]  the registry access (tenancyDeps()) — for
+ *                                    tests; the real one is used otherwise
  */
-export async function withGym(req, res, run, json) {
+export async function withGym(req, res, run, json, options = {}) {
   let slug;
   try {
     slug = gymForRequest(req);
@@ -158,15 +161,15 @@ export async function withGym(req, res, run, json) {
     throw err;
   }
 
-  // Single-gym mode. Unchanged, and cheap.
-  if (!slug) return run();
+  // No gym named: the deployment's own gym (KOM at the main address).
+  const tenancy = options.tenancy ?? (await import('./tenancy-deps.js')).tenancyDeps();
+  if (!slug) return withHomeGym(res, run, json, tenancy);
 
   const { resolveGym, runWithGym, ResolutionError } = await import('./tenancy.js');
-  const { tenancyDeps } = await import('./tenancy-deps.js');
 
   let resolved;
   try {
-    resolved = await resolveGym(slug, tenancyDeps());
+    resolved = await resolveGym(slug, tenancy);
   } catch (err) {
     if (err instanceof ResolutionError) {
       // The resolver's own statuses are already right: 404 unknown, 402
@@ -174,6 +177,40 @@ export async function withGym(req, res, run, json) {
       return json(res, err.status, { error: err.message });
     }
     throw err;
+  }
+
+  return runWithGym(resolved, run);
+}
+
+/**
+ * The gym at the main address, under the platform's control (CLAUDE.md §40.1
+ * Q1).
+ *
+ * This used to be `return run()`: a request that named no gym never met the
+ * registry, so suspending KOM on the platform locked only /g/kom/ while
+ * yoyogym.vercel.app/admin and /member carried on — and the Suspend button
+ * promised the opposite. Now the deployment's own gym is resolved like any
+ * other when the registry knows it, so its status and its plan apply here too.
+ *
+ * FAILS OPEN, deliberately and only for faults. A suspension or an unpaid
+ * state is a DECISION and is enforced. A registry that cannot be read, or a
+ * connection marked unreachable, is a FAULT, and a working gym is not locked
+ * out over one: it serves exactly as it did before this existed.
+ */
+async function withHomeGym(res, run, json, deps) {
+  const { resolveGym, runWithGym, ResolutionError } = await import('./tenancy.js');
+
+  const home = deps.homeGymSlug ? await deps.homeGymSlug() : null;
+  if (!home) return run();
+
+  let resolved;
+  try {
+    resolved = await resolveGym(home, deps);
+  } catch (err) {
+    if (err instanceof ResolutionError && (err.status === 403 || err.status === 402)) {
+      return json(res, err.status, { error: err.message });
+    }
+    return run();
   }
 
   return runWithGym(resolved, run);

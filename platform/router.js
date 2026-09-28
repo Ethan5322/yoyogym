@@ -41,6 +41,10 @@ import { AGREEMENT_VERSION, agreementTerms, agreementPdf, ownerId, termsApproved
 import { platformBaseUrl } from './base-url.js';
 import { OWNER_USERNAME } from './gym-admin.js';
 import { requestReset, completeReset } from './password-reset.js';
+import { readApplication } from './application-form.js';
+import { STAFF_ROLES, inviteProblem, teamChangeProblem, checkInvite, INVITE_REFUSED } from './team.js';
+import { emailConfigured } from './email.js';
+import { paystackConfigured } from './paystack.js';
 import {
   loginPage,
   forgotPage,
@@ -52,6 +56,7 @@ import {
   privacyPage,
   applicationsPage,
   applicationDetailPage,
+  APPLICATION_TABS,
   signupPage,
   signupSuccessPage,
   registryPage,
@@ -74,6 +79,9 @@ import {
   problemPage,
   accountPage,
   dashboardPage,
+  teamPage,
+  inviteHandoverPage,
+  settingsPage,
 } from './views.js';
 import { eventToIntent } from './billing.js';
 import { pageRequest, pageState } from './paging.js';
@@ -155,39 +163,31 @@ export async function handlePlatform(req, res, deps) {
 
     if (method === 'POST') {
       const form = await readFormBody(req);
+      // What was typed goes back into the form on a refusal — never the
+      // password.
       const values = {
         owner_name: form.owner_name,
         email: form.email,
+        phone: form.phone,
         gym_name: form.gym_name,
+        address: form.address,
         city: form.city,
         country: form.country,
         estimated_members: form.estimated_members,
+        needs: form.needs,
       };
       const fail = (message) =>
         html(res, 400, signupPage({ plans, values, error: message, selectedPlan: form.plan }));
 
-      if (!form.owner_name?.trim()) return fail('Please give your name.');
-      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email || '')) return fail('A valid email is required.');
-      if ((form.password || '').length < 10) return fail('Choose a password of at least 10 characters.');
-      if (!form.gym_name?.trim()) return fail('What is your gym called?');
-      if (!planByKey(form.plan)) return fail('Please choose a plan.');
+      // One rule for this form and the app's JSON twin (platform/application-form.js).
+      const { input, error } = readApplication(form);
+      if (error) return fail(error);
 
-      const result = await deps.createApplication({
-        owner_name: form.owner_name.trim(),
-        email: form.email.trim().toLowerCase(),
-        password: form.password,
-        gym_name: form.gym_name.trim(),
-        city: (form.city || '').trim(),
-        country: (form.country || '').trim().toUpperCase(),
-        estimated_members: Number(form.estimated_members) || null,
-        plan_key: form.plan,
-        // Demand evidence, not a feature-request form (D-104).
-        needs: (form.needs || '').trim() || null,
-      });
+      const result = await deps.createApplication(input);
 
       if (!result.ok) return fail(result.error || 'We could not submit that. Please try again.');
 
-      return html(res, 200, signupSuccessPage({ gymName: form.gym_name.trim() }));
+      return html(res, 200, signupSuccessPage({ gymName: input.gym_name }));
     }
   }
 
@@ -287,8 +287,17 @@ export async function handlePlatform(req, res, deps) {
       return forbid(res, 'You do not have permission to review applications.');
     }
 
-    const applications = await deps.listApplications();
-    return html(res, 200, applicationsPage({ applications, user: { email: session.email } }));
+    // In tabs by what each application waits for, with a search (§40.1 F-40.6).
+    const tab = APPLICATION_TABS.some(([key]) => key === url.searchParams.get('tab'))
+      ? url.searchParams.get('tab')
+      : 'review';
+    const states = APPLICATION_TABS.find(([key]) => key === tab)[2];
+    const query = (url.searchParams.get('q') || '').trim();
+    const [applications, counts] = await Promise.all([
+      deps.listApplications({ status: states.join(','), query }),
+      deps.countApplications ? deps.countApplications().catch(() => null) : null,
+    ]);
+    return html(res, 200, applicationsPage({ applications, tab, counts, query, user: await viewer(deps, session) }));
   }
 
   // ---- one application ---------------------------------------------------
@@ -304,14 +313,14 @@ export async function handlePlatform(req, res, deps) {
     }
 
     const view = await deps.getApplicationView(detail[1]);
-    if (!view) return html(res, 404, '<p>Application not found.</p>');
+    if (!view) return html(res, 404, problemPage({ title: 'That application does not exist', message: 'It may have been removed, or the link is wrong.', back: { href: '/platform/applications', label: 'All applications' }, user: await viewer(deps, session) }));
 
     return html(
       res,
       200,
       applicationDetailPage({
         ...view,
-        user: { email: session.email },
+        user: await viewer(deps, session),
         csrfToken: issueCsrfToken(session.sub),
       })
     );
@@ -344,17 +353,41 @@ export async function handlePlatform(req, res, deps) {
         res,
         409,
         problemPage({
-          title: outcome.dryRun
-            ? 'Creating gyms is switched off'
-            : outcome.notReady
-              ? 'Creating gyms is not fully set up'
-              : 'That decision did not go through',
+          title: outcome.missingDocuments
+            ? 'Documents still needed'
+            : outcome.dryRun
+              ? 'Creating gyms is switched off'
+              : outcome.notReady
+                ? 'Creating gyms is not fully set up'
+                : 'That decision did not go through',
           message: outcome.error || 'Nothing was changed.',
           // Plain text: problemPage escapes it, as it should.
-          fix: outcome.dryRun || outcome.notReady
-            ? 'In Vercel, open Settings → Environment Variables and fix what is listed above. ' +
-              'Redeploy, then approve the application again — it is still waiting.'
-            : null,
+          fix: outcome.missingDocuments
+            ? 'Accept each one on the application page once the owner has uploaded it. ' +
+              'If one is missing, use "Request information" to ask the owner for it.'
+            : outcome.dryRun || outcome.notReady
+              ? 'In Vercel, open Settings → Environment Variables and fix what is listed above. ' +
+                'Redeploy, then approve the application again — it is still waiting.'
+              : null,
+          back: { href: `/platform/applications/${decide[1]}`, label: 'Back to the application' },
+          user: await viewer(deps, session),
+        })
+      );
+    }
+
+    // The decision stands, but the owner has not been told — so the reviewer
+    // is, with the address to write to (CLAUDE.md §40.1 F-40.5).
+    if (outcome?.emailed === false) {
+      return html(
+        res,
+        200,
+        problemPage({
+          title: form.action === 'reject' ? 'Rejected — but the owner was not emailed' : 'Sent back — but the owner was not emailed',
+          message:
+            `The decision is recorded. The email could not be sent (${outcome.emailReason || 'unknown reason'}), ` +
+            `so please contact ${outcome.emailTo || 'the owner'} yourself and give them your message.`,
+          back: { href: `/platform/applications/${decide[1]}`, label: 'Back to the application' },
+          user: await viewer(deps, session),
         })
       );
     }
@@ -373,7 +406,7 @@ export async function handlePlatform(req, res, deps) {
           activation: outcome.activation,
           gymName: outcome.gym?.search_name || outcome.application?.proposed_gym_name || '',
           applicationId: decide[1],
-          user: { email: session.email },
+          user: await viewer(deps, session),
         })
       );
     }
@@ -406,8 +439,35 @@ async function may(deps, session, permission) {
   // may do: permissions are read from the database on each request, so
   // revoking a role takes effect immediately rather than in eight hours when
   // the cookie expires.
-  const held = (await deps.permissionsFor?.(session)) || [];
-  return held.includes(permission);
+  return (await permissionsOf(deps, session)).includes(permission);
+}
+
+// Read once per request, however many checks and menus ask. Keyed on the
+// session object, which lives exactly as long as the request.
+const heldBySession = new WeakMap();
+
+function permissionsOf(deps, session) {
+  if (!heldBySession.has(session)) {
+    heldBySession.set(
+      session,
+      Promise.resolve(deps.permissionsFor?.(session)).then((held) => held || [], () => [])
+    );
+  }
+  return heldBySession.get(session);
+}
+
+/**
+ * Who is looking, for the page shell: their email, whether they are Yoyo staff
+ * or a gym owner, and what they may open — so the menu offers only doors that
+ * open (CLAUDE.md §40.1 F-40.2).
+ */
+async function viewer(deps, session) {
+  const kind = session.kind || 'platform_staff';
+  return {
+    email: session.email,
+    kind,
+    perms: kind === 'gym_owner' ? [] : await permissionsOf(deps, session),
+  };
 }
 
 function forbid(res, message) {
@@ -613,7 +673,7 @@ async function handleExtraRoutes(req, res, deps, { url, path, method }) {
     const view = (await deps.ownerDashboard(session.sub)) || {};
     html(res, 200, ownerDashboardPage({
       ...view,
-      user: { email: session.email },
+      user: await viewer(deps, session),
       csrfToken: issueCsrfToken(session.sub),
     }));
     return true;
@@ -848,6 +908,10 @@ async function handleExtraRoutes(req, res, deps, { url, path, method }) {
       detail: { doc_type: form.doc_type },
     });
 
+    // Asked for more, and it has arrived: back to the reviewer's queue, as the
+    // email promised (CLAUDE.md §40.1 F-40.5).
+    if (application.status === 'info_requested') await deps.resumeReview?.(application.id, session.sub);
+
     redirect(res, '/platform/my-gym');
     return true;
   }
@@ -866,7 +930,7 @@ async function handleExtraRoutes(req, res, deps, { url, path, method }) {
 
     html(res, 200, plansPage({
       plans: await deps.listPlans(),
-      user: { email: session.email },
+      user: await viewer(deps, session),
       csrfToken: issueCsrfToken(session.sub),
     }));
     return true;
@@ -895,7 +959,7 @@ async function handleExtraRoutes(req, res, deps, { url, path, method }) {
       // silently, and that should never be a typo away.
       const bad = plansPage({
         plans: await deps.listPlans(),
-        user: { email: session.email },
+        user: await viewer(deps, session),
         csrfToken: issueCsrfToken(session.sub),
         error: 'Enter a price greater than zero, like 499.00. To stop offering a plan, untick "Offered to new gyms".',
       });
@@ -953,7 +1017,7 @@ async function handleExtraRoutes(req, res, deps, { url, path, method }) {
       entries,
       filter,
       page: pageState({ ...paging, total: entries.total, returned: entries.length }),
-      user: { email: session.email },
+      user: await viewer(deps, session),
     }));
     return true;
   }
@@ -966,6 +1030,22 @@ async function handleExtraRoutes(req, res, deps, { url, path, method }) {
     const session = requireSession(req, res);
     if (!session) return true;
 
+    // Yoyo staff only. A gym owner's session used to open this page and read
+    // platform-wide figures — applications waiting, every gym, money owed
+    // (CLAUDE.md §40.1 F-40.2). An owner is sent to their own page.
+    if (session.kind === 'gym_owner') return redirect(res, '/platform/my-gym'), true;
+
+    // A staff account with no access at all — switched off, or never given a
+    // role — sees nothing about the platform either.
+    if (!(await permissionsOf(deps, session)).length) {
+      html(res, 403, problemPage({
+        title: 'Your account has no access',
+        message: 'This account has been switched off, or has not been given a role yet. Ask a platform owner.',
+        back: { href: '/platform/logout', label: 'Sign out' },
+      }));
+      return true;
+    }
+
     // Everything is best-effort and independent. A dashboard that fails
     // entirely because one figure could not be fetched is worse than one
     // showing four numbers out of five.
@@ -977,29 +1057,45 @@ async function handleExtraRoutes(req, res, deps, { url, path, method }) {
       }
     };
 
-    const [applications, allGyms, finance, entries, closureRequests] = await Promise.all([
+    const [applications, allGyms, finance, entries, closureRequests, owners, gymCounts, seesMoney] = await Promise.all([
       safe(() => deps.listApplications(), []),
       safe(() => deps.listGyms({ limit: 500 }), []),
       safe(() => deps.financeSummary(), {}),
       safe(() => deps.listAuditLog({ limit: 500 }), []),
       safe(() => deps.countClosureRequests(), 0),
+      safe(() => deps.countOwners?.(), null),
+      safe(() => deps.countGyms?.(), null),
+      may(deps, session, 'subscription.manage'),
     ]);
 
-    const waiting = applications.filter((a) =>
-      ['submitted', 'under_review', 'info_requested'].includes(a.status)
-    ).length;
+    // To review (the reviewer's move) and waiting on the owner (theirs) are
+    // different queues, so Today counts them apart.
+    const waiting = applications.filter((a) => ['submitted', 'under_review'].includes(a.status)).length;
+    const waitingOnOwner = applications.filter((a) => a.status === 'info_requested').length;
+
+    // The registry's own counts when available: the list above stops at 500.
+    const byStatus = gymCounts || allGyms.reduce((m, g) => ((m[g.status] = (m[g.status] ?? 0) + 1), m), {});
+    const totalGyms = Object.values(byStatus).reduce((n, c) => n + c, 0);
+    const names = new Map(allGyms.map((g) => [g.id, g.search_name || g.slug]));
 
     html(res, 200, dashboardPage({
-      user: { email: session.email },
+      user: await viewer(deps, session),
       waiting,
-      gyms: allGyms.length,
-      activeGyms: allGyms.filter((g) => g.status === 'active').length,
+      waitingOnOwner,
+      gyms: totalGyms,
+      activeGyms: byStatus.active ?? 0,
+      gymCounts: byStatus,
+      owners,
       alerts: findAlerts(entries, { now: new Date() }).length,
       closureRequests,
       provisioning: provisioningReadiness(),
       unpricedPlans: finance.unpriced_plans || [],
-      outstandingCents: finance.outstanding_cents ?? 0,
+      // Money only for someone who may see the finances.
+      outstandingCents: seesMoney ? finance.outstanding_cents ?? 0 : null,
+      mrrCents: seesMoney ? finance.mrr_cents ?? null : null,
       currency: finance.currency || 'ZAR',
+      trialsEndingSoon: (finance.trials_ending || []).map((t) => ({ ...t, name: names.get(t.gym_id) || 'A gym' })),
+      recent: entries,
     }));
     return true;
   }
@@ -1009,9 +1105,13 @@ async function handleExtraRoutes(req, res, deps, { url, path, method }) {
     const session = requireSession(req, res);
     if (!session) return true;
 
+    // Recovery codes for the staff second factor. An owner's account lives on
+    // their own page.
+    if (session.kind === 'gym_owner') return redirect(res, '/platform/my-gym'), true;
+
     const user = await deps.findUserByEmail(session.email);
     html(res, 200, accountPage({
-      user: { email: session.email },
+      user: await viewer(deps, session),
       remaining: remainingCodes(user),
       csrfToken: issueCsrfToken(session.sub),
     }));
@@ -1032,7 +1132,7 @@ async function handleExtraRoutes(req, res, deps, { url, path, method }) {
     });
 
     html(res, result.ok ? 200 : 400, accountPage({
-      user: { email: session.email },
+      user: await viewer(deps, session),
       remaining: remainingCodes(user),
       csrfToken: issueCsrfToken(session.sub),
       error: result.ok ? '' : result.reason,
@@ -1060,7 +1160,7 @@ async function handleExtraRoutes(req, res, deps, { url, path, method }) {
     html(res, 200, securityPage({
       alerts,
       windowHours: DEFAULT_WINDOW_HOURS,
-      user: { email: session.email },
+      user: await viewer(deps, session),
     }));
     return true;
   }
@@ -1087,7 +1187,7 @@ async function handleExtraRoutes(req, res, deps, { url, path, method }) {
       owners,
       page: pageState({ ...paging, total: owners.total, returned: owners.length }),
       filter,
-      user: { email: session.email },
+      user: await viewer(deps, session),
       csrfToken: issueCsrfToken(session.sub),
     }));
     return true;
@@ -1136,7 +1236,7 @@ async function handleExtraRoutes(req, res, deps, { url, path, method }) {
 
     html(res, 200, financePage({
       summary: await deps.financeSummary(),
-      user: { email: session.email },
+      user: await viewer(deps, session),
     }));
     return true;
   }
@@ -1156,7 +1256,7 @@ async function handleExtraRoutes(req, res, deps, { url, path, method }) {
 
     const doc = await deps.getDocument(docOpen[1]);
     if (!doc) {
-      html(res, 404, '<p>Document not found.</p>');
+      html(res, 404, problemPage({ title: 'That document does not exist', message: 'It may have been removed, or the link is wrong.', back: { href: '/platform/applications', label: 'All applications' }, user: await viewer(deps, session) }));
       return true;
     }
 
@@ -1192,7 +1292,7 @@ async function handleExtraRoutes(req, res, deps, { url, path, method }) {
       application,
       facts,
       duplicates,
-      user: { email: session.email },
+      user: await viewer(deps, session),
       csrfToken: issueCsrfToken(session.sub),
       canDecide,
     }));
@@ -1215,14 +1315,17 @@ async function handleExtraRoutes(req, res, deps, { url, path, method }) {
 
     const doc = await deps.getDocument(docFile[1]);
     if (!doc) {
-      html(res, 404, '<p>Document not found.</p>');
+      html(res, 404, problemPage({ title: 'That document does not exist', message: 'It may have been removed, or the link is wrong.', back: { href: '/platform/applications', label: 'All applications' }, user: await viewer(deps, session) }));
       return true;
     }
 
     // Five minutes. Long enough to read a document, short enough that a URL
     // left anywhere is useless by the time somebody finds it.
-    const url = await deps.signedDocumentUrl(doc.storage_ref, 300);
-    if (!url) {
+    // ?download=1 asks storage to send it as a file to save, under its own
+    // name — for a phone that cannot show it inline.
+    const download = url.searchParams.get('download') === '1' ? doc.filename || 'document' : null;
+    const signed = await deps.signedDocumentUrl(doc.storage_ref, 300, { download });
+    if (!signed) {
       // Not a redirect to nowhere. A broken link here looks like a missing
       // document, and a reviewer might reject an application over it.
       res.writeHead(502, { 'Content-Type': 'text/plain; charset=utf-8' });
@@ -1230,7 +1333,7 @@ async function handleExtraRoutes(req, res, deps, { url, path, method }) {
       return true;
     }
 
-    redirect(res, url);
+    redirect(res, signed);
     return true;
   }
 
@@ -1267,7 +1370,7 @@ async function handleExtraRoutes(req, res, deps, { url, path, method }) {
 
     const doc = await deps.getDocument(docDecide[1]);
     if (!doc) {
-      html(res, 404, '<p>Document not found.</p>');
+      html(res, 404, problemPage({ title: 'That document does not exist', message: 'It may have been removed, or the link is wrong.', back: { href: '/platform/applications', label: 'All applications' }, user: await viewer(deps, session) }));
       return true;
     }
 
@@ -1305,7 +1408,9 @@ async function handleExtraRoutes(req, res, deps, { url, path, method }) {
     // Searchable AND paged. A list capped at 200 is not a registry at ten
     // thousand gyms — it is the first 200, with the rest invisible and no
     // sign that they were left out.
-    const paging = pageRequest(url.searchParams.get('page'));
+    // 25 a page: each row now carries live counts (§40.1 F-40.7), three
+    // small count queries per gym, run in parallel.
+    const paging = pageRequest(url.searchParams.get('page'), { size: 25 });
     const filter = {
       query: (url.searchParams.get('q') || '').trim(),
       status: (url.searchParams.get('status') || '').trim(),
@@ -1314,11 +1419,21 @@ async function handleExtraRoutes(req, res, deps, { url, path, method }) {
     };
 
     const gyms = await deps.listGyms(filter);
+
+    // Best-effort: a list that cannot fetch its figures still lists the gyms.
+    let stats = null;
+    try {
+      stats = (await deps.gymStatsForMany?.(gyms, session.sub)) ?? null;
+    } catch (err) {
+      console.error('registry stats failed:', err?.message);
+    }
+
     html(res, 200, registryPage({
       gyms,
+      stats,
       page: pageState({ ...paging, total: gyms.total, returned: gyms.length }),
       filter,
-      user: { email: session.email },
+      user: await viewer(deps, session),
       canSuspend: await may(deps, session, 'gym.suspend'),
     }));
     return true;
@@ -1336,7 +1451,7 @@ async function handleExtraRoutes(req, res, deps, { url, path, method }) {
 
     const view = await deps.getGymDetail(gymDetail[1]);
     if (!view) {
-      html(res, 404, '<p>Gym not found.</p>');
+      html(res, 404, problemPage({ title: 'That gym does not exist', message: 'It may have been removed, or the link is wrong.', back: { href: '/platform/registry', label: 'All gyms' }, user: await viewer(deps, session) }));
       return true;
     }
 
@@ -1351,12 +1466,16 @@ async function handleExtraRoutes(req, res, deps, { url, path, method }) {
       console.error('gym stats failed:', err?.message);
     }
 
+    const NOTICES = { activation: 'A new activation link was emailed to the owner. The old link no longer works.' };
+
     html(res, 200, gymDetailPage({
       ...view,
       stats,
-      user: { email: session.email },
+      notice: NOTICES[url.searchParams.get('sent')] || '',
+      user: await viewer(deps, session),
       csrfToken: issueCsrfToken(session.sub),
       canSuspend: await may(deps, session, 'gym.suspend'),
+      canOnboard: await may(deps, session, 'application.approve'),
       canBill,
       // Only fetched for someone who may act on it.
       plans: canBill ? PLANS.map((p) => ({ key: p.key, label: p.label })) : [],
@@ -1418,7 +1537,7 @@ async function handleExtraRoutes(req, res, deps, { url, path, method }) {
       report = { ok: false, orphans: [], dangling: [], checkedSchemas: 0, error: err?.message };
     }
 
-    html(res, 200, driftPage({ report, user: { email: session.email }, csrfToken: issueCsrfToken(session.sub) }));
+    html(res, 200, driftPage({ report, user: await viewer(deps, session), csrfToken: issueCsrfToken(session.sub) }));
     return true;
   }
 
@@ -1457,6 +1576,345 @@ async function handleExtraRoutes(req, res, deps, { url, path, method }) {
     });
 
     redirect(res, `/platform/registry/${planChange[1]}`);
+    return true;
+  }
+
+  // ---- send the owner a new activation link (CLAUDE.md §40.1 F-40.9) --------
+  // A lost email or an expired 48-hour link used to leave an approved gym
+  // stuck, with nothing in the panel to unstick it.
+  const resendActivation = /^registry\/([A-Za-z0-9-]+)\/resend-activation$/.exec(path);
+  if (resendActivation && method === 'POST') {
+    const form = await readFormBody(req);
+    const session = requireSession(req, res, { csrfToken: form.csrf });
+    if (!session) return true;
+
+    // Onboarding work: the same permission as approving.
+    if (!(await may(deps, session, 'application.approve'))) {
+      forbid(res, 'You do not have permission to send activation links.');
+      return true;
+    }
+
+    const view = await deps.getGymDetail(resendActivation[1]);
+    const gym = view?.gym;
+    if (!gym || gym.status !== 'pending' || !gym.owner_user_id) {
+      html(res, 409, problemPage({
+        title: 'No activation link to send',
+        message: gym
+          ? 'This gym is already open, or has no owner recorded, so there is nothing to activate.'
+          : 'That gym does not exist.',
+        back: { href: `/platform/registry/${resendActivation[1]}`, label: 'Back to the gym' },
+        user: await viewer(deps, session),
+      }));
+      return true;
+    }
+
+    await deps.retireActivations?.(gym.owner_user_id, gym.id);
+    const activation = await deps.issueActivation({ userId: gym.owner_user_id, gymId: gym.id });
+    await deps.audit({
+      action: 'platform.owner.activation_resent',
+      actor_user_id: session.sub,
+      entity: 'gym',
+      entity_id: gym.id,
+    });
+
+    // The same hand-over as at approval: no email, so the reviewer sees the
+    // link and code once, to send by hand.
+    if (!activation.emailed) {
+      html(res, 200, activationHandoverPage({
+        activation,
+        gymName: gym.search_name || gym.slug,
+        backHref: `/platform/registry/${gym.id}`,
+        user: await viewer(deps, session),
+      }));
+      return true;
+    }
+
+    redirect(res, `/platform/registry/${gym.id}?sent=activation`);
+    return true;
+  }
+
+  // ---- the Yoyo staff team (CLAUDE.md §40.1 Q4) -----------------------------
+  const TEAM_NOTICES = {
+    invited: 'Invitation sent.',
+    resent: 'A new invitation link was sent. The old one no longer works.',
+    role: 'Role changed. It applies from their next click.',
+    deactivate: 'Switched off. They can no longer sign in, and an open session loses its access at once.',
+    reactivate: 'Switched back on.',
+  };
+
+  const teamScreen = async (session, extra = {}) =>
+    teamPage({
+      staff: await deps.listStaff(),
+      roles: STAFF_ROLES,
+      me: session.sub,
+      user: await viewer(deps, session),
+      csrfToken: issueCsrfToken(session.sub),
+      ...extra,
+    });
+
+  if (path === 'team' && method === 'GET') {
+    const session = requireSession(req, res);
+    if (!session) return true;
+    if (!(await may(deps, session, 'platform.manage'))) {
+      forbid(res, 'You do not have permission to manage the team.');
+      return true;
+    }
+    html(res, 200, await teamScreen(session, { notice: TEAM_NOTICES[url.searchParams.get('done')] || '' }));
+    return true;
+  }
+
+  if (path === 'team/invite' && method === 'POST') {
+    const form = await readFormBody(req);
+    const session = requireSession(req, res, { csrfToken: form.csrf });
+    if (!session) return true;
+    if (!(await may(deps, session, 'platform.manage'))) {
+      forbid(res, 'You do not have permission to manage the team.');
+      return true;
+    }
+
+    const problem = inviteProblem({ email: form.email, fullName: form.full_name, role: form.role });
+    if (problem) {
+      html(res, 400, await teamScreen(session, { error: problem }));
+      return true;
+    }
+
+    const result = await deps.inviteStaff({
+      email: form.email,
+      fullName: form.full_name,
+      role: form.role,
+      invitedBy: session.sub,
+    });
+    if (!result.ok) {
+      html(res, 400, await teamScreen(session, { error: result.error }));
+      return true;
+    }
+    if (!result.emailed) {
+      html(res, 200, inviteHandoverPage({ invite: result, user: await viewer(deps, session) }));
+      return true;
+    }
+    redirect(res, '/platform/team?done=invited');
+    return true;
+  }
+
+  const teamChange = /^team\/([A-Za-z0-9-]+)\/(role|deactivate|reactivate|resend)$/.exec(path);
+  if (teamChange && method === 'POST') {
+    const form = await readFormBody(req);
+    const session = requireSession(req, res, { csrfToken: form.csrf });
+    if (!session) return true;
+    if (!(await may(deps, session, 'platform.manage'))) {
+      forbid(res, 'You do not have permission to manage the team.');
+      return true;
+    }
+
+    const [, userId, change] = teamChange;
+    const target = await deps.staffMember(userId);
+    const refuse = async (error) => {
+      html(res, 400, await teamScreen(session, { error }));
+      return true;
+    };
+
+    if (change === 'resend') {
+      if (!target || target.id === session.sub) return refuse('That person is not on the team.');
+      const result = await deps.resendStaffInvite(userId, session.sub);
+      if (!result.ok) return refuse(result.error);
+      if (!result.emailed) {
+        html(res, 200, inviteHandoverPage({ invite: result, user: await viewer(deps, session) }));
+        return true;
+      }
+      redirect(res, '/platform/team?done=resent');
+      return true;
+    }
+
+    const problem = teamChangeProblem({
+      actorId: session.sub,
+      target,
+      change,
+      newRole: form.role,
+      activeOwners: await deps.countActiveOwners(),
+    });
+    if (problem) return refuse(problem);
+
+    if (change === 'role') {
+      await deps.setStaffRole(userId, form.role, session.sub);
+      await deps.audit({
+        action: 'platform.staff.role_changed',
+        actor_user_id: session.sub,
+        entity: 'platform_user',
+        entity_id: userId,
+        detail: { role: form.role, email: target.email },
+      });
+    } else {
+      const active = change === 'reactivate';
+      await deps.setStaffActive(userId, active);
+      await deps.audit({
+        action: active ? 'platform.staff.reactivated' : 'platform.staff.deactivated',
+        actor_user_id: session.sub,
+        entity: 'platform_user',
+        entity_id: userId,
+        detail: { email: target.email },
+      });
+    }
+
+    redirect(res, `/platform/team?done=${change}`);
+    return true;
+  }
+
+  // ---- an invited staff member sets up their account --------------------------
+  // No session: they have no password yet. The one-time link IS the
+  // permission, in place of the first-run PLATFORM_SETUP_TOKEN. The setup
+  // itself is the same code the first owner went through (platform/setup.js):
+  // a password AND a proven authenticator, then recovery codes.
+  if (path === 'join' && (method === 'GET' || method === 'POST')) {
+    const form = method === 'POST' ? await readFormBody(req) : {};
+    const token = (method === 'POST' ? form.token : url.searchParams.get('token')) || '';
+    const found = token ? await deps.findInvite?.(token) : null;
+    const valid = checkInvite(found?.invite);
+    const user = found?.user;
+
+    if (!valid.ok || !user || user.is_active === false) {
+      html(res, 400, problemPage({ title: 'This invitation cannot be used', message: valid.reason || INVITE_REFUSED }));
+      return true;
+    }
+
+    if (method === 'GET') {
+      const begun = beginSetup(user);
+      if (!begun.ok) {
+        html(res, 400, problemPage({ title: 'This invitation cannot be used', message: begun.reason }));
+        return true;
+      }
+      html(res, 200, setupPage({
+        token,
+        email: user.email,
+        secret: begun.secret,
+        otpauth: begun.otpauth,
+        action: '/platform/join',
+      }));
+      return true;
+    }
+
+    const result = await completeSetup(deps, {
+      user,
+      secret: form.secret,
+      password: form.password,
+      totp: form.totp,
+    });
+    if (!result.ok) {
+      html(res, 400, setupPage({
+        token,
+        email: user.email,
+        secret: form.secret,
+        otpauth: '',
+        error: result.reason,
+        action: '/platform/join',
+      }));
+      return true;
+    }
+
+    await deps.markInviteUsed(found.invite.id);
+    await deps.audit({ action: 'platform.staff.joined', actor_user_id: user.id, entity: 'platform_user', entity_id: user.id });
+    html(res, 200, setupDonePage({ recoveryCodes: result.recoveryCodes, invited: true }));
+    return true;
+  }
+
+  // ---- platform settings — every switch, read-only (§16, §40.1) --------------
+  if (path === 'settings' && method === 'GET') {
+    const session = requireSession(req, res);
+    if (!session) return true;
+    if (!(await may(deps, session, 'platform.manage'))) {
+      forbid(res, 'You do not have permission to see the platform settings.');
+      return true;
+    }
+
+    const readiness = provisioningReadiness();
+    const env = process.env;
+    // NAMES AND STATES ONLY — never a value (settingsPage explains why).
+    const switches = [
+      {
+        label: 'Creating new gyms',
+        what: "Approving an application creates the gym's database and emails the owner.",
+        name: 'PLATFORM_PROVISION_LIVE',
+        on: readiness.live && readiness.ready,
+        onText: 'ready',
+        offText: readiness.live ? 'switched on, not set up' : 'off',
+        warn: readiness.live && !readiness.ready,
+        note: readiness.ready ? '' : readiness.problems.join(' '),
+      },
+      {
+        label: 'Billing gyms',
+        what: 'The nightly job charges each gym for its plan.',
+        name: 'PLATFORM_BILLING_LIVE',
+        on: env.PLATFORM_BILLING_LIVE === 'true',
+        offText: 'off — nothing is charged',
+      },
+      {
+        label: 'Card payments',
+        what: 'Paystack, for gym subscriptions.',
+        name: 'PAYSTACK_SECRET_KEY',
+        on: paystackConfigured(),
+        onText: 'set',
+        offText: 'not set',
+      },
+      {
+        label: 'Email',
+        what: 'Activation links, decisions, invitations and password resets.',
+        name: 'BREVO_API_KEY',
+        on: emailConfigured(),
+        onText: 'set',
+        offText: 'not set — links are shown on screen instead',
+        warn: true,
+      },
+      {
+        label: 'Nightly job',
+        what: 'Billing, the drift report and document retention, every night.',
+        name: 'PLATFORM_CRON_SECRET',
+        on: Boolean(env.PLATFORM_CRON_SECRET),
+        onText: 'set',
+        offText: 'not set — the nightly job cannot run',
+        warn: true,
+      },
+      {
+        label: 'Deleting old documents',
+        what: "A rejected applicant's identity documents are deleted after the retention period.",
+        name: 'PLATFORM_RETENTION_LIVE',
+        on: env.PLATFORM_RETENTION_LIVE === 'true',
+        offText: 'off — reported, not deleted',
+      },
+      {
+        label: 'Privacy policy',
+        what: 'Shown as a draft until approved.',
+        name: 'PLATFORM_PRIVACY_APPROVED',
+        on: env.PLATFORM_PRIVACY_APPROVED === 'true',
+        onText: 'approved',
+        offText: 'draft',
+      },
+      {
+        label: 'Privacy contact',
+        what: 'Where people write about their data.',
+        name: 'PLATFORM_PRIVACY_CONTACT',
+        on: Boolean(env.PLATFORM_PRIVACY_CONTACT),
+        onText: 'set',
+        offText: 'not set',
+      },
+      {
+        label: 'Gym Owner Agreement',
+        what: 'Shown as a draft until approved.',
+        name: 'PLATFORM_TERMS_APPROVED',
+        on: termsApproved(),
+        onText: 'approved',
+        offText: 'draft',
+      },
+      {
+        label: 'First-run setup link',
+        what: 'Only ever needed once, to claim the first account.',
+        name: 'PLATFORM_SETUP_TOKEN',
+        on: !env.PLATFORM_SETUP_TOKEN,
+        onText: 'removed',
+        offText: 'still set — remove it',
+        warn: true,
+      },
+    ];
+
+    html(res, 200, settingsPage({ switches, baseUrl: platformBaseUrl(), user: await viewer(deps, session) }));
     return true;
   }
 

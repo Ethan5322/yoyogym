@@ -51,8 +51,52 @@ function platformClient() {
   return _platform;
 }
 
+/** The cache slot for the home gym. Not a valid slug, so it cannot collide with one. */
+const HOME = '~home';
+
 export function tenancyDeps() {
   return {
+    /**
+     * The registry slug of the gym this deployment serves with no slug — the
+     * one whose data is in this project's own schema (KOM, schema `gym`).
+     *
+     * null when the registry does not know it: a standalone deployment with no
+     * platform, which then runs exactly as it always has. Cached like any gym,
+     * the "not known" answer included, so the main address costs no extra query
+     * on almost every request.
+     */
+    homeGymSlug: async () => {
+      const hit = cache.get(HOME);
+      if (hit && hit.expires > Date.now()) return hit.value;
+
+      const remember = (value) => {
+        cache.set(HOME, { value, expires: Date.now() + TTL_MS });
+        return value;
+      };
+
+      try {
+        const db = platformClient();
+        const schema = process.env.SUPABASE_SCHEMA || 'gym';
+        const { data: connection, error } = await db
+          .from('gym_connections')
+          .select('gym_id')
+          .eq('schema_name', schema)
+          // Schema mode on THIS project only. A gym in its own project that
+          // happens to use the same schema name is a different database.
+          .is('supabase_url', null)
+          .maybeSingle();
+        if (error || !connection) return remember(null);
+
+        const { data: gym } = await db.from('gyms').select('slug').eq('id', connection.gym_id).maybeSingle();
+        return remember(gym?.slug ? String(gym.slug).toLowerCase() : null);
+      } catch {
+        // No platform configured, or it could not be read: the gym serves as
+        // before (CLAUDE.md §40.1 Q1 — fail open), and is not asked again for
+        // the cache window.
+        return remember(null);
+      }
+    },
+
     /** The registry row for a slug, with its connection. */
     lookupGym: async (slug) => {
       const key = String(slug).toLowerCase();

@@ -407,13 +407,25 @@ test('the security screen is about the PLATFORM, not a gym members', async () =>
 // The front page
 // ---------------------------------------------------------------------------
 
-function dashDeps(over = {}) {
+// A platform owner, who may open everything the front page links to.
+const EVERYTHING = [
+  'application.view', 'application.approve', 'application.reject', 'gym.view', 'gym.suspend',
+  'subscription.manage', 'audit.view', 'platform.manage',
+];
+
+function dashOnly() {
   return {
-    ...deps({ permissions: ['gym.view'] }),
     listApplications: async () => [{ id: 'a1', status: 'submitted' }],
     listGyms: async () => [{ id: 'g1', status: 'active' }, { id: 'g2', status: 'suspended' }],
     financeSummary: async () => ({ currency: 'ZAR', outstanding_cents: 49900, unpriced_plans: [] }),
     listAuditLog: async () => [],
+  };
+}
+
+function dashDeps(over = {}) {
+  return {
+    ...deps({ permissions: ['gym.view'] }),
+    ...dashOnly(),
     ...over,
   };
 }
@@ -426,7 +438,7 @@ test('the front page needs a session', async () => {
 
 test('it opens on WHAT NEEDS YOU, not on a list', async () => {
   const r = res();
-  await handlePlatform(req({ url: '/platform/home', cookie: session() }), r, dashDeps());
+  await handlePlatform(req({ url: '/platform/home', cookie: session() }), r, dashDeps({ permissionsFor: async () => EVERYTHING }));
 
   assert.equal(r.statusCode, 200);
   assert.match(r.body, /Today/);
@@ -441,7 +453,10 @@ test('AN UNPRICED PLAN IS THE MOST URGENT THING ON THE PAGE', async () => {
   await handlePlatform(
     req({ url: '/platform/home', cookie: session() }),
     r,
-    dashDeps({ financeSummary: async () => ({ unpriced_plans: ['basic'], outstanding_cents: 0 }) })
+    dashDeps({
+      permissionsFor: async () => EVERYTHING,
+      financeSummary: async () => ({ unpriced_plans: ['basic'], outstanding_cents: 0 }),
+    })
   );
 
   assert.match(r.body, /bills nobody/i);
@@ -478,13 +493,30 @@ test('ONE FAILING FIGURE DOES NOT TAKE THE PAGE DOWN', async () => {
 
 test('every number on it is a link to the thing it counts', async () => {
   const r = res();
-  await handlePlatform(req({ url: '/platform/home', cookie: session() }), r, dashDeps());
+  // A platform owner, who may open everything it links to.
+  await handlePlatform(
+    req({ url: '/platform/home', cookie: session() }),
+    r,
+    dashDeps({ permissionsFor: async () => EVERYTHING, countOwners: async () => 3 })
+  );
 
   // A figure nobody can act on is decoration, and decoration on an operations
   // screen reads as information.
   for (const href of ['/platform/registry', '/platform/finance', '/platform/owners', '/platform/audit']) {
     assert.ok(r.body.includes(href), `${href} should be reachable from the front page`);
   }
+});
+
+test('SOMEONE WHO MAY ONLY LOOK AT GYMS IS OFFERED NO DOOR THEY WOULD BE REFUSED AT (§40.1 F-40.2)', async () => {
+  const r = res();
+  await handlePlatform(req({ url: '/platform/home', cookie: session() }), r, dashDeps());
+
+  assert.equal(r.statusCode, 200);
+  assert.ok(r.body.includes('/platform/registry'), 'gyms: theirs to open');
+  for (const href of ['/platform/finance', '/platform/owners', '/platform/audit', '/platform/plans', '/platform/team', '/platform/settings']) {
+    assert.ok(!r.body.includes(`href="${href}"`), `${href} would answer "forbidden"`);
+  }
+  assert.ok(!/49900|499\.00/.test(r.body), 'and no money figures without the finance permission');
 });
 
 test('NO RAW TIMESTAMP APPEARS ANYWHERE ON IT', async () => {

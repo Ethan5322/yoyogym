@@ -15,6 +15,46 @@ occurrence is answered from notes rather than rediscovered.
 
 ---
 
+## 2026-09-28 — The main admin panel, corporate level (D-162, D-163)
+
+**Production deployed first**, with the user's go-ahead: `main` caught up with the preview
+(`da6b0aa`, 33 commits). Before pushing, the five SQL files in those commits were checked READ-ONLY
+against the live database — all present — and the live site was smoke-tested after. **Correction:**
+earlier notes said everyone would sign in again on deploy. They do not: only a session opened at a
+`/g/<slug>/` address before the gym was stamped into tokens does.
+
+**Checked against the live data, not only the code.** One application (0 documents), one gym (KOM),
+three priced plans, one staff account. The PDF path was proven for real: a throwaway file uploaded
+exactly as the owner page sends it, opened as the reviewer's link does (`application/pdf`, inline,
+nothing blocking the viewer, bytes identical), then deleted.
+
+**What was wrong, and is fixed (§40.1 F-40.1 … F-40.10):**
+- Suspending KOM locked only `/g/kom/`. A request naming no gym never met the registry.
+- A gym owner saw the staff menu, and **Today had no permission check** — any owner could read
+  platform-wide figures.
+- The reviewer could not see who applied; nothing was required before Approve; a rejected owner was
+  never told (`decisionEmail()` existed and was never called).
+- No way to send a new activation link; no way to add a staff member except SQL.
+- **Found while building:** a switched-off staff member kept every permission until their 8-hour
+  cookie expired — `permissionsFor` never read `is_active`. It does now.
+- **Found while building:** the staff search boxes put typed text straight into a PostgREST `or()`
+  filter, where a comma adds a condition. `searchText()` now cleans it for all three searches.
+
+**Failures worth remembering:**
+- **Escaping through heredocs, again.** Two Python patches failed to match text that was byte-for-byte
+  identical, because the shell and Python each had a turn at the backslashes. Neither wrote anything
+  (every patch asserts before it writes). What worked: write the new code to a scratch file with the
+  editor, then splice it in with a small script that reads that file.
+- **`platform/schema.sql` had drifted to CRLF in the working copy** while git holds LF. Normalised
+  before editing. In Git Bash, `grep -c $'\r$'` counts every line — count `\r` bytes with Python.
+
+**Verified.** 957 tests pass (42 new in `tests/main-admin-panel.test.js`, 8 in
+`tests/home-gym-control.test.js`). Every redesigned page screenshotted at computer and phone width
+with made-up data; the screenshots found six layout faults the tests could not (money wrapping,
+stretched buttons, a stray scrollbar, a stretched checkbox), all fixed.
+
+---
+
 ## 2026-09-28 — Stunning end to end (D-161)
 
 **Found by looking, not guessing.** The admin panel was screenshotted from the real production

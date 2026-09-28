@@ -43,6 +43,35 @@ export const DOCUMENT_TYPES = [
   'other_supporting',
 ];
 
+/**
+ * The three a gym is approved on (CLAUDE.md §40.1 Q3 — resolves the §17 open
+ * item "required documents"): who the owner is, that the business exists, and
+ * where the gym is. The rest stay optional extras.
+ */
+export const REQUIRED_DOCUMENTS = ['id_document', 'business_registration', 'proof_of_address'];
+
+/** What a person reads for each type. */
+export const DOCUMENT_LABELS = {
+  business_registration: 'Business registration',
+  id_document: 'ID document',
+  proof_of_address: 'Proof of address',
+  tax_clearance: 'Tax clearance',
+  insurance: 'Insurance',
+  lease_agreement: 'Lease agreement',
+  other_supporting: 'Supporting document',
+};
+
+/**
+ * The required types that do not yet have an ACCEPTED document.
+ *
+ * Uploaded is not enough: a blurred photo, or someone else's ID, is uploaded.
+ * A type counts once a reviewer has accepted one file of it.
+ */
+export function missingRequiredDocuments(documents = []) {
+  const accepted = new Set(documents.filter((d) => d?.status === 'accepted').map((d) => d.doc_type));
+  return REQUIRED_DOCUMENTS.filter((type) => !accepted.has(type));
+}
+
 /** The private bucket. Nothing in it is ever served publicly. */
 export const DOCUMENT_BUCKET = process.env.PLATFORM_DOCUMENT_BUCKET || 'gym-applications';
 
