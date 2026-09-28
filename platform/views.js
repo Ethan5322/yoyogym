@@ -98,7 +98,7 @@ const STYLE = `
  * `body` is inserted as-is: it is markup the caller has already built and
  * escaped. `title` is escaped, because it can carry a gym name.
  */
-export function layout({ title = 'Yoyo Gyms', body = '', user = null, indexable = false, bare = false }) {
+export function layout({ title = 'Yoyo Gyms', body = '', user = null, indexable = false, bare = false, bodyClass = 'auth' }) {
   // noindex is right for the staff panel and WRONG for the two public pages.
   // A signup page nobody can find is a signup page nobody uses, so `indexable`
   // is opt-in per page rather than a blanket rule.
@@ -115,7 +115,7 @@ export function layout({ title = 'Yoyo Gyms', body = '', user = null, indexable 
 ${
   // A sign-in page stands alone: no panel header, the brand instead.
   bare
-    ? `<body class="auth">
+    ? `<body class="${bodyClass}">
 <main>
 ${body}
 </main>
@@ -720,12 +720,28 @@ function money(cents, currency = 'ZAR') {
  * gets a working search by name, because "allow location" is a question many
  * people answer no to, and the answer must not break the product.
  */
-export function finderPage() {
+/**
+ * Where a picked gym leads, by what the person came to do (CLAUDE.md §36 on
+ * the web). A fixed list: the value only ever chooses one of these paths.
+ */
+const FINDER_NEXT = {
+  join: { title: 'Join a gym', sub: 'Find the gym you want to join, then register with them.', path: '/register' },
+  signin: { title: 'Member sign in', sub: 'Find your gym, then sign in with your membership number and phone.', path: '/member' },
+  admin: {
+    title: 'Gym owner login',
+    sub: 'Choose your gym, then sign in with your admin username and password. Your staff use the same sign-in.',
+    path: '/admin/login',
+  },
+};
+
+export function finderPage({ next = '' } = {}) {
+  const go = FINDER_NEXT[next] || { title: 'Find your gym', sub: 'Search by name, or use your location to see the closest gyms first.', path: '' };
   return layout({
-    title: 'Find your gym',
-    indexable: true,
-    body: `<h1>Find your gym</h1>
-<p class="muted">Search by name, or use your location to see the closest gyms first.</p>
+    title: go.title,
+    indexable: !FINDER_NEXT[next],
+    body: `<p><a href="/platform/welcome">← Back</a></p>
+<h1>${h(go.title)}</h1>
+<p class="muted">${h(go.sub)}</p>
 
 <form class="card" id="finder" onsubmit="return false">
   <label>Gym name<input id="q" name="q" placeholder="e.g. BOS GYM" autocomplete="off"></label>
@@ -737,6 +753,7 @@ export function finderPage() {
 
 <script>
 (function () {
+  var NEXT_PATH = ${JSON.stringify(go.path)};
   var q = document.getElementById('q');
   var out = document.getElementById('results');
   var note = document.getElementById('note');
@@ -759,7 +776,7 @@ export function finderPage() {
     out.innerHTML = gyms.map(function (g) {
       var where = [g.city, g.country].filter(Boolean).map(esc).join(', ');
       var far = g.distance_km == null ? '' : ' · ' + esc(g.distance_km) + ' km away';
-      return '<a class="card block" href="/g/' + encodeURIComponent(g.slug) + '">' +
+      return '<a class="card block" href="/g/' + encodeURIComponent(g.slug) + NEXT_PATH + '">' +
         '<b>' + esc(g.name) + '</b><br><span class="muted">' + where + far + '</span></a>';
     }).join('');
   }
@@ -2176,35 +2193,63 @@ export function privacyPage({ approved = false, contact = '', operator = 'MuleSo
  * gym member or a gym owner who arrives here has a way forward.
  */
 export function welcomePage() {
+  // The website's front door, made to match the app's first screen (CLAUDE.md
+  // §36): the user's photograph — which already carries the Yoyo Gyms logo, so
+  // no header logo is added above it (§36.1 Q11) — the headline, and every
+  // choice a person arrives with. The main admin panel is still the website's
+  // main job (D-133); this page makes sure a member or an owner has a way in.
   return layout({
     title: 'Yoyo Gyms',
     indexable: true,
+    bare: true,
+    bodyClass: 'landing',
     body: `<style>
-  .doors { display: grid; gap: 16px; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); margin: 24px 0; }
-  .door { display: block; padding: 24px; border-radius: 16px; text-decoration: none; color: inherit;
-          border: 1px solid var(--line); background: var(--card, transparent); }
-  .door:hover { border-color: var(--accent); }
-  .door h2 { margin: 0 0 8px; }
-  .door .go { color: var(--accent); font-weight: 600; }
+  body.landing main { max-width: 960px; padding: 0 0 48px; }
+  .land-hero { position: relative; height: min(56vh, 520px); min-height: 260px; overflow: hidden; }
+  .land-hero img { display: block; width: 100%; height: 100%; object-fit: cover; object-position: 50% 0; }
+  .land-hero::after { content: ''; position: absolute; left: 0; right: 0; bottom: 0; height: 50%;
+                      background: linear-gradient(rgba(7,12,16,0), var(--bg) 92%); }
+  .land-body { position: relative; margin-top: -64px; padding: 0 20px; text-align: center; }
+  .land-h { font-size: clamp(32px, 8vw, 48px); line-height: 1.04; font-weight: 800; text-transform: uppercase;
+            letter-spacing: -0.01em; margin: 0 0 12px; }
+  .land-h span { display: block; color: var(--accent); }
+  .land-lede { font-size: 16px; max-width: 32ch; margin: 0 auto 32px; }
+  .land-grid { display: grid; gap: 16px; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); text-align: left; }
+  .land-card { background: var(--card); border: 1px solid var(--line); border-radius: 20px; padding: 24px; display: grid; gap: 12px; }
+  .land-card h2 { margin: 0; font-size: 20px; }
+  .land-card p { margin: 0 0 4px; }
+  .btn { display: flex; align-items: center; justify-content: center; min-height: 52px; border-radius: 26px;
+         font-weight: 800; text-decoration: none; background: var(--accent); color: var(--accent-ink); }
+  .btn.ghost { background: transparent; color: var(--ink); border: 1.5px solid rgba(255,255,255,.86); }
+  .btn:hover { filter: brightness(1.08); }
+  .land-small { text-align: center; font-size: 14px; }
+  .land-small a, .land-foot a { color: var(--muted); }
+  .land-foot { margin-top: 32px; text-align: center; }
 </style>
-<h1>Yoyo Gyms</h1>
-<p class="muted">Many gyms, one place to find them.</p>
+<div class="land-hero"><img src="/brand/landing-hero.jpg" width="941" height="956"
+  alt="Yoyo Gyms — lift, train, transform. A member training with a dumbbell."></div>
+<div class="land-body">
+  <h1 class="land-h">Your gym.<span>Your journey.</span></h1>
+  <p class="muted land-lede">Connect to your gym, manage your membership, and stay committed to your goals.</p>
 
-<div class="doors">
-  <a class="door" href="/platform/find">
-    <h2>I train at a gym</h2>
-    <p class="muted">Find your gym to join as a new member, or sign in with your membership number and phone.</p>
-    <span class="go">Find your gym →</span>
-  </a>
-  <a class="door" href="/platform/apply">
-    <h2>I own a gym</h2>
-    <p class="muted">List your gym on Yoyo Gyms. You get your own gym admin panel, member sign-up and check-in.</p>
-    <span class="go">List your gym →</span>
-  </a>
-</div>
+  <div class="land-grid">
+    <section class="land-card">
+      <h2>I’m a member</h2>
+      <p class="muted">Choose your gym first, then join or sign in.</p>
+      <a class="btn" href="/platform/find?next=join">Join a gym</a>
+      <a class="btn ghost" href="/platform/find?next=signin">Member sign in</a>
+    </section>
+    <section class="land-card">
+      <h2>I’m a gym owner</h2>
+      <p class="muted">Open your gym’s admin panel — you and your staff — or bring your gym to Yoyo.</p>
+      <a class="btn" href="/platform/find?next=admin">Owner login</a>
+      <a class="btn ghost" href="/platform/apply">Apply to join Yoyo Gyms</a>
+      <p class="land-small"><a href="/platform/login?as=owner">Check application status</a></p>
+    </section>
+  </div>
 
-<p>Already applied, or already running your gym here? <a href="/platform/login">Sign in</a></p>
-<p class="muted"><a href="/platform/privacy">Privacy policy</a> · <a href="/platform/delete-account">Delete your account</a> · <a href="/platform/login">Yoyo staff sign in</a></p>`,
+  <p class="muted land-foot"><a href="/platform/privacy">Privacy policy</a> · <a href="/platform/delete-account">Delete your account</a> · <a href="/platform/login">Yoyo staff sign in</a></p>
+</div>`,
   });
 }
 

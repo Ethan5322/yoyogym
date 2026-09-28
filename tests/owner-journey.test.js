@@ -70,14 +70,30 @@ test('THE WEBSITE OPENS ON A FRONT PAGE, NOT THE STAFF SIGN-IN', () => {
 });
 
 test('the front page leads to joining a gym and to listing one', async () => {
+  // The same choices as the app's first screen (CLAUDE.md §36).
   const page = welcomePage();
-  assert.match(page, /href="\/platform\/find"/, 'members: find your gym');
-  assert.match(page, /href="\/platform\/apply"/, 'owners: list your gym');
-  assert.match(page, /href="\/platform\/login"/, 'and sign in');
+  assert.match(page, /href="\/platform\/find\?next=join"/, 'members: join a gym');
+  assert.match(page, /href="\/platform\/find\?next=signin"/, 'members: sign in');
+  assert.match(page, /href="\/platform\/find\?next=admin"/, 'owners: their gym\'s admin sign-in');
+  assert.match(page, /href="\/platform\/apply"/, 'owners: apply');
+  assert.match(page, /href="\/platform\/login\?as=owner"/, 'owners: application status');
+  assert.match(page, /href="\/platform\/login"/, 'and Yoyo staff');
+  assert.match(page, /landing-hero\.jpg/, 'the user\'s photograph');
+  assert.ok(!/<header>/.test(page), 'no header logo above a photo that already carries the logo');
 
   const r = { statusCode: 0, body: '', headers: {}, setHeader() {}, getHeader() {}, writeHead(c) { this.statusCode = c; return this; }, end(b) { this.body = b; } };
   await handlePlatform({ method: 'GET', url: '/platform/welcome', headers: {} }, r, {});
   assert.equal(r.statusCode, 200);
+});
+
+test('THE GYM FINDER TAKES EACH CHOICE TO THE RIGHT PLACE', async () => {
+  const { finderPage } = await import('../platform/views.js');
+  assert.match(finderPage({ next: 'join' }), /var NEXT_PATH = "\/register";/);
+  assert.match(finderPage({ next: 'signin' }), /var NEXT_PATH = "\/member";/);
+  const admin = finderPage({ next: 'admin' });
+  assert.match(admin, /var NEXT_PATH = "\/admin\/login";/, 'the gym\'s OWN admin sign-in, never the Yoyo panel');
+  assert.match(admin, /Gym owner login/);
+  assert.match(finderPage({ next: '"><script>' }), /var NEXT_PATH = "";/, 'anything else is the plain finder');
 });
 
 test('the sign-in page says who it is for, and points members to their gym', () => {

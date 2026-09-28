@@ -15,6 +15,26 @@ occurrence is answered from notes rather than rediscovered.
 
 ---
 
+## 2026-09-28 — The website's front page, made to match the app (D-156 follow-up)
+
+**Reported by the user on the preview:** "I can't see where the gym owner signs in — it only asks to
+register as a gym owner or as a member, no sign in as member." True: the new first screen lives only
+inside the phone app. The preview address opens the WEBSITE's `/platform/welcome`, which offered
+only "Find your gym" and "List your gym", with sign-in as one small link — and that link went to the
+Yoyo staff login, not a gym's admin panel.
+
+**Fixed.** `/platform/welcome` now mirrors the app: the photograph (it carries the logo, so the page
+has no header logo), the headline, and every choice — Member: *Join a gym* / *Member sign in*;
+Gym owner: *Owner login* / *Apply to join Yoyo Gyms* / *Check application status*; plus privacy,
+account deletion and Yoyo staff sign-in. The finder takes `?next=join|signin|admin` from a fixed list
+and sends the picked gym to `/g/<slug>/register`, `/member` or `/admin/login` — the gym's OWN admin
+sign-in, never the Yoyo panel (§36.1 Q2).
+
+**Lesson.** A screen built for the app must be checked for its web twin too (§14 requires a web path
+for everyone without the app). The preview a user opens is the website, not the app.
+
+---
+
 ## 2026-09-28 — The new brand everywhere (D-157)
 
 Committed first: the landing redesign, `8403eab`. Then the user asked for the new colour and logo on

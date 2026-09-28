@@ -419,7 +419,9 @@ function forbid(res, message) {
 async function handleExtraRoutes(req, res, deps, { url, path, method }) {
   // ---- public: the member-facing gym finder -------------------------------
   if (path === 'find' && method === 'GET') {
-    html(res, 200, finderPage());
+    // Join, member sign-in, or a gym's own admin sign-in (the welcome page's
+    // choices). Anything else is the plain finder.
+    html(res, 200, finderPage({ next: url.searchParams.get('next') || '' }));
     return true;
   }
 
