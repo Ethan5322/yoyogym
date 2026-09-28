@@ -7,6 +7,7 @@ import { apiFetch } from '../../lib/api.js';
 import FaceCapture from '../../chatbot/components/FaceCapture.jsx';
 import IdPhotoUpload from '../../components/IdPhotoUpload.jsx';
 import CredentialActions from '../../components/CredentialActions.jsx';
+import { DEFAULT_ACCENT } from '../../../shared/brand.js';
 
 export default function Settings() {
   const [s, setS] = useState(null);
@@ -43,7 +44,7 @@ export default function Settings() {
       <Section title="Gym Profile" saved={savedKey === 'gym_profile'}
         note="Your brand identity. The name and accent colour appear on the splash screen, membership card, emails and PDFs."
         initial={{ ...DEFAULTS.gym_profile, ...(s.gym_profile || {}) }}
-        fields={[['name', 'Gym name'], ['tagline', 'Tagline (shown on the splash screen)'], ['accent_color', 'Brand accent colour (hex, e.g. #E63946)'], ['logo_url', 'Logo image URL (shown on the splash screen)'], ['phone', 'Contact phone'], ['email', 'Contact email'], ['website', 'Website (optional)'], ['address', 'Physical address'], ['operating_hours', 'Operating hours'], ['welcome_message', 'Welcome message (splash screen)']]}
+        fields={[['name', 'Gym name'], ['tagline', 'Tagline (shown on the splash screen)'], ['accent_color', 'Brand accent colour (hex — Yoyo lime is #BFF642)'], ['logo_url', 'Logo image URL (splash screen, ID cards and PDFs — blank uses the Yoyo Gyms logo)'], ['phone', 'Contact phone'], ['email', 'Contact email'], ['website', 'Website (optional)'], ['address', 'Physical address'], ['operating_hours', 'Operating hours'], ['welcome_message', 'Welcome message (splash screen)']]}
         onSave={(v) => save('gym_profile', v, 'gym_profile')} />
 
       <Section title="Owner Notifications" saved={savedKey === 'notifications'}
@@ -79,7 +80,7 @@ const DEFAULTS = {
   gym_profile: {
     name: 'Yoyo GYM',
     tagline: 'Train harder. Live stronger.',
-    accent_color: '#E63946',
+    accent_color: DEFAULT_ACCENT,
     logo_url: '',
     operating_hours: 'Mon–Fri 05:00–21:00 · Sat–Sun 07:00–18:00',
     welcome_message: 'Welcome to Yoyo GYM — your journey to a stronger, healthier you starts here. Scan, register, and let’s get moving.',

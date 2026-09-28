@@ -15,6 +15,7 @@
 import { getSupabase } from '../../lib/supabase.js';
 import { allowMethods, readJsonBody, ok, badRequest, serverError } from '../../lib/http.js';
 import { rateLimit } from '../../lib/ratelimit.js';
+import { accentOrDefault } from '../../../shared/brand.js';
 
 /**
  * The only member columns this endpoint may return.
@@ -99,7 +100,7 @@ export default async function handler(req, res) {
     return ok(res, {
       gym: {
         name: gymProfile.name || 'Your Gym',
-        accent: gymProfile.accent_color || '#E63946',
+        accent: accentOrDefault(gymProfile.accent_color),
         phone: gymProfile.phone || '',
         address: gymProfile.address || '',
         email: gymProfile.email || '',

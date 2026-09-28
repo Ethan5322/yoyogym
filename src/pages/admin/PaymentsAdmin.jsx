@@ -8,6 +8,7 @@ import { useToast } from '../../lib/toast.jsx';
 import { exportCsv } from '../../lib/csv.js';
 import { useBranding } from '../../lib/branding.js';
 import { downloadReceiptPdf } from '../../lib/receiptPdf.js';
+import { accentOrDefault } from '../../../shared/brand.js';
 
 const zar = (n) => 'R' + Number(n || 0).toLocaleString('en-ZA', { minimumFractionDigits: 2 });
 const CATS = ['joining_fee', 'monthly_fee', 'session_pack', 'personal_training', 'class_addon', 'day_pass', 'other'];
@@ -52,7 +53,7 @@ export default function PaymentsAdmin() {
     try {
       downloadReceiptPdf({
         gymName: branding.name || 'Yoyo GYM',
-        accent: branding.accent_color || '#E63946',
+        accent: accentOrDefault(branding.accent_color),
         payment: p,
         member: { full_name: p.member_name, membership_number: p.membership_number },
       });

@@ -8,6 +8,7 @@ import { useAuth } from '../lib/auth.jsx';
 import { useBranding } from '../lib/branding.js';
 import { apiFetch } from '../lib/api.js';
 import UpgradeNotice from './UpgradeNotice.jsx';
+import BrandLogo from './BrandLogo.jsx';
 
 // Grouped navigation reads as an organised product, not a random row of buttons.
 //
@@ -126,7 +127,10 @@ export default function AdminShell({ children }) {
         <button aria-label="Menu" className="admin-burger" onClick={() => setOpen(true)}>
           <span /><span /><span />
         </button>
-        <span className="font-display text-lg font-bold uppercase tracking-wider text-accent">{gymName}</span>
+        <span className="flex items-center gap-2">
+          <BrandLogo alt="" className="h-7 w-auto" />
+          <span className="font-display text-lg font-bold uppercase tracking-wider text-accent">{gymName}</span>
+        </span>
         <span className="text-xs uppercase tracking-wide text-muted">{user?.role}</span>
       </header>
 
@@ -136,6 +140,7 @@ export default function AdminShell({ children }) {
       {/* ===== Sidebar (fixed on desktop, drawer on mobile) ===== */}
       <aside className={`admin-sidebar ${open ? 'is-open' : ''}`}>
         <div className="admin-brand">
+          <BrandLogo alt="" className="mb-2 h-12 w-auto self-start" />
           <span className="font-display text-xl font-bold uppercase tracking-wider text-accent">{gymName}</span>
           <span className="text-[10px] uppercase tracking-[0.25em] text-muted">Management</span>
         </div>
@@ -163,7 +168,7 @@ export default function AdminShell({ children }) {
                     <span className="admin-link__icon">{n.icon}</span>
                     <span>{n.label}</span>
                     {n.label === 'Inbox' && unread > 0 && (
-                      <span className="ml-auto rounded-full bg-accent px-2 py-0.5 text-[10px] font-bold text-white">{unread}</span>
+                      <span className="ml-auto rounded-full bg-accent px-2 py-0.5 text-[10px] font-bold text-accent-ink">{unread}</span>
                     )}
                   </Link>
                 ) : (

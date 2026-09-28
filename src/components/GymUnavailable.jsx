@@ -23,7 +23,7 @@ export default function GymUnavailable({ gate, onRetry }) {
           <button
             type="button"
             onClick={onRetry ?? (() => window.location.reload())}
-            className="mt-6 w-full rounded-xl bg-accent px-4 py-3 font-semibold text-black"
+            className="mt-6 w-full rounded-xl bg-accent px-4 py-3 font-semibold text-accent-ink"
           >
             {gate.action}
           </button>
@@ -32,7 +32,7 @@ export default function GymUnavailable({ gate, onRetry }) {
           // of the same screen, so the link is never a dead end in either.
           <a
             href="/platform/find"
-            className="mt-6 block w-full rounded-xl bg-accent px-4 py-3 font-semibold text-black"
+            className="mt-6 block w-full rounded-xl bg-accent px-4 py-3 font-semibold text-accent-ink"
           >
             {gate.action}
           </a>

@@ -1817,3 +1817,41 @@ given. Nothing in §36 is built until these are answered.
 All clarifications answered 2026-09-28. The build is the app's Yoyo screens
 (`apps/mobile/www/`) plus the restyled admin-website login. Every gym's own screens, the member
 login, registration, and the gym admin login are **not** changed (§32).
+
+---
+
+## 37. Brand rollout — the new colours and logo everywhere (user instruction, 2026-09-28)
+
+> The user's words: *"apply colour app change the logo old one with new one and change everything
+> colour use that colour, also be sure that the new colour and logo appear on all id, documents,
+> pdf, and main admin panel the colour both main admin panel and …"* — clarified one question at a
+> time below. This is an **approved controlled change** to protected surfaces (§32: PDFs, member IDs,
+> gym admin screens): it changes colours and logos only, never behaviour, data or routes.
+
+**The brand.** Near-black ground `#070C10`, white type, **electric lime `#BFF642`** as the one accent
+(dark text `#0B1400` on it), and the user's logo (navy `#04162B` + purple `#6047A2` on light
+backgrounds; white + purple `#8C65C8` on dark). The old red `#E63946` and the old red dumbbell icon
+are retired as the default. One source of truth: `shared/brand.js`.
+
+### 37.1 Clarifications — answered by the user
+
+- **Q1 — where.** All four: the **main admin panel** (every page, not only the login), **each gym's
+  admin panel**, the **member web pages**, and the **owner web pages**.
+- **Q2 — whose brand on a gym's screens and documents.** **Yoyo is the default; a gym can change
+  it.** Lime and the Yoyo Gyms logo replace red as the default everywhere. A gym that sets its own
+  colour or logo in Settings → Gym Profile keeps them — and PDFs now **follow** that setting (they
+  were hard-coded red). The gym's name is still printed on its documents.
+  *This revises §36.1 Q3 only for the default: a gym's own saved colour still wins.*
+- **Q3 — a saved colour that is exactly the old red.** **Kept.** Only gyms that never saved a colour
+  turn lime. KOM stays red until its owner changes the colour in Settings. The Settings form
+  pre-fills lime from now on.
+- **Q4 — the app icon.** **The app logo itself, on a transparent background.** Verified against the
+  store rules on 2026-09-28: Apple rejects any App Store icon with transparency (alpha channel), and
+  Android always masks launcher icons into a shape. So: the browser-tab icon is the logo on a
+  **transparent** background; the Android and iPhone icons are the logo on the **near-black**
+  ground, which the stores require to be solid.
+
+**Readability rule, from the brand itself:** text on an accent colour is chosen by contrast — dark
+on light colours such as lime, white on dark ones such as red — so a gym's own colour never makes
+its buttons unreadable. On white paper (PDFs, receipts), a light accent is used for bands and
+rules, never for text.

@@ -11,6 +11,7 @@ import {
   emailConfigured,
 } from './channels.js';
 import { memberTemplates, ownerTemplates } from './templates.js';
+import { BRAND, accentOrDefault } from '../../../shared/brand.js';
 
 async function loadConfig(supabase) {
   const { data } = await supabase
@@ -21,6 +22,8 @@ async function loadConfig(supabase) {
   const n = map.notifications || {};
   return {
     gymName: map.gym_profile?.name || 'Your Gym',
+    // The gym's own colour, or the Yoyo lime (CLAUDE.md §37).
+    accent: accentOrDefault(map.gym_profile?.accent_color),
     sender: {
       email: process.env.BREVO_SENDER_EMAIL || n.sender_email,
       name: map.gym_profile?.name || process.env.BREVO_SENDER_NAME,
@@ -51,7 +54,7 @@ async function log(supabase, row) {
 async function emailMember(supabase, cfg, { member, templateKey, vars }) {
   const tpl = memberTemplates[templateKey];
   if (!tpl) return;
-  const { subject, html } = tpl({ gymName: cfg.gymName, member, ...vars });
+  const { subject, html } = tpl({ gymName: cfg.gymName, accent: cfg.accent, member, ...vars });
   const result = await sendEmail({
     to: member.email,
     toName: member.full_name,
@@ -72,12 +75,14 @@ async function emailMember(supabase, cfg, { member, templateKey, vars }) {
 }
 
 // Branded HTML wrapper for owner email alerts (plain text -> tidy email).
-function ownerEmailHtml(gymName, text) {
+function ownerEmailHtml(gymName, text, accent) {
   const body = text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/\n/g, '<br>');
-  return `<!doctype html><html><body style="margin:0;background:#080808;font-family:Arial,Helvetica,sans-serif;color:#F0EDE8">
+  // The gym's own colour, or the Yoyo lime (CLAUDE.md §37).
+  const colour = accentOrDefault(accent);
+  return `<!doctype html><html><body style="margin:0;background:${BRAND.ground};font-family:Arial,Helvetica,sans-serif;color:#F0EDE8">
     <div style="max-width:560px;margin:0 auto;padding:24px">
-      <h1 style="color:#E63946;letter-spacing:1px;text-transform:uppercase;font-size:20px;margin:0 0 12px">${gymName} — Owner Alert</h1>
-      <div style="background:#111;border:1px solid #222;border-left:3px solid #E63946;border-radius:6px;padding:18px;line-height:1.7;font-size:14px">${body}</div>
+      <h1 style="color:${colour};letter-spacing:1px;text-transform:uppercase;font-size:20px;margin:0 0 12px">${gymName} — Owner Alert</h1>
+      <div style="background:${BRAND.surface};border:1px solid #1f2a30;border-left:3px solid ${colour};border-radius:6px;padding:18px;line-height:1.7;font-size:14px">${body}</div>
       <p style="color:#8A8580;font-size:11px;margin-top:14px">Automated notification from your ${gymName} management system.</p>
     </div></body></html>`;
 }
@@ -99,7 +104,7 @@ async function alertOwner(supabase, cfg, { templateKey, text, memberId }) {
               to: cfg.owner.email,
               toName: 'Owner',
               subject: `${cfg.gymName} — ${text.split('\n')[0].replace(/^[^A-Za-z]+/, '').trim() || 'Notification'}`,
-              html: ownerEmailHtml(cfg.gymName, text),
+              html: ownerEmailHtml(cfg.gymName, text, cfg.accent),
               sender: cfg.sender,
             }),
           recipient: cfg.owner.email,

@@ -18,6 +18,7 @@
 import { when, exact, until, money as fmtMoney, count } from './format.js';
 import { pageLink } from './paging.js';
 import { gymAdminPath, OWNER_USERNAME } from './gym-admin.js';
+import { BRAND, LOGO_ON_DARK } from '../shared/brand.js';
 
 /** Escape text for safe interpolation into markup or an attribute. */
 export function escapeHtml(value) {
@@ -33,17 +34,22 @@ export function escapeHtml(value) {
 /** Shorthand used throughout: `h` is "escaped". */
 const h = escapeHtml;
 
+// The Yoyo Gyms brand on every page of the website (CLAUDE.md §37): near-black,
+// white type, electric lime — the same in light and dark system themes, like
+// the app. Values from shared/brand.js.
 const STYLE = `
-  :root { color-scheme: light dark; --ink:#111; --muted:#666; --line:#e5e5e5; --accent:#E63946; --bg:#fff; }
-  @media (prefers-color-scheme: dark) {
-    :root { --ink:#eee; --muted:#999; --line:#2a2a2a; --bg:#0d0d0d; }
-  }
+  :root { color-scheme: dark; --ink:#F2F5F3; --muted:rgba(255,255,255,.62); --line:rgba(255,255,255,.12);
+          --accent:${BRAND.lime}; --accent-ink:${BRAND.limeInk}; --bg:${BRAND.ground}; --card:${BRAND.surface};
+          --bad:#ff6b5e; }
   * { box-sizing: border-box; }
   body { margin:0; background:var(--bg); color:var(--ink);
          font:15px/1.5 system-ui,-apple-system,Segoe UI,Roboto,sans-serif; }
-  header { border-bottom:1px solid var(--line); padding:14px 20px; display:flex;
-           justify-content:space-between; align-items:center; gap:16px; }
-  header b { letter-spacing:.06em; text-transform:uppercase; font-size:13px; }
+  header { border-bottom:1px solid var(--line); padding:12px 20px; display:flex;
+           justify-content:space-between; align-items:center; gap:16px; background:var(--card); }
+  header .brand { display:inline-flex; align-items:center; }
+  header .brand img { display:block; height:48px; width:auto; }
+  header nav a { color:var(--ink); text-decoration:none; font-weight:600; }
+  header nav a:hover { color:var(--accent); }
   main { max-width:900px; margin:0 auto; padding:24px 20px 64px; }
   h1 { font-size:20px; margin:0 0 4px; }
   .muted { color:var(--muted); font-size:13px; }
@@ -57,11 +63,12 @@ const STYLE = `
   form.card { border:1px solid var(--line); border-radius:8px; padding:20px; max-width:360px;
               margin:64px auto; display:grid; gap:12px; }
   label { font-size:13px; color:var(--muted); display:grid; gap:4px; }
-  input, textarea { font:inherit; padding:9px 10px; border:1px solid var(--line);
-                    border-radius:6px; background:transparent; color:inherit; width:100%; }
-  button { font:inherit; padding:9px 14px; border:0; border-radius:6px;
-           background:var(--accent); color:#fff; cursor:pointer; }
-  .err { color:var(--accent); font-size:13px; }
+  input, textarea, select { font:inherit; padding:9px 10px; border:1px solid var(--line);
+                    border-radius:6px; background:var(--bg); color:inherit; width:100%; }
+  input:focus, textarea:focus, select:focus { outline:2px solid var(--accent); outline-offset:1px; }
+  button { font:inherit; font-weight:700; padding:9px 16px; border:0; border-radius:99px;
+           background:var(--accent); color:var(--accent-ink); cursor:pointer; }
+  .err { color:var(--bad); font-size:13px; }
   .row { display:flex; gap:12px; flex-wrap:wrap; align-items:center; }
   ul.events { list-style:none; padding:0; margin:12px 0 0; }
   ul.events li { border-left:2px solid var(--line); padding:6px 0 6px 12px; margin-bottom:6px; }
@@ -116,7 +123,7 @@ ${body}
 </html>`
     : `<body>
 <header>
-  <b>Yoyo Gyms</b>
+  <a class="brand" href="${user ? '/platform/home' : '/platform/welcome'}"><img src="${LOGO_ON_DARK}" width="720" height="531" alt="Yoyo Gyms"></a>
   ${
     user
       ? `<nav class="row">
@@ -156,7 +163,7 @@ export function loginPage({ error = '', audience = 'staff' } = {}) {
     title: owner ? 'Gym owner account' : 'Platform administrator login',
     bare: true,
     body: `
-<img class="auth-logo" src="/brand/yoyo-gyms-logo-on-dark.png" width="720" height="531" alt="Yoyo Gyms">
+<img class="auth-logo" src="${LOGO_ON_DARK}" width="720" height="531" alt="Yoyo Gyms">
 <form class="card" method="post" action="/platform/login">
   <h1>${owner ? 'Gym owner account' : 'Yoyo Gyms Platform'}</h1>
   <p class="muted auth-sub">${owner ? 'Your application, documents and subscription.' : 'Platform administrator login'}</p>
@@ -2176,9 +2183,9 @@ export function welcomePage() {
   .doors { display: grid; gap: 16px; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); margin: 24px 0; }
   .door { display: block; padding: 24px; border-radius: 16px; text-decoration: none; color: inherit;
           border: 1px solid var(--line); background: var(--card, transparent); }
-  .door:hover { border-color: #E63946; }
+  .door:hover { border-color: var(--accent); }
   .door h2 { margin: 0 0 8px; }
-  .door .go { color: #E63946; font-weight: 600; }
+  .door .go { color: var(--accent); font-weight: 600; }
 </style>
 <h1>Yoyo Gyms</h1>
 <p class="muted">Many gyms, one place to find them.</p>

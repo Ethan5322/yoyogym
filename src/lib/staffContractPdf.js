@@ -5,13 +5,8 @@
 import { jsPDF } from 'jspdf';
 import { downloadPdf } from './download.js';
 import { stampMulesooCredit } from './mulesooCredit.js';
-
-function hexToRgb(hex) {
-  const m = /^#?([0-9a-fA-F]{6})$/.exec(hex || '');
-  if (!m) return [230, 57, 70];
-  const n = parseInt(m[1], 16);
-  return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
-}
+import { brandBand } from './pdf/brand.js';
+import { DEFAULT_ACCENT } from '../../shared/brand.js';
 const fmtDate = (d) => (d ? new Date(d).toLocaleDateString('en-ZA', { day: 'numeric', month: 'long', year: 'numeric' }) : '________________');
 
 // Researched, professional gym-staff clauses (generic SA employment template).
@@ -46,24 +41,20 @@ const CLAUSES = [
 
 export async function downloadStaffContract({
   gymName = 'Yoyo GYM',
-  accent = '#E63946',
+  accent = DEFAULT_ACCENT,
   employee = {},
   issued = new Date(),
 }) {
   const doc = new jsPDF({ unit: 'mm', format: 'a4' });
   const W = 210, H = 297, M = 18, CW = W - M * 2;
-  const [r, g, b] = hexToRgb(accent);
   let y = 0;
 
   // Break before the footer band (divider + info line + agency credit).
   const ensure = (h) => { if (y + h > H - 28) { doc.addPage(); y = M; } };
 
-  // ---- Title block ----
-  doc.setFillColor(10, 10, 10);
-  doc.rect(0, 0, W, 40, 'F');
-  doc.setFillColor(r, g, b);
-  doc.rect(0, 40, W, 1.4, 'F');
-  doc.setTextColor(r, g, b);
+  // ---- Title block (CLAUDE.md §37): near-black, the logo, the accent stripe ----
+  const colours = brandBand(doc, { accent, height: 41.4, margin: M, stripe: 1.4 });
+  doc.setTextColor(...colours.accent);
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(20);
   doc.text(gymName.toUpperCase(), M, 22);
@@ -117,7 +108,7 @@ export async function downloadStaffContract({
     ensure(10);
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(10.5);
-    doc.setTextColor(r, g, b);
+    doc.setTextColor(...colours.text);
     doc.text(title, M, y);
     y += 5;
     doc.setFont('helvetica', 'normal');

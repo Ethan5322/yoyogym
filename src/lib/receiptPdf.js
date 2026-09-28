@@ -3,26 +3,19 @@
 import { jsPDF } from 'jspdf';
 import { downloadPdf } from './download.js';
 import { stampMulesooCredit } from './mulesooCredit.js';
-
-function hexToRgb(hex) {
-  const m = /^#?([0-9a-fA-F]{6})$/.exec(hex || '');
-  if (!m) return [230, 57, 70];
-  const n = parseInt(m[1], 16);
-  return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
-}
+import { brandBand } from './pdf/brand.js';
+import { DEFAULT_ACCENT } from '../../shared/brand.js';
 
 const zar = (n) => 'R ' + Number(n || 0).toLocaleString('en-ZA', { minimumFractionDigits: 2 });
 const fmt = (d) => (d ? new Date(d).toLocaleDateString('en-ZA', { day: 'numeric', month: 'long', year: 'numeric' }) : '—');
 
-export function downloadReceiptPdf({ gymName = 'Yoyo GYM', accent = '#E63946', payment, member = {} }) {
-  const [r, g, b] = hexToRgb(accent);
+export function downloadReceiptPdf({ gymName = 'Yoyo GYM', accent = DEFAULT_ACCENT, payment, member = {} }) {
   const doc = new jsPDF({ unit: 'pt', format: 'a4' });
   const W = doc.internal.pageSize.getWidth();
   const M = 48;
 
-  // Header band
-  doc.setFillColor(r, g, b);
-  doc.rect(0, 0, W, 90, 'F');
+  // Header band (CLAUDE.md §37): near-black, the logo, the gym's accent stripe.
+  const colours = brandBand(doc, { accent, height: 90, margin: M });
   doc.setTextColor(255, 255, 255);
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(22);
@@ -73,7 +66,7 @@ export function downloadReceiptPdf({ gymName = 'Yoyo GYM', accent = '#E63946', p
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(13);
   doc.text('TOTAL PAID', M + 8, y);
-  doc.setTextColor(r, g, b);
+  doc.setTextColor(...colours.text);
   doc.text(zar(payment.amount), W - M - 8, y, { align: 'right' });
 
   // Status + method

@@ -176,7 +176,7 @@ function PlanCard({ plan, priceLine, hintZar, currency, onSelect }) {
       }`}
     >
       {plan.is_featured && (
-        <span className="absolute -top-2 right-4 rounded-full bg-accent px-3 py-0.5 text-xs font-bold uppercase text-black">
+        <span className="absolute -top-2 right-4 rounded-full bg-accent px-3 py-0.5 text-xs font-bold uppercase text-accent-ink">
           Most Popular
         </span>
       )}

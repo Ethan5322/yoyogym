@@ -3,8 +3,15 @@
 // Output: ./Yoyo-GYM-Business-Master-Guide.pdf (also synced via OneDrive).
 import { jsPDF } from 'jspdf';
 import { writeFileSync } from 'node:fs';
+import { YOYO_LOGO_ON_DARK, YOYO_LOGO_ASPECT } from '../shared/yoyo-logo.js';
 
-const ACCENT = [230, 57, 70];   // brand red #E63946
+// The Yoyo Gyms brand (CLAUDE.md §37; shared/brand.js). Lime for bars and
+// stripes; the logo's navy for words on white paper, where lime cannot be read;
+// dark ink for text sitting on a lime fill.
+const ACCENT = [191, 246, 66];
+const ACCENT_TEXT = [4, 22, 43];
+const ACCENT_INK = [11, 20, 0];
+const GROUND = [7, 12, 16];
 const DARK = [22, 22, 22];
 const GRAY = [120, 120, 120];
 const LIGHT = [245, 245, 245];
@@ -39,7 +46,7 @@ function h2(text) {
   gap(2);
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(12);
-  setColor(ACCENT);
+  setColor(ACCENT_TEXT);
   doc.text(text, M, y);
   y += 6;
 }
@@ -57,7 +64,7 @@ function bullet(text, num) {
   const indent = num != null ? 8 : 6;
   const lines = doc.splitTextToSize(text, CW - indent);
   ensure(6);
-  setColor(ACCENT);
+  setColor(ACCENT_TEXT);
   doc.setFont('helvetica', 'bold');
   doc.text(marker, M + 1, y);
   doc.setFont('helvetica', 'normal');
@@ -77,7 +84,7 @@ function callout(title, text) {
   setFill(ACCENT);
   doc.rect(M, y, 1.5, boxH, 'F');
   let ty = y + 6;
-  doc.setFont('helvetica', 'bold'); setColor(ACCENT);
+  doc.setFont('helvetica', 'bold'); setColor(ACCENT_TEXT);
   doc.text(title, M + 5, ty); ty += 5;
   doc.setFont('helvetica', 'normal'); setColor(DARK);
   tLines.forEach((ln) => { doc.text(ln, M + 5, ty); ty += 5; });
@@ -101,8 +108,9 @@ function tableRows(rows, col1w = 55) {
 }
 
 // ---------------- COVER ----------------
-setFill(DARK);
+setFill(GROUND);
 doc.rect(0, 0, PW, PH, 'F');
+doc.addImage(YOYO_LOGO_ON_DARK, 'PNG', M, 18, 40 * YOYO_LOGO_ASPECT, 40); // the Yoyo Gyms logo (§37)
 setFill(ACCENT);
 doc.rect(0, 96, PW, 2, 'F');
 doc.setFont('times', 'bold');
@@ -204,7 +212,7 @@ const checks = [
 ];
 for (const c of checks) {
   ensure(7);
-  doc.setDrawColor(ACCENT[0], ACCENT[1], ACCENT[2]);
+  doc.setDrawColor(...ACCENT_TEXT);
   doc.setLineWidth(0.4);
   doc.rect(M, y - 3.5, 4, 4);
   doc.setFont('helvetica', 'normal'); doc.setFontSize(10.5); setColor(DARK);

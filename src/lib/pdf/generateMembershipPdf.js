@@ -15,18 +15,18 @@ import {
 import { gymTerms } from './terms.js';
 import { downloadPdf } from '../download.js';
 import { stampMulesooCredit } from '../mulesooCredit.js';
-
-function hexToRgb(hex) {
-  const m = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex || '');
-  return m ? [parseInt(m[1], 16), parseInt(m[2], 16), parseInt(m[3], 16)] : [230, 57, 70];
-}
+import { brandBand, documentColours, documentLogo } from './brand.js';
 const fmtDate = (d) =>
   d ? new Date(d).toLocaleDateString('en-ZA', { year: 'numeric', month: 'long', day: 'numeric' }) : '—';
 const zar = (n) => 'R' + Number(n || 0).toLocaleString('en-ZA', { minimumFractionDigits: 2 });
 
 export async function generateMembershipPdf(data) {
   const { gym, member, membership, parq, addons } = data;
-  const accent = hexToRgb(gym.accent);
+  // The gym's colour, or the Yoyo lime (CLAUDE.md §37). `accent` is for the
+  // dark card and bands; `accentText` for words on white paper.
+  const colours = documentColours(gym.accent);
+  const accent = colours.accent;
+  const accentText = colours.text;
   const gymName = (gym.name || 'Your Gym').toUpperCase();
   const companyUrl = data.companyUrl || gym.website || '';
 
@@ -38,7 +38,9 @@ export async function generateMembershipPdf(data) {
 
   const ink = [33, 33, 33];
   const muted = [120, 120, 120];
-  const dark = [8, 8, 8]; // obsidian
+  const dark = colours.ground; // the Yoyo near-black
+  // A health warning is a warning in every gym's colours — never the brand's.
+  const warn = [192, 57, 43];
   const gold = [200, 146, 42];
   const line = [220, 220, 220];
 
@@ -56,6 +58,16 @@ export async function generateMembershipPdf(data) {
   fColor(dark);
   doc.rect(0, 0, W, H, 'F');
 
+  // The logo — the gym's own if it has one, otherwise Yoyo Gyms.
+  const logo = documentLogo('dark');
+  const logoH = 34;
+  const logoW = logoH * logo.aspect;
+  if (logo.own) {
+    doc.setFillColor(255, 255, 255);
+    doc.roundedRect(W / 2 - logoW / 2 - 4, 10, logoW + 8, logoH + 8, 4, 4, 'F');
+  }
+  doc.addImage(logo.data, logo.format, W / 2 - logoW / 2, 14, logoW, logoH, undefined, 'FAST');
+
   tColor(accent);
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(24);
@@ -70,12 +82,12 @@ export async function generateMembershipPdf(data) {
   const cardW = CW;
   const cardH = cardW / 1.586;
   const cardY = 120;
-  doc.setFillColor(20, 20, 20);
+  doc.setFillColor(16, 24, 29);
   doc.roundedRect(cardX, cardY, cardW, cardH, 10, 10, 'F');
-  // bold red diagonal racing wedge in the top-right corner (safe triangle fill)
+  // bold accent diagonal racing wedge in the top-right corner (safe triangle fill)
   fColor(accent);
   doc.triangle(cardX + cardW, cardY, cardX + cardW, cardY + 64, cardX + cardW - 90, cardY, 'F');
-  // outer red border + inset gold "Member of Excellence" frame
+  // outer accent border + inset gold "Member of Excellence" frame
   doc.setDrawColor(accent[0], accent[1], accent[2]);
   doc.setLineWidth(1.5);
   doc.roundedRect(cardX, cardY, cardW, cardH, 10, 10, 'S');
@@ -102,7 +114,7 @@ export async function generateMembershipPdf(data) {
   const badgeW = doc.getTextWidth(tierLabel) + 20;
   fColor(accent);
   doc.roundedRect(cardX + cardW - badgeW - 22, cardY + 46, badgeW, 18, 5, 5, 'F');
-  tColor(dark);
+  tColor(colours.onAccent);
   doc.text(tierLabel, cardX + cardW - badgeW - 22 + 10, cardY + 58);
 
   tColor([245, 240, 232]);
@@ -173,11 +185,9 @@ export async function generateMembershipPdf(data) {
   const BAND = 70;
   let y = 0;
 
+  let logoBox = null; // where the band's logo sits, to keep header text clear of it
   function headerBand(title) {
-    fColor(dark);
-    doc.rect(0, 0, W, BAND, 'F');
-    fColor(accent);
-    doc.rect(0, BAND, W, 3, 'F');
+    ({ logoBox } = brandBand(doc, { accent: gym.accent, height: BAND + 3, margin: M, stripe: 3 }));
     tColor(accent);
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(18);
@@ -197,7 +207,7 @@ export async function generateMembershipPdf(data) {
   }
   function sectionTitle(t) {
     ensure(40, t);
-    tColor(accent);
+    tColor(accentText);
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(12);
     doc.text(t.toUpperCase(), M, y);
@@ -227,7 +237,8 @@ export async function generateMembershipPdf(data) {
   headerBand('Registration Confirmation');
   tColor(muted);
   doc.setFontSize(9);
-  doc.text(`Issued: ${fmtDate(member.created_at)}`, W - M, 56, { align: 'right' });
+  // Left of the logo, which now holds the band's right-hand corner.
+  doc.text(`Issued: ${fmtDate(member.created_at)}`, (logoBox ? logoBox.x - 14 : W - M), 56, { align: 'right' });
 
   sectionTitle('Member Details');
   row('Full Name', member.full_name);
@@ -269,14 +280,14 @@ export async function generateMembershipPdf(data) {
       doc.setFontSize(9);
       const ql = doc.splitTextToSize(q, CW - 50);
       doc.text(ql, M, y);
-      tColor(yes ? accent : [40, 150, 80]);
+      tColor(yes ? warn : [40, 150, 80]);
       doc.setFont('helvetica', 'bold');
       doc.text(yes ? 'YES' : 'NO', W - M, y, { align: 'right' });
       y += 14 * ql.length + 1;
     });
     y += 4;
     ensure(20, 'Registration Confirmation');
-    tColor(parq.clearance_required ? accent : [40, 150, 80]);
+    tColor(parq.clearance_required ? warn : [40, 150, 80]);
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(9.5);
     const note = parq.clearance_required
@@ -294,7 +305,7 @@ export async function generateMembershipPdf(data) {
   const terms = gymTerms(gym.name || 'the Gym');
   terms.forEach((clause, i) => {
     ensure(40, 'Membership Terms & Conditions');
-    tColor(accent);
+    tColor(accentText);
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(10.5);
     doc.text(`${i + 1}. ${clause.h}`, M, y);

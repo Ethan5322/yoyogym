@@ -94,9 +94,10 @@
       }
       button:focus-visible, a:focus-visible { outline: 2px solid var(--y-lime); outline-offset: 2px; }
       .hidden { display: none !important; }
-      /* Inside a gym, buttons wear THE GYM'S colour with white text, as they
-         always have — never the Yoyo lime (§36.1 Q3). */
-      #member { --accent: var(--m-accent); --accent-ink: #ffffff; }
+      /* Inside a gym, buttons wear THE GYM'S colour — the Yoyo lime until the
+         gym chooses one (§37.1 Q2) — with the text colour that reads on it,
+         set by member.js from the colour itself. */
+      #member { --accent: var(--m-accent); --accent-ink: var(--m-accent-ink); }
 
       /* ---- Buttons ---- */
       .y-btn {
@@ -290,7 +291,8 @@
       body.in-member { padding: 0; background: #0e1416; }
       body.in-member > *:not(#member):not(.m-toast) { display: none; }
       #member {
-        --m-accent: #e63946;
+        --m-accent: #bff642; /* the Yoyo lime until the gym's own colour loads */
+        --m-accent-ink: #0b1400; /* text on the accent */
         --m-ground: #0e1416;
         --m-surface: #172024;
         --m-line: rgba(255, 255, 255, 0.08);
@@ -355,7 +357,7 @@
            line entirely, and must still see a coloured button. */
         background: var(--m-accent);
         background: radial-gradient(circle at 50% 35%, color-mix(in srgb, var(--m-accent) 88%, #fff), var(--m-accent));
-        color: #fff; font-size: 20px;
+        color: var(--m-accent-ink); font-size: 20px;
         box-shadow: 0 16px 48px color-mix(in srgb, var(--m-accent) 45%, transparent), inset 0 2px 0 rgba(255, 255, 255, 0.28);
         transition: transform 0.15s ease;
       }

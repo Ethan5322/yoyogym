@@ -279,9 +279,20 @@ test('THE APP ICON IS NOT CAPACITOR\'S PLACEHOLDER', async () => {
   }
 });
 
-test('the icon is drawn from the same brand mark as the web app', () => {
+test('the icon is drawn from the Yoyo Gyms logo, like the web app\'s (CLAUDE.md §37)', () => {
   const script = readFileSync('scripts/mobile/make-icon-sources.mjs', 'utf8');
-  assert.match(script, /public\/icon\.svg/);
-  assert.match(readFileSync('public/icon.svg', 'utf8'), /#E63946/);
-  assert.match(script, /const RED = '#E63946'/);
+  assert.match(script, /'public', 'brand', 'yoyo-gyms-logo-on-dark\.png'/);
+  assert.match(script, /BRAND\.ground/);
+  assert.ok(!/E63946/i.test(script), 'the red dumbbell is retired');
+
+  const svg = readFileSync('public/icon.svg', 'utf8');
+  assert.match(svg, /data:image\/png;base64,/, 'the web icon IS the logo');
+  assert.ok(!/<rect[^>]+fill=/.test(svg), 'on a transparent background, as the user asked');
+});
+
+test('THE IPHONE ICON HAS NO TRANSPARENCY — APPLE REJECTS ONE THAT DOES', () => {
+  // Checked against Apple's rules on 2026-09-28 (§37.1 Q4). PNG byte 25 is the
+  // colour type: 2 is RGB, 6 is RGB + alpha.
+  const png = readFileSync('apps/mobile/ios/App/App/Assets.xcassets/AppIcon.appiconset/AppIcon-512@2x.png');
+  assert.equal(png[25], 2, 'RGB, no alpha channel');
 });

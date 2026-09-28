@@ -5,13 +5,21 @@
 // These are the built-in defaults. The admin panel (Phase 7) can later override
 // templates via settings; the dispatcher will prefer those when present.
 
+import { BRAND, accentOrDefault } from '../../../shared/brand.js';
+
 const zar = (n) => 'R' + Number(n || 0).toLocaleString('en-ZA', { minimumFractionDigits: 2 });
 
+// THE GYM'S COLOUR (CLAUDE.md §37). The helpers below write this marker where
+// the accent goes, and every member template swaps it for the gym's own colour
+// on the way out — the Yoyo lime when the gym has not chosen one. One place,
+// so no email path can send the marker or forget the colour.
+const ACCENT = '%%ACCENT%%';
+
 function shell(gymName, bodyHtml) {
-  return `<!doctype html><html><body style="margin:0;background:#0A0A0A;font-family:Arial,Helvetica,sans-serif;color:#F5F0E8">
+  return `<!doctype html><html><body style="margin:0;background:${BRAND.ground};font-family:Arial,Helvetica,sans-serif;color:#F5F0E8">
   <div style="max-width:560px;margin:0 auto;padding:24px">
-    <h1 style="color:#E63946;letter-spacing:1px;text-transform:uppercase;font-size:22px;margin:0 0 16px">${gymName}</h1>
-    <div style="background:#141414;border:1px solid #222;border-radius:12px;padding:24px">${bodyHtml}</div>
+    <h1 style="color:${ACCENT};letter-spacing:1px;text-transform:uppercase;font-size:22px;margin:0 0 16px">${gymName}</h1>
+    <div style="background:${BRAND.surface};border:1px solid #1f2a30;border-radius:12px;padding:24px">${bodyHtml}</div>
     <p style="color:#9A9590;font-size:11px;margin-top:16px">This is an automated message from ${gymName}.</p>
   </div></body></html>`;
 }
@@ -19,12 +27,12 @@ function shell(gymName, bodyHtml) {
 const codeBox = (label, value) =>
   `<div style="margin:14px 0;text-align:center">
      <div style="color:#9A9590;font-size:11px;text-transform:uppercase;letter-spacing:1px">${label}</div>
-     <div style="color:#E63946;font-size:28px;font-weight:bold;letter-spacing:4px;font-family:monospace">${value}</div>
+     <div style="color:${ACCENT};font-size:28px;font-weight:bold;letter-spacing:4px;font-family:monospace">${value}</div>
    </div>`;
 
 // A prominent call-to-action / highlight panel (accent-bordered).
 const panel = (html) =>
-  `<div style="margin:16px 0;background:#1A1A1A;border:1px solid #2A2A2A;border-left:3px solid #E63946;border-radius:8px;padding:14px 16px;font-size:13px;line-height:1.7;color:#F5F0E8">${html}</div>`;
+  `<div style="margin:16px 0;background:${BRAND.raise};border:1px solid #26323a;border-left:3px solid ${ACCENT};border-radius:8px;padding:14px 16px;font-size:13px;line-height:1.7;color:#F5F0E8">${html}</div>`;
 
 // A short, friendly closing sign-off used across member emails.
 const signoff = (gymName) =>
@@ -41,7 +49,7 @@ const rows = (pairs) =>
     )
     .join('')}</table>`;
 
-export const memberTemplates = {
+const rawMemberTemplates = {
   // Sent immediately after registration — warm, complete welcome.
   welcome: ({ gymName, member, planName, tier, contractLabel, amount, recurring }) => ({
     subject: `Welcome to ${gymName}, ${member.full_name?.split(' ')[0]}! 🎉`,
@@ -289,6 +297,19 @@ export const memberTemplates = {
     ),
   }),
 };
+
+/** Each member template, with the gym's colour filled in: pass `accent`. */
+export const memberTemplates = Object.fromEntries(
+  Object.entries(rawMemberTemplates).map(([key, tpl]) => [
+    key,
+    (vars = {}) => {
+      const out = tpl(vars);
+      return out && typeof out.html === 'string'
+        ? { ...out, html: out.html.split(ACCENT).join(accentOrDefault(vars.accent)) }
+        : out;
+    },
+  ])
+);
 
 export const ownerTemplates = {
   new_member: ({ member, planName, tier, contractLabel, amount, recurring, parqFlag }) =>

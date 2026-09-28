@@ -3,6 +3,7 @@
 // (via /api/content) — no per-gym code change required.
 import { Link, useParams } from 'react-router-dom';
 import { useBranding } from '../lib/branding.js';
+import BrandLogo from '../components/BrandLogo.jsx';
 
 export default function Splash() {
   const b = useBranding();
@@ -16,19 +17,8 @@ export default function Splash() {
   return (
     <div className="flex min-h-screen flex-col items-center justify-center bg-bg px-6 text-center">
       <div className="w-full max-w-sm animate-fade-up">
-        {b.logo_url ? (
-          <img
-            src={b.logo_url}
-            alt={name}
-            className="mx-auto mb-8 h-24 w-24 rounded-2xl object-contain"
-          />
-        ) : (
-          <div className="mx-auto mb-8 flex h-20 w-20 items-center justify-center rounded-2xl bg-accent">
-            <span className="font-display text-3xl font-bold text-black">
-              {(name.trim()[0] || 'G').toUpperCase()}
-            </span>
-          </div>
-        )}
+        {/* The gym's own logo, or the Yoyo Gyms logo (CLAUDE.md §37). */}
+        <BrandLogo alt={name} className="mx-auto mb-8 h-28 w-auto max-w-[240px]" />
 
         <h1 className="text-4xl font-bold uppercase text-body">{name}</h1>
         <p className="mt-3 text-muted">{tagline}</p>

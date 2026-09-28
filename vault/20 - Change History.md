@@ -15,6 +15,35 @@ occurrence is answered from notes rather than rediscovered.
 
 ---
 
+## 2026-09-28 — The new brand everywhere (D-157)
+
+Committed first: the landing redesign, `8403eab`. Then the user asked for the new colour and logo on
+everything. Four questions settled it (`CLAUDE.md` §37.1); the answers are in D-157.
+
+**Found while doing it.**
+- **Gyms' colours were never really applied.** 34 rules in `src/index.css` and every PDF hard-coded
+  red; only a few Tailwind classes followed the gym's setting. Now everything follows `--accent`.
+- **15 `border-accent/30`-style classes never worked**: Tailwind cannot make `var(--accent)` see-
+  through. The accent is now defined in RGB form, so they finally render as written.
+- **White text on lime is unreadable** — 16 buttons and badges, the PDF header bands and the PAR-Q
+  "YES". Text colour is now chosen by contrast (`inkOn`), and a health warning is a fixed warning
+  red rather than whatever the brand colour happens to be.
+- **The Settings form pre-fills the accent**, so almost every gym has red *saved*. The user chose to
+  keep saved colours (KOM stays red) rather than treat the old red as unset.
+- **Editing on Windows turned 14 files from LF to CRLF**, which makes a two-line change look like a
+  whole-file rewrite and differs from CI (Linux, LF). Before any commit: compare
+  `tr -cd '\r' < file | wc -c` with the same count on `git show HEAD:file`; fix with `sed -i 's/\r$//'`.
+- `@capacitor/assets` also reformats `AndroidManifest.xml` (blank lines only). Restored; nothing in
+  it changes.
+
+**Verified.** 869 tests pass (9 new, in `tests/brand.test.js`, including "the old red is nobody's
+default" and "the iPhone icon has no alpha channel"). The web app builds. Every PDF was generated
+from the real code and rendered to images; the ID card was rendered in Chrome; the gym screens were
+served from a production build and screenshotted; the four business PDFs and the QR sheet were
+regenerated, and the QR images came out identical, so every printed code still works.
+
+---
+
 ## 2026-09-28 — The app's first screen, redesigned (D-156)
 
 The user gave a written design for the app's landing screen and the paths from it, plus their own

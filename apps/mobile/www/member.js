@@ -131,10 +131,31 @@
   // Branding — the gym's own name and colour
   // -------------------------------------------------------------------------
 
+  /**
+   * The text colour that reads ON a gym's colour: white, unless white is under
+   * 3:1 on it (as on the Yoyo lime) — then the dark ink. The same WCAG rule as
+   * shared/brand.js inkOn(), written out because the shell has no modules.
+   */
+  function inkOn(hex) {
+    var n = parseInt(hex.slice(1), 16);
+    var lum = [(n >> 16) & 255, (n >> 8) & 255, n & 255].map(function (v) {
+      var c = v / 255;
+      return c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4);
+    });
+    var L = 0.2126 * lum[0] + 0.7152 * lum[1] + 0.0722 * lum[2];
+    return 1.05 / (L + 0.05) >= 3 ? '#ffffff' : '#0b1400';
+  }
+
   function applyBrand(branding) {
     var colour = branding && /^#[0-9a-fA-F]{6}$/.test(branding.accent_color || '') ? branding.accent_color : null;
-    if (colour) root.style.setProperty('--m-accent', colour);
-    else root.style.removeProperty('--m-accent');
+    if (colour) {
+      root.style.setProperty('--m-accent', colour);
+      root.style.setProperty('--m-accent-ink', inkOn(colour));
+    } else {
+      // No colour chosen: the Yoyo lime from the stylesheet (CLAUDE.md §37).
+      root.style.removeProperty('--m-accent');
+      root.style.removeProperty('--m-accent-ink');
+    }
     if (branding && branding.name) state.gymName = branding.name;
   }
 

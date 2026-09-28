@@ -23,7 +23,7 @@ export default class ErrorBoundary extends Component {
     return (
       <div className="flex min-h-[100dvh] items-center justify-center bg-bg px-6 text-center">
         <div className="w-full max-w-sm">
-          <div className="mx-auto mb-6 flex h-16 w-16 items-center justify-center rounded-2xl bg-accent text-3xl font-bold text-black">
+          <div className="mx-auto mb-6 flex h-16 w-16 items-center justify-center rounded-2xl bg-accent text-3xl font-bold text-accent-ink">
             !
           </div>
           <h1 className="text-2xl font-bold uppercase text-body">Something went wrong</h1>

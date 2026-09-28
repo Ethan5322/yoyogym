@@ -343,7 +343,7 @@ export default function FaceScan() {
                 <button
                   key={mo}
                   onClick={() => setMode(mo)}
-                  className={`rounded-md px-5 py-2 font-display uppercase ${mode === mo ? 'bg-accent text-black' : 'text-muted'}`}
+                  className={`rounded-md px-5 py-2 font-display uppercase ${mode === mo ? 'bg-accent text-accent-ink' : 'text-muted'}`}
                 >
                   {mo === 'face' ? 'Face' : 'QR'}
                 </button>

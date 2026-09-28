@@ -1,5 +1,5 @@
 // Corporate membership ID card generator. Renders a SINGLE-SIDED, ATM-card-
-// sized ID (obsidian + red racing stripe + gold frame + diamond corners) that
+// sized ID (near-black + accent racing stripe + gold frame + diamond corners) that
 // carries everything on the front:
 //
 //   passport photo · holder name · role · ID number · tier badge · validity ·
@@ -13,6 +13,8 @@
 import QRCode from 'qrcode';
 import { downloadCanvas, downloadPdf } from './download.js';
 import { drawBarcode } from './barcode.js';
+import { documentLogo } from './pdf/brand.js';
+import { BRAND, DEFAULT_ACCENT, accentOrDefault } from '../../shared/brand.js';
 
 const TIER_COLOR = {
   basic: '#8A8580',
@@ -32,7 +34,7 @@ const MULESOO_CREDIT_SRC = '/brand/mulesoo-credit-on-dark.png';
 const MULESOO_CREDIT_ASPECT = 4.25;
 
 const GOLD = '#C8922A';
-const INK = '#0A0A0A';
+const INK = BRAND.ground; // the Yoyo near-black (CLAUDE.md §37)
 const PAPER = '#F0EDE8';
 const MUTED = '#8A8580';
 
@@ -111,7 +113,7 @@ function drawShell(ctx, accent) {
   ctx.fill();
   ctx.restore();
 
-  // borders: red outer + gold inset frame
+  // borders: accent outer + gold inset frame
   ctx.strokeStyle = accent;
   ctx.lineWidth = 6;
   ctx.strokeRect(8, 8, W - 16, H - 16);
@@ -149,6 +151,24 @@ async function drawCard(ctx, o) {
   ctx.fillStyle = MUTED;
   ctx.font = '600 14px Oswald, sans-serif';
   ctx.fillText(o.subtitle.toUpperCase(), 58, 112);
+
+  // The logo, top-right of the header: the gym's own if it has one, otherwise
+  // Yoyo Gyms (§37). Inside the gold frame (y > 24), clear of the corner
+  // diamond (x < W − 50), of the name (fitted to x ≤ 676) and of the header
+  // rule at y = 120.
+  const brand = documentLogo('dark');
+  const logoImg = await loadImg(brand.data);
+  if (logoImg) {
+    const lh = 72;
+    const lw = lh * brand.aspect;
+    const lx = W - 64 - lw;
+    const ly = 36;
+    if (brand.own) {
+      ctx.fillStyle = '#FFFFFF';
+      ctx.fillRect(lx - 8, ly - 8, lw + 16, lh + 16);
+    }
+    ctx.drawImage(logoImg, lx, ly, lw, lh);
+  }
 
   // ── QR (top-right, white quiet zone) ─────────────────────────────────────
   if (o.qrUrl) {
@@ -322,7 +342,7 @@ async function drawCard(ctx, o) {
 function normalise(o) {
   return {
     gymName: 'YOYO GYM',
-    accent: '#E63946',
+    accent: DEFAULT_ACCENT,
     name: '',
     membershipNumber: '',
     tier: '',
@@ -344,6 +364,8 @@ function normalise(o) {
     builtByUrl: 'mulesoo.com',
     builtByEmail: 'hello@mulesoo.com',
     ...o,
+    // A missing or malformed colour is the Yoyo lime, never a blank stripe.
+    accent: accentOrDefault(o.accent),
   };
 }
 

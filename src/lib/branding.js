@@ -3,6 +3,7 @@
 // per-gym code change. Fetched once and cached for the session.
 import { useEffect, useState } from 'react';
 import { apiFetch } from './api.js';
+import { accentOrDefault, hexToRgb, inkOn, deepen } from '../../shared/brand.js';
 
 let cache = null;
 let inflight = null;
@@ -21,20 +22,22 @@ export function brandingFailure() {
   return failedStatus;
 }
 
-function hexToRgba(hex, a) {
-  const m = /^#?([0-9a-fA-F]{6})$/.exec(hex || '');
-  if (!m) return null;
-  const n = parseInt(m[1], 16);
-  return `rgba(${(n >> 16) & 255}, ${(n >> 8) & 255}, ${n & 255}, ${a})`;
-}
-
+/**
+ * The gym's own colour, with everything that has to match it: the RGB form
+ * (so every glow and border follows it), a darker shade for gradients, and
+ * the TEXT colour that reads on it (CLAUDE.md §37). With no colour chosen,
+ * the stylesheet's own defaults — the Yoyo lime — stay in place.
+ */
 export function applyBranding(b) {
   if (!b || typeof document === 'undefined') return;
-  if (b.accent_color) {
+  if (hexToRgb(b.accent_color)) {
+    const accent = accentOrDefault(b.accent_color);
     const root = document.documentElement;
-    root.style.setProperty('--accent', b.accent_color);
-    const soft = hexToRgba(b.accent_color, 0.15);
-    if (soft) root.style.setProperty('--accent-soft', soft);
+    root.style.setProperty('--accent', accent);
+    root.style.setProperty('--accent-rgb', hexToRgb(accent).join(' '));
+    root.style.setProperty('--accent-soft', `rgb(${hexToRgb(accent).join(' ')} / 0.15)`);
+    root.style.setProperty('--accent-deep', deepen(accent));
+    root.style.setProperty('--accent-ink', inkOn(accent));
   }
   if (b.name) document.title = b.name;
 }
@@ -47,6 +50,12 @@ export function loadBranding() {
       .then((c) => {
         cache = c?.branding || {};
         applyBranding(cache);
+        // Fetched now so a PDF made later can carry it (pdf/brand.js). Loaded
+        // on demand: the embedded Yoyo logo it brings is no weight for a
+        // member who is only registering.
+        if (cache.logo_url) {
+          import('./pdf/brand.js').then((m) => m.preloadGymLogo(cache.logo_url)).catch(() => {});
+        }
         return cache;
       })
       .catch((err) => {

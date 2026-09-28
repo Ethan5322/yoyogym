@@ -39,7 +39,7 @@ export default function Attendance() {
             <button
               key={t}
               onClick={() => setTab(t)}
-              className={`rounded-lg px-4 py-1.5 text-sm font-display uppercase ${tab === t ? 'bg-accent text-black' : 'bg-elevated text-muted'}`}
+              className={`rounded-lg px-4 py-1.5 text-sm font-display uppercase ${tab === t ? 'bg-accent text-accent-ink' : 'bg-elevated text-muted'}`}
             >
               {t}
             </button>
@@ -125,7 +125,7 @@ function LiveBoard() {
       {/* controls */}
       <div className="mt-4 flex flex-wrap items-center gap-2">
         {Object.keys(FILTERS).map((f) => (
-          <button key={f} onClick={() => setFilter(f)} className={`rounded-lg px-3 py-1 text-xs uppercase ${filter === f ? 'bg-accent text-black' : 'bg-elevated text-muted'}`}>
+          <button key={f} onClick={() => setFilter(f)} className={`rounded-lg px-3 py-1 text-xs uppercase ${filter === f ? 'bg-accent text-accent-ink' : 'bg-elevated text-muted'}`}>
             {f.replace('_', ' ')}
           </button>
         ))}

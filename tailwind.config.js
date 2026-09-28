@@ -5,15 +5,18 @@ export default {
   theme: {
     extend: {
       colors: {
-        // "Dark Power Athletic Corporate" palette. Brand accent stays runtime-
-        // configurable per gym via the --accent CSS variable.
-        accent: 'var(--accent, #E63946)',
-        'accent-soft': 'var(--accent-soft, rgba(230,57,70,0.15))',
+        // The Yoyo Gyms palette (CLAUDE.md §37; values in shared/brand.js).
+        // The accent stays runtime-configurable per gym: branding.js sets
+        // --accent-rgb, and the RGB form is what lets `border-accent/30` and
+        // friends actually be see-through.
+        accent: 'rgb(var(--accent-rgb, 191 246 66) / <alpha-value>)',
+        'accent-soft': 'var(--accent-soft, rgb(191 246 66 / 0.15))',
+        'accent-ink': 'var(--accent-ink, #0B1400)', // text ON the accent
         gold: '#C8922A',
-        bg: '#080808', // obsidian
-        surface: '#111111', // deep charcoal
-        elevated: '#1A1A1A', // lighter charcoal
-        bubble: '#1A1A1A',
+        bg: '#070C10', // near-black ground
+        surface: '#10181D', // cards
+        elevated: '#172026', // raised surfaces
+        bubble: '#172026',
         body: '#F0EDE8', // warm white
         muted: '#8A8580', // soft gray
         success: '#00C851',

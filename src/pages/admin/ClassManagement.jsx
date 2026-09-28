@@ -95,7 +95,7 @@ export default function ClassManagement() {
                 {TIERS.map((t) => {
                   const on = form.allowed_tiers.includes(t);
                   return (
-                    <button key={t} className={`rounded border px-3 py-1 text-sm uppercase ${on ? 'border-accent bg-accent text-black' : 'border-accent/50 text-accent'}`}
+                    <button key={t} className={`rounded border px-3 py-1 text-sm uppercase ${on ? 'border-accent bg-accent text-accent-ink' : 'border-accent/50 text-accent'}`}
                       onClick={() => setForm({ ...form, allowed_tiers: on ? form.allowed_tiers.filter((x) => x !== t) : [...form.allowed_tiers, t] })}>
                       {t}
                     </button>

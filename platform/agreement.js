@@ -16,6 +16,8 @@
 // Acceptance is recorded in the audit log with the version the owner saw —
 // the evidence, if it is ever needed, of what was agreed and when.
 import { TRIAL_DAYS, GRACE_DAYS, PURGE_AFTER_SUSPENDED_DAYS } from './billing.js';
+import { BRAND, hexToRgb } from '../shared/brand.js';
+import { YOYO_LOGO_ON_DARK, YOYO_LOGO_ASPECT } from '../shared/yoyo-logo.js';
 
 /** Bump when the terms change; stored with every acceptance. */
 export const AGREEMENT_VERSION = '2026-09-24';
@@ -131,9 +133,20 @@ export async function agreementPdf(d) {
   };
   const date = (iso) => (iso ? new Date(iso).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' }) : '—');
 
-  // Header band in the brand red.
-  doc.setFillColor(230, 57, 70);
-  doc.rect(0, 0, W, 6, 'F');
+  // Header band in the Yoyo Gyms brand (CLAUDE.md §37): near-black, the logo,
+  // a lime stripe beneath.
+  const band = 78;
+  doc.setFillColor(...hexToRgb(BRAND.ground));
+  doc.rect(0, 0, W, band, 'F');
+  doc.setFillColor(...hexToRgb(BRAND.lime));
+  doc.rect(0, band, W, 5, 'F');
+  const logoH = 52;
+  doc.addImage(YOYO_LOGO_ON_DARK, 'PNG', M, (band - logoH) / 2, logoH * YOYO_LOGO_ASPECT, logoH, undefined, 'FAST');
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(10);
+  doc.setTextColor(255, 255, 255);
+  doc.text('GYM OWNER AGREEMENT', W - M, band / 2 + 3, { align: 'right' });
+  y = band + 5 + 36;
 
   if (!d.approved) line('DRAFT — under review, not yet in force', { size: 10, bold: true, colour: [140, 47, 34] });
   line('Yoyo Gyms — Gym Owner Agreement', { size: 18, bold: true, gap: 2 });

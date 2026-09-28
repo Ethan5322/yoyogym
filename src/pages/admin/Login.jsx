@@ -4,6 +4,7 @@ import { useNavigate, useLocation, Navigate } from 'react-router-dom';
 import { useAuth } from '../../lib/auth.jsx';
 import { apiFetch } from '../../lib/api.js';
 import FaceCapture from '../../chatbot/components/FaceCapture.jsx';
+import BrandLogo from '../../components/BrandLogo.jsx';
 
 export default function AdminLogin() {
   const { user, login, applySession, homeFor } = useAuth();
@@ -58,6 +59,7 @@ export default function AdminLogin() {
     <div className="flex min-h-screen items-center justify-center bg-bg px-6">
       <div className="w-full max-w-sm animate-fade-up">
         <div className="mb-8 text-center">
+          <BrandLogo className="mx-auto mb-6 h-20 w-auto" />
           <h1 className="text-3xl font-bold uppercase text-body">Admin Access</h1>
           <p className="mt-2 text-sm text-muted">Verify your identity to continue</p>
         </div>

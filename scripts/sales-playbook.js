@@ -3,8 +3,15 @@
 // Output: ./Yoyo-GYM-Sales-Playbook.pdf (also synced via OneDrive).
 import { jsPDF } from 'jspdf';
 import { writeFileSync } from 'node:fs';
+import { YOYO_LOGO_ON_DARK, YOYO_LOGO_ASPECT } from '../shared/yoyo-logo.js';
 
-const ACCENT = [230, 57, 70];   // brand red #E63946
+// The Yoyo Gyms brand (CLAUDE.md §37; shared/brand.js). Lime for bars and
+// stripes; the logo's navy for words on white paper, where lime cannot be read;
+// dark ink for text sitting on a lime fill.
+const ACCENT = [191, 246, 66];
+const ACCENT_TEXT = [4, 22, 43];
+const ACCENT_INK = [11, 20, 0];
+const GROUND = [7, 12, 16];
 const DARK = [22, 22, 22];
 const GRAY = [120, 120, 120];
 const LIGHT = [245, 245, 245];
@@ -27,7 +34,7 @@ function h1(text) {
 }
 function h2(text) {
   ensure(12); gap(2);
-  doc.setFont('helvetica', 'bold'); doc.setFontSize(12); setColor(ACCENT);
+  doc.setFont('helvetica', 'bold'); doc.setFontSize(12); setColor(ACCENT_TEXT);
   doc.text(text, M, y); y += 6;
 }
 function para(text) {
@@ -40,7 +47,7 @@ function bullet(text, num) {
   const indent = num != null ? 8 : 6;
   const lines = doc.splitTextToSize(text, CW - indent);
   ensure(6);
-  setColor(ACCENT); doc.setFont('helvetica', 'bold'); doc.text(marker, M + 1, y);
+  setColor(ACCENT_TEXT); doc.setFont('helvetica', 'bold'); doc.text(marker, M + 1, y);
   doc.setFont('helvetica', 'normal'); setColor(DARK);
   lines.forEach((ln, i) => { if (i) { ensure(6); } doc.text(ln, M + indent, y); if (i < lines.length - 1) y += 5.4; });
   y += 5.4;
@@ -53,7 +60,7 @@ function callout(title, text) {
   setFill(LIGHT); doc.rect(M, y, CW, boxH, 'F');
   setFill(ACCENT); doc.rect(M, y, 1.5, boxH, 'F');
   let ty = y + 6;
-  doc.setFont('helvetica', 'bold'); setColor(ACCENT); doc.text(title, M + 5, ty); ty += 5;
+  doc.setFont('helvetica', 'bold'); setColor(ACCENT_TEXT); doc.text(title, M + 5, ty); ty += 5;
   doc.setFont('helvetica', 'normal'); setColor(DARK);
   tLines.forEach((ln) => { doc.text(ln, M + 5, ty); ty += 5; });
   y += boxH + 4;
@@ -65,7 +72,7 @@ function script(title, text) {
   ensure(boxH + 3);
   setFill([20, 20, 20]); doc.rect(M, y, CW, boxH, 'F');
   let ty = y + 6;
-  doc.setFont('helvetica', 'bold'); doc.setFontSize(8.5); doc.setTextColor(ACCENT[0], ACCENT[1], ACCENT[2]);
+  doc.setFont('helvetica', 'bold'); doc.setFontSize(8.5); doc.setTextColor(...ACCENT);
   doc.text(title.toUpperCase(), M + 6, ty); ty += 5;
   doc.setFont('helvetica', 'italic'); doc.setFontSize(10.5); doc.setTextColor(235, 232, 226);
   tLines.forEach((ln) => { doc.text(ln, M + 6, ty); ty += 5.2; });
@@ -87,7 +94,8 @@ function twoCol(rows, col1w = 60) {
 }
 
 // ---------------- COVER ----------------
-setFill(DARK); doc.rect(0, 0, PW, PH, 'F');
+setFill(GROUND); doc.rect(0, 0, PW, PH, 'F');
+doc.addImage(YOYO_LOGO_ON_DARK, 'PNG', M, 18, 40 * YOYO_LOGO_ASPECT, 40); // the Yoyo Gyms logo (§37)
 setFill(ACCENT); doc.rect(0, 96, PW, 2, 'F');
 doc.setFont('times', 'bold'); doc.setFontSize(13); setColor(ACCENT);
 doc.text('MULESOO DIGITAL SOLUTIONS', M, 70);

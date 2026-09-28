@@ -139,7 +139,7 @@ function CountryControl({ step, value, onSubmit }) {
             className={[
               'flex w-full items-center gap-3 rounded-lg border px-4 py-3 text-left transition',
               value === c.code
-                ? 'border-accent bg-accent text-black'
+                ? 'border-accent bg-accent text-accent-ink'
                 : 'border-accent/50 text-body hover:bg-accent-soft',
             ].join(' ')}
           >
@@ -163,7 +163,7 @@ function SelectControl({ step, value, onSubmit }) {
           className={[
             'w-full rounded-lg border px-4 py-3 text-left font-display uppercase tracking-wide transition',
             value === opt.value
-              ? 'border-accent bg-accent text-black'
+              ? 'border-accent bg-accent text-accent-ink'
               : 'border-accent/60 text-accent hover:bg-accent-soft',
           ].join(' ')}
         >
@@ -193,7 +193,7 @@ function MultiSelectControl({ step, value, onSubmit }) {
               onClick={() => toggle(opt.value)}
               className={[
                 'flex w-full items-center justify-between rounded-lg border px-4 py-3 text-left transition',
-                on ? 'border-accent bg-accent text-black' : 'border-accent/60 text-accent hover:bg-accent-soft',
+                on ? 'border-accent bg-accent text-accent-ink' : 'border-accent/60 text-accent hover:bg-accent-soft',
               ].join(' ')}
             >
               <span className="font-display uppercase tracking-wide">{opt.label}</span>

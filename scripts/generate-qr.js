@@ -3,10 +3,10 @@
 import QRCode from 'qrcode';
 import { jsPDF } from 'jspdf';
 import { mkdirSync, writeFileSync } from 'node:fs';
+import { YOYO_LOGO_ON_DARK, YOYO_LOGO_ASPECT } from '../shared/yoyo-logo.js';
 
 const SITE = 'https://yoyogym.vercel.app/';
 const GYM = 'YOYO GYM';
-const ACCENT = [230, 57, 70];
 
 const codes = [
   { key: 'company', label: 'Company QR — Join or Log In', url: `${SITE}?src=qr`, file: 'yoyo-gym-company-qr' },
@@ -31,12 +31,12 @@ const W = doc.internal.pageSize.getWidth();
 const H = doc.internal.pageSize.getHeight();
 
 function page(label, url, dataUrl) {
-  doc.setFillColor(10, 10, 10);
+  // The Yoyo Gyms brand (CLAUDE.md §37): near-black, and the logo — which
+  // carries the name — in place of the name in plain text.
+  doc.setFillColor(7, 12, 16);
   doc.rect(0, 0, W, H, 'F');
-  doc.setTextColor(ACCENT[0], ACCENT[1], ACCENT[2]);
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(40);
-  doc.text(GYM, W / 2, 110, { align: 'center' });
+  const logoH = 96;
+  doc.addImage(YOYO_LOGO_ON_DARK, 'PNG', W / 2 - (logoH * YOYO_LOGO_ASPECT) / 2, 26, logoH * YOYO_LOGO_ASPECT, logoH);
   doc.setTextColor(245, 240, 232);
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(16);

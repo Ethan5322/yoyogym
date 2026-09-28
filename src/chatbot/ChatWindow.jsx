@@ -6,6 +6,7 @@ import TypingIndicator from './components/TypingIndicator.jsx';
 import ProgressBar from './components/ProgressBar.jsx';
 import Controls from './components/Controls.jsx';
 import { formatAnswer } from './format.js';
+import BrandLogo from '../components/BrandLogo.jsx';
 
 export default function ChatWindow({ engine, completeView }) {
   const {
@@ -33,7 +34,8 @@ export default function ChatWindow({ engine, completeView }) {
       {/* Header + progress */}
       <div className="chat-header">
         <div className="flex items-center justify-between px-4 pt-3">
-          <span className="font-display text-lg uppercase tracking-wider text-body">
+          <span className="flex items-center gap-2 font-display text-lg uppercase tracking-wider text-body">
+            <BrandLogo alt="" className="h-7 w-auto" />
             Registration
           </span>
           <button onClick={startOver} className="text-xs text-muted hover:text-error">

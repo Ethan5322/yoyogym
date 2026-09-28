@@ -10,6 +10,7 @@ import { downloadReceiptPdf } from '../../lib/receiptPdf.js';
 import PersonalQr from '../../components/PersonalQr.jsx';
 import IdCardButton from '../../components/IdCardButton.jsx';
 import { countryByCode } from '../../../shared/countries.js';
+import { accentOrDefault } from '../../../shared/brand.js';
 
 const zar = (n) => 'R' + Number(n || 0).toLocaleString('en-ZA', { minimumFractionDigits: 2 });
 const country = (code) => {
@@ -174,7 +175,7 @@ export default function MemberDetail() {
                       try {
                         downloadReceiptPdf({
                           gymName: branding.name || 'Yoyo GYM',
-                          accent: branding.accent_color || '#E63946',
+                          accent: accentOrDefault(branding.accent_color),
                           payment: p,
                           member: { full_name: m.full_name, membership_number: m.membership_number },
                         });

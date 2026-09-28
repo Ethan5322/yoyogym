@@ -77,7 +77,7 @@ export async function run(supabase) {
   let failed = 0;
   for (const m of members || []) {
     if (!m.email) continue;
-    const { subject, html } = memberTemplates.weekly_schedule({ gymName, member: m, weekLabel, items });
+    const { subject, html } = memberTemplates.weekly_schedule({ gymName, accent: gp?.value?.accent_color, member: m, weekLabel, items });
     const r = await sendEmail({ to: m.email, toName: m.full_name, subject, html, sender: { name: gymName } });
     try {
       await supabase.from('notifications_log').insert({

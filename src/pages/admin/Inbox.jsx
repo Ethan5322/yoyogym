@@ -46,7 +46,7 @@ export default function Inbox() {
     <AdminShell>
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h1 className="text-2xl font-bold uppercase text-body">
-          Inbox {data?.unread_count > 0 && <span className="ml-2 rounded-full bg-accent px-2 py-0.5 align-middle text-sm text-white">{data.unread_count}</span>}
+          Inbox {data?.unread_count > 0 && <span className="ml-2 rounded-full bg-accent px-2 py-0.5 align-middle text-sm text-accent-ink">{data.unread_count}</span>}
         </h1>
         <div className="flex gap-2">
           <button className="btn-outline px-3 py-1 text-sm" onClick={markAll} disabled={!data?.unread_count}>Mark all read</button>
@@ -57,7 +57,7 @@ export default function Inbox() {
 
       <div className="admin-toolbar mt-5">
         {FILTERS.map(([v, l]) => (
-          <button key={v} onClick={() => setKind(v)} className={`rounded-full px-4 py-1.5 text-sm ${kind === v ? 'bg-accent text-white' : 'bg-surface text-muted'}`}>{l}</button>
+          <button key={v} onClick={() => setKind(v)} className={`rounded-full px-4 py-1.5 text-sm ${kind === v ? 'bg-accent text-accent-ink' : 'bg-surface text-muted'}`}>{l}</button>
         ))}
         <label className="ml-auto flex items-center gap-2 text-sm text-muted">
           <input type="checkbox" checked={unreadOnly} onChange={(e) => setUnreadOnly(e.target.checked)} /> Unread only

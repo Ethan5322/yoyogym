@@ -2,6 +2,7 @@
 import { useState } from 'react';
 import { useBranding } from '../lib/branding.js';
 import { countryByCode } from '../../shared/countries.js';
+import { accentOrDefault } from '../../shared/brand.js';
 
 const fmt = (d) => (d ? new Date(d).toLocaleDateString('en-ZA', { day: '2-digit', month: 'short', year: 'numeric' }).toUpperCase() : '');
 const GENDER = { male: 'Male', female: 'Female', prefer_not_to_say: 'Not disclosed' };
@@ -38,7 +39,7 @@ export default function IdCardButton({ member, className = 'btn-primary w-full' 
   function payload() {
     return {
       gymName: branding.name || 'Yoyo GYM',
-      accent: branding.accent_color || '#E63946',
+      accent: accentOrDefault(branding.accent_color),
       name: member.full_name,
       membershipNumber: member.membership_number,
       tier: member.tier || '',

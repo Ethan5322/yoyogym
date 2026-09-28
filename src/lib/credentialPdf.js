@@ -5,13 +5,8 @@ import { jsPDF } from 'jspdf';
 import QRCode from 'qrcode';
 import { downloadPdf } from './download.js';
 import { stampMulesooCredit } from './mulesooCredit.js';
-
-function hexToRgb(hex) {
-  const m = /^#?([0-9a-fA-F]{6})$/.exec(hex || '');
-  if (!m) return [230, 57, 70];
-  const n = parseInt(m[1], 16);
-  return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
-}
+import { brandBand } from './pdf/brand.js';
+import { DEFAULT_ACCENT } from '../../shared/brand.js';
 
 function loadDataUrl(src) {
   return new Promise((resolve) => {
@@ -36,7 +31,7 @@ function loadDataUrl(src) {
 
 export async function downloadCredentialPdf({
   gymName = 'Yoyo GYM',
-  accent = '#E63946',
+  accent = DEFAULT_ACCENT,
   roleLabel = 'STAFF',
   subtitle = 'STAFF CREDENTIAL',
   name = '',
@@ -50,15 +45,12 @@ export async function downloadCredentialPdf({
   const doc = new jsPDF({ unit: 'mm', format: 'a4' });
   const W = 210;
   const M = 18;
-  const [r, g, b] = hexToRgb(accent);
   const gold = [200, 146, 42];
 
-  // Header band
-  doc.setFillColor(10, 10, 10);
-  doc.rect(0, 0, W, 56, 'F');
-  doc.setFillColor(r, g, b);
-  doc.rect(0, 56, W, 1.6, 'F');
-  doc.setTextColor(r, g, b);
+  // Header band (CLAUDE.md §37): near-black, the logo, the gym's accent stripe.
+  // The gym's name is in its accent — on the dark band, any accent reads.
+  const colours = brandBand(doc, { accent, height: 57.6, margin: M, stripe: 1.6 });
+  doc.setTextColor(...colours.accent);
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(24);
   doc.text(gymName.toUpperCase(), M, 30);
@@ -91,8 +83,8 @@ export async function downloadCredentialPdf({
   dy += 10;
 
   if (badgeText) {
-    doc.setFillColor(r, g, b);
-    doc.setTextColor(255, 255, 255);
+    doc.setFillColor(...colours.accent);
+    doc.setTextColor(...colours.onAccent);
     doc.setFontSize(10);
     const tw = doc.getTextWidth(badgeText.toUpperCase()) + 8;
     doc.rect(dx, dy - 5, tw, 7, 'F');

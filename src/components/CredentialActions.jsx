@@ -5,6 +5,7 @@
 // Uses the gym's live branding (name + accent) so documents are on-brand.
 import { useState } from 'react';
 import { useBranding } from '../lib/branding.js';
+import { accentOrDefault } from '../../shared/brand.js';
 
 const fmt = (d) => (d ? new Date(d).toLocaleDateString('en-ZA', { day: '2-digit', month: 'short', year: 'numeric' }).toUpperCase() : '');
 
@@ -15,7 +16,7 @@ export default function CredentialActions({ person, className = '' }) {
   const [err, setErr] = useState('');
   const branding = useBranding();
   const gymName = branding.name || 'Yoyo GYM';
-  const accent = branding.accent_color || '#E63946';
+  const accent = accentOrDefault(branding.accent_color);
 
   const isTrainer = person.kind === 'trainer';
   const roleLabel = isTrainer ? 'TRAINER' : 'STAFF';

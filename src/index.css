@@ -3,9 +3,13 @@
 @tailwind utilities;
 
 :root {
-  /* Accent is overridden at runtime from gym settings (Phase 7). */
-  --accent: #e63946;
-  --accent-soft: rgba(230, 57, 70, 0.15);
+  /* The Yoyo Gyms lime (CLAUDE.md §37), overridden at runtime by a gym's own
+     colour from Settings → Gym Profile (src/lib/branding.js sets all five). */
+  --accent: #bff642;
+  --accent-rgb: 191 246 66;
+  --accent-soft: rgb(191 246 66 / 0.15);
+  --accent-deep: #99c535;
+  --accent-ink: #0b1400; /* text ON the accent: dark on lime, white on a dark colour */
   --gold: #c8922a;
 }
 
@@ -20,21 +24,21 @@ body {
   line-height: 1.7;
   color: #f0ede8;
   /* Premium multi-layer gym backdrop (top → bottom in the stack):
-     1) vignette frame  2) red "spotlight" glow  3) faint equipment pattern
+     1) vignette frame  2) accent "spotlight" glow  3) faint equipment pattern
      4) base diagonal gradient. Fills the entire page; visible around the
      centered chat panel on desktop. */
-  background-color: #0a0a0a;
+  background-color: #070c10;
   background-image:
     radial-gradient(ellipse at 50% 50%, transparent 40%, rgba(0, 0, 0, 0.6) 100%),
-    radial-gradient(ellipse at 50% 30%, rgba(230, 57, 70, 0.08) 0%, transparent 60%),
+    radial-gradient(ellipse at 50% 30%, rgb(var(--accent-rgb) / 0.08) 0%, transparent 60%),
     url('/gym-pattern.svg'),
-    linear-gradient(135deg, #0a0a0a 0%, #0f0a0a 40%, #120808 70%, #0a0a0a 100%);
+    linear-gradient(135deg, #070c10 0%, #081014 40%, #0a1216 70%, #070c10 100%);
   background-repeat: no-repeat, no-repeat, repeat, no-repeat;
   background-size: cover, cover, 300px 300px, cover;
   background-attachment: fixed;
 }
 
-/* ===== Thin gym-red scrollbar ===== */
+/* ===== Thin accent scrollbar ===== */
 ::-webkit-scrollbar {
   width: 4px;
   height: 4px;
@@ -43,11 +47,11 @@ body {
   background: transparent;
 }
 ::-webkit-scrollbar-thumb {
-  background: rgba(230, 57, 70, 0.4);
+  background: rgb(var(--accent-rgb) / 0.4);
   border-radius: 4px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: rgba(230, 57, 70, 0.8);
+  background: rgb(var(--accent-rgb) / 0.8);
 }
 
 /* Commanding athletic headings (Bebas Neue) */
@@ -87,7 +91,7 @@ textarea:focus-visible,
 @layer components {
   .btn-primary {
     @apply inline-flex items-center justify-center rounded-[4px] bg-accent px-6 py-3
-      font-heading text-base font-semibold uppercase tracking-[0.14em] text-white
+      font-heading text-base font-semibold uppercase tracking-[0.14em] text-accent-ink
       transition-transform duration-75 hover:brightness-110 active:scale-[0.96]
       disabled:opacity-50;
   }
@@ -101,7 +105,7 @@ textarea:focus-visible,
     @apply w-full rounded-[4px] border border-white/10 bg-elevated px-4 py-3 text-body
       placeholder-muted outline-none transition focus:border-accent;
   }
-  /* Surface card with a thin signature red top stripe (racing accent). */
+  /* Surface card with a thin signature accent top stripe (racing accent). */
   .card {
     @apply relative rounded-[6px] border border-white/[0.06] bg-surface p-6;
   }
@@ -143,12 +147,12 @@ textarea:focus-visible,
   max-width: 480px;
   height: 100dvh;
   margin: 0 auto;
-  background: rgba(10, 10, 10, 0.85);
+  background: rgba(7, 12, 16, 0.85);
   -webkit-backdrop-filter: blur(8px);
   backdrop-filter: blur(8px);
-  border: 1px solid rgba(230, 57, 70, 0.15);
+  border: 1px solid rgb(var(--accent-rgb) / 0.15);
   box-shadow:
-    0 0 40px rgba(230, 57, 70, 0.08),
+    0 0 40px rgb(var(--accent-rgb) / 0.08),
     0 20px 60px rgba(0, 0, 0, 0.5);
 }
 @media (min-width: 640px) {
@@ -162,19 +166,19 @@ textarea:focus-visible,
 
 /* Header bar */
 .chat-header {
-  background: rgba(8, 8, 8, 0.95);
+  background: rgba(7, 12, 16, 0.95);
   -webkit-backdrop-filter: blur(12px);
   backdrop-filter: blur(12px);
-  border-bottom: 1px solid rgba(230, 57, 70, 0.3);
-  box-shadow: 0 1px 20px rgba(230, 57, 70, 0.15);
+  border-bottom: 1px solid rgb(var(--accent-rgb) / 0.3);
+  box-shadow: 0 1px 20px rgb(var(--accent-rgb) / 0.15);
 }
 
 /* Footer / active-control area */
 .chat-footer {
-  background: rgba(8, 8, 8, 0.6);
+  background: rgba(7, 12, 16, 0.6);
   -webkit-backdrop-filter: blur(8px);
   backdrop-filter: blur(8px);
-  border-top: 1px solid rgba(230, 57, 70, 0.15);
+  border-top: 1px solid rgb(var(--accent-rgb) / 0.15);
   /* THE ANSWER AREA SCROLLS, never overflows the chat.
      .chat-shell is a fixed-height column (and clips its overflow on larger
      screens). A step with a tall control — several membership plans, each
@@ -199,8 +203,8 @@ textarea:focus-visible,
 .progress-fill {
   height: 100%;
   border-radius: 2px;
-  background: linear-gradient(90deg, #e63946, #ff6b6b);
-  box-shadow: 0 0 8px rgba(230, 57, 70, 0.6);
+  background: linear-gradient(90deg, var(--accent-deep), var(--accent));
+  box-shadow: 0 0 8px rgb(var(--accent-rgb) / 0.6);
   transition: width 500ms ease;
 }
 
@@ -214,9 +218,9 @@ textarea:focus-visible,
   white-space: pre-line;
 }
 .bubble-ai {
-  background: rgba(20, 20, 20, 0.9);
-  border: 1px solid rgba(230, 57, 70, 0.15);
-  border-left: 3px solid #e63946;
+  background: rgba(16, 24, 29, 0.9);
+  border: 1px solid rgb(var(--accent-rgb) / 0.15);
+  border-left: 3px solid var(--accent);
   border-radius: 2px 16px 16px 16px;
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
   -webkit-backdrop-filter: blur(4px);
@@ -224,12 +228,12 @@ textarea:focus-visible,
   color: #f0ede8;
 }
 .bubble-user {
-  background: linear-gradient(135deg, #e63946 0%, #c0243a 100%);
+  background: linear-gradient(135deg, var(--accent) 0%, var(--accent-deep) 100%);
   border-radius: 16px 2px 16px 16px;
   box-shadow:
-    0 4px 20px rgba(230, 57, 70, 0.3),
-    0 0 30px rgba(230, 57, 70, 0.1);
-  color: #ffffff;
+    0 4px 20px rgb(var(--accent-rgb) / 0.3),
+    0 0 30px rgb(var(--accent-rgb) / 0.1);
+  color: var(--accent-ink);
   font-weight: 500;
 }
 
@@ -241,28 +245,28 @@ textarea:focus-visible,
   transition: color 150ms ease;
 }
 .go-back:hover {
-  color: rgba(230, 57, 70, 0.8);
+  color: rgb(var(--accent-rgb) / 0.8);
 }
 
 /* Premium buttons (scoped to the chatbot only) */
 .chat-shell .btn-primary {
   min-height: 54px;
   border-radius: 6px;
-  background: linear-gradient(135deg, #e63946 0%, #c0243a 100%);
+  background: linear-gradient(135deg, var(--accent) 0%, var(--accent-deep) 100%);
   font-family: 'Bebas Neue', sans-serif;
   font-size: 18px;
   letter-spacing: 0.15em;
-  color: #fff;
+  color: var(--accent-ink);
   box-shadow:
-    0 4px 20px rgba(230, 57, 70, 0.4),
-    0 0 40px rgba(230, 57, 70, 0.15);
+    0 4px 20px rgb(var(--accent-rgb) / 0.4),
+    0 0 40px rgb(var(--accent-rgb) / 0.15);
   transition: all 150ms ease;
 }
 .chat-shell .btn-primary:hover {
   filter: brightness(1.1);
   box-shadow:
-    0 6px 28px rgba(230, 57, 70, 0.55),
-    0 0 52px rgba(230, 57, 70, 0.2);
+    0 6px 28px rgb(var(--accent-rgb) / 0.55),
+    0 0 52px rgb(var(--accent-rgb) / 0.2);
 }
 .chat-shell .btn-primary:active {
   transform: scale(0.97);
@@ -271,29 +275,29 @@ textarea:focus-visible,
   min-height: 54px;
   border-radius: 6px;
   background: transparent;
-  border: 1px solid rgba(230, 57, 70, 0.5);
-  color: #e63946;
+  border: 1px solid rgb(var(--accent-rgb) / 0.5);
+  color: var(--accent);
   font-family: 'Oswald', sans-serif;
   font-size: 16px;
   letter-spacing: 0.1em;
   transition: all 150ms ease;
 }
 .chat-shell .btn-outline:hover {
-  background: rgba(230, 57, 70, 0.1);
+  background: rgb(var(--accent-rgb) / 0.1);
 }
 
 /* Inputs */
 .chat-shell .field {
-  background: rgba(15, 15, 15, 0.9);
-  border: 1px solid rgba(230, 57, 70, 0.2);
+  background: rgba(10, 16, 20, 0.9);
+  border: 1px solid rgb(var(--accent-rgb) / 0.2);
   border-radius: 8px;
   transition: all 200ms ease;
 }
 .chat-shell .field:focus {
-  border-color: #e63946;
+  border-color: var(--accent);
   box-shadow:
-    0 0 0 3px rgba(230, 57, 70, 0.15),
-    0 0 20px rgba(230, 57, 70, 0.1);
+    0 0 0 3px rgb(var(--accent-rgb) / 0.15),
+    0 0 20px rgb(var(--accent-rgb) / 0.1);
 }
 
 /* =====================================================================
@@ -312,10 +316,10 @@ textarea:focus-visible,
   justify-content: space-between;
   gap: 12px;
   padding: 12px 16px;
-  background: rgba(8, 8, 8, 0.95);
+  background: rgba(7, 12, 16, 0.95);
   -webkit-backdrop-filter: blur(12px);
   backdrop-filter: blur(12px);
-  border-bottom: 1px solid rgba(230, 57, 70, 0.25);
+  border-bottom: 1px solid rgb(var(--accent-rgb) / 0.25);
 }
 .admin-burger {
   display: inline-flex;
@@ -351,7 +355,7 @@ textarea:focus-visible,
   width: 272px;
   display: flex;
   flex-direction: column;
-  background: #0c0c0c;
+  background: #0a1115;
   border-right: 1px solid rgba(255, 255, 255, 0.06);
   transform: translateX(-100%);
   transition: transform 220ms cubic-bezier(0.16, 1, 0.3, 1);
@@ -394,9 +398,9 @@ textarea:focus-visible,
 }
 .admin-link:hover { background: rgba(255, 255, 255, 0.04); color: #f0ede8; }
 .admin-link.is-active {
-  background: rgba(230, 57, 70, 0.12);
+  background: rgb(var(--accent-rgb) / 0.12);
   color: #ffffff;
-  border-left-color: #e63946;
+  border-left-color: var(--accent);
 }
 .admin-link__icon {
   display: inline-flex;
@@ -404,7 +408,7 @@ textarea:focus-visible,
   justify-content: center;
   width: 20px;
   font-size: 13px;
-  color: #e63946;
+  color: var(--accent);
   opacity: 0.9;
 }
 .admin-userbox {

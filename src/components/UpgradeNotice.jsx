@@ -51,7 +51,7 @@ export default function UpgradeNotice() {
         </p>
 
         {isOwner && (
-          <a href="/platform/my-gym" className="mt-5 block w-full rounded-xl bg-accent px-4 py-3 font-semibold text-black">
+          <a href="/platform/my-gym" className="mt-5 block w-full rounded-xl bg-accent px-4 py-3 font-semibold text-accent-ink">
             See plans
           </a>
         )}

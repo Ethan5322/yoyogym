@@ -1,72 +1,73 @@
-// Draw the app's icon and splash SOURCES from the Yoyo Gym brand mark.
+// Draw the app's icon and splash SOURCES from the Yoyo Gyms logo.
 //
-// The mark is public/icon.svg — the red dumbbell the gym's web app already
-// uses. The shipped app carried Capacitor's placeholder icon instead: a blue
-// cross on a grid, which is the first thing a store reviewer and a gym member
-// would see.
+// The logo is the user's own (CLAUDE.md §37): public/brand/yoyo-gyms-logo-on-
+// dark.png, white + purple, made for the near-black ground. It replaced the
+// red dumbbell (the old public/icon.svg) on 2026-09-28.
 //
-// This writes the four sources `@capacitor/assets` expects, into
-// apps/mobile/assets/. Then `npm run mobile:icons` renders every size Android
-// (and later iOS) needs from them.
+// The user asked for the logo on a TRANSPARENT background (§37.1 Q4). The
+// stores decide what is possible: Apple rejects any App Store icon with
+// transparency, and Android masks every launcher icon into a shape over its
+// background layer. So the logo keeps a transparent background where a store
+// allows one — the adaptive FOREGROUND layer — and sits on the brand's solid
+// near-black where it must.
 //
-//   icon-only.png        1024  full-bleed square — stores round the corners
-//                              themselves, and iOS refuses transparency
-//   icon-foreground.png  1024  the dumbbell alone, inside Android's adaptive
-//                              safe zone, so no launcher shape clips it
-//   icon-background.png  1024  the plain ground behind the foreground
-//   splash.png           2732  the mark centred on the app's own dark ground
+// This writes the sources `@capacitor/assets` expects, into apps/mobile/assets/.
+// Then `npm run mobile:icons` renders every size Android and iOS need.
+//
+//   icon-only.png        1024  the logo on solid near-black — iOS refuses
+//                              transparency, and the stores round the corners
+//   icon-foreground.png  1024  the logo alone, TRANSPARENT, inside Android's
+//                              adaptive safe zone, so no launcher shape clips it
+//   icon-background.png  1024  the plain near-black behind the foreground
+//   splash.png           2732  the logo centred on the app's own ground
 import { mkdirSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import { createRequire } from 'node:module';
+import { BRAND } from '../../shared/brand.js';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
-const MOBILE = join(HERE, '..', '..', 'apps', 'mobile');
+const ROOT = join(HERE, '..', '..');
+const MOBILE = join(ROOT, 'apps', 'mobile');
 // sharp arrives with @capacitor/assets, inside the mobile project.
 const sharp = createRequire(join(MOBILE, 'package.json'))('sharp');
 
-const RED = '#E63946';
-const ICON_GROUND = '#0A0A0A'; // public/icon.svg's own background
-const APP_GROUND = '#0e1416'; // the app's screens
+const LOGO = join(ROOT, 'public', 'brand', 'yoyo-gyms-logo-on-dark.png');
+const GROUND = BRAND.ground;
 
 /**
- * The dumbbell from public/icon.svg, on its original 512 grid. It spans
- * x 96-416 and y 196-316, so its centre is (256, 256).
+ * A `size` square with the logo centred at `width` × size wide, on `ground`
+ * (or transparent when `ground` is null).
  */
-const DUMBBELL = `
-  <line x1="150" y1="256" x2="362" y2="256" stroke="${RED}" stroke-width="34" stroke-linecap="round"/>
-  <rect x="96" y="196" width="44" height="120" rx="16" fill="${RED}"/>
-  <rect x="372" y="196" width="44" height="120" rx="16" fill="${RED}"/>
-  <rect x="140" y="216" width="34" height="80" rx="12" fill="${RED}"/>
-  <rect x="338" y="216" width="34" height="80" rx="12" fill="${RED}"/>`;
-
-/** The dumbbell, scaled about the centre of a `size` canvas. */
-function mark(size, scale, ground) {
-  const s = (size / 512) * scale;
-  const offset = (size - 512 * s) / 2;
-  return Buffer.from(
-    `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 ${size} ${size}">` +
-      (ground ? `<rect width="${size}" height="${size}" fill="${ground}"/>` : '') +
-      `<g transform="translate(${offset} ${offset}) scale(${s})">${DUMBBELL}</g>` +
-      `</svg>`
-  );
+async function compose(size, width, ground) {
+  const logo = await sharp(LOGO).resize({ width: Math.round(size * width) }).png().toBuffer();
+  const base = sharp({
+    create: {
+      width: size,
+      height: size,
+      channels: 4,
+      background: ground ?? { r: 0, g: 0, b: 0, alpha: 0 },
+    },
+  });
+  return base.composite([{ input: logo, gravity: 'centre' }]).png();
 }
 
 const out = join(MOBILE, 'assets');
 mkdirSync(out, { recursive: true });
 
-// Full icon: the mark at its original proportion on its own ground.
-await sharp(mark(1024, 1, ICON_GROUND)).png().toFile(join(out, 'icon-only.png'));
+// Full icon: the logo large on solid near-black.
+await (await compose(1024, 0.84, GROUND)).toFile(join(out, 'icon-only.png'));
 
-// Adaptive foreground: Android shows only the central 66% of a 108dp icon for
-// certain, so the dumbbell (62.5% of its box wide) is scaled to sit inside it.
-await sharp(mark(1024, 0.85, null)).png().toFile(join(out, 'icon-foreground.png'));
-await sharp({ create: { width: 1024, height: 1024, channels: 4, background: ICON_GROUND } })
+// Adaptive foreground: Android shows only a central circle 66/108 of the icon
+// for certain. The logo is wider than tall, so it is sized to fit INSIDE that
+// circle — corners included — whatever shape the launcher cuts.
+await (await compose(1024, 0.5, null)).toFile(join(out, 'icon-foreground.png'));
+await sharp({ create: { width: 1024, height: 1024, channels: 4, background: GROUND } })
   .png()
   .toFile(join(out, 'icon-background.png'));
 
-// Splash: small and centred — a splash is a pause, not a poster.
-await sharp(mark(2732, 0.35, APP_GROUND)).png().toFile(join(out, 'splash.png'));
-await sharp(mark(2732, 0.35, APP_GROUND)).png().toFile(join(out, 'splash-dark.png'));
+// Splash: modest and centred — a splash is a pause, not a poster.
+await (await compose(2732, 0.34, GROUND)).toFile(join(out, 'splash.png'));
+await (await compose(2732, 0.34, GROUND)).toFile(join(out, 'splash-dark.png'));
 
 console.log('Wrote apps/mobile/assets/{icon-only,icon-foreground,icon-background,splash,splash-dark}.png');

@@ -5,6 +5,7 @@ import { apiFetch } from '../../lib/api.js';
 import { useToast } from '../../lib/toast.jsx';
 import { useBranding } from '../../lib/branding.js';
 import { downloadBoardReportPdf } from '../../lib/boardReportPdf.js';
+import { accentOrDefault } from '../../../shared/brand.js';
 
 const zar = (n) => 'R' + Number(n || 0).toLocaleString('en-ZA');
 
@@ -26,7 +27,7 @@ export default function Analytics() {
         d ? Promise.resolve(d) : apiFetch('/admin/analytics'),
         apiFetch('/admin/finance').catch(() => ({})),
       ]);
-      downloadBoardReportPdf({ gymName: branding.name || 'Yoyo GYM', accent: branding.accent_color || '#E63946', dashboard, analytics, finance });
+      downloadBoardReportPdf({ gymName: branding.name || 'Yoyo GYM', accent: accentOrDefault(branding.accent_color), dashboard, analytics, finance });
     } catch (e) {
       toast.error(e.message);
     } finally {

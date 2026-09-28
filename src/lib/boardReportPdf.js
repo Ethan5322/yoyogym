@@ -4,26 +4,20 @@
 import { jsPDF } from 'jspdf';
 import { downloadPdf } from './download.js';
 import { stampMulesooCredit } from './mulesooCredit.js';
+import { brandBand } from './pdf/brand.js';
+import { DEFAULT_ACCENT } from '../../shared/brand.js';
 
-function hexToRgb(hex) {
-  const m = /^#?([0-9a-fA-F]{6})$/.exec(hex || '');
-  if (!m) return [230, 57, 70];
-  const n = parseInt(m[1], 16);
-  return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
-}
 const zar = (n) => 'R ' + Number(n || 0).toLocaleString('en-ZA', { minimumFractionDigits: 0 });
 
-export function downloadBoardReportPdf({ gymName = 'Yoyo GYM', accent = '#E63946', dashboard = {}, analytics = {}, finance = {} }) {
-  const [r, g, b] = hexToRgb(accent);
+export function downloadBoardReportPdf({ gymName = 'Yoyo GYM', accent = DEFAULT_ACCENT, dashboard = {}, analytics = {}, finance = {} }) {
   const doc = new jsPDF({ unit: 'pt', format: 'a4' });
   const W = doc.internal.pageSize.getWidth();
   const H = doc.internal.pageSize.getHeight();
   const M = 48;
   let y = 0;
 
-  // Header band
-  doc.setFillColor(r, g, b);
-  doc.rect(0, 0, W, 92, 'F');
+  // Header band (CLAUDE.md §37): near-black, the logo, the gym's accent stripe.
+  const colours = brandBand(doc, { accent, height: 92, margin: M });
   doc.setTextColor(255, 255, 255);
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(22);
@@ -39,7 +33,7 @@ export function downloadBoardReportPdf({ gymName = 'Yoyo GYM', accent = '#E63946
     if (y > H - 90) { doc.addPage(); y = 56; }
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(13);
-    doc.setTextColor(r, g, b);
+    doc.setTextColor(...colours.text);
     doc.text(t, M, y);
     doc.setDrawColor(220, 220, 220);
     doc.line(M, y + 6, W - M, y + 6);
