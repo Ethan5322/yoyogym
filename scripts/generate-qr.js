@@ -36,7 +36,7 @@ function page(label, url, dataUrl) {
   doc.setFillColor(7, 12, 16);
   doc.rect(0, 0, W, H, 'F');
   const logoH = 96;
-  doc.addImage(YOYO_LOGO_ON_DARK, 'PNG', W / 2 - (logoH * YOYO_LOGO_ASPECT) / 2, 26, logoH * YOYO_LOGO_ASPECT, logoH);
+  doc.addImage(YOYO_LOGO_ON_DARK, 'PNG', W / 2 - (logoH * YOYO_LOGO_ASPECT) / 2, 26, logoH * YOYO_LOGO_ASPECT, logoH, undefined, 'FAST');
   doc.setTextColor(245, 240, 232);
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(16);

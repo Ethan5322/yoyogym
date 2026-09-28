@@ -98,7 +98,7 @@ function section(n, title) {
 
 // ===================== COVER =====================
 setFill(GROUND); doc.rect(0, 0, PW, PH, 'F');
-doc.addImage(YOYO_LOGO_ON_DARK, 'PNG', M, 18, 40 * YOYO_LOGO_ASPECT, 40); // the Yoyo Gyms logo (§37)
+doc.addImage(YOYO_LOGO_ON_DARK, 'PNG', M, 18, 40 * YOYO_LOGO_ASPECT, 40, undefined, 'FAST'); // the Yoyo Gyms logo (§37)
 setFill(ACCENT); doc.rect(0, 104, PW, 2, 'F');
 doc.setFont('helvetica', 'bold'); doc.setFontSize(30); doc.setTextColor(245, 240, 232);
 doc.text('Owner\'s Manual', M, 128);

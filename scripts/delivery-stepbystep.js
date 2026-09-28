@@ -97,7 +97,7 @@ function stepBadge(n, title) {
 
 // ===================== COVER (p1) =====================
 setFill(GROUND); doc.rect(0, 0, PW, PH, 'F');
-doc.addImage(YOYO_LOGO_ON_DARK, 'PNG', M, 18, 40 * YOYO_LOGO_ASPECT, 40); // the Yoyo Gyms logo (§37)
+doc.addImage(YOYO_LOGO_ON_DARK, 'PNG', M, 18, 40 * YOYO_LOGO_ASPECT, 40, undefined, 'FAST'); // the Yoyo Gyms logo (§37)
 setFill(ACCENT); doc.rect(0, 100, PW, 2, 'F');
 doc.setFont('times', 'bold'); doc.setFontSize(13); setColor(ACCENT);
 doc.text('MULESOO DIGITAL SOLUTIONS', M, 74);
