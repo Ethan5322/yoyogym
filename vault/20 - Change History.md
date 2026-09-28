@@ -15,6 +15,34 @@ occurrence is answered from notes rather than rediscovered.
 
 ---
 
+## 2026-09-28 — Stunning end to end (D-161)
+
+**Found by looking, not guessing.** The admin panel was screenshotted from the real production
+build with every API call answered by made-up data (Chrome DevTools protocol, a fake token; no real
+member, no password). What it showed: five red banners stacked as the dashboard's first impression;
+every member status printed in the accent colour, so a healthy "active" looked like an error; mixed
+text glyphs (▣ ◷ ⛨ ☰) as sidebar icons.
+
+**Failures worth remembering:**
+- **AI upscaling on this machine:** Real-ESRGAN's GPU build produced corrupted tiles
+  (`vkQueueSubmit failed -4`), then its files vanished from disk (most likely the antivirus). The
+  user said to stop and keep the picture. Do not retry upscaling tools here.
+- **The poster did not show at first:** the page's pre-mount style gives `html` a background, so
+  `body`'s own background is painted in-flow — ABOVE a `z-index: -10` fixed layer. Fixed with
+  `isolation: isolate` on `body`. Same technique for the app's `#member::before`.
+- **Escaping, three times in one day:** regexes and apostrophes written through shell heredocs
+  and Python strings lost backslashes (`\\]`, `\\d`, `gym's`). Each was caught — by `node --check`, a
+  failing test or the build — but the lesson stands: write code that contains quotes or backslashes
+  with the editor or a file, not through a heredoc.
+- **Money on phones:** "R95 400,00" at hero size overflowed two columns; the dashboard now shows
+  whole rands (payments and receipts keep cents).
+
+**Verified.** Screens compared before and after on computer and phone widths; poster shown behind
+splash, admin sign-in and sidebar; tests for the poster check, backdrop placement, status labels and
+the app's poster.
+
+---
+
 ## 2026-09-28 — Each gym's own app (D-160)
 
 **Asked:** once someone belongs to a gym, the app is that gym's app — it remembers them, keeps them

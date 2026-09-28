@@ -9,6 +9,7 @@ import PersonalQr from '../components/PersonalQr.jsx';
 import IdCardButton from '../components/IdCardButton.jsx';
 import FaceCapture from '../chatbot/components/FaceCapture.jsx';
 import GymIcon from '../components/GymIcon.jsx';
+import GymBackdrop from '../components/GymBackdrop.jsx';
 
 /**
  * The URL a member's own QR card should contain.
@@ -74,7 +75,8 @@ export default function MemberPortal() {
   if (!token) return <MemberLogin onLoggedIn={onLoggedIn} />;
 
   return (
-    <div className="mx-auto flex min-h-[100dvh] max-w-md flex-col bg-bg">
+    <div className="mx-auto flex min-h-[100dvh] max-w-md flex-col bg-bg/80 backdrop-blur-sm">
+      <GymBackdrop />
       <header className="flex items-center justify-between border-b border-white/5 bg-surface px-4 py-3">
         <span className="flex items-center gap-2 font-display text-lg uppercase tracking-wider text-body">
           <GymIcon size={28} alt="" />
@@ -188,7 +190,8 @@ function MemberLogin({ onLoggedIn }) {
   }
 
   return (
-    <div className="flex min-h-[100dvh] items-center justify-center bg-bg px-6">
+    <div className="flex min-h-[100dvh] items-center justify-center px-6">
+      <GymBackdrop />
       <div className="w-full max-w-sm animate-fade-up space-y-4">
         <div className="text-center">
           <div className="mb-5 flex justify-center"><GymIcon size={80} /></div>

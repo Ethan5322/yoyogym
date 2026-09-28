@@ -1933,3 +1933,48 @@ everywhere" for members (member page) and staff (Staff page), and automatically 
 reset or disable; the app reopens a member into their gym's home (cover, icon, notice, hours,
 Call / Directions / Email) and an owner into their admin panel; Settings gains Cover picture
 (uploaded straight to Storage with a one-time link) and Notice.
+
+
+---
+
+## 39. Stunning end to end — clear pictures, each gym's poster, the admin panel (user instruction, 2026-09-28)
+
+> The user's words, word for word. Clarified one question at a time in §39.1, which wins over the
+> text above it.
+
+> on app the picture are not clearly display as profetional app i dont know may be is because its
+> desktop or waiting for phone vertion fix it, also in each gym app bckground must have the poster
+> that gym owner that app on app, the app must look stunning ebd to end, encluding admi pannel
+
+### 39.1 Clarifications — answered by the user, one at a time
+
+Checked against the code on 2026-09-28:
+- **The landing photograph is only 941 × 956 pixels** — it was cut from the user's mockup, which
+  was itself 941 wide. On a phone (390 points × 3 = 1170 pixels) it is stretched a little; on a
+  wide computer screen the website shows it far larger than it is, so it looks soft. A sharper
+  picture needs a larger original, or a layout that never shows it bigger than it is.
+- **Each gym already has a cover picture** (§38.1 Q4), shown only at the top of its app home.
+- **Q1 — where it looked unclear:** everywhere — the website on a computer and on a phone, and the
+  phone app.
+- **Q2 — the landing photo: keep the existing picture, NO upscaling** (the user, after a first
+  choice of AI upscaling: the tools were blocked on this Windows machine, and the user said to stop
+  and keep the picture). Every layout instead stops showing a picture larger than it really is —
+  on a computer the photo sits in a phone-width panel; on newer phones it stays slightly soft.
+- **Q3 — each gym's poster is a SEPARATE upload:** owners upload a tall poster (portrait, like a phone
+  screen) in Settings. It is the dimmed background of the gym's screens; the cover picture stays
+  the wide banner at the top of the app home.
+- **Q4 — where the poster shows, and what "stunning" covers:** the poster behind **every member
+  screen** (welcome page, registration, member sign-in, member portal, the app's gym home) and behind
+  the **gym admin sign-in**; and a **redesign of the gym admin panel** (poster/logo in the sidebar
+  header, a polished dashboard with stat cards, consistent cards and tables, mobile-first). The Yoyo
+  pages (app front page, main admin website) are not part of this pass.
+
+**Built 2026-09-28** — vault D-161: a separate **Poster (background)** upload in Settings (portrait,
+≤ 1080 × 1920, Storage `poster-<time>.jpg` in the gym's own folder), shown darkened behind the
+welcome page, registration, member sign-in, member portal, the app's member screens, the admin
+sign-in and behind the gym's name in the admin sidebar; the website's welcome page shows the photo
+in a phone-width panel on a computer, and the app's landing stays phone-width on a tablet, so the
+941 px photo is never stretched; the admin panel redesigned — one family of line icons, the poster
+and avatar in the sidebar, a calm "Needs attention" list instead of red banners, icon stat cards,
+coloured status labels (green active, amber expiring, red suspended…) instead of red for everything,
+softer cards, rounded buttons and fields.

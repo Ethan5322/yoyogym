@@ -4,6 +4,7 @@
 import { Link, useParams } from 'react-router-dom';
 import { useBranding } from '../lib/branding.js';
 import GymIcon from '../components/GymIcon.jsx';
+import GymBackdrop from '../components/GymBackdrop.jsx';
 
 export default function Splash() {
   const b = useBranding();
@@ -15,7 +16,9 @@ export default function Splash() {
   const tagline = b.tagline || 'Train harder. Live stronger.';
 
   return (
-    <div className="flex min-h-screen flex-col items-center justify-center bg-bg px-6 text-center">
+    <div className="flex min-h-screen flex-col items-center justify-center px-6 text-center">
+      {/* The gym's poster behind its welcome page (CLAUDE.md §39.1 Q4). */}
+      <GymBackdrop />
       <div className="w-full max-w-sm animate-fade-up">
         {/* The gym's own icon: its logo, or its letter in its colour (CLAUDE.md §37.1 Q7). */}
         <div className="mb-8 flex justify-center"><GymIcon size={96} alt={name} /></div>

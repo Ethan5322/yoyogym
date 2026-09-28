@@ -158,3 +158,36 @@ test('A COVER PICTURE MUST BE ONE UPLOADED FOR THIS GYM (§38.1 Q5)', async () =
   assert.match(coverProblem(`${KOM}cover-1.jpg?"><script>`, KOM), /not valid/);
   assert.match(coverProblem('https://evil.example/a.jpg', KOM), /not one uploaded/);
 });
+
+// ---------------------------------------------------------------------------
+// Each gym's poster, and the admin panel (CLAUDE.md §39.1)
+// ---------------------------------------------------------------------------
+
+test('A POSTER MUST BE ONE UPLOADED FOR THIS GYM, NAMED BY THIS SYSTEM (§39.1 Q3)', async () => {
+  process.env.JWT_SECRET ||= 'test-secret-for-poster';
+  const { pictureProblem } = await import('../server/handlers/admin/settings.js');
+  const KOM = 'https://x.supabase.co/storage/v1/object/public/gym-branding/kom/';
+  assert.equal(pictureProblem('poster', `${KOM}poster-1759000000000.jpg`, KOM), null);
+  assert.match(pictureProblem('poster', `${KOM}cover-1759000000000.jpg`, KOM), /not valid/, 'a cover is not a poster');
+  assert.match(pictureProblem('poster', 'https://x.supabase.co/storage/v1/object/public/gym-branding/other/poster-1.jpg', KOM), /not one uploaded/);
+  assert.match(pictureProblem('poster', `${KOM}../x/poster-1.jpg`, KOM), /not valid/);
+});
+
+test('THE GYM\'S POSTER SITS BEHIND EVERY MEMBER SCREEN AND THE ADMIN SIGN-IN (§39.1 Q4)', () => {
+  for (const f of ['src/pages/Splash.jsx', 'src/pages/Register.jsx', 'src/pages/MemberPortal.jsx', 'src/pages/PublicProfile.jsx', 'src/pages/admin/Login.jsx']) {
+    assert.match(readFileSync(f, 'utf8'), /<GymBackdrop \/>/, f);
+  }
+  const backdrop = readFileSync('src/components/GymBackdrop.jsx', 'utf8');
+  assert.match(backdrop, /SAFE\.test\(b\.poster_url\)/, 'only the gym\'s own https picture');
+  assert.match(readFileSync('src/index.css', 'utf8'), /isolation: isolate;/, 'painted above the page background, below the page');
+  assert.match(readFileSync('src/components/AdminShell.jsx', 'utf8'), /admin-brand__poster/, 'behind the gym\'s name in the admin sidebar');
+});
+
+test('A STATUS IS A COLOURED LABEL, NOT RED FOR EVERYTHING (§39.1 Q4)', () => {
+  const ui = readFileSync('src/components/ui.jsx', 'utf8');
+  assert.match(ui, /active: 'good'/);
+  assert.match(ui, /expiring: 'warn'/);
+  assert.match(ui, /suspended: 'bad'/);
+  assert.match(readFileSync('src/pages/admin/MembersList.jsx', 'utf8'), /<StatusPill status=\{m\.status\} \/>/);
+  assert.ok(!/text-accent">\{m\.status\}/.test(readFileSync('src/pages/admin/MembersList.jsx', 'utf8')));
+});

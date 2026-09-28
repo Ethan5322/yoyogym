@@ -52,7 +52,7 @@ test('A MEMBER\'S REQUEST IS ON THE OWNER\'S DASHBOARD, BY NAME', () => {
   assert.match(handler, /deletion_requests: deletionRequests/);
   const page = readFileSync('src/pages/admin/Dashboard.jsx', 'utf8');
   assert.match(page, /d\.deletion_requests/);
-  assert.match(page, /to=\{`\/admin\/members\/\$\{m\.id\}`\}/, 'each links to where the erasure is done');
+  assert.match(page, /to(=\{|: )`\/admin\/members\/\$\{m\.id\}`/, 'each links to where the erasure is done');
 });
 
 // ---------------------------------------------------------------------------

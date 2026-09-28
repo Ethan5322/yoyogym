@@ -9,6 +9,7 @@ import { useBranding } from '../lib/branding.js';
 import { apiFetch } from '../lib/api.js';
 import UpgradeNotice from './UpgradeNotice.jsx';
 import BrandLogo from './BrandLogo.jsx';
+import Icon from './Icon.jsx';
 
 // Grouped navigation reads as an organised product, not a random row of buttons.
 //
@@ -21,61 +22,66 @@ const GROUPS = [
   {
     title: 'Overview',
     items: [
-      { to: '/admin', label: 'Dashboard', icon: '▣', roles: ['owner', 'manager'], exact: true },
-      { to: '/admin/today', label: 'Today', icon: '◷', roles: ['owner', 'manager', 'reception'] },
-      { to: '/admin/inbox', label: 'Inbox', icon: '✉', roles: ['owner', 'manager'], feature: 'messaging' },
+      { to: '/admin', label: 'Dashboard', icon: 'dashboard', roles: ['owner', 'manager'], exact: true },
+      { to: '/admin/today', label: 'Today', icon: 'today', roles: ['owner', 'manager', 'reception'] },
+      { to: '/admin/inbox', label: 'Inbox', icon: 'inbox', roles: ['owner', 'manager'], feature: 'messaging' },
     ],
   },
   {
     title: 'Front Desk',
     items: [
-      { to: '/admin/scan', label: 'Scan', icon: '⛨', roles: ['owner', 'manager', 'reception'], feature: 'face' },
-      { to: '/admin/verify', label: 'Verify', icon: '✓', roles: ['owner', 'manager', 'reception'] },
-      { to: '/admin/register-member', label: 'Register', icon: '＋', roles: ['owner', 'manager', 'reception'] },
-      { to: '/admin/visitors', label: 'Visitors', icon: '◍', roles: ['owner', 'manager', 'reception'], feature: 'access_control' },
-      { to: '/admin/incidents', label: 'Incidents', icon: '!', roles: ['owner', 'manager', 'reception'], feature: 'access_control' },
+      { to: '/admin/scan', label: 'Scan', icon: 'scan', roles: ['owner', 'manager', 'reception'], feature: 'face' },
+      { to: '/admin/verify', label: 'Verify', icon: 'verify', roles: ['owner', 'manager', 'reception'] },
+      { to: '/admin/register-member', label: 'Register', icon: 'register', roles: ['owner', 'manager', 'reception'] },
+      { to: '/admin/visitors', label: 'Visitors', icon: 'visitors', roles: ['owner', 'manager', 'reception'], feature: 'access_control' },
+      { to: '/admin/incidents', label: 'Incidents', icon: 'incidents', roles: ['owner', 'manager', 'reception'], feature: 'access_control' },
     ],
   },
   {
     title: 'People',
     items: [
-      { to: '/admin/members', label: 'Members', icon: '☰', roles: ['owner', 'manager'] },
-      { to: '/admin/attendance', label: 'Attendance', icon: '▤', roles: ['owner', 'manager', 'reception'], feature: 'reporting' },
-      { to: '/admin/trainers', label: 'Trainers', icon: '★', roles: ['owner', 'manager'], feature: 'trainers' },
-      { to: '/admin/clients', label: 'My Clients', icon: '◆', roles: ['owner', 'manager', 'trainer'], feature: 'trainers' },
+      { to: '/admin/members', label: 'Members', icon: 'members', roles: ['owner', 'manager'] },
+      { to: '/admin/attendance', label: 'Attendance', icon: 'attendance', roles: ['owner', 'manager', 'reception'], feature: 'reporting' },
+      { to: '/admin/trainers', label: 'Trainers', icon: 'trainers', roles: ['owner', 'manager'], feature: 'trainers' },
+      { to: '/admin/clients', label: 'My Clients', icon: 'clients', roles: ['owner', 'manager', 'trainer'], feature: 'trainers' },
     ],
   },
   {
     title: 'Scheduling',
     items: [
-      { to: '/admin/classes', label: 'Classes', icon: '◈', roles: ['owner', 'manager'], feature: 'classes' },
-      { to: '/admin/calendar', label: 'Calendar', icon: '▦', roles: ['owner', 'manager'], feature: 'classes' },
+      { to: '/admin/classes', label: 'Classes', icon: 'classes', roles: ['owner', 'manager'], feature: 'classes' },
+      { to: '/admin/calendar', label: 'Calendar', icon: 'calendar', roles: ['owner', 'manager'], feature: 'classes' },
     ],
   },
   {
     title: 'Business',
     items: [
-      { to: '/admin/payments', label: 'Payments', icon: '$', roles: ['owner', 'manager'] },
-      { to: '/admin/analytics', label: 'Analytics', icon: '▮', roles: ['owner', 'manager'], feature: 'advanced_analytics' },
-      { to: '/admin/communications', label: 'Comms', icon: '✉', roles: ['owner', 'manager'], feature: 'messaging' },
-      { to: '/admin/catalog', label: 'Catalog', icon: '▤', roles: ['owner', 'manager'] },
-      { to: '/admin/qr-codes', label: 'QR Codes', icon: '▩', roles: ['owner', 'manager'] },
+      { to: '/admin/payments', label: 'Payments', icon: 'payments', roles: ['owner', 'manager'] },
+      { to: '/admin/analytics', label: 'Analytics', icon: 'analytics', roles: ['owner', 'manager'], feature: 'advanced_analytics' },
+      { to: '/admin/communications', label: 'Comms', icon: 'comms', roles: ['owner', 'manager'], feature: 'messaging' },
+      { to: '/admin/catalog', label: 'Catalog', icon: 'catalog', roles: ['owner', 'manager'] },
+      { to: '/admin/qr-codes', label: 'QR Codes', icon: 'qr', roles: ['owner', 'manager'] },
     ],
   },
   {
     title: 'System',
     items: [
-      { to: '/admin/audit', label: 'Audit Log', icon: '❏', roles: ['owner', 'manager'], feature: 'audit' },
-      { to: '/admin/staff', label: 'Staff & Roles', icon: '☷', roles: ['owner'] },
-      { to: '/admin/settings', label: 'Settings', icon: '⚙', roles: ['owner'] },
+      { to: '/admin/audit', label: 'Audit Log', icon: 'audit', roles: ['owner', 'manager'], feature: 'audit' },
+      { to: '/admin/staff', label: 'Staff & Roles', icon: 'staff', roles: ['owner'] },
+      { to: '/admin/settings', label: 'Settings', icon: 'settings', roles: ['owner'] },
     ],
   },
 ];
+
+/** "Lindiwe Dube" → "LD": the person's initials, for the avatar. */
+const initials = (name) =>
+  String(name || '?').trim().split(/\s+/).slice(0, 2).map((w) => w[0]).join('').toUpperCase() || '?';
 
 export default function AdminShell({ children }) {
   const { user, logout, hasFeature } = useAuth();
   const branding = useBranding();
   const gymName = branding.name || 'Your gym';
+  const poster = /^https:\/\/[^\s"'<>()\\]+$/.test(branding.poster_url || '') ? branding.poster_url : '';
   const navigate = useNavigate();
   const { pathname } = useLocation();
   const [open, setOpen] = useState(false);
@@ -127,11 +133,11 @@ export default function AdminShell({ children }) {
         <button aria-label="Menu" className="admin-burger" onClick={() => setOpen(true)}>
           <span /><span /><span />
         </button>
-        <span className="flex items-center gap-2">
+        <span className="flex min-w-0 items-center gap-2">
           <BrandLogo alt="" className="h-7 w-auto" />
-          <span className="font-display text-lg font-bold uppercase tracking-wider text-accent">{gymName}</span>
+          <span className="truncate text-base font-bold text-body">{gymName}</span>
         </span>
-        <span className="text-xs uppercase tracking-wide text-muted">{user?.role}</span>
+        <span className="admin-avatar admin-avatar--sm" aria-label={user?.role}>{initials(user?.full_name)}</span>
       </header>
 
       {/* ===== Mobile drawer overlay ===== */}
@@ -139,10 +145,15 @@ export default function AdminShell({ children }) {
 
       {/* ===== Sidebar (fixed on desktop, drawer on mobile) ===== */}
       <aside className={`admin-sidebar ${open ? 'is-open' : ''}`}>
-        <div className="admin-brand">
-          <BrandLogo alt="" className="mb-2 h-12 w-auto self-start" />
-          <span className="font-display text-xl font-bold uppercase tracking-wider text-accent">{gymName}</span>
-          <span className="text-[10px] uppercase tracking-[0.25em] text-muted">Management</span>
+        {/* The gym's poster behind its name (§39.1 Q4); the Yoyo Gyms logo
+            stays, small, as the platform mark (§37.1 Q7). */}
+        <div className={`admin-brand ${poster ? 'has-poster' : ''}`}>
+          {poster && <img src={poster} alt="" className="admin-brand__poster" />}
+          <div className="admin-brand__body">
+            <BrandLogo alt="Yoyo Gyms" className="h-9 w-auto self-start" />
+            <span className="admin-brand__name">{gymName}</span>
+            <span className="text-[11px] uppercase tracking-[0.2em] text-muted">Gym management</span>
+          </div>
         </div>
 
         {canSearch && (
@@ -165,7 +176,7 @@ export default function AdminShell({ children }) {
               {g.items.map((n) =>
                 hasFeature(n.feature) ? (
                   <Link key={n.to} to={n.to} className={`admin-link ${isActive(n) ? 'is-active' : ''}`}>
-                    <span className="admin-link__icon">{n.icon}</span>
+                    <span className="admin-link__icon"><Icon name={n.icon} /></span>
                     <span>{n.label}</span>
                     {n.label === 'Inbox' && unread > 0 && (
                       <span className="ml-auto rounded-full bg-accent px-2 py-0.5 text-[10px] font-bold text-accent-ink">{unread}</span>
@@ -179,7 +190,7 @@ export default function AdminShell({ children }) {
                     aria-label={`${n.label} - not in your plan`}
                     onClick={() => window.dispatchEvent(new CustomEvent('yoyo:upgrade', { detail: { feature: n.feature } }))}
                   >
-                    <span className="admin-link__icon">{n.icon}</span>
+                    <span className="admin-link__icon"><Icon name={n.icon} /></span>
                     <span>{n.label}</span>
                     <span className="ml-auto text-xs" aria-hidden="true">🔒</span>
                   </button>
@@ -190,11 +201,14 @@ export default function AdminShell({ children }) {
         </nav>
 
         <div className="admin-userbox">
-          <div className="min-w-0">
-            <div className="truncate text-sm text-body">{user?.full_name}</div>
-            <div className="text-xs uppercase tracking-wide text-accent">{user?.role}</div>
+          <span className="admin-avatar" aria-hidden="true">{initials(user?.full_name)}</span>
+          <div className="min-w-0 flex-1">
+            <div className="truncate text-sm font-semibold text-body">{user?.full_name}</div>
+            <div className="text-xs capitalize text-muted">{user?.role}</div>
           </div>
-          <button onClick={handleLogout} className="btn-outline px-3 py-1.5 text-xs">Logout</button>
+          <button onClick={handleLogout} className="admin-iconbtn" aria-label="Log out" title="Log out">
+            <Icon name="logout" />
+          </button>
         </div>
       </aside>
 

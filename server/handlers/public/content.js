@@ -59,6 +59,8 @@ export default async function handler(req, res) {
         // The gym's home in the app (CLAUDE.md §38.1 Q4): what the owner chose
         // to show its members. All of it is what a gym shows the public.
         cover_url: profile.cover_url || null,
+        // The tall background poster behind the gym's member screens (§39.1 Q3).
+        poster_url: profile.poster_url || null,
         notice: profile.notice || null,
         operating_hours: profile.operating_hours || null,
         phone: profile.phone || null,

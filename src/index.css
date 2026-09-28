@@ -36,6 +36,9 @@ body {
   background-repeat: no-repeat, no-repeat, repeat, no-repeat;
   background-size: cover, cover, 300px 300px, cover;
   background-attachment: fixed;
+  /* Its own stacking context, so a gym's poster (GymBackdrop, z-index -10)
+     is painted ABOVE this background and below the page (CLAUDE.md §39.1). */
+  isolation: isolate;
 }
 
 /* ===== Thin accent scrollbar ===== */
@@ -90,30 +93,25 @@ textarea:focus-visible,
 /* "Dark Power Athletic Corporate" component system — sharp, purposeful. */
 @layer components {
   .btn-primary {
-    @apply inline-flex items-center justify-center rounded-[4px] bg-accent px-6 py-3
-      font-heading text-base font-semibold uppercase tracking-[0.14em] text-accent-ink
-      transition-transform duration-75 hover:brightness-110 active:scale-[0.96]
-      disabled:opacity-50;
+    @apply inline-flex items-center justify-center gap-2 rounded-full bg-accent px-6 py-3
+      font-body text-sm font-bold uppercase tracking-[0.08em] text-accent-ink
+      shadow-[0_8px_24px_rgb(var(--accent-rgb)/0.18)] transition duration-100
+      hover:brightness-110 active:scale-[0.97] disabled:opacity-50;
   }
   .btn-outline {
-    @apply inline-flex items-center justify-center rounded-[4px] border border-accent
-      px-6 py-3 font-heading text-base font-semibold uppercase tracking-[0.14em]
-      text-accent transition-transform duration-75 hover:bg-accent-soft active:scale-[0.96]
+    @apply inline-flex items-center justify-center gap-2 rounded-full border border-white/15
+      px-6 py-3 font-body text-sm font-bold uppercase tracking-[0.08em] text-body
+      transition duration-100 hover:border-accent/60 hover:bg-white/[0.04] active:scale-[0.97]
       disabled:opacity-50;
   }
   .field {
-    @apply w-full rounded-[4px] border border-white/10 bg-elevated px-4 py-3 text-body
-      placeholder-muted outline-none transition focus:border-accent;
+    @apply w-full rounded-xl border border-white/10 bg-elevated/80 px-4 py-3 text-body
+      placeholder-muted outline-none transition focus:border-accent focus:ring-2 focus:ring-accent/20;
   }
-  /* Surface card with a thin signature accent top stripe (racing accent). */
+  /* A surface card: soft edge, faint top light, gentle depth (CLAUDE.md §39.1 Q4). */
   .card {
-    @apply relative rounded-[6px] border border-white/[0.06] bg-surface p-6;
-  }
-  .card::before {
-    content: '';
-    @apply pointer-events-none absolute inset-x-0 top-0 h-[2px] rounded-t-[6px];
-    background: linear-gradient(90deg, var(--accent) 0%, transparent 55%);
-    opacity: 0.55;
+    @apply relative rounded-2xl border border-white/[0.07] bg-surface p-6;
+    background-image: linear-gradient(180deg, rgb(255 255 255 / 0.025), transparent 40%);
   }
 }
 
@@ -365,12 +363,34 @@ textarea:focus-visible,
   box-shadow: 0 30px 60px rgba(0, 0, 0, 0.6);
 }
 .admin-brand {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  padding: 20px 20px 16px;
+  position: relative;
+  overflow: hidden;
+  padding: 20px;
   border-bottom: 1px solid rgba(255, 255, 255, 0.06);
 }
+/* The gym's poster behind its name, darkened so the name reads (§39.1 Q4). */
+.admin-brand.has-poster { padding-top: 64px; }
+.admin-brand__poster { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.admin-brand.has-poster::after {
+  content: ''; position: absolute; inset: 0;
+  background: linear-gradient(180deg, rgba(10, 17, 21, 0.25) 0%, rgba(10, 17, 21, 0.92) 78%);
+}
+.admin-brand__body { position: relative; z-index: 1; display: flex; flex-direction: column; gap: 6px; }
+.admin-brand__name { font-size: 20px; font-weight: 800; line-height: 1.15; color: #fff; letter-spacing: 0.01em; }
+
+.admin-avatar {
+  flex: none; width: 36px; height: 36px; border-radius: 12px;
+  display: inline-flex; align-items: center; justify-content: center;
+  background: rgb(var(--accent-rgb) / 0.16); color: var(--accent);
+  font-size: 13px; font-weight: 800;
+}
+.admin-avatar--sm { width: 32px; height: 32px; border-radius: 10px; font-size: 12px; }
+.admin-iconbtn {
+  flex: none; width: 36px; height: 36px; border-radius: 10px;
+  display: inline-flex; align-items: center; justify-content: center;
+  color: #8a8580; transition: background 120ms ease, color 120ms ease;
+}
+.admin-iconbtn:hover { background: rgba(255, 255, 255, 0.06); color: #f0ede8; }
 .admin-nav {
   flex: 1;
   overflow-y: auto;
@@ -400,6 +420,7 @@ textarea:focus-visible,
 .admin-link.is-active {
   background: rgb(var(--accent-rgb) / 0.12);
   color: #ffffff;
+  font-weight: 600;
   border-left-color: var(--accent);
 }
 .admin-link__icon {
@@ -407,10 +428,11 @@ textarea:focus-visible,
   align-items: center;
   justify-content: center;
   width: 20px;
-  font-size: 13px;
-  color: var(--accent);
-  opacity: 0.9;
+  color: #8a8580;
+  transition: color 120ms ease;
 }
+.admin-link:hover .admin-link__icon { color: #f0ede8; }
+.admin-link.is-active .admin-link__icon { color: var(--accent); }
 .admin-userbox {
   display: flex;
   align-items: center;
@@ -440,5 +462,24 @@ textarea:focus-visible,
 
 /* Corporate depth for admin cards */
 .admin .card {
-  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.02), 0 10px 30px rgba(0, 0, 0, 0.25);
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.03) inset, 0 12px 32px rgba(0, 0, 0, 0.28);
 }
+/* Calmer page headings in the admin: strong, not shouted (§39.1 Q4). */
+.admin h1 { letter-spacing: 0.02em; }
+.admin h2 { letter-spacing: 0.06em; }
+.admin-content main, .admin-content > div { max-width: 1280px; }
+
+/* Tables: a quiet header, roomy rows, a hover that shows which row you are on. */
+.admin table thead th { font-size: 11px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: #8a8580; }
+.admin table tbody tr { transition: background 120ms ease; }
+.admin table tbody tr:hover { background: rgba(255, 255, 255, 0.025); }
+
+/* A status, as a label: green is fine, amber needs a look, red needs action. */
+.pill { display: inline-flex; align-items: center; gap: 6px; padding: 3px 10px; border-radius: 999px;
+        font-size: 12px; font-weight: 700; text-transform: capitalize; white-space: nowrap; }
+.pill::before { content: ''; width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+.pill--good { background: rgba(0, 200, 81, 0.12); color: #3ddc84; }
+.pill--warn { background: rgba(255, 140, 0, 0.13); color: #ffae42; }
+.pill--bad { background: rgba(255, 90, 78, 0.13); color: #ff6b5e; }
+.pill--info { background: rgba(96, 165, 250, 0.13); color: #7cb4ff; }
+.pill--muted { background: rgba(255, 255, 255, 0.06); color: #a8a29e; }

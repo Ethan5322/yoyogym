@@ -5,6 +5,7 @@ import { useParams } from 'react-router-dom';
 import { gymHeaders } from '../lib/gym.js';
 import GymIcon from '../components/GymIcon.jsx';
 import { useBranding } from '../lib/branding.js';
+import GymBackdrop from '../components/GymBackdrop.jsx';
 
 export default function PublicProfile() {
   const { type, key } = useParams(); // type: 'm' | 't' | 's'
@@ -28,7 +29,8 @@ export default function PublicProfile() {
   }, [type, key]);
 
   return (
-    <div className="flex min-h-[100dvh] flex-col items-center justify-center bg-bg px-6 text-center">
+    <div className="flex min-h-[100dvh] flex-col items-center justify-center px-6 text-center">
+      <GymBackdrop />
       <div className="w-full max-w-sm animate-fade-up">
         <div className="mb-6 flex flex-col items-center gap-3">
           <GymIcon size={64} />

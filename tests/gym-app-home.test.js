@@ -131,3 +131,20 @@ test('AN OWNER REOPENS INTO THEIR GYM\'S ADMIN PANEL, WITH THE WAY BACK (Q3)', (
   assert.match(app, /else if \(role === 'owner'\) \{\s*var admin = myGym\(ADMIN_MINE\);\s*if \(admin\) goAdmin\(admin\.slug\);/);
   assert.match(app, /go\(adminPath\(slug\) \+ '\?app=1&back=' \+ encodeURIComponent\(appHome\(\)\)\)/);
 });
+
+test("THE GYM'S POSTER IS BEHIND THE APP'S MEMBER SCREENS (§39.1 Q4)", async () => {
+  const poster = 'https://x.supabase.co/storage/v1/object/public/gym-branding/kom/poster-1.jpg';
+  const { doc } = boot({ storage: SIGNED_IN_AT_KOM, brand: { ...BRAND, poster_url: poster } });
+  await tick();
+  const member = doc.getElementById('member');
+  assert.ok(member.classList.contains('has-poster'));
+  assert.equal(member.style.getPropertyValue('--m-poster'), `url("${poster}")`);
+});
+
+test("a poster that is not a plain https picture is never put into the page's style", async () => {
+  const { doc } = boot({ storage: SIGNED_IN_AT_KOM, brand: { ...BRAND, poster_url: 'https://x/a") ; background: url(evil' } });
+  await tick();
+  const member = doc.getElementById('member');
+  assert.ok(!member.classList.contains('has-poster'));
+  assert.equal(member.style.getPropertyValue('--m-poster'), '');
+});

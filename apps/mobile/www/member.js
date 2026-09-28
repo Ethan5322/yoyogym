@@ -182,6 +182,13 @@
       email: text(b.email),
       address: text(b.address),
     };
+
+    // The gym's POSTER behind every member screen (CLAUDE.md §39.1 Q3, Q4) —
+    // a CSS value, so only a plain https URL with no quotes or brackets.
+    var poster = typeof b.poster_url === 'string' && /^https:\/\/[^\s"'<>()\\]+$/.test(b.poster_url) ? b.poster_url : '';
+    if (poster) root.style.setProperty('--m-poster', 'url("' + poster + '")');
+    else root.style.removeProperty('--m-poster');
+    root.classList.toggle('has-poster', Boolean(poster));
   }
 
   /**

@@ -6,7 +6,7 @@ import { apiFetch } from '../../lib/api.js';
 import { exportCsv } from '../../lib/csv.js';
 import { parseMembersCsv } from '../../lib/csv.js';
 import { useToast } from '../../lib/toast.jsx';
-import { SkeletonRows } from '../../components/ui.jsx';
+import { SkeletonRows, StatusPill } from '../../components/ui.jsx';
 
 const STATUSES = ['', 'new', 'active', 'lapsed', 'suspended'];
 const TIERS = [['', 'All tiers'], ['basic', 'Basic'], ['standard', 'Standard'], ['premium', 'Premium'], ['vip', 'VIP']];
@@ -191,7 +191,7 @@ export default function MembersList() {
                 <td className="px-4 py-2 text-muted">{m.membership_number}</td>
                 <td className="px-4 py-2 hidden text-muted sm:table-cell">{m.phone}</td>
                 <td className="px-4 py-2">
-                  <span className="text-accent">{m.status}</span>
+                  <StatusPill status={m.status} />
                 </td>
               </tr>
             ))}

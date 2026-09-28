@@ -7,6 +7,7 @@ import ChatWindow from '../chatbot/ChatWindow.jsx';
 import SuccessScreen from '../chatbot/components/SuccessScreen.jsx';
 import { apiFetch } from '../lib/api.js';
 import { logQrScan } from '../lib/scan.js';
+import GymBackdrop from '../components/GymBackdrop.jsx';
 
 export default function Register({ manual = false }) {
   const [status, setStatus] = useState('idle'); // idle | saving | done | error
@@ -58,5 +59,12 @@ export default function Register({ manual = false }) {
     completeView = <SuccessScreen result={result} />;
   }
 
-  return <ChatWindow engine={engine} completeView={completeView} />;
+  // The gym's poster behind registration (CLAUDE.md §39.1 Q4). Outside the
+  // chat window: its frosted glass would otherwise hold the poster inside it.
+  return (
+    <>
+      <GymBackdrop />
+      <ChatWindow engine={engine} completeView={completeView} />
+    </>
+  );
 }

@@ -121,6 +121,9 @@
 
       /* ---- 1. The first screen ---- */
       .y-landing { min-height: 100vh; min-height: 100dvh; display: flex; flex-direction: column; }
+      /* On a tablet the photo would be stretched far past its 941 px: the
+         landing stays phone-width, centred (§39.1 Q2). */
+      @media (min-width: 560px) { .y-landing { max-width: 520px; margin: 0 auto; } }
       .y-hero {
         position: relative; flex: none; overflow: hidden;
         padding-top: calc(12px + var(--y-top)); /* the logo is not flush with the top */
@@ -335,6 +338,20 @@
       /* The gym's own home (CLAUDE.md §38.1): cover, icon and name; its notice;
          its hours and one-tap contact. */
       #member.m-on-home .m-top { display: none; }
+
+      /* The gym's poster behind every member screen (§39.1 Q3, Q4): fixed,
+         softly blurred and darkened so every word stays readable. Painted
+         between #member's own ground and its content (isolation + z-index -1). */
+      #member { isolation: isolate; }
+      #member.has-poster::before {
+        content: ''; position: fixed; inset: -8px; z-index: -1; pointer-events: none;
+        background:
+          linear-gradient(180deg, rgba(14, 20, 22, 0.70) 0%, rgba(14, 20, 22, 0.86) 55%, rgba(14, 20, 22, 0.96) 100%),
+          var(--m-poster) center / cover no-repeat;
+        filter: blur(2px);
+      }
+      #member.has-poster .m-card { background: rgba(23, 32, 36, 0.86); backdrop-filter: blur(6px); }
+      #member.has-poster .m-top { background: linear-gradient(rgba(14, 20, 22, 0.9) 70%, transparent); }
       .m-gymhero { position: relative; margin: 0 -24px 8px; padding: max(24px, env(safe-area-inset-top)) 24px 16px; }
       .m-gymhero.has-cover { min-height: 220px; display: flex; align-items: flex-end; overflow: hidden; }
       .m-gymhero__img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }

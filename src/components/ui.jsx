@@ -2,6 +2,7 @@
 // loading skeletons, empty-states with a call-to-action, and a KPI stat card
 // with period-over-period trend deltas.
 import { Link } from 'react-router-dom';
+import Icon from './Icon.jsx';
 
 /** Animated placeholder block shown while data loads (replaces "Loading…"). */
 export function Skeleton({ className = '' }) {
@@ -59,7 +60,22 @@ export function EmptyState({ icon = '∅', title, hint, actionLabel, actionTo, o
  * `delta` is the raw change vs the previous period; `deltaGood` flips the
  * colour semantics for metrics where "down is good" (e.g. churn).
  */
-export function StatCard({ label, value, to, delta, deltaGood = true }) {
+/**
+ * A member's (or anything's) status as a coloured label: green is fine, amber
+ * needs a look, red needs action (CLAUDE.md §39.1 Q4). Every status used to
+ * print in the accent colour, so a healthy "active" looked like an error.
+ */
+const STATUS_TONE = {
+  active: 'good', paid: 'good', completed: 'good', present: 'good', approved: 'good', resolved: 'good',
+  expiring: 'warn', pending: 'warn', new: 'info', trial: 'info', frozen: 'muted', inactive: 'muted',
+  lapsed: 'muted', expired: 'bad', suspended: 'bad', cancelled: 'bad', failed: 'bad', overdue: 'bad', rejected: 'bad',
+};
+export function StatusPill({ status, children }) {
+  const s = String(status || '').toLowerCase();
+  return <span className={`pill pill--${STATUS_TONE[s] || 'muted'}`}>{children ?? (s.replace(/_/g, ' ') || '—')}</span>;
+}
+
+export function StatCard({ label, value, to, delta, deltaGood = true, icon, hero = false }) {
   const hasDelta = delta !== undefined && delta !== null && !Number.isNaN(delta);
   const up = Number(delta) > 0;
   const flat = Number(delta) === 0;
@@ -69,14 +85,20 @@ export function StatCard({ label, value, to, delta, deltaGood = true }) {
 
   const inner = (
     <>
-      <div className="flex items-center justify-between text-sm text-muted">
-        <span>{label}</span>
-        {to && <span className="text-accent opacity-0 transition group-hover:opacity-100">→</span>}
+      <div className="flex items-start justify-between gap-3">
+        <span className="text-[13px] font-medium leading-snug text-muted">{label}</span>
+        {icon && (
+          <span className="inline-flex h-9 w-9 flex-none items-center justify-center rounded-xl bg-accent/10 text-accent">
+            <Icon name={icon} size={18} />
+          </span>
+        )}
       </div>
-      <div className="mt-2 font-display text-3xl text-body">{value}</div>
+      <div className={`mt-3 font-body font-extrabold tabular-nums tracking-tight text-body ${hero ? 'text-[26px] leading-tight sm:text-3xl xl:text-4xl' : 'text-2xl leading-none sm:text-[28px]'} break-words`}>
+        {value}
+      </div>
       {hasDelta && (
-        <div className={`mt-1 text-xs font-medium ${deltaCls}`}>
-          {arrow} {Math.abs(Number(delta)).toLocaleString('en-ZA')} <span className="text-muted">vs last period</span>
+        <div className={`mt-2 text-xs font-semibold ${deltaCls}`}>
+          {arrow} {Math.abs(Number(delta)).toLocaleString('en-ZA')} <span className="font-medium text-muted">vs last month</span>
         </div>
       )}
     </>
@@ -84,8 +106,8 @@ export function StatCard({ label, value, to, delta, deltaGood = true }) {
 
   if (to) {
     return (
-      <Link to={to} className="card group transition hover:border-accent/40 hover:bg-surface">{inner}</Link>
+      <Link to={to} className="card group !p-5 transition hover:-translate-y-0.5 hover:border-accent/40">{inner}</Link>
     );
   }
-  return <div className="card">{inner}</div>;
+  return <div className="card !p-5">{inner}</div>;
 }

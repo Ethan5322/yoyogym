@@ -2225,7 +2225,22 @@ export function welcomePage() {
   .land-small { text-align: center; font-size: 14px; }
   .land-small a, .land-foot a { color: var(--muted); }
   .land-foot { margin-top: 32px; text-align: center; }
+
+  /* A computer: the photograph in a phone-width panel beside the choices, never
+     shown larger than it really is (941 px wide — §39.1 Q2), so it stays sharp. */
+  @media (min-width: 900px) {
+    body.landing main { max-width: 1200px; padding: 48px 32px; }
+    .land { display: grid; grid-template-columns: 440px 1fr; gap: 56px; align-items: center; min-height: calc(100vh - 96px); }
+    .land-grid { grid-template-columns: 1fr 1fr; }
+    .land-hero { height: auto; min-height: 0; aspect-ratio: 941 / 956; border-radius: 28px;
+                 box-shadow: 0 30px 80px rgba(0,0,0,.55), 0 0 0 1px rgba(255,255,255,.06); }
+    .land-hero::after { height: 30%; }
+    .land-body { margin-top: 0; padding: 0; text-align: left; }
+    .land-lede { margin: 0 0 32px; }
+    .land-foot { text-align: left; }
+  }
 </style>
+<div class="land">
 <div class="land-hero"><img src="/brand/landing-hero.jpg" width="941" height="956"
   alt="Yoyo Gyms — lift, train, transform. A member training with a dumbbell."></div>
 <div class="land-body">
@@ -2249,6 +2264,7 @@ export function welcomePage() {
   </div>
 
   <p class="muted land-foot"><a href="/platform/privacy">Privacy policy</a> · <a href="/platform/delete-account">Delete your account</a> · <a href="/platform/login">Yoyo staff sign in</a></p>
+</div>
 </div>`,
   });
 }
