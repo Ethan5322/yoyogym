@@ -55,5 +55,6 @@
   ],
   "defaultServer": "https://yoyogym.vercel.app",
   "adminHost": "",
-  "supportContact": "MuleSoo Digital Solutions"
+  "supportContact": "MuleSoo Digital Solutions",
+  "supportEmail": "hello@mulesoo.com"
 }

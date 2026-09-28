@@ -15,6 +15,40 @@ occurrence is answered from notes rather than rediscovered.
 
 ---
 
+## 2026-09-28 — The app's first screen, redesigned (D-156)
+
+The user gave a written design for the app's landing screen and the paths from it, plus their own
+images: a finished mockup (photo + logo + text + buttons) and the logo alone. It was added to
+`CLAUDE.md` as §36, word for word, then checked against the code; eleven contradictions and gaps
+were answered one at a time (§36.1).
+
+**Images.** Only the photograph (with the user's logo on it) was cut from the mockup: its drawn
+status bar, headline and buttons are rebuilt as real, tappable elements. A small brand-like white
+mark on the shorts was painted out ("no visible third-party logos"). The logo was made transparent
+in two colourings: navy turned white for dark screens (`logo-on-dark.png`), and the original colours.
+All bundled in the app, so the first screen works with no signal.
+
+**Built.** The first screen, Welcome Member, Welcome to [Gym], Join [Gym], Welcome Gym Owner,
+Bring your gym to Yoyo, Gym owner login (the gym's own admin sign-in) and Help, in
+`apps/mobile/www/`. A back stack, so Back returns where the person came from. The website's
+sign-in restyled, with `?as=owner` so an owner is not shown "Platform administrator login".
+
+**Found while building.**
+- The staff panel cannot be linked from the app today: it shares the member host, and Capacitor
+  keeps any allowed host INSIDE the app. `adminHost` (already in `shell.config.json`, never used)
+  is how it will leave for the browser once a domain exists.
+- My new default button colour leaked into the member area and put dark text on the gym's red.
+  Fixed by giving `#member` back the gym's accent and white text, without touching member rules.
+- **Local `node_modules` had lost packages** (bcryptjs, supabase-js, vite plugin, face-api…), so
+  every platform test failed to import. Not a code fault: `npm ci` restored them from the lock file.
+  If tests suddenly fail with `ERR_MODULE_NOT_FOUND`, check `npm ls --depth=0` for UNMET first.
+
+**Verified.** 860 tests pass. Every screen screenshotted at 390×844 (and 667 tall) through Chrome's
+DevTools protocol; full-window headless Chrome cannot go below ~500px wide, so its screenshots of a
+phone layout are misleading.
+
+---
+
 ## 2026-09-24 — Preview testing by the user: sign-in, registration, the owner journey, faces
 
 The user tested the preview and hit these problems:

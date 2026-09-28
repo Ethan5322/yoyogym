@@ -1392,3 +1392,428 @@ LAST UPDATED: 2026-09-22
 ```
 
 Claude updates this block when a gate is passed, and only after the user has approved the pass.
+
+---
+
+## 36. App landing screen — user instruction (2026-09-28)
+
+> Added by the user's instruction on 2026-09-28. The text below is the user's own, word for word;
+> only the heading levels were lowered so it sits inside this file's numbering. Where it conflicts
+> with the repository or with an earlier decision, the user answers the question one at a time and
+> the answer is recorded in §36.1 — **§36.1 wins over the text above it**. The `mobile-app-ui-design`
+> skill (§2) applies to this work.
+
+### Yoyo App Landing Screen
+
+When a person opens the **Yoyo app**, the first screen should feel like a premium fitness platform—not like an admin dashboard or a confusing registration form.
+
+The app should immediately explain that Yoyo connects people to their gym, then give them two clear choices:
+
+- **I’m a Member**
+- **I’m a Gym Owner**
+
+Use a modern dark fitness style with strong photography, clean spacing, high contrast, and one bright accent color. Professional fitness apps commonly use a visual welcome screen followed by clear sign-in or registration choices.
+
+#### First screen layout
+
+##### Top area
+
+Place the Yoyo logo at the top center or upper left.
+
+Logo concept:
+
+```text
+YOYO
+GYMS
+```
+
+Use a clean geometric wordmark. The logo should be simple enough to recognize as an app icon.
+
+Add a small location or language control in the top-right corner if needed, but do not overcrowd the screen.
+
+##### Main visual
+
+Use a large, high-quality photograph showing:
+
+- A confident gym member training.
+- Modern gym equipment.
+- Clean dark background.
+- Strong directional lighting.
+- A feeling of energy, discipline, and progress.
+- No visible brand logos from another company.
+- No excessive bodybuilder posing.
+- A realistic, inclusive fitness environment.
+
+The image should occupy approximately the upper half of the screen.
+
+##### Main message
+
+Place this text below or partly over the image:
+
+```text
+YOUR GYM.
+YOUR JOURNEY.
+```
+
+Supporting text:
+
+```text
+Connect to your gym, manage your membership,
+and stay committed to your goals.
+```
+
+##### Main buttons
+
+Use two large buttons:
+
+```text
+I’M A MEMBER
+```
+
+and:
+
+```text
+I’M A GYM OWNER
+```
+
+The member button should be the primary bright accent button.
+
+The owner button should be a dark or outlined secondary button.
+
+##### Smaller link
+
+At the bottom:
+
+```text
+Already have an account? Sign in
+```
+
+However, because member and owner login are different, a better first-screen structure is:
+
+```text
+I’M A MEMBER
+I’M A GYM OWNER
+```
+
+The next screen then provides the correct login or registration choices.
+
+#### Recommended first screen
+
+```text
+┌──────────────────────────────┐
+│          YOYO GYMS            │
+│                              │
+│     [large gym photograph]    │
+│                              │
+│       YOUR GYM.               │
+│       YOUR JOURNEY.           │
+│                              │
+│ Connect to your gym, manage   │
+│ your membership, and grow.   │
+│                              │
+│       [ I'M A MEMBER ]        │
+│                              │
+│      [ I'M A GYM OWNER ]      │
+│                              │
+│       Privacy   Help          │
+└──────────────────────────────┘
+```
+
+#### Member path
+
+When the person taps **I’M A MEMBER**, show:
+
+```text
+Welcome, Member
+```
+
+Then provide:
+
+```text
+Find my gym
+Scan gym QR code
+I already know my gym
+```
+
+The member must identify the gym before login or registration.
+
+After selecting the gym, show:
+
+```text
+Welcome to [Gym Name]
+
+[ New member registration ]
+[ Existing member login ]
+```
+
+This is important because the member belongs to a specific gym.
+
+##### New member screen
+
+```text
+Join [Gym Name]
+
+Create your membership and get started.
+
+[ Start registration ]
+
+Already a member?
+[ Sign in instead ]
+```
+
+##### Existing member screen
+
+```text
+Sign in to [Gym Name]
+
+Membership number
+[________________]
+
+Phone number
+[________________]
+
+[ Sign in ]
+
+[ Scan gym QR code ]
+[ Need help? ]
+```
+
+The current Yoyo Gym member login uses membership number and phone number, so the visual design should not show email and password as the primary existing login unless the authentication system is later changed.
+
+#### Gym-owner path
+
+When the person taps **I’M A GYM OWNER**, show:
+
+```text
+Welcome, Gym Owner
+```
+
+Then provide:
+
+```text
+Apply to join Yoyo Gyms
+Owner login
+Check application status
+```
+
+##### Owner application screen
+
+```text
+Bring your gym to Yoyo
+
+Manage members, payments, attendance,
+trainers, classes, and daily gym operations.
+
+[ Apply as a gym owner ]
+```
+
+The application process may then request:
+
+- Owner name.
+- Email.
+- Phone number.
+- Gym name.
+- Gym address.
+- Business information.
+- Required verification documents.
+
+##### Owner login screen
+
+```text
+Gym owner login
+
+Email or username
+[________________]
+
+Password
+[________________]
+
+[ Sign in ]
+
+Forgot password?
+[ Apply as a gym owner ]
+```
+
+The owner login should lead to the owner’s individual **Yoyo Gym admin panel**, not directly to the main Yoyo platform admin panel.
+
+#### Main admin panel access
+
+The main platform admin panel is a **website**, not the normal first screen of the mobile app.
+
+It should be accessed through a separate address such as:
+
+```text
+admin.yoyogyms.com
+```
+
+or:
+
+```text
+platform.yoyogyms.com
+```
+
+Only Yoyo platform administrators should use it.
+
+The first mobile app screen should not prominently display:
+
+```text
+Main Admin Login
+```
+
+If needed, add it discreetly under:
+
+```text
+Help
+```
+
+or:
+
+```text
+Staff access
+```
+
+The platform admin website should have its own professional login screen:
+
+```text
+Yoyo Gyms Platform
+
+Platform administrator login
+
+Email
+[________________]
+
+Password
+[________________]
+
+[ Sign in ]
+
+Forgot password?
+```
+
+#### Visual design direction
+
+Use:
+
+- Dark charcoal or near-black background.
+- White typography.
+- One bright lime, electric green, orange, or blue accent.
+- Large rounded buttons.
+- Rounded cards.
+- High-quality realistic gym photography.
+- Subtle gradients.
+- Minimal icons.
+- Strong visual hierarchy.
+- Generous spacing.
+- Large readable text.
+- Accessible contrast.
+
+Avoid:
+
+- Too many buttons on the first screen.
+- Multiple unrelated login forms.
+- Showing gym-owner tools to members.
+- Showing platform-admin controls in the mobile app.
+- Generic stock-photo appearance.
+- Excessive neon effects.
+- Tiny text.
+- A crowded dashboard on the landing page.
+
+#### Image-generation prompt
+
+Use this prompt to generate the visual concept:
+
+```text
+Create a premium mobile app landing-screen design for “YOYO GYMS,” a modern gym membership platform for Android and iPhone.
+
+Show a single polished smartphone screen in a professional product-design presentation. The screen has a dark charcoal and black background with subtle gradients, crisp white typography, and a refined electric-lime accent color.
+
+At the top, display the clean modern wordmark “YOYO GYMS.” The upper half of the screen features a high-quality realistic photograph of a confident adult gym member training in a modern, well-lit fitness facility, with black gym equipment, dramatic directional lighting, and an energetic but premium atmosphere. The image should feel authentic, inclusive, and professional, with no visible third-party logos.
+
+Below the image, display the exact headline:
+“YOUR GYM. YOUR JOURNEY.”
+
+Add the supporting text:
+“Connect to your gym, manage your membership, and stay committed to your goals.”
+
+At the bottom, include two large rounded call-to-action buttons with excellent spacing:
+“I’M A MEMBER”
+“I’M A GYM OWNER”
+
+The member button is filled with electric lime and dark text. The gym-owner button is outlined in white with a transparent dark interior. Add small, subtle “Privacy” and “Help” links at the bottom.
+
+Design the screen as a real production-ready mobile interface, not a poster. Use a vertical 9:16 smartphone composition, modern UX layout, realistic mobile spacing, accessible typography, premium fitness-brand art direction, and perfectly readable text.
+```
+
+#### Important text accuracy
+
+Tell the image generator to render these exact words:
+
+```text
+YOYO GYMS
+YOUR GYM. YOUR JOURNEY.
+Connect to your gym, manage your membership, and stay committed to your goals.
+I’M A MEMBER
+I’M A GYM OWNER
+Privacy
+Help
+```
+
+AI image generators can sometimes distort interface text. For the final app design, use the generated image for visual direction, then recreate the screen in Figma or the application itself with real text and buttons.
+
+### 36.1 Clarifications — answered by the user, one at a time
+
+Found by checking §36 against the repository on 2026-09-28. Each answer is recorded here as it is
+given. Nothing in §36 is built until these are answered.
+
+- **Already true in the code, no question needed:** the member picks the gym before signing in or
+  registering (D-041); member sign-in is membership number + phone (§9) and stays so; "Start
+  registration" opens the gym's existing registration flow unchanged (§10); an applicant sets a
+  password when applying, so "Check application status" can be the owner signing in and seeing the
+  status on their own page (`/platform/my-gym` already shows it).
+- **Q1 — "Delete your account" (store requirement, §19).** The first screen's bottom row stays
+  "Privacy · Help" exactly as designed. **Help** opens a small screen that includes "Delete your
+  account", so it stays reachable inside the app.
+- **Q2 — who the app is for, and where owner login goes.** In the user's words: the app is for
+  **tenant gym owners** (their own gym's admin panel, or register as a gym owner) and **gym
+  members** (register, or sign in at the gym they already belong to). The **main Yoyo Gyms admin
+  panel has nothing to do with the app — it is website only.** In the app, owner login = pick the
+  gym, then that gym's **existing admin login** (username + password, §8), unchanged. **Owner and
+  all staff** (manager, reception, trainer) use this same door; each sees only what their role
+  allows today. "Check application status" stays on the Yoyo account (email + password chosen when
+  applying), because an applicant has no gym to sign in to yet.
+- **Q3 — accent colour.** **Electric lime**, with dark text on lime buttons, replacing today's red
+  on the Yoyo screens. Once a member is inside their gym, the member area keeps **that gym's own
+  colour**, as today.
+- **Q4 — the photograph.** The user generates it with the §36 image prompt and supplies the file.
+  Claude crops it for the top half, compresses it for phones, fades it into the dark background,
+  and **bundles it inside the app** so the first screen works with no signal. Until the file
+  arrives, a dark placeholder stands in.
+- **Q5 — "I already know my gym".** It **opens the gym saved on this phone**, by name (e.g.
+  "Continue to KOM"), in one tap. With no saved gym it is hidden and only "Find my gym" and "Scan
+  gym QR code" show. "Find my gym" keeps what it has today: search by name, "Use my location", and
+  the "I don't remember which gym I joined" recovery (D-041).
+- **Q6 — the scan button on "Sign in to [Gym Name]".** It becomes **"Scan my membership card"**.
+  Scanning the member ID card's QR **fills in the membership number only**. It never signs anyone
+  in; the member still enters their phone number (§14: a member-ID QR must not authenticate).
+- **Q7 — the Help screen** holds all four: **contact Yoyo support**; **common questions** (forgot
+  my membership number, my gym isn't listed, how do I cancel — each pointing to the member's gym,
+  which owns the member's data); **Privacy policy + Delete your account** (Q1); and a small,
+  discreet **Yoyo staff access** link to the main admin *website*. That link only leaves the app;
+  no platform-admin control is ever shown inside the app (Q2). **Support contact:
+  `hello@mulesoo.com`.**
+- **Q8 — the main admin website login** is restyled to the §36 design ("Yoyo Gyms Platform —
+  Platform administrator login", Email, Password, Forgot password?) and **keeps the 6-digit
+  authenticator code** for Yoyo staff (Stage 5 requirement unchanged).
+- **Q9 — the admin website address.** No domain is owned yet. It stays on the current Vercel
+  address at `/platform/login`. `admin.yoyogyms.com` / `platform.yoyogyms.com` are future names;
+  moving later is a Vercel domain setting plus one app config line, not a rebuild.
+- **Q10 — language / location control.** **Not now.** The top of the first screen shows only the
+  wordmark. A language switch is added when a second language actually exists.
+- **Q11 — the images (2026-09-28).** The user supplies **two** files: the landing photograph with
+  the Yoyo logo **already on it**, and the **logo on its own**. **Never add a second logo or
+  wordmark over the photograph.** The standalone logo is used where there is no photo (other
+  screens, app icon source). Building was approved the same day.
+
+All clarifications answered 2026-09-28. The build is the app's Yoyo screens
+(`apps/mobile/www/`) plus the restyled admin-website login. Every gym's own screens, the member
+login, registration, and the gym admin login are **not** changed (§32).

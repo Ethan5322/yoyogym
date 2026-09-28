@@ -4,4 +4,6 @@ window.YOYO_SHELL = Object.freeze({
   allowedHosts: Object.freeze(["yoyogym.vercel.app"]),
   defaultServer: "https://yoyogym.vercel.app",
   supportContact: "MuleSoo Digital Solutions",
+  supportEmail: "hello@mulesoo.com",
+  adminHost: "",
 });

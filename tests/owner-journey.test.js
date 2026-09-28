@@ -81,9 +81,18 @@ test('the front page leads to joining a gym and to listing one', async () => {
 });
 
 test('the sign-in page says who it is for, and points members to their gym', () => {
+  // CLAUDE.md §36.1 Q8: the Yoyo staff login by default; owners reach their
+  // own version of it from the app's "Check application status".
   const page = loginPage();
-  assert.match(page, /gym owners and Yoyo Gyms staff/i);
+  assert.match(page, /Platform administrator login/);
+  assert.match(page, /href="\/platform\/login\?as=owner"/);
   assert.match(page, /href="\/platform\/find"/);
+  assert.match(page, /name="totp"/, 'the 6-digit code stays');
+
+  const owner = loginPage({ audience: 'owner' });
+  assert.match(owner, /Gym owner account/);
+  assert.ok(!/Platform administrator/.test(owner), 'an owner is not told this is the admin login');
+  assert.match(owner, /name="as" value="owner"/, 'and keeps that heading after a wrong password');
 });
 
 test('a gym\'s own page keeps the gym in its Join and Sign-in links', () => {

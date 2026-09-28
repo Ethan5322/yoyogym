@@ -216,10 +216,14 @@ export async function handlePlatform(req, res, deps) {
 
   // ---- sign in -----------------------------------------------------------
   if (path === 'login') {
-    if (method === 'GET') return html(res, 200, loginPage({}));
+    // Which heading the page wears, and nothing else: login.js decides who
+    // may enter, whatever the page said.
+    const asOwner = (value) => (value === 'owner' ? 'owner' : 'staff');
+    if (method === 'GET') return html(res, 200, loginPage({ audience: asOwner(url.searchParams.get('as')) }));
 
     if (method === 'POST') {
       const form = await readFormBody(req);
+      const again = (error) => loginPage({ error, audience: asOwner(form.as) });
 
       // The decision is platform/login.js, shared with the app door so the two
       // cannot drift apart. Only the representation is decided here.
@@ -234,24 +238,23 @@ export async function handlePlatform(req, res, deps) {
         return html(
           res,
           200,
-          loginPage({
-            error:
-              'This account requires two-factor authentication before it can be used. ' +
-              'Ask a platform owner to finish setting up your authenticator app.',
-          })
+          again(
+            'This account requires two-factor authentication before it can be used. ' +
+              'Ask a platform owner to finish setting up your authenticator app.'
+          )
         );
       }
 
       if (outcome === 'locked') {
         await deps.audit({ action: 'platform.login.locked', actor_user_id: user.id, detail: { email: form.email } });
-        return html(res, 200, loginPage({ error: LOCKED }));
+        return html(res, 200, again(LOCKED));
       }
 
       if (outcome !== 'ok') {
         // Every failure takes the same path and says the same thing, so the
         // response cannot be used to discover which accounts exist.
         await deps.audit({ action: 'platform.login.failed', detail: { email: form.email } });
-        return html(res, 200, loginPage({ error: INVALID }));
+        return html(res, 200, again(INVALID));
       }
 
       await deps.audit({ action: 'platform.login', actor_user_id: user.id });

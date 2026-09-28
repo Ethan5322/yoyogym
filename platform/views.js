@@ -65,6 +65,24 @@ const STYLE = `
   .row { display:flex; gap:12px; flex-wrap:wrap; align-items:center; }
   ul.events { list-style:none; padding:0; margin:12px 0 0; }
   ul.events li { border-left:2px solid var(--line); padding:6px 0 6px 12px; margin-bottom:6px; }
+
+  /* The sign-in page (CLAUDE.md §36, §36.1 Q8): the Yoyo Gyms brand — near-
+     black, white type, electric lime — in both colour schemes. */
+  body.auth { --ink:#fff; --muted:rgba(255,255,255,.62); --line:rgba(255,255,255,.12);
+              --bg:#070c10; --accent:#bff642; min-height:100vh; display:grid; place-items:center; }
+  body.auth main { width:100%; max-width:440px; padding:48px 24px; }
+  body.auth a { color:#fff; }
+  .auth-logo { display:block; width:144px; height:auto; margin:0 auto 32px; }
+  body.auth form.card { max-width:none; margin:0; padding:32px 24px; gap:16px;
+                        background:#10181d; border-radius:24px; }
+  body.auth h1 { font-size:28px; line-height:1.15; text-align:center; margin:0; }
+  body.auth .auth-sub { text-align:center; margin:0 0 8px; }
+  body.auth input { padding:14px 16px; border-radius:14px; font-size:16px; background:#070c10; }
+  body.auth input:focus { outline:2px solid #bff642; outline-offset:1px; }
+  body.auth button { min-height:52px; border-radius:26px; color:#0b1400; font-weight:800; font-size:16px; }
+  body.auth .err { color:#ff6b5e; }
+  body.auth .auth-links { text-align:center; margin:0; }
+  body.auth .auth-foot { text-align:center; margin:24px 0 0; }
 `;
 
 /**
@@ -73,7 +91,7 @@ const STYLE = `
  * `body` is inserted as-is: it is markup the caller has already built and
  * escaped. `title` is escaped, because it can carry a gym name.
  */
-export function layout({ title = 'Yoyo Gyms', body = '', user = null, indexable = false }) {
+export function layout({ title = 'Yoyo Gyms', body = '', user = null, indexable = false, bare = false }) {
   // noindex is right for the staff panel and WRONG for the two public pages.
   // A signup page nobody can find is a signup page nobody uses, so `indexable`
   // is opt-in per page rather than a blanket rule.
@@ -87,7 +105,16 @@ export function layout({ title = 'Yoyo Gyms', body = '', user = null, indexable 
 <title>${h(title)} · Yoyo Gyms</title>
 <style>${STYLE}</style>
 </head>
-<body>
+${
+  // A sign-in page stands alone: no panel header, the brand instead.
+  bare
+    ? `<body class="auth">
+<main>
+${body}
+</main>
+</body>
+</html>`
+    : `<body>
 <header>
   <b>Yoyo Gyms</b>
   ${
@@ -111,18 +138,29 @@ export function layout({ title = 'Yoyo Gyms', body = '', user = null, indexable 
 ${body}
 </main>
 </body>
-</html>`;
+</html>`
+}`;
 }
 
-/** Sign-in. Password and the second factor together — 2FA is not optional here. */
-export function loginPage({ error = '' } = {}) {
+/**
+ * Sign-in. Password and the second factor together.
+ *
+ * ONE form, two audiences, because the server decides who is who (login.js).
+ * The Yoyo staff panel is the default (CLAUDE.md §36.1 Q8). A gym owner
+ * checking their application arrives from the app with `?as=owner` and is not
+ * told they are at the "platform administrator" login.
+ */
+export function loginPage({ error = '', audience = 'staff' } = {}) {
+  const owner = audience === 'owner';
   return layout({
-    title: 'Sign in',
+    title: owner ? 'Gym owner account' : 'Platform administrator login',
+    bare: true,
     body: `
+<img class="auth-logo" src="/brand/yoyo-gyms-logo-on-dark.png" width="720" height="531" alt="Yoyo Gyms">
 <form class="card" method="post" action="/platform/login">
-  <h1>Sign in</h1>
-  <p class="muted">For gym owners and Yoyo Gyms staff. Gym members sign in at their gym —
-  <a href="/platform/find">find your gym</a>.</p>
+  <h1>${owner ? 'Gym owner account' : 'Yoyo Gyms Platform'}</h1>
+  <p class="muted auth-sub">${owner ? 'Your application, documents and subscription.' : 'Platform administrator login'}</p>
+  ${owner ? '<input type="hidden" name="as" value="owner">' : ''}
   ${error ? `<p class="err">${h(error)}</p>` : ''}
   <label>Email
     <input type="email" name="email" autocomplete="username" required>
@@ -130,15 +168,17 @@ export function loginPage({ error = '' } = {}) {
   <label>Password
     <input type="password" name="password" autocomplete="current-password" required>
   </label>
-  <label>Authentication code <span class="muted">(if you have set one up)</span>
+  <label>${owner ? 'Authentication code <span class="muted">(if you have set one up)</span>' : 'Authentication code'}
     <input type="text" name="totp" inputmode="numeric" autocomplete="one-time-code"
            placeholder="6 digits">
   </label>
   <button type="submit">Sign in</button>
-  <p><a href="/platform/forgot">Forgot your password?</a></p>
-  <p class="muted">Lost your device? Use a recovery code in place of the authentication code.</p>
-  <p class="muted"><a href="/platform/privacy">Privacy policy</a> · <a href="/platform/delete-account">Delete your account</a></p>
-</form>`,
+  <p class="auth-links"><a href="/platform/forgot">Forgot password?</a></p>
+  <p class="muted auth-links">Lost your device? Use a recovery code in place of the authentication code.</p>
+</form>
+${owner ? '' : '<p class="muted auth-foot">Gym owner? <a href="/platform/login?as=owner">Sign in to your owner account</a></p>'}
+<p class="muted auth-foot">Gym member? You sign in at your own gym — <a href="/platform/find">find your gym</a>.</p>
+<p class="muted auth-foot"><a href="/platform/privacy">Privacy policy</a> · <a href="/platform/delete-account">Delete your account</a></p>`,
   });
   // The code field used to be `required`. Two-factor is REQUIRED for Yoyo
   // staff but OPTIONAL for gym owners (D-119), so an owner without it could

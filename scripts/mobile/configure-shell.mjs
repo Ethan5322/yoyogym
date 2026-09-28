@@ -68,6 +68,15 @@ export function validateShellConfig(config) {
         'from the member app — staff reach it in a browser. Remove it from allowedHosts.'
     );
   }
+  if (admin && !HOST.test(admin)) {
+    problems.push(`adminHost "${admin}" is not a bare hostname. Use "admin.yoyogyms.com", not a URL.`);
+  }
+
+  // Shown on the Help screen as a mailto: link (CLAUDE.md §36.1 Q7).
+  const email = config?.supportEmail;
+  if (email && !/^[^\s@<>"]+@[^\s@<>"]+\.[^\s@<>"]+$/.test(email)) {
+    problems.push(`supportEmail "${email}" is not an email address.`);
+  }
 
   return problems;
 }
@@ -106,6 +115,8 @@ window.YOYO_SHELL = Object.freeze({
   allowedHosts: Object.freeze(${JSON.stringify(config.allowedHosts)}),
   defaultServer: ${JSON.stringify(config.defaultServer)},
   supportContact: ${JSON.stringify(config.supportContact || '')},
+  supportEmail: ${JSON.stringify(config.supportEmail || '')},
+  adminHost: ${JSON.stringify(config.adminHost || '')},
 });
 `;
 }

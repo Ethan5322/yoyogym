@@ -60,11 +60,14 @@ async function scan(outcome) {
     },
   };
   const app = boot({ plugins });
-  click(app.doc, app.window, '[data-go="member-signin"]');
+  click(app.doc, app.window, '[data-go="member"]');
   click(app.doc, app.window, '#scan');
   await tick();
   return { ...app, scanCalls };
 }
+
+/** The message line on the member's "Welcome, Member" screen, where Scan lives. */
+const WELCOME_NOTE = '#member-welcome [data-note]';
 
 test('THE SCANNER CALLS THE PLUGIN THAT IS INSTALLED, FOR QR CODES', async () => {
   const { scanCalls } = await scan('https://yoyogym.vercel.app/g/bos-gym');
@@ -96,9 +99,12 @@ test('the code and the installed plugin agree on the API', (t) => {
 });
 
 test('A GYM POSTER OPENS THAT GYM, OFFERING SIGN-IN AND JOINING', async () => {
+  // "Welcome to [Gym]" — CLAUDE.md §36.
   const { doc } = await scan('https://yoyogym.vercel.app/g/bos-gym');
-  assert.ok(doc.getElementById('m-login'));
-  assert.match(text(doc, '.m-join'), /New here\?/);
+  assert.ok(!doc.getElementById('gym').classList.contains('hidden'));
+  assert.equal(text(doc, '#gym [data-gym-name]'), 'Bos Gym');
+  assert.ok(doc.querySelector('#gym [data-go="join"]'), 'New member registration');
+  assert.ok(doc.querySelector('#gym [data-go="signin"]'), 'Existing member login');
 });
 
 test('A MEMBER CARD FILLS IN THE NUMBER, AND SIGNS NOBODY IN', async () => {
@@ -107,26 +113,61 @@ test('A MEMBER CARD FILLS IN THE NUMBER, AND SIGNS NOBODY IN', async () => {
   assert.ok(!calls.some((c) => c.path === '/api/member/login'));
 });
 
-test('a code that is not ours is said plainly, on the picker', async () => {
+test('a code that is not ours is said plainly, where the scan was started', async () => {
   const { doc } = await scan('https://evil.example/phish');
-  assert.match(text(doc, '#note'), /not a Yoyo Gyms code/i);
+  assert.match(text(doc, WELCOME_NOTE), /not a Yoyo Gyms code/i);
 });
 
 test('backing out of the scanner is not an error', async () => {
   const { doc } = await scan(new Error('Scanning cancelled by the user'));
-  assert.equal(text(doc, '#note'), '');
+  assert.equal(text(doc, WELCOME_NOTE), '');
 });
 
 test('a refused camera leaves the app usable, and says where to change it', async () => {
   const { doc } = await scan(new Error('Camera permission denied'));
-  assert.match(text(doc, '#note'), /allow it in your phone settings/);
+  assert.match(text(doc, WELCOME_NOTE), /allow it in your phone settings/);
 });
 
-test('in a browser, with no plugin, it says so rather than pretending', () => {
+test('in a browser, with no plugin, it says so rather than pretending', async () => {
   const { doc, window } = boot();
-  click(doc, window, '[data-go="member-signin"]');
+  click(doc, window, '[data-go="member"]');
   click(doc, window, '#scan');
-  assert.match(text(doc, '#note'), /Scanning needs the Yoyo Gyms app/);
+  await tick();
+  assert.match(text(doc, WELCOME_NOTE), /Scanning needs the Yoyo Gyms app/);
+});
+
+test('a gym-less code of ours opens the gym search, with the reason', async () => {
+  const { doc } = await scan('https://yoyogym.vercel.app/register?src=qr');
+  assert.ok(!doc.getElementById('pick').classList.contains('hidden'));
+  assert.notEqual(text(doc, '#note'), '');
+});
+
+// ---------------------------------------------------------------------------
+// "Scan my membership card", on a gym's sign-in screen (§36.1 Q6)
+// ---------------------------------------------------------------------------
+
+async function scanCard(outcome) {
+  const plugins = {
+    CapacitorBarcodeScanner: { scanBarcode: async () => ({ ScanResult: outcome, format: 0 }) },
+  };
+  const app = boot({ plugins });
+  app.window.YOYO_MEMBER.open('bos-gym', { name: 'BOS GYM' });
+  click(app.doc, app.window, '[data-m="scan-card"]');
+  await tick();
+  return app;
+}
+
+test('THE MEMBERSHIP CARD FILLS IN THE NUMBER ONLY — NOBODY IS SIGNED IN', async () => {
+  const { doc, calls } = await scanCard('https://yoyogym.vercel.app/g/bos-gym/p/m/GYM-2026-ABC123');
+  assert.equal(doc.getElementById('m-mn').value, 'GYM-2026-ABC123');
+  assert.equal(doc.getElementById('m-ph').value, '', 'the phone is still the member\'s to type');
+  assert.ok(!calls.some((c) => c.path === '/api/member/login'));
+});
+
+test('the gym\'s own poster is not a membership card, and says so', async () => {
+  const { doc } = await scanCard('https://yoyogym.vercel.app/g/bos-gym');
+  assert.match(text(doc, '#m-scan-err'), /membership card/);
+  assert.equal(doc.getElementById('m-mn').value, '');
 });
 
 test('the old see-through overlay is gone — the plugin draws its own screen', () => {
@@ -156,9 +197,12 @@ test('ANDROID BACK WALKS BACK THROUGH THE APP, THEN PUTS IT AWAY', () => {
   const { doc, window } = boot({ plugins });
   const back = () => log.listeners.backButton();
 
-  click(doc, window, '[data-go="member-signin"]');
+  click(doc, window, '[data-go="member"]');
+  click(doc, window, '[data-go="find"]');
   back();
-  assert.ok(!doc.getElementById('home').classList.contains('hidden'), 'picker → home');
+  assert.ok(!doc.getElementById('member-welcome').classList.contains('hidden'), 'search → Welcome, Member');
+  back();
+  assert.ok(!doc.getElementById('home').classList.contains('hidden'), 'Welcome, Member → home');
 
   window.YOYO_MEMBER.open('bos-gym', { name: 'BOS GYM' });
   back();
@@ -178,8 +222,145 @@ test('light status-bar text on the dark ground; the splash hides once drawn', ()
 test('LEAVING FOR A WEB SCREEN WITH NO SIGNAL IS SAID, NOT A BROWSER ERROR PAGE', () => {
   const { doc, window } = boot();
   Object.defineProperty(window.navigator, 'onLine', { value: false, configurable: true });
-  click(doc, window, '[data-go="owner-register"]');
-  assert.match(text(doc, '#note'), /You are offline/);
+  click(doc, window, '[data-go="owner"]');
+  click(doc, window, '#owner-welcome [data-go="owner-apply"]');
+  click(doc, window, '#owner-apply [data-go="owner-register"]');
+  assert.match(text(doc, '#owner-apply [data-note]'), /You are offline/);
+});
+
+// ---------------------------------------------------------------------------
+// The first screen and the paths from it (CLAUDE.md §36, §36.1)
+// ---------------------------------------------------------------------------
+
+const visible = (doc, id) => !doc.getElementById(id).classList.contains('hidden');
+
+test('THE FIRST SCREEN: THE PHOTO, THE HEADLINE, TWO CHOICES, PRIVACY AND HELP', () => {
+  const { doc } = boot();
+  assert.ok(visible(doc, 'home'));
+  assert.match(text(doc, '.y-headline'), /Your gym\.\s*Your journey\./i);
+  assert.match(text(doc, '.y-lede'), /Connect to your gym, manage your membership, and stay committed to your goals\./);
+
+  const choices = [...doc.querySelectorAll('#home .y-actions button')].map((b) => b.textContent.trim().toUpperCase());
+  assert.deepEqual(choices, ['I’M A MEMBER', 'I’M A GYM OWNER'], 'exactly two, in this order');
+  assert.ok(doc.querySelector('#home .y-btn--primary[data-go="member"]'), 'the member button is the bright one');
+
+  const foot = [...doc.querySelectorAll('#home .y-foot button')].map((b) => b.textContent.trim());
+  assert.deepEqual(foot, ['Privacy', 'Help']);
+});
+
+test('THE PHOTOGRAPH CARRIES THE LOGO — NO SECOND LOGO IS PUT OVER IT', () => {
+  // §36.1 Q11: the user's image already has the Yoyo Gyms logo on it.
+  const { doc } = boot();
+  const hero = doc.querySelector('#home .y-hero');
+  assert.equal(hero.querySelectorAll('img').length, 1);
+  assert.equal(hero.textContent.trim(), '', 'no wordmark text over the photo');
+  assert.equal(doc.querySelectorAll('#home img').length, 1, 'and no other logo on the first screen');
+  assert.ok(existsSync(WWW + hero.querySelector('img').getAttribute('src')), 'the photo ships inside the app');
+  assert.ok(existsSync(WWW + 'img/logo-on-dark.png'));
+});
+
+test('THE MAIN YOYO ADMIN PANEL IS NOT IN THE APP', () => {
+  // §36.1 Q2: website only. Owner login is the gym's own admin sign-in.
+  const html = read('index.html');
+  const app = read('app.js');
+  assert.ok(!/Main Admin|Platform administrator/i.test(html));
+  for (const panel of ['/platform/home', '/platform/applications', '/platform/registry']) {
+    assert.ok(!app.includes(panel) && !html.includes(panel), panel);
+  }
+});
+
+test('WELCOME, MEMBER: FIND AND SCAN — AND "I ALREADY KNOW MY GYM" ONLY WHEN ONE IS SAVED', () => {
+  const fresh = boot();
+  click(fresh.doc, fresh.window, '[data-go="member"]');
+  assert.match(text(fresh.doc, '#member-welcome .y-title'), /Welcome, Member/);
+  assert.ok(fresh.doc.querySelector('#member-welcome [data-go="find"]'));
+  assert.ok(fresh.doc.querySelector('#member-welcome #scan'));
+  assert.ok(!visible(fresh.doc, 'mine'), 'nothing saved, nothing offered');
+
+  const saved = boot();
+  saved.window.localStorage.setItem('yoyo.mygym', JSON.stringify({ slug: 'bos-gym', name: 'BOS GYM' }));
+  click(saved.doc, saved.window, '[data-go="member"]');
+  assert.ok(visible(saved.doc, 'mine'));
+  assert.equal(text(saved.doc, '#mine-name'), 'BOS GYM');
+
+  click(saved.doc, saved.window, '#mine-open');
+  assert.ok(visible(saved.doc, 'gym'), 'Welcome to [Gym]');
+  assert.equal(text(saved.doc, '#gym [data-gym-name]'), 'BOS GYM');
+});
+
+test('a member already signed in to that gym goes straight in', async () => {
+  const { doc, window } = boot();
+  window.localStorage.setItem('yoyo.mygym', JSON.stringify({ slug: 'bos-gym', name: 'BOS GYM' }));
+  window.localStorage.setItem('yoyo.member.token:bos-gym', JSON.stringify('tok'));
+  click(doc, window, '[data-go="member"]');
+  click(doc, window, '#mine-open');
+  assert.ok(!doc.getElementById('member').classList.contains('hidden'), 'the member area');
+  assert.ok(!doc.getElementById('m-login'), 'not the sign-in form');
+});
+
+test('WELCOME TO [GYM]: JOIN LEADS TO "JOIN [GYM]", SIGN IN TO "SIGN IN TO [GYM]"', () => {
+  const { doc, window } = boot();
+  window.localStorage.setItem('yoyo.mygym', JSON.stringify({ slug: 'bos-gym', name: 'BOS GYM' }));
+  click(doc, window, '[data-go="member"]');
+  click(doc, window, '#mine-open');
+
+  click(doc, window, '#gym [data-go="join"]');
+  assert.ok(visible(doc, 'join'));
+  assert.equal(text(doc, '#join .y-title'), 'Join BOS GYM');
+  assert.ok(doc.querySelector('#join [data-go="register"]'), 'Start registration');
+
+  click(doc, window, '#join [data-go="signin"]');
+  assert.ok(doc.getElementById('m-login'), 'Sign in instead');
+  assert.equal(text(doc, '.m-hero .m-eyebrow'), 'Sign in to');
+  assert.equal(text(doc, '.m-hero h1'), 'BOS GYM');
+  assert.ok(doc.querySelector('[data-m="scan-card"]'), 'Scan my membership card');
+  assert.ok(doc.querySelector('[data-m="help"]'), 'Need help?');
+
+  // Back from the gym's sign-in returns to the Yoyo screen it came from.
+  click(doc, window, '[data-m="leave"]');
+  assert.ok(visible(doc, 'join'));
+});
+
+test('OWNER LOGIN IS THE GYM\'S OWN ADMIN SIGN-IN, FOR OWNER AND STAFF', async () => {
+  const routes = {
+    ...ROUTES,
+    'GET /platform/api/gyms': { status: 200, body: { gyms: [{ slug: 'bos-gym', name: 'BOS GYM', city: 'Durban' }] } },
+  };
+  const { doc, window } = boot({ routes });
+  click(doc, window, '[data-go="owner"]');
+  assert.match(text(doc, '#owner-welcome .y-title'), /Welcome, Gym Owner/);
+  const options = [...doc.querySelectorAll('#owner-welcome .y-option b')].map((b) => b.textContent);
+  assert.deepEqual(options, ['Apply to join Yoyo Gyms', 'Owner login', 'Check application status']);
+
+  click(doc, window, '[data-go="owner-signin"]');
+  assert.equal(text(doc, '#pick-title'), 'Gym owner login');
+  assert.match(text(doc, '#pick-sub'), /staff/);
+  assert.ok(!visible(doc, 'forgot'), 'the member recovery route is not offered to owners');
+  assert.ok(visible(doc, 'owner-extras'), 'Forgot password? and Apply');
+
+  const q = doc.getElementById('q');
+  q.value = 'bos';
+  q.dispatchEvent(new window.Event('input'));
+  await new Promise((r) => setTimeout(r, 320));
+  click(doc, window, '#results .gym');
+  assert.deepEqual(JSON.parse(window.localStorage.getItem('yoyo.admingym')), { slug: 'bos-gym', name: 'BOS GYM' });
+  assert.equal(window.localStorage.getItem('yoyo.mygym'), null, 'an owner\'s gym is not saved as a member\'s');
+});
+
+test('HELP: SUPPORT, QUESTIONS, PRIVACY, DELETE YOUR ACCOUNT — AND STAFF ONLY LEAVE THE APP', () => {
+  const { doc, window } = boot();
+  click(doc, window, '#home [data-go="help"]');
+  assert.ok(visible(doc, 'help'));
+  assert.equal(text(doc, '#support-email'), 'hello@mulesoo.com');
+  assert.equal(doc.getElementById('support-link').getAttribute('href'), 'mailto:hello@mulesoo.com');
+  assert.ok(doc.querySelectorAll('#help details').length >= 3, 'common questions');
+  assert.ok(doc.querySelector('#help [data-go="privacy"]'));
+  assert.ok(doc.querySelector('#help [data-go="delete-account"]'), 'the stores require it (§36.1 Q1)');
+
+  // No admin host yet, so no link at all: a tap would open the staff panel
+  // INSIDE the app, on the shared host.
+  assert.equal(doc.querySelector('#staff a'), null);
+  assert.match(text(doc, '#staff'), /staff/i);
 });
 
 test('the native plugins are declared, so a build includes them', () => {

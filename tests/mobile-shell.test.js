@@ -79,6 +79,23 @@ test('a missing default server is refused rather than opening a blank screen', (
   assert.match(problems.join(' '), /blank screen/);
 });
 
+test('the admin host is a bare hostname: the Help screen builds a link from it', () => {
+  const problems = validateShellConfig(good({ adminHost: 'https://admin.yoyogyms.com/platform' }));
+  assert.match(problems.join(' '), /adminHost .* bare hostname/);
+});
+
+test('the support email on the Help screen must be an email address', () => {
+  assert.deepEqual(validateShellConfig(good({ supportEmail: 'hello@mulesoo.com' })), []);
+  const problems = validateShellConfig(good({ supportEmail: 'javascript:alert(1)' }));
+  assert.match(problems.join(' '), /not an email address/);
+});
+
+test('the Help screen\'s support email and admin host reach the app', () => {
+  const out = generate(good({ supportEmail: 'hello@mulesoo.com' }));
+  assert.match(out, /supportEmail: "hello@mulesoo\.com"/);
+  assert.match(out, /adminHost: "admin\.yoyogyms\.com"/);
+});
+
 // ---------------------------------------------------------------------------
 // What it generates
 // ---------------------------------------------------------------------------

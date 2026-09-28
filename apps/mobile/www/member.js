@@ -180,15 +180,25 @@
       render();
       refresh();
     } else {
-      renderSignIn(opts.join);
+      renderSignIn();
     }
   }
 
+  /**
+   * Is a member already signed in to this gym on this phone? The entry screens
+   * use it to skip "Welcome to [Gym]" for somebody who is already in.
+   */
+  function hasSession(slug) {
+    if (!SAFE_SLUG.test(String(slug || ''))) return false;
+    try { return Boolean(JSON.parse(localStorage.getItem('yoyo.member.token:' + slug) || 'null')); } catch (e) { return false; }
+  }
+
+  /** Leave the gym, back to the Yoyo screen the member came from. */
   function close() {
     document.body.classList.remove('in-member');
     root.classList.add('hidden');
     root.innerHTML = '';
-    if (window.YOYO_APP) window.YOYO_APP.home();
+    if (window.YOYO_APP) window.YOYO_APP.resume();
   }
 
   function signOut(expired) {
@@ -197,23 +207,24 @@
     save('checkedIn', null);
     state.token = null;
     state.status = null;
-    renderSignIn(false, expired ? 'Please sign in again.' : '');
+    renderSignIn(expired ? 'Please sign in again.' : '');
   }
 
   // -------------------------------------------------------------------------
   // Sign in — the same membership number + phone as always (CLAUDE.md §9)
   // -------------------------------------------------------------------------
 
-  function renderSignIn(offerJoin, notice) {
+  // "Sign in to [Gym Name]" (CLAUDE.md §36). Joining is one screen back, on
+  // "Welcome to [Gym]", so it is not repeated here.
+  function renderSignIn(notice) {
     root.innerHTML =
       '<div class="m-signin">' +
-      '  <button type="button" class="m-back" data-m="leave" aria-label="Back to gyms">← Gyms</button>' +
+      '  <button type="button" class="m-back" data-m="leave" aria-label="Back">← Back</button>' +
       '  <div class="m-hero">' +
-      '    <p class="m-eyebrow">Welcome to</p>' +
+      '    <p class="m-eyebrow">Sign in to</p>' +
       '    <h1 data-gym-name>' + esc(state.gymName || 'your gym') + '</h1>' +
       '  </div>' +
       '  <form class="m-card" id="m-login" novalidate>' +
-      '    <h2>Sign in</h2>' +
       (notice ? '<p class="m-note">' + esc(notice) + '</p>' : '') +
       '    <label for="m-mn">Membership number</label>' +
       '    <input id="m-mn" autocapitalize="characters" autocomplete="off" placeholder="GYM-2026-000123" value="' + esc(state.prefill) + '" required>' +
@@ -223,8 +234,11 @@
       '    <button type="submit" class="m-primary" id="m-login-btn">Sign in</button>' +
       '  </form>' +
       '  <div class="m-join">' +
-      '    <p>' + (offerJoin ? 'New here?' : 'Not a member yet?') + '</p>' +
-      '    <button type="button" class="m-secondary" data-m="join">Join ' + esc(state.gymName || 'this gym') + '</button>' +
+      // Fills in the membership number from the member's own card, and
+      // signs nobody in: the phone is still asked for (§14, §36.1 Q6).
+      '    <button type="button" class="m-secondary" data-m="scan-card">Scan my membership card</button>' +
+      '    <p class="m-err" id="m-scan-err" role="alert"></p>' +
+      '    <button type="button" class="y-link" data-m="help">Need help?</button>' +
       '  </div>' +
       '</div>';
 
@@ -534,8 +548,38 @@
       case 'switch': return close();
       case 'signout': return signOut(false);
       case 'delete': return requestDeletion();
+      case 'scan-card': return scanCard();
+      case 'help':
+        close();
+        return window.YOYO_APP.help();
     }
   });
+
+  /**
+   * "Scan my membership card": the card's code fills in the number. Nothing
+   * else — the member still types their phone number and presses Sign in.
+   */
+  function scanCard() {
+    var err = document.getElementById('m-scan-err');
+    err.textContent = '';
+    window.YOYO_APP.scan('Point your camera at the QR code on your membership card').then(function (r) {
+      if (r.message) { err.textContent = r.message; return; }
+      var payload = r.payload;
+      if (!payload) return; // backed out
+      if (payload.kind === 'member') {
+        // The card knows its gym. A card from another gym opens that gym's
+        // sign-in, with the number filled in, rather than failing here.
+        if (payload.slug !== state.slug) return open(payload.slug, { number: payload.membershipNumber });
+        var input = document.getElementById('m-mn');
+        input.value = payload.membershipNumber;
+        document.getElementById('m-ph').focus();
+        return;
+      }
+      err.textContent = payload.kind === 'gym'
+        ? 'That is the gym’s own code. Scan the QR code on your membership card.'
+        : payload.reason || 'That is not a membership card.';
+    });
+  }
 
   /**
    * Android's back button, inside the member area. Returns true if it was
@@ -552,5 +596,5 @@
     return true;
   }
 
-  window.YOYO_MEMBER = Object.freeze({ open: open, close: close, back: back });
+  window.YOYO_MEMBER = Object.freeze({ open: open, close: close, back: back, hasSession: hasSession });
 })();
