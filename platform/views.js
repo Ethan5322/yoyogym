@@ -22,6 +22,7 @@ import { BRAND, LOGO_ON_DARK } from '../shared/brand.js';
 import { REQUIRED_DOCUMENTS, DOCUMENT_LABELS, missingRequiredDocuments, MAX_DOCUMENT_BYTES } from './documents.js';
 import { INVITE_TTL_HOURS } from './team.js';
 import { SERVICE_INFO, SERVICE_GROUPS, ALL_SERVICES, CORE_FEATURES, effectiveFeatures } from '../shared/features.js';
+import { planByKey } from './plans.js';
 
 /** Escape text for safe interpolation into markup or an attribute. */
 export function escapeHtml(value) {
@@ -36,6 +37,18 @@ export function escapeHtml(value) {
 
 /** Shorthand used throughout: `h` is "escaped". */
 const h = escapeHtml;
+
+/**
+ * A plan as a person names it — "Prime", never the key "prime" (design
+ * critique 2026-09-29). The live plans' own labels when a page has them, the
+ * built-in label otherwise, and the key only for a plan nobody knows.
+ * Returns plain text: escape it where it is drawn.
+ */
+export function planName(key, plans = null) {
+  if (!key) return '';
+  const live = Array.isArray(plans) ? plans.find((p) => p && p.key === key) : null;
+  return live?.label || live?.name || planByKey(key)?.label || String(key);
+}
 
 // The Yoyo Gyms brand on every page of the website (CLAUDE.md §37): near-black,
 // white type, electric lime — the same in light and dark system themes, like

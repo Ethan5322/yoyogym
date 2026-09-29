@@ -45,3 +45,11 @@ test("the app's copy of the rule gives the same answer for every colour", () => 
     assert.deepEqual({ accent: mine.accent, ink: mine.ink }, accentPair(c), c);
   }
 });
+
+test('a plan is shown by its name, never its key', async () => {
+  const { planName } = await import('../platform/views.js');
+  assert.equal(planName('prime'), 'Prime');
+  assert.equal(planName('basic', [{ key: 'basic', label: 'Starter' }]), 'Starter');
+  assert.equal(planName('unknown-plan'), 'unknown-plan');
+  assert.equal(planName(null), '');
+});
