@@ -15,6 +15,26 @@ occurrence is answered from notes rather than rediscovered.
 
 ---
 
+## 2026-09-29 — The owner activated, and the gym sign-in still refused the password
+
+**Evidence (read-only).** Activation completed at 09:52:17 (`gym_admin_created: true`, gym `active`); the
+owner row exists in `gym_cocate_gym.admin_users` (username `owner`, the owner's email); `failed_logins: 2`
+— so the sign-in reached the RIGHT account and the password check failed. Both sides use plain bcrypt;
+the activation form decodes with URLSearchParams; the sign-in compares untrimmed. No code path found that
+saves one password and checks another.
+
+**Most likely cause, stated as such (not proven):** two passwords for one email on one site — the one
+chosen when applying, saved by the browser, and the one chosen at activation. The activation form had no
+username beside the new password, so the browser could not tell which saved login it replaced and kept
+the old one, then filled it into the gym sign-in.
+
+**Fixed regardless:** the gym sign-in page had NO way back in — it now links owners to the email reset
+(`/platform/forgot`, which sets the Yoyo account and every gym sign-in together) and tells staff to ask
+their owner. The activation page carries the owner's email as a hidden `autocomplete="username"` field
+so the browser updates its saved password, and says the new password replaces the old one. 1089 tests.
+
+---
+
 ## 2026-09-29 — What a second gym would have met: evaluation after the build fix
 
 Asked by the user to evaluate the whole gym app and admin system once the build was fixed. Walked the

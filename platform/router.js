@@ -738,7 +738,7 @@ async function handleExtraRoutes(req, res, deps, { url, path, method }) {
     if (method === 'GET') {
       const token = url.searchParams.get('token') || '';
       const context = (await deps.activationContext?.(token)) || {};
-      html(res, 200, activatePage({ token, gymName: context.gymName }));
+      html(res, 200, activatePage({ token, gymName: context.gymName, email: context.email }));
       return true;
     }
 
@@ -749,7 +749,7 @@ async function handleExtraRoutes(req, res, deps, { url, path, method }) {
       // checked on the server too, since a browser's `required` is a courtesy.
       // Refused without consuming the link, so the owner can tick and retry.
       if (form.accept_terms !== 'yes') {
-        html(res, 400, activatePage({ token: form.token, error: 'Please read and accept the Gym Owner Agreement.' }));
+        html(res, 400, activatePage({ token: form.token, email: form.username, error: 'Please read and accept the Gym Owner Agreement.' }));
         return true;
       }
 
@@ -766,7 +766,7 @@ async function handleExtraRoutes(req, res, deps, { url, path, method }) {
         // The token is echoed back so a mistyped code can be corrected without
         // digging the email out again. The code is not — retyping it is the
         // point.
-        html(res, 400, activatePage({ token: form.token, error: result.reason }));
+        html(res, 400, activatePage({ token: form.token, email: form.username, error: result.reason }));
         return true;
       }
 

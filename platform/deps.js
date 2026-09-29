@@ -1186,14 +1186,18 @@ export function activationDeps(db = platformDb()) {
       if (!token) return {};
       const { data } = await db
         .from('owner_activations')
-        .select('gym_id')
+        .select('gym_id, user_id')
         .eq('token_hash', activationLookupHash(token))
         .is('used_at', null)
         .maybeSingle();
       if (!data) return {};
 
-      const { data: gym } = await db.from('gyms').select('search_name').eq('id', data.gym_id).maybeSingle();
-      return { gymName: gym?.search_name ?? '' };
+      const [{ data: gym }, { data: owner }] = await Promise.all([
+        db.from('gyms').select('search_name').eq('id', data.gym_id).maybeSingle(),
+        // Shown only to whoever holds the emailed link — sent to this address.
+        db.from('platform_users').select('email').eq('id', data.user_id).maybeSingle(),
+      ]);
+      return { gymName: gym?.search_name ?? '', email: owner?.email ?? '' };
     },
 
     findActivation: async (tokenHash) => {

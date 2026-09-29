@@ -175,3 +175,32 @@ test('the decision route accepts Try again and hands it to the same decision pat
   assert.deepEqual(asked, { id: 'app-1', action: 'retry_provision' });
   assert.equal(r.statusCode, 302);
 });
+
+// ---------------------------------------------------------------------------
+// After activation: one password, and a way back in (2026-09-29)
+// ---------------------------------------------------------------------------
+import { readFileSync } from 'node:fs';
+import { activatePage, activateSuccessPage } from '../platform/views.js';
+
+test('the activation page names the owner for the browser, so it UPDATES the saved password', () => {
+  const page = activatePage({ token: 't', gymName: 'COCATE GYM', email: 'owner@example.com' });
+  assert.match(page, /<input type="text" name="username" value="owner@example\.com" autocomplete="username" readonly hidden>/);
+  assert.match(page, /autocomplete="new-password"/);
+  assert.match(page, /replaces the one you chose when you applied/);
+});
+
+test('with no email known, the page still works — just without the browser hint', () => {
+  assert.doesNotMatch(activatePage({ token: 't' }), /name="username"/);
+});
+
+test('after activating, the owner is told exactly which password signs in to the gym', () => {
+  const page = activateSuccessPage({ gymActivated: true, gymSlug: 'cocate-gym', gymUsername: 'owner' });
+  assert.match(page, /Sign in there as <b>owner<\/b> \(or with your email\)/);
+  assert.match(page, /not the one from your application/);
+});
+
+test('the gym sign-in page offers a way back in: owners reset by email, staff ask their owner', () => {
+  const login = readFileSync(new URL('../src/pages/admin/Login.jsx', import.meta.url), 'utf8');
+  assert.match(login, /href="\/platform\/forgot"/);
+  assert.match(login, /Staff: ask your gym owner/);
+});

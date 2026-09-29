@@ -103,6 +103,17 @@ export default function AdminLogin() {
             <button className="btn-outline mt-3 w-full" onClick={() => { setError(''); setFaceMode(true); }}>
               🛡️ Verify with Face
             </button>
+            {/* A WAY BACK IN. This page had none, so an owner whose password did
+                not work was simply stuck (2026-09-29). The platform's reset sets
+                the owner's Yoyo account AND this gym sign-in together; staff
+                passwords are reset by the owner, in Staff. */}
+            <div className="mt-6 space-y-1 text-center text-sm text-muted">
+              <p>
+                Forgot your password?{' '}
+                <a className="font-semibold text-body underline" href="/platform/forgot">Gym owner: reset it by email</a>
+              </p>
+              <p>Staff: ask your gym owner — they can reset it in Staff.</p>
+            </div>
           </>
         )}
       </div>

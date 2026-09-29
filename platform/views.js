@@ -1884,7 +1884,7 @@ ${list(report.dangling || [], (d) => `<li><b>${h(d.gym_id)}</b> → ${h(d.schema
  * typed, because the whole purpose of the second half is that it is not in the
  * link — putting it in the URL too would make it decoration.
  */
-export function activatePage({ token = '', gymName = '', error = '', code = '' } = {}) {
+export function activatePage({ token = '', gymName = '', error = '', code = '', email = '' } = {}) {
   return layout({
     title: 'Activate your account',
     body: `<h1>Activate your account</h1>
@@ -1897,6 +1897,14 @@ ${error ? `<p class="err">${h(error)}</p>` : ''}
 
 <form class="card" method="post" action="/platform/activate">
   <input type="hidden" name="token" value="${h(token)}">
+  ${
+    // THE BROWSER'S SAVED PASSWORD. The owner chose a password when applying,
+    // and the browser saved it for this site. Without a username beside the
+    // new password it could not tell which saved login this replaces, so it
+    // kept the OLD one — and filled it into the gym sign-in, which refused it
+    // (2026-09-29). Named here, the browser offers to update it instead.
+    email ? `<input type="text" name="username" value="${h(email)}" autocomplete="username" readonly hidden>` : ''
+  }
   <label>Six-digit code
     <input name="code" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" required
            autocomplete="one-time-code" value="${h(code)}">
@@ -1904,7 +1912,9 @@ ${error ? `<p class="err">${h(error)}</p>` : ''}
   <label>Choose a password
     <input type="password" name="password" required minlength="10" autocomplete="new-password">
   </label>
-  <p class="muted">At least 10 characters. You will use it for your Yoyo Gyms account and your gym admin panel.</p>
+  <p class="muted">At least 10 characters. <b>This becomes your one password</b> — for your Yoyo Gyms account and your
+  gym admin panel — and it <b>replaces the one you chose when you applied</b>. Type it yourself: if your browser
+  offers a saved password here, that is the old one.</p>
   <label class="check">
     <input type="checkbox" name="accept_terms" value="yes" required>
     I have read and accept the <a href="/platform/terms" target="_blank" rel="noopener">Gym Owner Agreement</a>.
@@ -1927,7 +1937,8 @@ export function activateSuccessPage({ gymActivated = false, gymSlug = '', gymUse
       ? `<div class="card">
   <h2>Running your gym</h2>
   <p>Your gym's own panel is where you add members, take check-ins and record payments.</p>
-  <p>Sign in there as <b>${h(gymUsername)}</b>, with the same password you just chose.</p>
+  <p>Sign in there as <b>${h(gymUsername)}</b> (or with your email), using the password you <b>just chose</b> —
+  not the one from your application, which it replaced.</p>
   <p><a href="${h(gymAdminPath(gymSlug))}">Open your gym admin panel →</a></p>
   <p class="muted">You can change that password, and add staff, from Settings inside the panel.</p>
 </div>`
