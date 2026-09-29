@@ -5,10 +5,14 @@
 // reaches into server/ or src/, and nothing in the gym app reaches in here.
 // This file exists only because Vercel requires an entry point under api/.
 import { handlePlatform } from '../../platform/router.js';
+import { restorePlatformPath } from '../../platform/vercel-path.js';
 import { platformDeps, platformOpsDeps, activationDeps, ownerDeps, platformControlDeps } from '../../platform/deps.js';
 
 export default async function handler(req, res) {
   try {
+    // Multi-segment addresses arrive rewritten (vercel.json, CLAUDE.md §42.1).
+    restorePlatformPath(req);
+
     // Both sets are merged here rather than in one big factory, so the
     // application flow and the operations flow stay separately readable.
     return await handlePlatform(req, res, {

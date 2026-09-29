@@ -15,6 +15,36 @@ occurrence is answered from notes rather than rediscovered.
 
 ---
 
+## 2026-09-29 — Every two-part platform address was a Vercel 404 (CLAUDE.md §42.1 F-42.1)
+
+**Reported by the user:** an application submitted with no documents, no working upload, and a
+"404 NOT_FOUND" page on clicking the application in the panel. Two applications left waiting.
+
+**Read the actual error first.** `curl -D -` on production: `X-Vercel-Error: NOT_FOUND`, plain-text
+body — Vercel answering, not the router. One-segment addresses (`/platform/plans`) reached the
+function; every two-segment one (`/platform/applications/<id>`, `/platform/my-gym/documents/request`,
+`/platform/registry/<id>`, `/platform/api/gyms`) did not, and `/api/platform/a/b` failed the same way.
+Vercel's docs (Gatsby page, "splat API routes"): outside Next.js a catch-all file has no native
+support and needs a rewrite. **Our gym routers never noticed** because they are a fixed key map of
+single names (ids travel in the query); the platform router is the only one built on nested paths,
+and its tests call it directly, never through Vercel.
+
+**What it broke, live, since the platform went up:** the application page and every decision,
+opening and uploading documents, a gym's page (suspend, plan, services, activation link), and the
+app's gym search and sign-ins under `/platform/api/`.
+
+**Correction.** The 2026-09-28 entry below explains "the application page says fail" as the
+applicant's own account. That was a guess stated as "likely", and it was wrong: this was the cause.
+It was rendered locally, which is exactly the path that could not see it.
+
+**Fix.** Two rewrites in `vercel.json`, placed before the one-segment rule and leaving it untouched:
+`/platform/:first/:rest+` and `/api/platform/:first/:rest+` → `/api/platform/[...path]?__pp=…`. The
+entry file calls `restorePlatformPath()` (`platform/vercel-path.js`), which puts `/platform/<path>`
+back into `req.url` and keeps the rest of the query. Six tests. **It can only be proven on Vercel**:
+the preview sits behind Vercel's login, so the first live check is production.
+
+---
+
 ## 2026-09-29 — Before the first live gym: three defects in provisioning, found by reading it
 
 The user switched gym creation on (`PLATFORM_PROVISION_LIVE`, project ID, `sbp_` token; Settings

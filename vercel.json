@@ -8,6 +8,14 @@
       "destination": "/api/platform"
     },
     {
+      "source": "/platform/:first/:rest+",
+      "destination": "/api/platform/[...path]?__pp=:first/:rest+"
+    },
+    {
+      "source": "/api/platform/:first/:rest+",
+      "destination": "/api/platform/[...path]?__pp=:first/:rest+"
+    },
+    {
       "source": "/platform/:path*",
       "destination": "/api/platform/:path*"
     },

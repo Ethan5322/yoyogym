@@ -2175,3 +2175,43 @@ leaderboard, Family and group memberships — each with its rules, the owner's s
 screen on the web and in the app, and its switch; points and progress counted from check-ins; the
 morning job ends pauses; starting plans per Q4. SQL: `db/migrations/2026-09-29-member-services.sql`
 (each existing gym schema) and `platform/migrations/2026-09-29-plan-services.sql`.
+
+---
+
+## 42. Gym-owner application — documents before submit, a review page that opens every document (user instruction, 2026-09-29)
+
+> The user's words, word for word (the pasted error page shortened to its code). Clarified one
+> question at a time in §42.1, which wins over the text above it. The new application flow is not
+> built until §42.1 is answered.
+
+> during applying to as gym owner it submitted before upload required documents also there no
+> button ready to upload those documents, also as main yoyo gyms owner try to approve it does not
+> display when i click submited application it says = *[This page doesn't exist … 404 NOT_FOUND]*
+> still yester day application is waiting today application also waiting, so what needed to fix is
+> there must be each requred document upload box that acces from any device either form of pdf or
+> photo, and after uploaded and person must submit after checking that he wrote correctly, yoyo gyms
+> admin pannel must open when clicked on it either pdf or picture get download inorder to prevent
+> fruad, approving automatically sent link on email to gym owner by provided email during
+> regestration for further
+
+### 42.1 Clarifications — answered by the user, one at a time
+
+Checked against the code AND production on 2026-09-29:
+
+- **F-42.1 — the 404 is Vercel's, not the app's** (`X-Vercel-Error: NOT_FOUND`). Outside Next.js a
+  catch-all file (`api/platform/[...path].js`) matches ONE path segment only; Vercel's docs say
+  splat routes need a rewrite. So every two-part platform address never reached the app on Vercel:
+  an application's page and its decision, opening a document, the owner's document upload
+  (`/platform/my-gym/documents/request`), a gym's page (suspend, plan, services), and the app's
+  gym search and sign-in (`/platform/api/…`). One-part pages (lists, login, apply) work. Local tests
+  passed because they call the router directly. The earlier explanation of "the application page
+  says fail" (the applicant's own account) was wrong — this was the cause.
+- **F-42.2 — an application is submitted with no documents.** By design today the applicant applies
+  first and uploads the three documents afterwards from their account page — and that upload is
+  behind F-42.1, so nobody could upload.
+- **F-42.3 — an iPhone photo can arrive as HEIC**, which Chrome on a Windows computer cannot show,
+  so the reviewer could not open it.
+- **Already true once F-42.1 is fixed:** the review page shows a PDF in a viewer and a photo as a
+  picture, with Open and Download; approving creates the gym and emails the activation link to the
+  email given at registration (hardened in `2a16b36`: the token is tried before anything is
+  recorded).
