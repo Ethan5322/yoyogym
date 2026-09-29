@@ -29,10 +29,14 @@ export function normalisePhone(raw) {
 /**
  * Read an application from a form or a JSON body.
  *
+ * @param {object} [options]
+ * @param {boolean} [options.editing=false]  a signed-in owner correcting their
+ *   own draft (CLAUDE.md §42): the account already exists and the agreement was
+ *   accepted at the start, so email, password and the tick are not asked again.
  * @returns {{ input: object, error: string|null }}  `error` is the first
  *   problem, in the order the form asks the questions.
  */
-export function readApplication(raw = {}) {
+export function readApplication(raw = {}, { editing = false } = {}) {
   const text = (v) => String(v ?? '').trim();
 
   const input = {
@@ -52,15 +56,15 @@ export function readApplication(raw = {}) {
 
   const error =
     (!input.owner_name && 'Please give your name.') ||
-    (!EMAIL.test(input.email) && 'A valid email is required.') ||
-    (input.password.length < 10 && 'Choose a password of at least 10 characters.') ||
+    (!editing && !EMAIL.test(input.email) && 'A valid email is required.') ||
+    (!editing && input.password.length < 10 && 'Choose a password of at least 10 characters.') ||
     (!input.phone && 'Please give a phone number we can reach you on, with the country code — like +27 82 123 4567.') ||
     (!input.gym_name && 'What is your gym called?') ||
     (!input.address && "Please give the gym's street address.") ||
     (!planByKey(input.plan_key) && 'Please choose a plan.') ||
     // The Gym Owner Agreement, accepted at registration (§41.1 Q5): the
     // website sends "yes" from the tick box, the app sends true.
-    (!input.accepted_terms && 'Please read and accept the Gym Owner Agreement.') ||
+    (!editing && !input.accepted_terms && 'Please read and accept the Gym Owner Agreement.') ||
     null;
 
   return { input, error };

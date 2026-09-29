@@ -125,18 +125,23 @@ test('THE APPLICATION FORM DOES NOT PROMISE A 2FA STEP THAT OWNERS DO NOT GET', 
   assert.ok(!/two-factor authentication next/.test(signupPage({ plans: [] })));
 });
 
-test('after applying, the owner is told exactly what to do next', () => {
+// Since CLAUDE.md §42 the documents come BEFORE the application is sent, so
+// the page after Submit no longer asks for them — it says what happens next.
+test('after submitting, the owner is told exactly what happens next', () => {
   const page = signupSuccessPage({ gymName: 'BOS GYM' });
-  assert.match(page, /Upload your documents now/);
-  assert.match(page, /href="\/platform\/login"/);
+  assert.match(page, /Application sent/);
+  assert.match(page, /and its documents are with us/);
+  assert.match(page, /href="\/platform\/my-gym"/, 'where to follow it');
   assert.match(page, /activation link and a code/);
+  assert.doesNotMatch(page, /Upload your documents now/, 'never asks for what was just sent');
 });
 
 test('and it is emailed to them, with a real sign-in link', () => {
   const mail = applicationReceivedEmail({ gymName: 'BOS GYM', signInUrl: 'https://yoyogym.vercel.app/platform/login' });
   assert.match(mail.subject, /BOS GYM/);
   assert.match(mail.html, /href="https:\/\/yoyogym\.vercel\.app\/platform\/login"/);
-  assert.match(mail.text, /upload your documents/i);
+  assert.match(mail.text, /with its documents, has arrived/);
+  assert.doesNotMatch(mail.text, /tax clearance/i, 'it no longer lists a document that is optional');
 });
 
 test('AN EXISTING ACCOUNT MUST BE PROVEN BEFORE AN APPLICATION IS FILED UNDER IT', () => {

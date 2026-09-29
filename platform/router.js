@@ -60,6 +60,8 @@ import {
   APPLICATION_TABS,
   signupPage,
   signupSuccessPage,
+  applyDocumentsPage,
+  applyReviewPage,
   registryPage,
   gymDetailPage,
   finderPage,
@@ -171,10 +173,47 @@ export async function handlePlatform(req, res, deps) {
         ...extra,
       });
 
-    if (method === 'GET') return html(res, 200, page());
+    // A signed-in owner with a draft is CORRECTING it (CLAUDE.md §42): the
+    // form comes back filled in, without the email, password or agreement.
+    const session = readSession(req);
+    const draft = session?.kind === 'gym_owner' ? await deps.findOwnDraft?.(session.sub) : null;
+    const editPage = (extra = {}) =>
+      page({
+        editing: true,
+        email: draft?.email || session?.email || '',
+        csrfToken: issueCsrfToken(session.sub),
+        values: {
+          owner_name: draft?.ownerName,
+          phone: draft?.application.owner_phone,
+          gym_name: draft?.application.proposed_gym_name,
+          address: draft?.application.gym_address,
+          city: draft?.application.city,
+          country: draft?.application.country,
+          estimated_members: draft?.application.estimated_members,
+          needs: draft?.application.owner_needs,
+        },
+        selectedPlan: draft?.application.requested_plan_key,
+        ...extra,
+      });
+
+    if (method === 'GET') return html(res, 200, draft ? editPage() : page());
 
     if (method === 'POST') {
       const form = await readFormBody(req);
+
+      if (form.editing === '1') {
+        const owner = requireSession(req, res, { csrfToken: form.csrf });
+        if (!owner) return;
+        const again = (message) =>
+          html(res, 400, editPage({ error: message, values: { ...form }, selectedPlan: form.plan }));
+        if (!draft) return redirect(res, '/platform/my-gym');
+        const { input, error } = readApplication(form, { editing: true });
+        if (error) return again(error);
+        const saved = await deps.updateDraftApplication(owner.sub, input);
+        if (!saved.ok) return again(saved.error || 'We could not save that. Please try again.');
+        return redirect(res, '/platform/apply/review');
+      }
+
       // What was typed goes back into the form on a refusal — never the
       // password.
       const values = {
@@ -197,10 +236,86 @@ export async function handlePlatform(req, res, deps) {
 
       const result = await deps.createApplication(input);
 
-      if (!result.ok) return fail(result.error || 'We could not submit that. Please try again.');
+      if (!result.ok) return fail(result.error || 'We could not save that. Please try again.');
 
-      return html(res, 200, signupSuccessPage({ gymName: input.gym_name }));
+      // SIGNED IN, so the documents can be uploaded now — and the draft
+      // continued later from any device by signing in (CLAUDE.md §42). The
+      // password was just chosen, or just proven for an existing account.
+      await deps.audit({ action: 'platform.login', actor_user_id: result.userId, actor_kind: 'gym_owner', detail: { via: 'apply' } });
+      return redirect(res, '/platform/apply/documents', {
+        'Set-Cookie': sessionCookie({ id: result.userId, email: input.email, kind: 'gym_owner' }),
+      });
     }
+  }
+
+  // ---- step 2: documents, step 3: check and submit (CLAUDE.md §42) ----------
+  // Only the signed-in owner's own DRAFT. Anything else — no draft, already
+  // sent — goes to their page, which says where the application stands.
+  if ((path === 'apply/documents' || path === 'apply/review') && method === 'GET') {
+    const session = requireSession(req, res);
+    if (!session) return;
+    const draft = await deps.findOwnDraft(session.sub);
+    if (!draft) return redirect(res, '/platform/my-gym');
+    const common = {
+      application: draft.application,
+      documents: draft.documents,
+      csrfToken: issueCsrfToken(session.sub),
+      user: await viewer(deps, session),
+    };
+    if (path === 'apply/documents') return html(res, 200, applyDocumentsPage(common));
+    return html(res, 200, applyReviewPage({
+      ...common,
+      email: draft.email,
+      ownerName: draft.ownerName,
+      plans: await livePlansForOwners(deps),
+    }));
+  }
+
+  if (path === 'apply/submit' && method === 'POST') {
+    const form = await readFormBody(req);
+    const session = requireSession(req, res, { csrfToken: form.csrf });
+    if (!session) return;
+
+    const again = async (message) => {
+      const draft = await deps.findOwnDraft(session.sub);
+      if (!draft) return redirect(res, '/platform/my-gym');
+      return html(res, 400, applyReviewPage({
+        application: draft.application,
+        documents: draft.documents,
+        email: draft.email,
+        ownerName: draft.ownerName,
+        plans: await livePlansForOwners(deps),
+        csrfToken: issueCsrfToken(session.sub),
+        user: await viewer(deps, session),
+        error: message,
+      }));
+    };
+
+    if (form.confirm !== 'yes') return again('Please tick the box to confirm you have checked everything.');
+
+    const result = await deps.submitApplication(session.sub);
+    if (!result.ok) return again(result.error);
+
+    return html(res, 200, signupSuccessPage({ gymName: result.gymName, emailed: result.emailed, user: await viewer(deps, session) }));
+  }
+
+  // The owner opens THEIR OWN upload, to check it is the right file. Keyed on
+  // the session: another applicant's document id simply does not resolve.
+  const ownDoc = /^apply\/documents\/([A-Za-z0-9-]+)$/.exec(path);
+  if (ownDoc && method === 'GET') {
+    const session = requireSession(req, res);
+    if (!session) return;
+    const doc = await deps.getDocument(ownDoc[1]);
+    const mine = doc ? await deps.findOwnApplication(session.sub, doc.application_id) : null;
+    if (!doc || !mine) {
+      return html(res, 404, problemPage({ title: 'That document does not exist', message: 'It may have been replaced, or the link is wrong.', back: { href: '/platform/apply/documents', label: 'Your documents' } }));
+    }
+    const signed = await deps.signedDocumentUrl(doc.storage_ref, 300, {});
+    if (!signed) {
+      res.writeHead(502, { 'Content-Type': 'text/plain; charset=utf-8' });
+      return res.end('That document could not be opened just now. Please try again.');
+    }
+    return redirect(res, signed);
   }
 
   // ---- public: gym search --------------------------------------------------
@@ -929,6 +1044,12 @@ async function handleExtraRoutes(req, res, deps, { url, path, method }) {
     // email promised (CLAUDE.md §40.1 F-40.5).
     if (application.status === 'info_requested') await deps.resumeReview?.(application.id, session.sub);
 
+    // The step-by-step upload page stays where it is and shows the new file.
+    if (form.respond === 'json') {
+      res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+      res.end(JSON.stringify({ ok: true }));
+      return true;
+    }
     redirect(res, '/platform/my-gym');
     return true;
   }
@@ -1348,6 +1469,15 @@ async function handleExtraRoutes(req, res, deps, { url, path, method }) {
     // ?download=1 asks storage to send it as a file to save, under its own
     // name — for a phone that cannot show it inline.
     const download = url.searchParams.get('download') === '1' ? doc.filename || 'document' : null;
+    // Every open and every download is recorded (CLAUDE.md §42.1 Q1): a copy
+    // of someone's ID leaving the platform is exactly what the log is for.
+    await deps.audit({
+      action: download ? 'platform.document.downloaded' : 'platform.document.opened',
+      actor_user_id: session.sub,
+      entity: 'document',
+      entity_id: doc.id,
+      detail: { application_id: doc.application_id, doc_type: doc.doc_type },
+    });
     const signed = await deps.signedDocumentUrl(doc.storage_ref, 300, { download });
     if (!signed) {
       // Not a redirect to nowhere. A broken link here looks like a missing

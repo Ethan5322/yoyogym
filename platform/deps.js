@@ -15,7 +15,7 @@ import { provisionGym } from './provisioning.js';
 import { schemaRunnerDeps, gymSchemaChecksum, runSql, canReachProject } from './schema-runner.js';
 import { runBilling } from './billing-runner.js';
 import { issueActivation, activationLookupHash } from './activation.js';
-import { DOCUMENT_BUCKET } from './documents.js';
+import { DOCUMENT_BUCKET, REQUIRED_DOCUMENTS, DOCUMENT_LABELS } from './documents.js';
 import {
   sendEmail,
   activationEmail,
@@ -464,7 +464,10 @@ export function platformDeps() {
 
       const row = {
         applicant_user_id: user.id,
-        status: 'submitted',
+        // A DRAFT until the three required documents are in and the owner has
+        // checked everything and pressed Submit (CLAUDE.md §42). Only a
+        // submitted application reaches the review queue.
+        status: 'draft',
         proposed_gym_name: input.gym_name,
         slug,
         city: input.city || null,
@@ -472,11 +475,10 @@ export function platformDeps() {
         estimated_members: input.estimated_members,
         requested_plan_key: input.plan_key,
         owner_needs: input.needs,
-        submitted_at: new Date().toISOString(),
       };
       // CLAUDE.md §40.1 Q2. Written separately so that, before
       // 2026-09-28-main-admin-panel.sql has run, the application is still
-      // saved — without these two answers — rather than lost.
+      // saved — without these answers — rather than lost.
       const contact = {
         owner_phone: input.phone || null,
         gym_address: input.address || null,
@@ -484,45 +486,57 @@ export function platformDeps() {
         terms_version: input.accepted_terms ? AGREEMENT_VERSION : null,
         terms_accepted_at: input.accepted_terms ? new Date().toISOString() : null,
       };
+      const missingColumns = (e) => /owner_phone|gym_address|terms_version|terms_accepted_at/.test(e?.message || '');
 
-      let { data: application, error: appErr } = await db
+      // STARTING AGAIN CONTINUES THE OWNER'S OWN DRAFT rather than making a
+      // second one — which the unique gym-name index would refuse anyway.
+      const { data: draft } = await db
         .from('gym_applications')
-        .insert({ ...row, ...contact })
         .select('id')
-        .single();
-      if (appErr && /owner_phone|gym_address|terms_version|terms_accepted_at/.test(appErr.message || '')) {
+        .eq('applicant_user_id', user.id)
+        .eq('status', 'draft')
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      const save = (fields) =>
+        draft
+          ? db.from('gym_applications').update({ ...fields, updated_at: new Date().toISOString() }).eq('id', draft.id).select('id').single()
+          : db.from('gym_applications').insert(fields).select('id').single();
+
+      let { data: application, error: appErr } = await save({ ...row, ...contact });
+      if (appErr && missingColumns(appErr)) {
         console.error('gym_applications is missing new columns — run the latest platform migrations');
-        ({ data: application, error: appErr } = await db.from('gym_applications').insert(row).select('id').single());
+        ({ data: application, error: appErr } = await save(row));
       }
 
-      if (appErr) return { ok: false, error: 'We could not submit your application.' };
+      if (appErr) {
+        // Another applicant already uses this gym name (the unique index).
+        if (appErr.code === '23505') {
+          return { ok: false, error: 'A gym with this name has already applied. Please use your gym\'s full name, or contact us.' };
+        }
+        return { ok: false, error: 'We could not save your application.' };
+      }
 
-      await db.from('application_events').insert({
-        application_id: application.id,
-        event: 'submitted',
-        actor_user_id: user.id,
-      });
-      await audit(db, {
-        action: 'application.submitted',
-        actor_kind: 'gym_owner',
-        actor_user_id: user.id,
-        entity: 'application',
-        entity_id: application.id,
-        detail: { gym_name: input.gym_name, plan: input.plan_key, terms_version: input.accepted_terms ? AGREEMENT_VERSION : null },
-      });
-
-      // A confirmation, saying what happens next and where to upload the
-      // documents. Best-effort: a mail failure must never lose an application.
-      try {
-        await sendEmail({
-          to: input.email,
-          ...applicationReceivedEmail({ gymName: input.gym_name, signInUrl: `${platformBaseUrl()}/platform/login` }),
+      if (!draft) {
+        await db.from('application_events').insert({
+          application_id: application.id,
+          event: 'started',
+          actor_user_id: user.id,
         });
-      } catch {
-        /* the application is saved; the page already says what to do */
+        await audit(db, {
+          action: 'application.started',
+          actor_kind: 'gym_owner',
+          actor_user_id: user.id,
+          entity: 'application',
+          entity_id: application.id,
+          detail: { gym_name: input.gym_name, plan: input.plan_key, terms_version: input.accepted_terms ? AGREEMENT_VERSION : null },
+        });
       }
 
-      return { ok: true, applicationId: application.id };
+      // No email yet: nothing has been sent to anyone. The confirmation goes
+      // out when the owner submits (submitApplication).
+      return { ok: true, applicationId: application.id, userId: user.id };
     },
 
     // ---- public: gym search ----------------------------------------------
@@ -1332,7 +1346,9 @@ export function ownerDeps(db = platformDb()) {
         .from('gym_applications')
         .select('*')
         .eq('applicant_user_id', userId)
-        .order('submitted_at', { ascending: false, nullsFirst: false })
+        // NEWEST FIRST by creation: a draft has no submitted_at yet, and
+        // ordering by it put a new draft behind an old decided application.
+        .order('created_at', { ascending: false })
         .limit(1)
         .maybeSingle();
 
@@ -1399,6 +1415,136 @@ export function ownerDeps(db = platformDb()) {
      * application is loaded and the ownership check is a separate `if` that a
      * later edit could drop.
      */
+    /**
+     * The owner's application that is still being filled in (CLAUDE.md §42),
+     * with its documents. Keyed on the SESSION's user, never on anything sent.
+     */
+    findOwnDraft: async (userId) => {
+      if (!userId) return null;
+      const { data: application } = await db
+        .from('gym_applications')
+        .select('*')
+        .eq('applicant_user_id', userId)
+        .eq('status', 'draft')
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (!application) return null;
+      const [{ data: documents }, { data: me }] = await Promise.all([
+        db.from('application_documents').select('*').eq('application_id', application.id).order('uploaded_at', { ascending: true }),
+        db.from('platform_users').select('email, full_name').eq('id', userId).maybeSingle(),
+      ]);
+      return { application, documents: documents ?? [], email: me?.email ?? '', ownerName: me?.full_name ?? '' };
+    },
+
+    /** The owner corrects what they wrote, while it is still a draft. */
+    updateDraftApplication: async (userId, input) => {
+      const slug = slugify(input.gym_name);
+      if (!slug || !schemaNameFor(slug)) {
+        return { ok: false, error: 'Please use a gym name with some letters or numbers in it.' };
+      }
+      const { data: taken } = await db.from('gyms').select('id').eq('slug', slug).maybeSingle();
+      if (taken) return { ok: false, error: 'A gym with a very similar name is already listed. Please contact us.' };
+
+      const { data, error } = await db
+        .from('gym_applications')
+        .update({
+          proposed_gym_name: input.gym_name,
+          slug,
+          city: input.city || null,
+          country: input.country || null,
+          estimated_members: input.estimated_members,
+          requested_plan_key: input.plan_key,
+          owner_needs: input.needs,
+          owner_phone: input.phone || null,
+          gym_address: input.address || null,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('applicant_user_id', userId)
+        .eq('status', 'draft')
+        .select('id');
+      if (error) {
+        if (error.code === '23505') return { ok: false, error: 'A gym with this name has already applied. Please use your gym\'s full name, or contact us.' };
+        return { ok: false, error: 'We could not save that. Please try again.' };
+      }
+      if (!data?.length) return { ok: false, error: 'There is no application being filled in on this account.' };
+      // Their name lives on the account, not the application.
+      if (input.owner_name) await db.from('platform_users').update({ full_name: input.owner_name }).eq('id', userId);
+      return { ok: true };
+    },
+
+    /**
+     * SEND the draft to the review queue (CLAUDE.md §42).
+     *
+     * Refused until each required document has a file that has not been
+     * rejected — checked HERE, where it is decided, not only by a greyed-out
+     * button. The owner is told which are missing. Only a draft moves, and only
+     * the owner's own, so a decided application can never be resubmitted.
+     */
+    submitApplication: async (userId) => {
+      const { data: application } = await db
+        .from('gym_applications')
+        .select('id, proposed_gym_name')
+        .eq('applicant_user_id', userId)
+        .eq('status', 'draft')
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (!application) return { ok: false, error: 'There is no application waiting to be sent on this account.' };
+
+      const { data: documents, error: docErr } = await db
+        .from('application_documents')
+        .select('doc_type, status')
+        .eq('application_id', application.id);
+      // Fails CLOSED: documents that cannot be read have not been shown.
+      if (docErr) return { ok: false, error: 'We could not check your documents just now. Please try again.' };
+
+      const have = new Set((documents ?? []).filter((d) => d.status !== 'rejected').map((d) => d.doc_type));
+      const missing = REQUIRED_DOCUMENTS.filter((t) => !have.has(t));
+      if (missing.length) {
+        return {
+          ok: false,
+          missing,
+          error: `Please upload ${missing.map((t) => DOCUMENT_LABELS[t] || t).join(', ')} before sending your application.`,
+        };
+      }
+
+      const now = new Date().toISOString();
+      const { data: moved, error } = await db
+        .from('gym_applications')
+        .update({ status: 'submitted', submitted_at: now, updated_at: now })
+        .eq('id', application.id)
+        .eq('status', 'draft')
+        .select('id');
+      if (error || !moved?.length) return { ok: false, error: 'We could not send your application. Please try again.' };
+
+      await db.from('application_events').insert({ application_id: application.id, event: 'submitted', actor_user_id: userId, created_at: now });
+      await audit(db, {
+        action: 'application.submitted',
+        actor_kind: 'gym_owner',
+        actor_user_id: userId,
+        entity: 'application',
+        entity_id: application.id,
+        detail: { gym_name: application.proposed_gym_name },
+      });
+
+      // The confirmation. Best-effort: a mail failure never un-sends it.
+      const { data: me } = await db.from('platform_users').select('email').eq('id', userId).maybeSingle();
+      let emailed = false;
+      if (me?.email) {
+        try {
+          const sent = await sendEmail({
+            to: me.email,
+            ...applicationReceivedEmail({ gymName: application.proposed_gym_name, signInUrl: `${platformBaseUrl()}/platform/login?as=owner` }),
+          });
+          emailed = sent?.ok !== false;
+        } catch {
+          /* sent is what matters; the page says what happens next */
+        }
+      }
+      return { ok: true, applicationId: application.id, gymName: application.proposed_gym_name, emailed };
+    },
+
     findOwnApplication: async (userId, applicationId) => {
       if (!userId || !applicationId) return null;
       const { data } = await db

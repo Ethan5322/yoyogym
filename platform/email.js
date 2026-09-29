@@ -148,21 +148,54 @@ export function applicationReceivedEmail({ gymName, signInUrl }) {
   const safeName = escapeHtml(gymName || 'your gym');
   return {
     subject: `We have your application for ${gymName || 'your gym'}`,
-    html: `<p>Thank you — your application to list <b>${safeName}</b> on Yoyo Gyms has arrived.</p>
+    html: `<p>Thank you — your application to list <b>${safeName}</b> on Yoyo Gyms, with its documents, has arrived.</p>
 <p><b>What happens next</b></p>
 <ol>
-  <li><a href="${escapeHtml(signInUrl)}">Sign in</a> with this email and the password you chose, and upload your
-  documents: business registration, your ID, proof of your premises and tax clearance.</li>
-  <li>A person reviews your application and documents. We email you with the decision.</li>
-  <li>Once approved, you receive an activation link and code, and your gym opens.</li>
+  <li>A person checks your details and each document by hand. It is not instant.</li>
+  <li>We email you the decision at this address. If anything is missing we tell you exactly what.</li>
+  <li>Once approved, we email you an activation link and a code. Using them opens your gym and your own gym admin panel.</li>
 </ol>
+<p>You can follow your application at any time: <a href="${escapeHtml(signInUrl)}">sign in</a> with this email and your password.</p>
 <p style="color:#666;font-size:12px">If you did not apply, you can ignore this email.</p>`,
-    text: `Thank you — your application to list ${gymName || 'your gym'} on Yoyo Gyms has arrived.
+    text: `Thank you — your application to list ${gymName || 'your gym'} on Yoyo Gyms, with its documents, has arrived.
 
 What happens next:
-1. Sign in at ${signInUrl} and upload your documents: business registration, ID, proof of premises, tax clearance.
-2. A person reviews your application. We email you with the decision.
-3. Once approved, you receive an activation link and code, and your gym opens.`,
+1. A person checks your details and each document by hand.
+2. We email you the decision at this address.
+3. Once approved, we email you an activation link and a code, which open your gym.
+
+Follow your application: ${signInUrl}`,
+  };
+}
+
+/**
+ * An application sent before the documents were in (CLAUDE.md §42.1 Q2): the
+ * owner is asked to finish it. Their details are kept; only the documents and
+ * the final check are left.
+ */
+export function finishApplicationEmail({ gymName, signInUrl }) {
+  const safeName = escapeHtml(gymName || 'your gym');
+  return {
+    subject: `Please finish your application for ${gymName || 'your gym'}`,
+    html: `<p>Thank you for applying to list <b>${safeName}</b> on Yoyo Gyms.</p>
+<p>Your application reached us <b>without its documents</b>, so it has not been reviewed yet. We are sorry —
+the upload was not working on our side. It works now, and your details are saved.</p>
+<p><b>To finish, it takes a few minutes:</b></p>
+<ol>
+  <li><a href="${escapeHtml(signInUrl)}">Sign in</a> with this email and the password you chose.</li>
+  <li>Upload three documents — a PDF or a clear photo from your phone is fine: <b>your ID</b>,
+  <b>your business registration</b> and <b>proof of the gym's address</b>.</li>
+  <li>Check what you wrote, and press <b>Submit application</b>.</li>
+</ol>
+<p>A person then reviews it and we email you the decision.</p>`,
+    text: `Thank you for applying to list ${gymName || 'your gym'} on Yoyo Gyms.
+
+Your application reached us without its documents, so it has not been reviewed yet. The upload was not working on our side; it works now, and your details are saved.
+
+To finish:
+1. Sign in: ${signInUrl}
+2. Upload your ID, your business registration and proof of the gym's address (PDF or a clear photo).
+3. Check what you wrote and press Submit application.`,
   };
 }
 

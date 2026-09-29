@@ -2215,3 +2215,26 @@ Checked against the code AND production on 2026-09-29:
   picture, with Open and Download; approving creates the gym and emails the activation link to the
   email given at registration (hardened in `2a16b36`: the token is tried before anything is
   recorded).
+- **F-42.1 FIXED and live 2026-09-29** (`1e9bbd4`, `2daae8b`, deployed with the user's approval).
+  Two rewrites carry every multi-segment address to the function by its file name; checked on
+  production: an application's page and a gym's page go to sign-in (were 404), the app's gym search
+  returns KOM, the document upload route answers. First attempt reached the router but missed the
+  routes: a `+` in the rewrite's destination came through as a trailing space.
+- **Q1 — what a reviewer's click does:** the PDF or photo **opens inside the panel** (full screen on a
+  phone too), with a **Download** button to save the original and inspect it closely. Every open and
+  download is recorded in the audit log.
+- **Q2 — the two applications already waiting with no documents** (SASO GYM, 24 Sept; COCATE GYM,
+  29 Sept): both go back to **documents needed** and leave the review queue; each applicant is
+  **emailed a link** to sign in, upload the three documents, review and submit.
+
+Both answered 2026-09-29. **The build:** the application becomes three steps on any device — (1) the
+details, which create the account and save a draft; (2) one upload box per required document, PDF or
+photo, from the phone's camera or files (photos converted on the device so any computer can open
+them), plus the optional ones; (3) a review page with everything written and every document, where
+Submit stays unavailable until the three are in. A draft is continued by signing in, from any device.
+Only a submitted application reaches the review queue.
+
+**Built 2026-09-29** — vault D-166: the three steps (details save a draft and sign the owner in; one upload
+box per document, PDF or photo, photos converted on the device; a review page with a required tick), Submit
+refused on the server without the three documents, drafts shown to reviewers as "Not sent yet", every
+document open and download audited, and the app's JSON twin on the same rule. No SQL.

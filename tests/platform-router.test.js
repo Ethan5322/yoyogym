@@ -271,9 +271,11 @@ test('a short password is refused before an account is created', async () => {
   assert.match(r.body, /10 characters/);
 });
 
-test('a valid application is submitted and confirmed', async () => {
+// CLAUDE.md §42: step 1 saves a DRAFT and signs the owner in, so the three
+// documents can be uploaded at once — nothing is sent to a reviewer yet.
+test('valid details save a draft, sign the owner in and go to the documents', async () => {
   let received = null;
-  const d = { ...deps(), createApplication: async (input) => { received = input; return { ok: true }; } };
+  const d = { ...deps(), createApplication: async (input) => { received = input; return { ok: true, applicationId: 'app-9', userId: 'owner-9' }; } };
   const r = res();
   await handlePlatform(
     req({ method: 'POST', url: '/platform/apply',
@@ -287,7 +289,9 @@ test('a valid application is submitted and confirmed', async () => {
   assert.equal(received.needs, 'SMS reminders', 'demand evidence is captured');
   assert.equal(received.phone, '+27821234567', 'the phone is kept with its country code, without spaces');
   assert.equal(received.address, '12 Main Rd', 'the gym street address is captured');
-  assert.match(r.body, /Application received/);
+  assert.equal(r.statusCode, 302);
+  assert.equal(r.headers.location, '/platform/apply/documents');
+  assert.match(String(r.headers['set-cookie']), /HttpOnly/, 'signed in, to upload now and continue later');
 });
 
 test('a rejected application redisplays the form without losing what was typed', async () => {

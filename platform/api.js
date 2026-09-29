@@ -205,7 +205,8 @@ export async function handlePlatformApi(req, res, deps, { path, method, url }) {
 
     if (!result.ok) return json(res, 400, { error: result.error || 'We could not submit that.' }), true;
 
-    return json(res, 201, { ok: true, application_id: result.applicationId }), true;
+    // A DRAFT (CLAUDE.md §42): the three documents go next, then submit.
+    return json(res, 201, { ok: true, application_id: result.applicationId, status: 'draft' }), true;
   }
 
   // ---- activate (owners) --------------------------------------------------
@@ -378,6 +379,19 @@ export async function handlePlatformApi(req, res, deps, { path, method, url }) {
     if (application.status === 'info_requested') await deps.resumeReview?.(application.id, session.sub);
 
     return json(res, 201, { ok: true, document_id: row?.id ?? null }), true;
+  }
+
+  // ---- send the draft for review (CLAUDE.md §42) ----------------------------
+  // The same dependency as the website's /platform/apply/submit, so the rule
+  // "not without the three documents" is enforced in one place for both doors.
+  if (path === 'api/my-gym/submit' && method === 'POST') {
+    const body = await readJson(req);
+    if (!body || body.confirm !== true) {
+      return json(res, 400, { error: 'Please confirm you have checked everything.' }), true;
+    }
+    const result = await deps.submitApplication(session.sub);
+    if (!result.ok) return json(res, 400, { error: result.error, missing: result.missing ?? [] }), true;
+    return json(res, 200, { ok: true, application_id: result.applicationId, status: 'submitted' }), true;
   }
 
   // ---- close my account (owners) — store requirement ----------------------

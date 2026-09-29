@@ -15,6 +15,25 @@ occurrence is answered from notes rather than rediscovered.
 
 ---
 
+## 2026-09-29 — The application in three steps (D-166)
+
+**Built:** details → documents → check and submit. The details save a **draft** and sign the owner in, so
+uploading starts at once and continues later from any device. One box per document, PDF or photo; photos
+become JPEG on the device (max 2400 px). Submit is refused server-side without the three documents, a
+rejected file does not count, and an application can be sent once. Reviewers see a draft under "Waiting on
+the owner" with "Not sent yet" instead of decision buttons; a photo their browser cannot draw says so and
+offers Download; downloads are now audited (`platform.document.downloaded`), as are direct opens.
+
+**Also corrected:** the "application received" email still listed four documents including tax clearance
+(required since §40.1 Q3 are three); it now goes out on Submit and lists none. The owner's page picked
+their application by `submitted_at`, which put a new draft behind an old decided one; now by `created_at`.
+Two applicants using the same gym name get a plain message instead of "could not submit" (unique index).
+
+**Verified.** 1065 tests (22 new). Screens checked at phone and computer width with made-up data: the
+three steps, the sent page, a reviewer's draft.
+
+---
+
 ## 2026-09-29 — Every two-part platform address was a Vercel 404 (CLAUDE.md §42.1 F-42.1)
 
 **Reported by the user:** an application submitted with no documents, no working upload, and a

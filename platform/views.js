@@ -19,7 +19,7 @@ import { when, exact, until, money as fmtMoney, count } from './format.js';
 import { pageLink } from './paging.js';
 import { gymAdminPath, OWNER_USERNAME } from './gym-admin.js';
 import { BRAND, LOGO_ON_DARK } from '../shared/brand.js';
-import { REQUIRED_DOCUMENTS, DOCUMENT_LABELS, missingRequiredDocuments } from './documents.js';
+import { REQUIRED_DOCUMENTS, DOCUMENT_LABELS, missingRequiredDocuments, MAX_DOCUMENT_BYTES } from './documents.js';
 import { INVITE_TTL_HOURS } from './team.js';
 import { SERVICE_INFO, SERVICE_GROUPS, ALL_SERVICES, CORE_FEATURES, effectiveFeatures } from '../shared/features.js';
 
@@ -467,7 +467,7 @@ export function resetDonePage({ gymAccountsUpdated = 0 } = {}) {
 // longer look the same at a glance (CLAUDE.md §40.1 F-40.6).
 const STATUS_TONE = {
   active: 'good', approved: 'good', accepted: 'good', paid: 'good', healthy: 'good', ready: 'good',
-  included: 'good', on: 'good', done: 'good', off: 'muted',
+  included: 'good', on: 'good', done: 'good', off: 'muted', draft: 'muted',
   submitted: 'warn', under_review: 'warn', info_requested: 'warn', pending: 'warn', past_due: 'warn', issued: 'warn',
   invited: 'warn',
   trialing: 'info',
@@ -484,7 +484,8 @@ const statusTag = (status) =>
  */
 export const APPLICATION_TABS = [
   ['review', 'To review', ['submitted', 'under_review']],
-  ['owner', 'Waiting on the owner', ['info_requested']],
+  // A draft has not been sent: the owner is still uploading (CLAUDE.md §42).
+  ['owner', 'Waiting on the owner', ['info_requested', 'draft']],
   ['approved', 'Approved', ['approved']],
   ['rejected', 'Rejected', ['rejected']],
   ['all', 'All', []],
@@ -651,7 +652,11 @@ ${events
   }
 </div>`;
 
-  const decision = decided
+  const decision = a.status === 'draft'
+    ? `<div class="card"><h2>Not sent yet</h2><p class="muted">The owner is still uploading their documents and
+checking what they wrote. Nothing can be decided until they press Submit; it then appears under
+<a href="/platform/applications">To review</a>.</p></div>`
+    : decided
     ? `<div class="card"><p class="muted">This application has been decided. Decisions are final; the owner
 may submit a new application.${
         a.status === 'approved' && a.slug
@@ -825,6 +830,11 @@ export function signupPage({
   terms = [],
   termsApproved = false,
   includes = [],
+  // A signed-in owner correcting their own draft (CLAUDE.md §42): the account
+  // exists and the agreement was accepted, so neither is asked again.
+  editing = false,
+  email = '',
+  csrfToken = '',
 } = {}) {
   const chosen = selectedPlan || (plans.find((p) => p.key === 'medium') ? 'medium' : plans[0]?.key || '');
 
@@ -839,6 +849,8 @@ export function signupPage({
   and we set it up with you. Your first 30 days are free.</p>
   <div class="trust"><span>Verified gyms only</span><span>30 days free</span><span>Setup help included</span><span>Your data kept separate</span></div>
 </section>
+<style>${APPLY_STEP_STYLE}</style>
+${applySteps(1)}
 
 ${
   includes.length
@@ -852,6 +864,7 @@ ${includes.map(([title, text]) => `  <div><b>${h(title)}</b><p>${h(text)}</p></d
 ${error ? `<p class="err" role="alert" style="margin-top:24px">${h(error)}</p>` : ''}
 
 <form class="wide" method="post" action="/platform/apply">
+  ${editing ? `<input type="hidden" name="editing" value="1"><input type="hidden" name="csrf" value="${h(csrfToken)}">` : ''}
   <h2 class="apply-h2">1. Choose your plan</h2>
   <div class="plans">
     ${plans
@@ -864,20 +877,31 @@ ${error ? `<p class="err" role="alert" style="margin-top:24px">${h(error)}</p>` 
 
   <h2 class="apply-h2">2. About you and your gym</h2>
   <div class="apply-card">
-    <div class="two">
+    ${
+      editing
+        ? `<label>Your name
+        <input name="owner_name" required autocomplete="name" value="${h(values.owner_name)}">
+      </label>
+      <p class="muted">Signed in as <b>${h(email)}</b>. Your email and password stay as they are.</p>`
+        : `<div class="two">
       <label>Your name
         <input name="owner_name" required autocomplete="name" value="${h(values.owner_name)}">
       </label>
       <label>Your email
         <input type="email" name="email" required autocomplete="email" value="${h(values.email)}">
       </label>
-    </div>
+    </div>`
+    }
 
     <div class="two">
-      <label>Choose a password
+      ${
+        editing
+          ? ''
+          : `<label>Choose a password
         <input type="password" name="password" required minlength="10" autocomplete="new-password">
-        <span class="muted">At least 10 characters. You will use it to follow your application and upload your documents.</span>
-      </label>
+        <span class="muted">At least 10 characters. You will use it to finish and follow your application, from any device.</span>
+      </label>`
+      }
       <label>Your phone number
         <input type="tel" name="phone" required autocomplete="tel" placeholder="+27 82 123 4567" value="${h(values.phone)}">
         <span class="muted">With the country code. We call if anything needs checking.</span>
@@ -913,7 +937,10 @@ ${error ? `<p class="err" role="alert" style="margin-top:24px">${h(error)}</p>` 
     </label>
   </div>
 
-  <h2 class="apply-h2">3. The agreement</h2>
+  ${
+    editing
+      ? ''
+      : `<h2 class="apply-h2">3. The agreement</h2>
   <div class="apply-card">
     <p><b>Gym Owner Agreement — the key terms</b>${termsApproved ? '' : '<span class="draft">DRAFT</span>'}</p>
     <ul class="terms-list">
@@ -924,34 +951,357 @@ ${error ? `<p class="err" role="alert" style="margin-top:24px">${h(error)}</p>` 
       <input type="checkbox" name="accept_terms" value="yes" required${values.accept_terms === 'yes' ? ' checked' : ''}>
       <span>I have read and agree to the Gym Owner Agreement.</span>
     </label>
-    <p class="muted">After you apply, you upload three documents from your account page: <b>your ID</b>,
-    <b>your business registration</b> and <b>proof of the gym's address</b>. Your gym is approved once
-    all three have been checked, and you confirm the agreement again when you activate.</p>
-  </div>
+    <p class="muted">Next you upload three documents — a PDF, or a photo from your phone: <b>your ID</b>,
+    <b>your business registration</b> and <b>proof of the gym's address</b>. Then you check everything and
+    submit. Nothing is sent until you do.</p>
+  </div>`
+  }
 
-  <div class="submit-row"><button type="submit">Submit application</button></div>
+  <div class="submit-row"><button type="submit">${editing ? 'Save and continue' : 'Continue — upload your documents'}</button></div>
 </form>`,
   });
 }
 
-export function signupSuccessPage({ gymName = '' } = {}) {
+export function signupSuccessPage({ gymName = '', emailed = true, user = null } = {}) {
   return layout({
-    title: 'Application received',
-    body: `<h1>Application received</h1>
-<p>Thank you — we have your application for <b>${h(gymName)}</b>.</p>
+    title: 'Application sent',
+    user,
+    body: `<style>${SIGNUP_STYLE}${APPLY_STEP_STYLE}</style>
+${applySteps(4)}
+<h1>Application sent</h1>
+<p>Thank you — your application for <b>${h(gymName)}</b> and its documents are with us.${
+      emailed ? ' We have emailed you a confirmation.' : ''
+    }</p>
 
 <div class="card">
   <h2>What happens next</h2>
   <ol>
-    <li><b>Upload your documents now.</b> <a href="/platform/login">Sign in</a> with your email and the
-    password you just chose, and open <b>Your gym</b>. We need your business registration, your ID,
-    proof of your premises and tax clearance.</li>
-    <li><b>A person reviews it.</b> It is not instant. We email you with the decision.</li>
-    <li><b>Once approved,</b> you receive an activation link and a code. Using them opens your gym,
-    and gives you your own gym admin panel.</li>
+    <li><b>A person checks it.</b> Your details and each document, by hand. It is not instant.</li>
+    <li><b>We email you the decision.</b> If anything is missing, we tell you exactly what.</li>
+    <li><b>Once approved,</b> we email you an activation link and a code. Using them opens your gym and
+    gives you your own gym admin panel.</li>
   </ol>
 </div>
+<p><a class="btn" href="/platform/my-gym">Follow your application →</a></p>
 <p class="muted">Your gym will not appear in member search until it is approved and live.</p>`,
+  });
+}
+
+// ---------------------------------------------------------------------------
+// The application, step by step (CLAUDE.md §42): details → documents → check
+// and submit. Nothing reaches a reviewer until the owner presses Submit.
+// ---------------------------------------------------------------------------
+
+const APPLY_STEP_STYLE = `
+  .steps { display:flex; gap:10px; list-style:none; padding:0; margin:20px 0 28px; }
+  .steps li { flex:1; border-top:4px solid var(--line); padding-top:10px; font-weight:700; color:var(--muted); font-size:14px; }
+  .steps li.on { border-color:var(--accent); color:var(--ink); }
+  .steps li.done { border-color:var(--accent); }
+  .docs { display:grid; gap:14px; grid-template-columns:repeat(auto-fit,minmax(280px,1fr)); }
+  .doc-box { position:relative; background:var(--card); border:1px solid var(--line); border-radius:20px; padding:20px; display:grid; gap:10px; align-content:start; }
+  .doc-box.done { border-color:rgba(191,246,66,.55); }
+  .doc-box.bad { border-color:rgba(255,107,107,.6); }
+  .doc-box.busy { opacity:.7; pointer-events:none; }
+  .doc-head { display:flex; justify-content:space-between; align-items:center; gap:8px; }
+  .doc-head b { font-size:17px; }
+  .req { font-size:12px; font-weight:800; color:var(--accent-ink); background:var(--accent); border-radius:99px; padding:3px 10px; }
+  .doc-file { margin:0; word-break:break-word; }
+  .doc-file::before { content:'✓ '; color:var(--accent); font-weight:800; }
+  .upload-btn { position:relative; display:flex; align-items:center; justify-content:center; gap:8px; min-height:56px; border:2px dashed var(--line);
+                border-radius:16px; font-weight:800; cursor:pointer; color:var(--ink); text-align:center; padding:8px 12px; }
+  .upload-btn:hover, .upload-btn:focus-within { border-color:var(--accent); }
+  .upload-btn input { position:absolute; opacity:0; width:1px; height:1px; }
+  .doc-note { margin:0; min-height:1.2em; }
+  .optional { margin-top:18px; }
+  .optional summary { cursor:pointer; font-weight:800; min-height:44px; display:flex; align-items:center; }
+  .optional summary::before { content:'+'; font-size:22px; width:22px; margin-right:8px; color:var(--accent); }
+  .optional[open] summary::before { content:'–'; }
+  .cta { display:flex; align-items:center; justify-content:center; min-height:56px; font-size:17px; width:100%; border-radius:99px; }
+  a.cta { background:var(--accent); color:var(--accent-ink); font-weight:800; text-decoration:none; }
+  .review-head { display:flex; justify-content:space-between; align-items:baseline; gap:12px; }
+  .review-head h2 { margin:0; }
+  .review-head a { font-weight:800; min-height:44px; display:inline-flex; align-items:center; }
+`;
+
+/** Where the owner is: 1 details, 2 documents, 3 check and submit, 4 sent. */
+function applySteps(at) {
+  const step = (n, label) =>
+    `<li class="${n === at ? 'on' : n < at ? 'done' : ''}"${n === at ? ' aria-current="step"' : ''}>${n}. ${label}</li>`;
+  return `<ol class="steps" aria-label="Your application">${step(1, 'Your details')}${step(2, 'Documents')}${step(3, 'Check and submit')}</ol>`;
+}
+
+/** What each document is, in the owner's words. */
+const DOCUMENT_HINTS = {
+  id_document: 'Your passport or national ID card — the side with your photo, all four corners in the picture.',
+  business_registration: 'The certificate that registers the business that runs the gym.',
+  proof_of_address: "A recent utility bill, lease or municipal account showing the gym's street address.",
+  tax_clearance: 'A tax clearance certificate, if you have one.',
+  insurance: 'Your public liability or business insurance, if you have it.',
+  lease_agreement: 'The lease for the gym premises, if you rent them.',
+  other_supporting: 'Anything else that helps us check your gym.',
+};
+
+const OPTIONAL_DOCUMENTS = ['tax_clearance', 'insurance', 'lease_agreement', 'other_supporting'];
+
+function fileSize(bytes) {
+  const n = Number(bytes) || 0;
+  if (!n) return '';
+  return n >= 1024 * 1024 ? `${(n / 1024 / 1024).toFixed(1)} MB` : `${Math.max(1, Math.round(n / 1024))} KB`;
+}
+
+/** The newest file of one type (documents arrive oldest first). */
+function latestOf(type, documents) {
+  const ofType = documents.filter((d) => d.doc_type === type);
+  return ofType[ofType.length - 1] || null;
+}
+
+function docBox(type, documents, { required }) {
+  const latest = latestOf(type, documents);
+  const rejected = latest?.status === 'rejected';
+  const done = latest && !rejected;
+  return `<div class="doc-box${done ? ' done' : ''}${rejected ? ' bad' : ''}">
+  <div class="doc-head"><b>${h(DOCUMENT_LABELS[type] || type)}</b>${required ? '<span class="req">Required</span>' : '<span class="muted">Optional</span>'}</div>
+  <p class="muted" style="margin:0">${h(DOCUMENT_HINTS[type] || '')}</p>
+  ${
+    done
+      ? `<p class="doc-file"><a href="/platform/apply/documents/${h(latest.id)}" target="_blank" rel="noopener">${h(latest.filename || 'Your file')}</a> <span class="muted">${h(fileSize(latest.size_bytes))}</span></p>`
+      : ''
+  }
+  ${rejected ? `<p class="err" style="margin:0">Not accepted${latest.reject_reason ? `: ${h(latest.reject_reason)}` : ''} — please upload a new one.</p>` : ''}
+  <label class="upload-btn">
+    <input type="file" accept="application/pdf,image/*" data-type="${h(type)}">
+    <span>${done ? 'Replace' : 'Upload'} — PDF or photo</span>
+  </label>
+  <p class="doc-note muted" aria-live="polite"></p>
+</div>`;
+}
+
+/**
+ * Step 2 — one upload box per document (CLAUDE.md §42). Works on any device:
+ * on a phone the box offers the camera, the photo library and files.
+ *
+ * A PHOTO IS CONVERTED TO JPEG ON THE DEVICE before it is sent (§42.1 F-42.3).
+ * An iPhone photo can be HEIC, which Chrome on a Windows computer cannot show,
+ * so the reviewer would have had nothing to look at. It is also shrunk to at
+ * most 2400 px — still sharp enough to read an ID number — so it uploads on a
+ * weak signal. A PDF is sent exactly as it is.
+ */
+export function applyDocumentsPage({ application, documents = [], csrfToken = '', user = null } = {}) {
+  const have = REQUIRED_DOCUMENTS.filter((t) => {
+    const latest = latestOf(t, documents);
+    return latest && latest.status !== 'rejected';
+  }).length;
+  const ready = have === REQUIRED_DOCUMENTS.length;
+  const optionalUploaded = OPTIONAL_DOCUMENTS.some((t) => latestOf(t, documents));
+  // Into a <script>: JSON, with "<" escaped so no value can close the tag.
+  const js = (v) => JSON.stringify(v).replace(/</g, '\\u003c');
+
+  return layout({
+    title: 'Upload your documents',
+    user,
+    body: `<style>${SIGNUP_STYLE}${APPLY_STEP_STYLE}</style>
+${applySteps(2)}
+<h1>Upload your documents</h1>
+<p class="muted">For <b>${h(application.proposed_gym_name || 'your gym')}</b>. A PDF, or a clear photo — take one with
+your phone's camera or choose a file. Up to 10 MB each. We look at every document by hand.</p>
+
+<div class="docs">
+${REQUIRED_DOCUMENTS.map((t) => docBox(t, documents, { required: true })).join('\n')}
+</div>
+
+<details class="optional"${optionalUploaded ? ' open' : ''}>
+  <summary>Optional documents — they can speed up the review</summary>
+  <div class="docs">
+${OPTIONAL_DOCUMENTS.map((t) => docBox(t, documents, { required: false })).join('\n')}
+  </div>
+</details>
+
+<p class="muted" style="margin-top:24px"><b>${have} of ${REQUIRED_DOCUMENTS.length}</b> required documents uploaded.</p>
+<div class="submit-row">${
+      ready
+        ? '<a class="cta" href="/platform/apply/review">Continue — check and submit</a>'
+        : '<button class="cta" type="button" disabled>Upload the three required documents to continue</button>'
+    }</div>
+<p><a href="/platform/apply">← Back to your details</a></p>
+
+<script>
+(function () {
+  var CSRF = ${js(csrfToken)};
+  var APPLICATION = ${js(application.id)};
+  var MAX = ${MAX_DOCUMENT_BYTES};
+
+  function isHeic(file) { return /\\.(heic|heif)$/i.test(file.name || '') || /heic|heif/i.test(file.type || ''); }
+
+  // A photo becomes a JPEG any computer can show; a PDF is left alone.
+  function asJpeg(file) {
+    return new Promise(function (resolve) {
+      if (!/^image\\//.test(file.type || '') && !isHeic(file)) return resolve(file);
+      var url = URL.createObjectURL(file);
+      var img = new Image();
+      img.onload = function () {
+        var longest = Math.max(img.naturalWidth, img.naturalHeight) || 1;
+        var k = Math.min(1, 2400 / longest);
+        var canvas = document.createElement('canvas');
+        canvas.width = Math.round(img.naturalWidth * k);
+        canvas.height = Math.round(img.naturalHeight * k);
+        canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
+        URL.revokeObjectURL(url);
+        canvas.toBlob(function (blob) {
+          if (!blob) return resolve(file);
+          var name = (file.name || 'photo').replace(/\\.[^.]+$/, '') + '.jpg';
+          resolve(new File([blob], name, { type: 'image/jpeg' }));
+        }, 'image/jpeg', 0.88);
+      };
+      // This browser cannot read it (a HEIC outside Safari): send the original.
+      img.onerror = function () { URL.revokeObjectURL(url); resolve(file); };
+      img.src = url;
+    });
+  }
+
+  function post(url, params) {
+    return fetch(url, {
+      method: 'POST',
+      credentials: 'same-origin',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: params.toString()
+    });
+  }
+
+  async function send(input) {
+    var box = input.closest('.doc-box');
+    var note = box.querySelector('.doc-note');
+    var file = input.files && input.files[0];
+    if (!file) return;
+    box.classList.add('busy');
+    note.textContent = 'Preparing…';
+    try {
+      file = await asJpeg(file);
+      var type = file.type || (isHeic(file) ? 'image/heic' : '');
+      if (file.size > MAX) { note.textContent = 'That file is larger than 10 MB. Please send a smaller scan or photo.'; return; }
+
+      var params = new URLSearchParams({
+        csrf: CSRF, application_id: APPLICATION, doc_type: input.dataset.type,
+        filename: file.name, mime_type: type, size_bytes: String(file.size)
+      });
+
+      // 1. The server decides WHERE it goes.
+      var ask = await post('/platform/my-gym/documents/request', params);
+      var target = await ask.json().catch(function () { return {}; });
+      if (!ask.ok) { note.textContent = target.error || 'That file was not accepted.'; return; }
+
+      // 2. The bytes go straight to private storage, never through our server.
+      note.textContent = 'Uploading…';
+      var put = await fetch(target.uploadUrl, {
+        method: 'PUT',
+        headers: { 'Content-Type': type, Authorization: 'Bearer ' + target.token },
+        body: file
+      });
+      if (!put.ok) { note.textContent = 'The upload did not finish. Please try again.'; return; }
+
+      // 3. Recorded, so a reviewer can find it.
+      params.set('storage_ref', target.path);
+      params.set('respond', 'json');
+      var done = await post('/platform/my-gym/documents/confirm', params);
+      if (!done.ok) { note.textContent = 'We could not record that upload. Please try again.'; return; }
+
+      note.textContent = 'Uploaded ✓';
+      location.reload();
+    } catch (err) {
+      note.textContent = 'Something went wrong. Please check your connection and try again.';
+    } finally {
+      box.classList.remove('busy');
+      input.value = '';
+    }
+  }
+
+  document.querySelectorAll('.doc-box input[type=file]').forEach(function (input) {
+    input.addEventListener('change', function () { send(input); });
+  });
+})();
+</script>`,
+  });
+}
+
+/**
+ * Step 3 — everything the owner wrote and every document, before it is sent
+ * (CLAUDE.md §42: "submit after checking that he wrote correctly"). Submit is
+ * unavailable until the three documents are in, and the server refuses it too.
+ */
+export function applyReviewPage({
+  application,
+  documents = [],
+  email = '',
+  ownerName = '',
+  plans = [],
+  csrfToken = '',
+  error = '',
+  user = null,
+} = {}) {
+  const a = application;
+  const plan = plans.find((p) => p.key === a.requested_plan_key);
+  const missing = REQUIRED_DOCUMENTS.filter((t) => {
+    const latest = latestOf(t, documents);
+    return !latest || latest.status === 'rejected';
+  });
+  const ready = missing.length === 0;
+  const fact = (label, value) => `<dt>${h(label)}</dt><dd>${value ? h(value) : '<span class="muted">not given</span>'}</dd>`;
+
+  const docLines = [...REQUIRED_DOCUMENTS, ...OPTIONAL_DOCUMENTS]
+    .map((t) => {
+      const latest = latestOf(t, documents);
+      const required = REQUIRED_DOCUMENTS.includes(t);
+      if (!latest && !required) return '';
+      const ok = latest && latest.status !== 'rejected';
+      return `<li class="${ok ? 'ok' : ''}"><b>${h(DOCUMENT_LABELS[t] || t)}</b> ${
+        ok
+          ? `<span class="muted">· <a href="/platform/apply/documents/${h(latest.id)}" target="_blank" rel="noopener">${h(latest.filename || 'open')}</a></span>`
+          : '<span class="err">· missing</span>'
+      }</li>`;
+    })
+    .filter(Boolean)
+    .join('\n    ');
+
+  return layout({
+    title: 'Check and submit',
+    user,
+    body: `<style>${SIGNUP_STYLE}${APPLY_STEP_STYLE}</style>
+${applySteps(3)}
+<h1>Check and submit</h1>
+<p class="muted">Read it through once. A person reviews exactly what is below, and uses it to decide.</p>
+${error ? `<p class="err" role="alert">${h(error)}</p>` : ''}
+
+<div class="apply-card">
+  <div class="review-head"><h2>You and your gym</h2><a href="/platform/apply">Edit</a></div>
+  <dl class="facts">
+    ${fact('Your name', ownerName)}
+    ${fact('Email', email)}
+    ${fact('Phone', a.owner_phone)}
+    ${fact('Gym name', a.proposed_gym_name)}
+    ${fact('Street address', a.gym_address)}
+    ${fact('City', a.city)}
+    ${fact('Country', a.country)}
+    ${fact('Plan', plan?.label || a.requested_plan_key)}
+    ${fact('Roughly how many members', a.estimated_members != null ? String(a.estimated_members) : '')}
+    ${fact('Anything else you need', a.owner_needs)}
+  </dl>
+</div>
+
+<div class="apply-card" style="margin-top:14px">
+  <div class="review-head"><h2>Documents</h2><a href="/platform/apply/documents">Change</a></div>
+  <ul class="checklist">
+    ${docLines}
+  </ul>
+</div>
+
+<form class="wide" method="post" action="/platform/apply/submit" style="margin-top:14px">
+  <input type="hidden" name="csrf" value="${h(csrfToken)}">
+  <label class="agree">
+    <input type="checkbox" name="confirm" value="yes" required>
+    <span>I have checked that everything above is correct, and the documents are genuine.</span>
+  </label>
+  <div class="submit-row"><button type="submit"${ready ? '' : ' disabled'}>Submit application</button></div>
+  ${ready ? '' : `<p class="muted">Upload the missing documents first: ${h(missing.map((t) => DOCUMENT_LABELS[t] || t).join(', '))}.</p>`}
+</form>`,
   });
 }
 
@@ -1602,6 +1952,10 @@ ${gymLogin}`,
  */
 function ownerApplicationText(application) {
   switch (application.status) {
+    case 'draft':
+      return `<p><b>Your application has not been sent yet.</b> Upload your three documents, check what
+  you wrote, and submit it — then a person reviews it.</p>
+  <p><a class="btn" href="/platform/apply/documents">Continue your application →</a></p>`;
     case 'info_requested':
       return `<p><b>We need something more from you:</b> ${h(application.review_notes) || 'please check your email.'}</p>
   <p class="muted">Upload it below and the review carries on straight away.</p>`;
@@ -1703,7 +2057,7 @@ ${documents
     : `<div class="empty">Nothing uploaded yet.</div>`;
 
   // The upload form only appears while there is an application to attach to.
-  const upload = application
+  const upload = application && application.status !== 'draft'
     ? `<form class="card" id="doc-form">
   <h2>Send a document</h2>
   <input type="hidden" name="csrf" value="${h(csrfToken)}">
@@ -2271,7 +2625,8 @@ export function documentReviewPage({
   <a class="btn ghost" href="${src}?download=1">Download</a>
 </p>`;
   const viewer = isImage
-    ? `${tools}<img src="${src}" alt="${h(doc.filename)}" style="max-width:100%;border:1px solid var(--line);border-radius:12px">`
+    ? `${tools}<img src="${src}" alt="${h(doc.filename)}" style="max-width:100%;border:1px solid var(--line);border-radius:12px"
+  onerror="this.outerHTML='<div class=&quot;empty&quot;><p>This browser cannot show this photo. Use <b>Download</b> above to open it.</p></div>'">`
     : `${tools}<object data="${src}" type="application/pdf" style="width:100%;height:78vh;border:1px solid var(--line);border-radius:12px;background:#fff">
   <div class="empty">
     <p>This browser cannot show the PDF here. Use <b>Open in a new tab</b> or <b>Download</b> above.</p>
