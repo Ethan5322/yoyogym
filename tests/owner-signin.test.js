@@ -246,3 +246,11 @@ test('Q3 THE WEBSITE IS NOT AN INSTALLABLE WEB APP', () => {
   const sw = readFileSync(new URL('../public/sw.js', import.meta.url), 'utf8');
   assert.match(sw, /self\.registration\.unregister\(\)/);
 });
+
+test("THE REGISTRY'S OWNER LOOKUP IS NOT LIMITED TO GYM-OWNER ACCOUNTS — KOM's owner is a staff account", () => {
+  const src = readFileSync(new URL('../server/lib/tenancy-deps.js', import.meta.url), 'utf8');
+  const fn = src.slice(src.indexOf('ownerGymSlugs: async'), src.indexOf('lookupGym: async'));
+  assert.doesNotMatch(fn, /\.eq\('kind', 'gym_owner'\)/, 'KOM is owned by the platform owner\'s staff account');
+  assert.match(fn, /\.eq\('is_active', true\)/, 'a switched-off account owns nothing');
+  assert.match(fn, /\.eq\('status', 'active'\)/, 'only open gyms');
+});

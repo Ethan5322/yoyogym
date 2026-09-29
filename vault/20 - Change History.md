@@ -15,6 +15,20 @@ occurrence is answered from notes rather than rediscovered.
 
 ---
 
+## 2026-09-29 — Final check before the build: KOM's owner could not use "Owner login"; CLAUDE.md brought up to date
+
+Asked by the user to check for anything left over before the final build. **Found:** the email sign-in
+looked for owners among `gym_owner` accounts only, and KOM's registered owner is the platform owner's
+own `platform_staff` account — so KOM's owner was refused at `/owner/login`, against §43's "works for all
+gym owners". The kind filter added nothing (each gym checks the password against its own account) and
+is gone; any active account a gym names as its owner may sign in. **Checked and fine:** no TODO/FIXME
+markers in the code; the app icon is already the new logo. **CLAUDE.md:** §5–§30 corrected where they
+had gone stale (routers, schemas and table counts, object storage, sessions, crons, the PWA reversal,
+the decided items in §17 and §30, the vault), and the §35 status block rewritten to the real state.
+1122 tests.
+
+---
+
 ## 2026-09-29 — Why COCATE's features were locked and its sign-ups closed; the nightly job that never ran (D-169)
 
 **Read first (live, read-only).** COCATE resolves to Medium: 16 of 23 services; the 7 locked are exactly

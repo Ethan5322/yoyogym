@@ -113,9 +113,11 @@ export function tenancyDeps() {
 
     /**
      * The open gyms owned by the Yoyo account with this email (CLAUDE.md §43.1
-     * Q2: owners sign in with email + password alone). Only a gym-owner
-     * account, only an active one, only open gyms. Says nothing about the
-     * password — each gym checks that against its own account.
+     * Q2: owners sign in with email + password alone). Any active account that
+     * a gym names as its owner — KOM's is the platform owner's own STAFF
+     * account, and filtering on the gym-owner kind locked KOM's owner out.
+     * Only open gyms. Says nothing about the password: each gym checks that
+     * against its own account.
      */
     ownerGymSlugs: async (email) => {
       const db = platformClient();
@@ -125,7 +127,6 @@ export function tenancyDeps() {
         .from('platform_users')
         .select('id')
         .eq('email', wanted)
-        .eq('kind', 'gym_owner')
         .eq('is_active', true)
         .maybeSingle();
       if (error) throw new Error(`Could not look up the owner: ${error.message}`);
