@@ -83,6 +83,13 @@ export default async function handler(req, res) {
       supabase.from('payments').select('id', { count: 'exact', head: true }).eq('status', 'failed')
     );
 
+    // A new gym has no membership plans, and a member who tries to join fills
+    // in their details and health questions before meeting "No membership
+    // plans are configured yet". Counted so the owner is told first.
+    const enabledPlans = await count(
+      supabase.from('plans').select('id', { count: 'exact', head: true }).eq('is_enabled', true)
+    );
+
     // Outstanding (unsettled) balance + unread inbox messages for the home tiles.
     const { data: unsettled } = await supabase.from('payments').select('amount').in('status', ['pending', 'failed']);
     const outstandingTotal = sumAmount(unsettled);
@@ -169,6 +176,7 @@ export default async function handler(req, res) {
       revenue_month_prev: sumAmount(revMonthPrev.data),
       outstanding_total: outstandingTotal,
       unread_messages: unreadMessages,
+      enabled_plans: enabledPlans,
       recent_registrations: recent.data || [],
       deletion_requests: deletionRequests || [],
       activity: feed,

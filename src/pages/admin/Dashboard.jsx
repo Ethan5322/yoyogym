@@ -41,6 +41,13 @@ export default function Dashboard() {
   const attention = !d
     ? []
     : [
+        // A gym that sells nothing yet cannot take a single member: said first,
+        // because it blocks everything else (a brand-new gym, 2026-09-29).
+        d.enabled_plans === 0 && {
+          tone: 'bad',
+          to: '/admin/catalog',
+          text: 'Add your membership plans — members cannot join until you do',
+        },
         // A legal request (POPIA) comes first — one row per member.
         ...(d.deletion_requests || []).map((m) => ({
           tone: 'bad',

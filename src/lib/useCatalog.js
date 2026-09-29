@@ -2,21 +2,25 @@
 // caches it for the registration session. Prices always come from the server.
 import { useEffect, useState } from 'react';
 import { apiFetch } from './api.js';
+import { currentGymSlug } from './gym.js';
 
-let _cache = null;
+// ONE ENTRY PER GYM. This was a single slot, so moving from one gym's sign-up
+// to another's in the same session showed the first gym's plans and prices.
+const _cache = new Map();
 
 export function useCatalog() {
-  const [data, setData] = useState(_cache);
-  const [loading, setLoading] = useState(!_cache);
+  const key = currentGymSlug() || '~home';
+  const [data, setData] = useState(_cache.get(key) || null);
+  const [loading, setLoading] = useState(!_cache.has(key));
   const [error, setError] = useState(null);
 
   useEffect(() => {
-    if (_cache) return;
+    if (_cache.has(key)) return;
     let active = true;
     (async () => {
       try {
         const res = await apiFetch('/catalog', { auth: false });
-        _cache = res;
+        _cache.set(key, res);
         if (active) setData(res);
       } catch (err) {
         if (active) setError(err.message);
@@ -27,7 +31,7 @@ export function useCatalog() {
     return () => {
       active = false;
     };
-  }, []);
+  }, [key]);
 
   return { catalog: data, loading, error };
 }

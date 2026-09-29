@@ -98,6 +98,19 @@ export function tenancyDeps() {
       }
     },
 
+    /**
+     * Every gym the scheduled jobs run for: open for business. Not cached —
+     * it is read a few times a day, and a gym opened this morning must be in
+     * tonight's run. Throws when the registry cannot be read, so the caller
+     * can fall back to the home gym rather than run for nobody.
+     */
+    servingGymSlugs: async () => {
+      const db = platformClient();
+      const { data, error } = await db.from('gyms').select('slug').eq('status', 'active').order('created_at', { ascending: true });
+      if (error) throw new Error(`Could not list the gyms: ${error.message}`);
+      return (data || []).map((g) => String(g.slug).toLowerCase());
+    },
+
     /** The registry row for a slug, with its connection. */
     lookupGym: async (slug) => {
       const key = String(slug).toLowerCase();

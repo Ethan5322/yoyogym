@@ -8,6 +8,7 @@ import SuccessScreen from '../chatbot/components/SuccessScreen.jsx';
 import { apiFetch } from '../lib/api.js';
 import { logQrScan } from '../lib/scan.js';
 import GymBackdrop from '../components/GymBackdrop.jsx';
+import { useCatalog } from '../lib/useCatalog.js';
 
 export default function Register({ manual = false }) {
   const [status, setStatus] = useState('idle'); // idle | saving | done | error
@@ -35,6 +36,11 @@ export default function Register({ manual = false }) {
   );
 
   const engine = useChatEngine({ onComplete: save });
+  // The same catalog the membership step reads (cached per gym), asked for up
+  // front: a gym with no plans cannot take a member, and saying so after the
+  // details and health questions wasted the member's time.
+  const { catalog, loading: catalogLoading } = useCatalog();
+  const noPlans = !catalogLoading && catalog && !(catalog.plans || []).length;
 
   let completeView = null;
   if (status === 'saving') {
@@ -61,6 +67,27 @@ export default function Register({ manual = false }) {
 
   // The gym's poster behind registration (CLAUDE.md §39.1 Q4). Outside the
   // chat window: its frosted glass would otherwise hold the poster inside it.
+  if (noPlans) {
+    return (
+      <>
+        <GymBackdrop />
+        <main className="mx-auto flex min-h-screen max-w-md items-center px-4">
+          <div className="card w-full animate-fade-up text-center">
+            <h1 className="font-display text-2xl">Not taking sign-ups yet</h1>
+            <p className="mt-3 text-body">
+              {manual
+                ? 'Add your membership plans in Catalog first — a member needs a plan to join.'
+                : 'This gym has not opened online sign-ups yet. Please ask at the front desk, or check back soon.'}
+            </p>
+            <button className="btn-outline mt-6 w-full" onClick={() => window.history.back()}>
+              Go back
+            </button>
+          </div>
+        </main>
+      </>
+    );
+  }
+
   return (
     <>
       <GymBackdrop />

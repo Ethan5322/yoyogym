@@ -12,6 +12,21 @@ import {
 } from './channels.js';
 import { memberTemplates, ownerTemplates } from './templates.js';
 import { BRAND, accentOrDefault } from '../../../shared/brand.js';
+import { currentGym } from '../tenancy.js';
+
+/**
+ * Is this the deployment's OWN gym — the one whose owner the server's
+ * environment variables (OWNER_EMAIL, the CallMeBot keys) belong to?
+ *
+ * THOSE VARIABLES ARE ONE GYM'S CONTACTS. They were the fallback for every
+ * gym, so any gym that had not typed its own contacts sent its owner alerts —
+ * a new member's name and phone, their payments, a PAR-Q health flag — to
+ * KOM's owner. Found evaluating the first live gym (2026-09-29).
+ */
+export function servingHomeGym() {
+  const gym = currentGym();
+  return !gym || gym.schema === (process.env.SUPABASE_SCHEMA || 'gym');
+}
 
 async function loadConfig(supabase) {
   const { data } = await supabase
@@ -20,19 +35,37 @@ async function loadConfig(supabase) {
     .in('key', ['gym_profile', 'notifications', 'notification_toggles']);
   const map = Object.fromEntries((data || []).map((r) => [r.key, r.value || {}]));
   const n = map.notifications || {};
+  // The environment is KOM's; any other gym falls back to its own owner's
+  // account instead — the email they activated with, in their own schema.
+  const home = servingHomeGym();
+  const env = (value) => (home ? value : undefined);
+  let ownerEmail = n.owner_email || env(process.env.OWNER_EMAIL);
+  if (!ownerEmail && !home) {
+    const { data: owner } = await supabase
+      .from('admin_users')
+      .select('email')
+      .eq('role', 'owner')
+      .eq('is_active', true)
+      .not('email', 'is', null)
+      .limit(1)
+      .maybeSingle();
+    ownerEmail = owner?.email || undefined;
+  }
+  // The gym's own saved name; then its registry name — never another gym's.
+  const gymName = map.gym_profile?.name || map.gym_profile?.gym_name || currentGym()?.gym?.search_name || null;
   return {
-    gymName: map.gym_profile?.name || 'Your Gym',
+    gymName: gymName || 'Your Gym',
     // The gym's own colour, or the Yoyo lime (CLAUDE.md §37).
     accent: accentOrDefault(map.gym_profile?.accent_color),
     sender: {
       email: process.env.BREVO_SENDER_EMAIL || n.sender_email,
-      name: map.gym_profile?.name || process.env.BREVO_SENDER_NAME,
+      name: gymName || env(process.env.BREVO_SENDER_NAME) || 'Yoyo Gyms',
     },
     owner: {
-      email: n.owner_email || process.env.OWNER_EMAIL,
-      whatsappPhone: n.owner_whatsapp_phone || process.env.CALLMEBOT_WHATSAPP_PHONE,
-      whatsappApiKey: n.owner_whatsapp_apikey || process.env.CALLMEBOT_WHATSAPP_APIKEY,
-      telegramUser: n.owner_telegram_user || process.env.CALLMEBOT_TELEGRAM_USERNAME,
+      email: ownerEmail,
+      whatsappPhone: n.owner_whatsapp_phone || env(process.env.CALLMEBOT_WHATSAPP_PHONE),
+      whatsappApiKey: n.owner_whatsapp_apikey || env(process.env.CALLMEBOT_WHATSAPP_APIKEY),
+      telegramUser: n.owner_telegram_user || env(process.env.CALLMEBOT_TELEGRAM_USERNAME),
     },
     toggles: map.notification_toggles || {},
   };

@@ -15,6 +15,36 @@ occurrence is answered from notes rather than rediscovered.
 
 ---
 
+## 2026-09-29 — What a second gym would have met: evaluation after the build fix
+
+Asked by the user to evaluate the whole gym app and admin system once the build was fixed. Walked the
+path of a NEW gym (not KOM) through the code; five defects, all specific to being the second gym:
+
+1. **Owner alerts went to KOM's owner.** `server/lib/notify/index.js` fell back to `OWNER_EMAIL` and the
+   CallMeBot variables — KOM's contacts — for every gym that had not typed its own. A new gym's members'
+   names, phones, payments and **PAR-Q health flags** would have reached another gym's owner. Now the
+   environment is used only when serving the home gym (`servingHomeGym()`: no gym in scope, or the
+   default schema); any other gym falls back to its own owner account's email, in its own schema.
+2. **Scheduled jobs ran for KOM only.** Vercel calls the cron with no gym named, so `withGym` served the
+   home gym alone: no other gym's memberships ever expired, reminders never went, pauses never ended,
+   overdue members were never suspended. `forEveryGym()` (`server/lib/every-gym.js`) now runs each job for
+   every active gym inside its own schema, one gym's failure not stopping the next; with the registry
+   unreadable, the home gym still runs (fail open). A call naming a gym still runs for that gym alone.
+3. **A new gym had no name of its own.** Provisioning seeded `gym_profile.gym_name`; everything reads
+   `gym_profile.name`. Seeded as `name` now, merged on a retry; notifications fall back to the registry
+   name, never to KOM's sender name.
+4. **A member could type everything before learning the gym sells nothing.** A new gym has no plans;
+   the chatbot reached "No membership plans are configured yet" after the details and PAR-Q. The page
+   now says so first, and the owner's dashboard leads with "Add your membership plans".
+5. **The catalog cache was one slot for every gym** (`src/lib/useCatalog.js`): another gym's plans could
+   show in the same session. Keyed by gym now.
+
+Checked and fine: QR codes follow the gym's own `/g/<slug>/` address; branding uploads go to the gym's
+own folder; the member-services cache is keyed per schema; activation creates the owner's gym account
+before consuming the link and opens the gym. 1085 tests (7 new).
+
+---
+
 ## 2026-09-29 — The first live gym failed to build: the wrong owner field (D-167)
 
 **Reported:** COCATE GYM was approved, and its owner's gym sign-in said "Invalid username or password".

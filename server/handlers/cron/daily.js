@@ -16,11 +16,8 @@ import { run as resumePauses } from './resume-pauses.js';
 // NOTE: daily_summary runs on its own 8 PM schedule (spec Part 5 #10), so it is
 // intentionally NOT included in this morning orchestrator.
 
-export default async function handler(req, res) {
-  if (!allowMethods(req, res, ['GET', 'POST'])) return;
-  if (!authorizeCron(req, res)) return;
-
-  const supabase = getSupabase();
+/** The morning's jobs for ONE gym (the router runs this for every gym). */
+export async function runDaily(supabase) {
   const jobs = [
     ['suspend_overdue', suspendOverdue],
     ['billing_reminders', billingReminders],
@@ -40,6 +37,11 @@ export default async function handler(req, res) {
       results[name] = { error: err.message };
     }
   }
+  return results;
+}
 
-  return ok(res, { ran: true, at: new Date().toISOString(), results });
+export default async function handler(req, res) {
+  if (!allowMethods(req, res, ['GET', 'POST'])) return;
+  if (!authorizeCron(req, res)) return;
+  return ok(res, { ran: true, at: new Date().toISOString(), results: await runDaily(getSupabase()) });
 }

@@ -148,16 +148,21 @@ export function schemaRunnerDeps({ projectRef } = {}) {
       // existing seed script at handover, so a password is never generated here
       // and emailed around.
       assertSafe(schema);
+      // `name` is the key the whole gym app reads (Settings, the public pages,
+      // the notifications). This wrote `gym_name`, which nothing reads, so a
+      // new gym had no name of its own (found 2026-09-29).
       const profile = JSON.stringify({
-        gym_name: application.proposed_gym_name,
+        name: application.proposed_gym_name,
         city: application.city,
         country: application.country,
       }).replace(/'/g, "''");
 
+      // A retried build ADDS what is missing and keeps whatever is already
+      // there — the right-hand side of || wins, and that is the saved value.
       await runSql(
         `insert into ${schema}.settings (key, value, category)
          values ('gym_profile', '${profile}'::jsonb, 'branding')
-         on conflict (key) do nothing;`,
+         on conflict (key) do update set value = excluded.value || ${schema}.settings.value;`,
         opts
       );
     },
