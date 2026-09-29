@@ -33,32 +33,12 @@ Yoyo Gyms must extend and connect to the existing system without replacing its w
 **Build discipline (binding):** work proceeds **one stage at a time** per §34. Finish, verify and
 get approval for a stage before opening the next. Do not work ahead. Do not bundle stages.
 
-## 2. First install the required mobile design skill
+## 2. Mobile design skill
 
-Before designing or building mobile-app screens, install the following Claude Code skill:
+The `mobile-app-ui-design` skill (in `.claude/skills/`) covers mobile screens, onboarding, owner and
+member registration entry, gym search, QR entry, login, navigation and mobile UI components.
 
-```bash
-npx -y skills add ceorkm/mobile-app-ui-design --agent claude-code
-```
-
-Use this skill for:
-
-- Mobile app screen design.
-- Mobile onboarding.
-- Owner registration screens.
-- Member registration entry screens.
-- Gym search screens.
-- QR-code entry screens.
-- Login screens.
-- Navigation.
-- Mobile UI components.
-- Android and iPhone design consistency.
-- Accessibility and responsive mobile layouts.
-
-Do not install or use this skill to redesign the existing single-gym system without explicit approval.
-
-**Timing:** this install is the entry gate for **Stage 8 (mobile app)**, not for Stage 0. Install it
-when Stage 8 opens, or earlier on explicit request. Do not install it automatically.
+Do not use this skill to redesign the existing single-gym system without explicit approval.
 
 ## 3. Core purpose
 
@@ -117,11 +97,14 @@ The existing repository was inspected and confirmed as follows **[verified]**:
 - Tailwind CSS.
 - React Router.
 - Vercel serverless API routes.
-- Six thin API routers under `api/*` (`[...path].js`, `auth`, `admin`, `member`, `payments`, `cron`).
+- Six thin API routers under `api/*` (`[...path].js`, `auth`, `admin`, `member`, `cron`, `platform`)
+  **[updated 2026-09-29]** — the member-payments router went with member payments (2026-09-21);
+  `platform` serves the main admin panel and the app's JSON API.
 - Business logic under `server/` — deliberately outside `api/` so only the six routers count as
   Serverless Functions against the Vercel plan limit.
 - Supabase PostgreSQL.
-- Database schema named `gym`.
+- Database schema named `gym` — KOM's. Every further gym has its own schema `gym_<slug>` in the same
+  project (D-096), and the platform registry is the `platform` schema **[updated 2026-09-29]**.
 - Service-role database access (`SUPABASE_SERVICE_ROLE_KEY`, bypasses RLS).
 - RLS enabled on every table but with **no policies**, resulting in browser default-deny behaviour.
 - JWT authentication using `jsonwebtoken`.
@@ -134,17 +117,21 @@ The existing repository was inspected and confirmed as follows **[verified]**:
 - QR generation using `qrcode`.
 - QR scanning using `jsqr`.
 - In-browser face recognition using `@vladmandic/face-api`.
-- Three Vercel cron jobs (`daily` 06:00, `daily-summary` 20:00, `weekly-schedule` Mon 07:00).
-- Unit tests (`npm test`, `node --test`, 5 test files) and GitHub Actions CI.
+- Three Vercel cron jobs (`daily` 06:00, `daily-summary` 20:00, `weekly-schedule` Mon 07:00). Since
+  2026-09-29 each runs for EVERY active gym inside its own schema (`server/lib/every-gym.js`), and the
+  06:00 run also calls the platform's nightly job (billing, drift report, retention).
+- Unit tests (`npm test`, `node --test` — 86 test files, 1122 tests on 2026-09-29) and GitHub Actions CI.
 - Error capture (`server/lib/observability.js`) and rate limiting (`server/lib/ratelimit.js`,
   Upstash-ready with in-memory fallback).
 
 Additional verified facts not previously recorded **[verified]**:
 
-- **No object storage is in use.** Member photos are a `photo_url` text column and face templates
-  are `jsonb` columns **inside Postgres**. This materially affects both mobile and 10,000-gym cost
-  planning and must be revisited in Stage 3.
-- `shared/` holds code used by both client and server: `pricing.js`, `countries.js`.
+- **Object storage [updated 2026-09-29]:** Supabase Storage now holds gym branding (public
+  `gym-branding` bucket — logo, cover, poster; §38.1 Q5) and gym-owner application documents (a private
+  bucket, opened by 5-minute signed links). Member photos (`photo_url`) and face templates (`jsonb`) are
+  still **inside Postgres** — their storage is still **[undecided]** (§30).
+- `shared/` holds code used by both client and server: `pricing.js`, `countries.js`, `brand.js`,
+  `features.js`, `facilities.js`, `member-directory.js`, `qr-payload.js`, `cors.js`, `yoyo-logo.js`.
 - `face-service/` contains an **unused** Python/FastAPI InsightFace (ArcFace) microservice. It is
   deliberately **deferred** — `FACE_SERVICE_URL` is intentionally unset and the app runs on the
   in-browser face-api engine. Do not activate it without a decision.
@@ -160,45 +147,32 @@ Do not assume this architecture is final for the multi-tenant platform. Treat it
 
 ## 6. Existing single-gym database
 
-The existing schema contains **24 tables** **[verified — counted in `db/schema.sql`]**:
+The gym schema contains **31 tables** **[verified 2026-09-29 — counted in `db/schema.sql`]** (24 at the
+start; the member services of §41 and later features added the rest); the list is in that file. The
+platform's own 21 tables are in `platform/schema.sql`.
 
-- `admin_users`
-- `trainers`
-- `plans`
-- `addon_services`
-- `members`
-- `memberships`
-- `parq_responses`
-- `member_addons`
-- `payments`
-- `checkins`
-- `classes`
-- `class_bookings`
-- `training_sessions`
-- `notifications_log`
-- `admin_inbox`
-- `progress_entries`
-- `referrals`
-- `announcements`
-- `settings`
-- `qr_scan_analytics`
-- `events`
-- `visitors`
-- `incidents`
-- `audit_log`
+16 migrations exist in `db/migrations/`, latest `2026-09-29-member-services.sql` (the platform's own are in
+`platform/migrations/`). Every table created by a migration also appears in `db/schema.sql`; the schema
+file is the complete picture — and it is what builds every NEW gym's schema.
 
-13 migrations exist in `db/migrations/`, latest `2026-07-11-international-members.sql`. Every table
-created by a migration also appears in `db/schema.sql`; the schema file is the complete picture.
-
-The existing schema currently represents one gym through one Supabase project and one deployment.
-
-The existing schema does not currently use `gym_id` or `tenant_id`.
-
-Do not add `gym_id`, `tenant_id`, migrations, or tenant policies until the tenancy architecture has been explicitly decided.
+The schema does not use `gym_id` or `tenant_id`, and does not need to: the tenancy decision (D-016 →
+D-096) isolates each gym in **its own schema**, so a gym's tables hold only that gym's rows.
 
 ## 7. Existing current tenancy model
 
-The current repository uses:
+**NOW [updated 2026-09-29] — decided (D-016, refined by D-096) and live:**
+
+```text
+One Vercel deployment + one Supabase project
++ one SCHEMA per gym (KOM = `gym`, each new gym = `gym_<slug>`)
++ the `platform` schema: the registry that says which gym is which, its plan and status
+```
+
+A request names its gym (`/g/<slug>/`, or the gym stamped in its session); `withGym` resolves it
+through the registry and every query runs inside that gym's schema (`getSupabase()`). The rest of this
+section is the single-gym starting point, kept as history.
+
+**Before the platform,** the repository used:
 
 ```text
 One Vercel deployment
@@ -243,44 +217,21 @@ The current system has these confirmed roles:
 
 The current administrator login uses:
 
-- Username.
+- Username — or the account's email (§36.1 Q12). Owners can also sign in with email alone at
+  `/owner/login`, their own gym checking the password (§43.1 Q2).
 - Password.
 - Bcrypt password verification.
 - Generic login errors (never reveals whether a username exists).
 - Five failed attempts causing a 15-minute lockout.
 - Disabled-account checks.
-- Eight-hour JWT sessions.
+- Eight-hour JWT sessions in a browser; in the app, until sign-out (§38.1 Q3).
 - Role information in the JWT (`sub`, `username`, `role`, `full_name`, `trainer_id`).
 - Face login for administrators (`/api/auth/face-login`).
 
-The current admin panel has **23 role-guarded routes plus an unguarded `/admin/login`**
-**[verified in `src/App.jsx`]**:
+The admin panel has **25 role-guarded routes plus an unguarded `/admin/login`**
+**[verified in `src/App.jsx`, 2026-09-29]**. Settings and Staff are owner-only; Clients is trainer-only.
 
-- Dashboard (`/admin`).
-- Verify.
-- FaceScan.
-- Attendance.
-- Visitors.
-- Incidents.
-- Members.
-- MemberDetail.
-- Today.
-- Classes.
-- Trainers.
-- Payments.
-- Analytics.
-- Calendar.
-- Communications.
-- ManualRegister.
-- Catalog.
-- QrCodes.
-- Settings (owner only).
-- Staff (owner only).
-- AuditLog.
-- Inbox.
-- Clients (trainer only).
-
-They are backed by 37 admin handlers under `server/handlers/admin/`.
+They are backed by 42 admin handlers under `server/handlers/admin/`.
 
 Preserve these existing routes and functions unless a future approved integration requires a controlled change.
 
@@ -290,7 +241,7 @@ The current member login uses:
 
 - Membership number.
 - Phone number.
-- A 12-hour member JWT.
+- A 12-hour member JWT in a browser; in the app, until sign-out (§38.1 Q2).
 - JWT audience set to `member`.
 
 There is **no member password and no member email login** **[verified]**.
@@ -341,14 +292,7 @@ The existing system contains:
 - Credential PDFs.
 - Staff contracts.
 
-Confirmed implementation files include **[verified]**:
-
-- `src/lib/pdf/generateMembershipPdf.js`
-- `src/lib/idcard.js`
-- `src/lib/receiptPdf.js`
-- `src/lib/credentialPdf.js`
-- `src/lib/staffContractPdf.js`
-- `src/lib/boardReportPdf.js`
+Implementation files are under `src/lib/` **[verified]**.
 
 Member document delivery currently includes a document endpoint at:
 
@@ -418,7 +362,8 @@ qr_scan_analytics
 ```
 
 Current QR codes do not contain a gym identifier. Because the URL is derived from the deployment's
-own origin, gym identity today is **implicit in the domain**.
+own origin, gym identity today is **implicit in the domain**. **[updated 2026-09-29]** Inside a gym's
+own `/g/<slug>/` admin panel the QR codes carry that address, so each gym's codes open that gym.
 
 Do not change current QR behavior until the future gym-routing architecture is approved.
 
@@ -481,11 +426,13 @@ The owner side must eventually support:
 - Owner login.
 - Opening the owner's assigned gym system.
 
-Do not build the mobile app until the tenancy and platform-boundary decisions are completed.
+**BUILT [updated 2026-09-29]:** the app is a Capacitor app in `apps/mobile` (Stage 8), not yet verified
+on a real phone.
 
 **DECIDED 2026-09-21 (D-038):** the app is **one cross-platform codebase shipped as real store
 apps** on Android and iPhone — not a PWA, and not two separate native codebases. The existing PWA
-(`public/manifest.webmanifest`, `public/sw.js`) **[verified]**) stays as the gym's own web surface.
+(`public/manifest.webmanifest`, `public/sw.js`) stayed as the gym's own web surface — **REVERSED
+2026-09-29 (§43.1 Q3): the website is no longer installable**; the only app is the store app.
 
 **DECIDED 2026-09-21 (D-036):** entry is **in-app** — scan the gym's QR or search the gym name
 against the platform registry. **No per-gym subdomains.**
@@ -540,19 +487,23 @@ Gym owner applies
 → Owner opens assigned existing gym admin panel
 ```
 
-The following remain decisions **[undecided]**:
+**[updated 2026-09-29]** Decided since, and live:
 
-- Required documents.
-- Approval rules.
+- ~~Required documents.~~ ID, business registration, proof of address — each ACCEPTED by a reviewer (§40.1 Q3).
+- ~~Approval rules.~~ A person approves; only a SUBMITTED application with the three accepted (§42).
+- ~~Rejection and appeal process.~~ A reason is required and emailed; the owner may apply again; no formal appeal.
+- ~~Trial period.~~ 30 days, opened when the gym is built.
+- ~~Monthly pricing.~~ Data in `platform_plans`, set on the Plans page (§18).
+- ~~Subscription enforcement.~~ §18.4; trial → charge → 2 days' grace → suspend.
+- ~~Payment provider.~~ Paystack, card, monthly in advance (test mode first, §45.1 Q2).
+- ~~Owner activation.~~ Verifying the emailed link + code opens the gym (D-124); links last 10 minutes,
+  one a day (§43.1 Q1).
+
+Still **[undecided]**:
+
 - Review SLA.
-- Rejection and appeal process.
-- Trial period.
-- Monthly pricing.
-- Subscription enforcement.
-- Payment provider.
-- Whether payment method is required during trial.
-- Whether owner ID is created before or after subscription activation.
-- Whether subscriptions are purchased inside the mobile app or on the website.
+- Whether a payment method is required during the trial (today it is not).
+- Whether subscriptions are bought inside the mobile app or on the website (today: the website).
 
 Do not invent final answers.
 
@@ -562,78 +513,13 @@ Three tiers, gated on **active member count** plus a small number of genuinely p
 Written 2026-09-22 from the feature inventory in `vault/02` and from market research, replacing the
 earlier placeholder. **Prices remain data, never constants** (see the end of this section).
 
-### 18.1 What the market actually does — evidence, not assumption
-
-Two models dominate gym-management software:
-
-| Model | Who | Shape |
-|---|---|---|
-| **By member count, everything included** | Gymdesk, Mindbody, Zen Planner | $75 ≤50 members → $200 ≤400 |
-| **By feature tier** | PushPress, TeamUp | Free / $159 / $229, then paid add-ons |
-
-**The market's loudest complaint is add-on gouging** — a "$159/month" plan reaching $500–664/month
-once the necessary modules are bought, and Gymdesk competes explicitly on *not* doing that.
-
-Features the market consistently treats as **premium**: access control and hardware, marketing and
-CRM ($20–329/mo), branded mobile apps ($39–100/mo), advanced analytics, multi-location.
-Features it treats as **entry-level**: billing, scheduling, check-in, simple reporting.
-
-**Consequence for Yoyo Gyms:** member count is the primary lever, because that is what this market
-understands and it scales with the gym's own revenue. Feature gating is kept **deliberately light** —
-enough to make upgrading worthwhile, not so much that the product feels crippled. **Yoyo's face
-recognition maps exactly onto the market's "access control" premium category**, which makes it the
-natural flagship of the top tier.
-
-### 18.2 The three plans
-
-**Every tier includes the whole of "core gym operation".** A gym that cannot register, check in,
-charge and manage its members is not running; crippling that would produce bad software, not
-upgrades.
-
-| | **BASIC** | **MEDIUM** | **PRIME** |
-|---|---|---|---|
-| **Active members** | up to ~40 | up to ~150 | up to ~500 |
-| **Locations** | 1 | 1 | 1 |
-| Member registration (38-step flow, PAR-Q, agreements) | ✅ | ✅ | ✅ |
-| Member list, 360 profile, quick actions | ✅ | ✅ | ✅ |
-| Member portal (status, check-in, history, profile) | ✅ | ✅ | ✅ |
-| Check-in — self, staff verification, today's overview | ✅ | ✅ | ✅ |
-| Payment recording, receipts, arrears and aging | ✅ | ✅ | ✅ |
-| Plans and add-ons catalog | ✅ | ✅ | ✅ |
-| Gym settings, branding, logo | ✅ | ✅ | ✅ |
-| Staff accounts and roles | ✅ | ✅ | ✅ |
-| QR codes (gym and per-member) | ✅ | ✅ | ✅ |
-| Membership card and ID card PDFs | ✅ | ✅ | ✅ |
-| Automated member emails and reminders | ✅ | ✅ | ✅ |
-| **Classes, bookings, waitlists, calendar** | ❌ | ✅ | ✅ |
-| **Trainers and PT session logging** | ❌ | ✅ | ✅ |
-| **Announcements and member messaging (inbox)** | ❌ | ✅ | ✅ |
-| **Standard reporting** — attendance, revenue trend | ❌ | ✅ | ✅ |
-| **Member progress tracking** | ❌ | ✅ | ✅ |
-| **CSV import and export** | ❌ | ✅ | ✅ |
-| **🔒 Face recognition — enrolment, face login, door scanner** | ❌ | ❌ | ✅ |
-| **🔒 Visitors, incidents, access control** | ❌ | ❌ | ✅ |
-| **🔒 Advanced analytics — churn, retention, peak hours, board PDF** | ❌ | ❌ | ✅ |
-| **🔒 Bulk email broadcast (marketing)** | ❌ | ❌ | ✅ |
-| **🔒 Referral programme** | ❌ | ❌ | ✅ |
-| **🔒 Audit log** | ❌ | ❌ | ✅ |
-
-**PRIME is the complete existing system.** Nothing is held back from it, and future premium
-additions land there.
-
-### 18.3 Pricing
-
 **Prices are NOT set here and must never be hard-coded.** They live in
 `platform_plans.price_cents`, as data.
 
-Two facts for whoever sets them:
-
-1. **There is no cost floor any more.** Since D-096 (schema-per-gym in one free Supabase project),
-   the marginal infrastructure cost of a gym is **approximately zero**. The earlier "$10/gym/month
-   floor" no longer applies. Pricing is a pure market decision.
-2. **International rates are $75–200/month (≈R1,400–3,800).** South African independent gyms — the
-   stated target market — are materially more price-sensitive than that. Pricing at international
-   rates would be a strategic error; pricing is a market test, not a calculation.
+Tier definitions (BASIC / MEDIUM / PRIME), market research, pricing context, the gap analysis and
+the owner "what else do you need" question are in the `subscription-plans` skill
+(`.claude/skills/subscription-plans/SKILL.md`). Load it before any work on plans, pricing,
+entitlements or feature gating.
 
 ### 18.4 Enforcement — where, and how it behaves
 
@@ -656,85 +542,13 @@ nobody enforces is not a limit.
   deleted by a plan change; only *new* registrations are blocked.
 - Limits and feature maps are **data** in `platform_plans`, editable without a deploy.
 
-### 18.5 Gap analysis — what this market sells that we have NOT built
-
-Measured against the feature inventory in `vault/02` and the market research in §18.1. The market's
-own "five core features" are member management, scheduling and booking, a member app, reporting, and
-marketing automation.
-
-**Where Yoyo GYM is already strong, and competitors charge extra:**
-
-| Capability | Note |
-|---|---|
-| **Face recognition / biometric door** | Sold as "access control" add-on elsewhere. This is the differentiator |
-| Digital waivers with signature | Indemnity + contract + signature, built in |
-| PAR-Q health screening | Built in. Rare in this market |
-| Per-gym branding | Name, logo, colour at runtime |
-| Member 360 profile | Bookings, incidents, activity, receipts in one place |
-| POPIA compliance posture | Consent, cascade erasure, deletion requests |
-
-**Gaps — market-standard, NOT built:**
-
-| # | Missing | Market position | Assessment |
-|---|---|---|---|
-| G-1 | **Automated recurring billing** | Treated as *standard* — "automated recurring billing, failed payment retry, clear financial reporting should be standard" | ⚠️ **Deliberately removed** (D-015/D-018). Members pay their gym directly. This is a conscious divergence from the market, not an oversight — but gyms **will** ask for it |
-| G-2 | **Lead management / CRM / prospects** | Standard; a headline feature at Gymdesk and OfferingTree | **Not built.** No concept of a prospect who has not joined yet. The clearest genuine gap |
-| G-3 | **Member app** | Standard; $39–100/mo add-on elsewhere | Planned — Capacitor, Stage 8 (D-053) |
-| G-4 | **Marketing automation** | One of the five core features; $20–329/mo elsewhere | Partial. Bulk email exists; no sequences, triggers or campaigns |
-| G-5 | **POS / retail** | "Sell apparel and supplements without a separate POS" | **Not built.** `addon_services` is adjacent but is not retail |
-| G-6 | **Member SMS** | Common | **Not built.** Owner gets WhatsApp/Telegram; members get email only |
-| G-7 | **Website builder** | Included by Gymdesk, $99/mo at Zen Planner | **Not built.** Only a public profile page per gym |
-| G-8 | **Workout programming** | $79+/mo elsewhere (PushPress Train) | Partial. Trainers log workout *notes*; no programmed workouts |
-| G-9 | **Multi-location** | Standard at higher tiers | **Not built.** One location per plan, by design for now |
-| G-10 | **Staff payroll / commission** | Common | **Not built** |
-
-**How to read this list.** It is a menu, not a backlog. Most gyms will never ask for most of it. The
-two worth watching are **G-1** (because the market assumes it and we removed it on purpose) and
-**G-2** (because converting prospects is how a gym grows, and we have no concept of a prospect at
-all).
-
-**Rule: nothing here is built speculatively.** These are recorded so that when a gym owner asks for
-one, we already know where it sits in the market and what it is worth. That is what the "anything
-else you need?" question at §18.6 is for.
-
-### 18.6 Asking the owner what else they need
-
-Gym-owner registration asks, in plain words, **what else the gym needs that the system does not do**.
-Free text, optional, stored on the application and surfaced in the platform panel.
-
-It is not a feature request form. It is **demand evidence**: three gyms asking for the same thing is
-worth more than any amount of speculation about what to build next, and it costs one text box.
-
-Answers are read against §18.5 — if a request matches a known gap, that gap gains a real customer
-attached to it.
-
 ## 19. Mobile-store compliance
 
 Future Android and iPhone releases must meet current Google Play and Apple App Store requirements.
 
-The future mobile implementation must plan for:
-
-- Current Android target API requirements.
-- Current iOS SDK requirements.
-- Privacy policy.
-- Data-safety disclosure.
-- Apple privacy disclosure.
-- Account deletion inside the app and through a web route.
-- Clear consent for health, biometric, face, camera, document, and location data.
-- Minimum required permissions.
-- Secure authentication.
-- Secure session storage.
-- Server-side authorization.
-- Tenant isolation.
-- Rate limiting.
-- Secure password recovery.
-- Reviewer test accounts or review instructions.
-- Store screenshots and metadata.
-- Release notes.
-- Crash monitoring.
-- Real-device testing.
-- QR/deep-link testing.
-- Payment and subscription compliance.
+The full release checklist (target API/SDK, privacy and data-safety disclosures, account deletion,
+consent, reviewer accounts, metadata, device and deep-link testing) is in the `store-compliance`
+skill (`.claude/skills/store-compliance/SKILL.md`) and `vault/15`.
 
 Do not assume the app may use an external payment page for digital subscriptions without checking the applicable current Google Play and Apple rules.
 
@@ -759,6 +573,9 @@ Potential future methods include:
 - Device biometrics for unlocking a secure session.
 
 Do not force Google or Apple login onto existing members without a product and migration decision.
+
+**[updated 2026-09-29]** Gym OWNERS sign in with email + password (§43.1 Q2). Google and Apple sign-in
+for owners is agreed in principle (§44.1) and **on hold** at the user's word.
 
 If third-party social sign-in is added to the iPhone app, evaluate Apple's Sign in with Apple requirements.
 
@@ -812,14 +629,18 @@ The existing deployment uses:
 
 - Vercel.
 - Supabase.
-- Environment-variable-based gym configuration.
-- Three Vercel cron jobs.
+- Environment variables for the deployment; each gym's own settings live in its own schema, and its
+  plan and status in the registry **[updated 2026-09-29]**.
+- Three Vercel cron jobs, run for every gym (see §5).
+- Where things deploy (D-163): main-admin-panel fixes to production (`main`), app fixes to the
+  preview (`stage-8-app`), until a domain exists.
 - GitHub Actions CI.
 - Existing tests.
 - Error capture.
 - Rate limiting support.
 
-Do not assume the current one-project-per-gym deployment model is suitable for 10,000 gyms.
+The model is ONE project with a schema per gym (D-096), not a project per gym. Known limits at
+10,000 gyms are listed in §35.
 
 Evaluate provisioning, cost, migrations, environment variables, monitoring, backups, upgrades, and support before choosing the final tenancy model.
 
@@ -830,56 +651,8 @@ logic lives outside `api/`. Any tenancy model must be costed against these limit
 
 The first major decision is the tenancy model.
 
-Evaluate honestly:
-
-### Model A: separate deployment and Supabase project per gym
-
-Advantages:
-
-- Strong isolation.
-- Existing single-gym code can remain mostly unchanged.
-- Existing environment-variable model remains familiar.
-
-Risks:
-
-- Approximately 10,000 Supabase projects.
-- Approximately 10,000 environment configurations.
-- Many deployment and migration processes.
-- High operational complexity.
-- Difficult monitoring and upgrades.
-- High provisioning burden.
-
-### Model B: shared database and shared deployment
-
-Advantages:
-
-- Easier to operate many gyms.
-- Centralized updates.
-- Centralized monitoring.
-- Lower provisioning overhead.
-
-Risks:
-
-- Requires gym ownership across tables.
-- Requires changes to routes and handlers.
-- Requires strong tenant authorization.
-- Requires RLS design and testing.
-- May change existing assumptions.
-
-### Model C: hybrid or sharded model
-
-Advantages:
-
-- Can preserve stronger isolation than a fully pooled model.
-- Can reduce operational burden compared with one project per gym.
-- May allow staged migration.
-
-Risks:
-
-- More complex routing.
-- More complex provisioning.
-- More complex support and monitoring.
-- Requires careful boundary design.
+**Decided — D-016, refined by D-096 (schema-per-gym).** The Model A / B / C evaluation is in
+`vault/06 - Tenant Architecture.md`; §35 has the current status.
 
 Do not choose the model automatically.
 
@@ -944,18 +717,10 @@ C:\Users\mule\OneDrive\Desktop\Yoyo GYM\
 
 The vault **is** the repository root — `.obsidian/` sits beside the source code.
 
-The vault currently has zero project notes.
+**[updated 2026-09-29]** The vault has 23 notes in `vault/` (00–22), tracked in git; the decision log is
+`vault/18`, the change history `vault/20`. Obsidian's own settings (`.obsidian/`) stay local.
 
-The vault contains Obsidian configuration and plugins, including:
-
-- Dataview.
-- Smart Connections.
-- Omnisearch.
-- Templater.
-- InfraNodus graph view.
-- 3D graph.
-- Excalidraw.
-- Realclaudian.
+The vault's Obsidian plugins are in `.obsidian/plugins/`.
 
 There is no Obsidian plugin named Graphify.
 
@@ -1038,39 +803,12 @@ codebase — use it to find how requirements, decisions, files and failures conn
 architecture questions. It is **opt-in**: run it only with permission, and write its vault output to
 the agreed structure (§28), never scattered.
 
-**Current gap, stated honestly:** the vault has zero notes today, so there is nothing to consult
-yet. Until Stage 2 creates the note structure, this protocol has no memory to draw on — which is
-the strongest argument for doing Stage 2 promptly after the Stage 1 decision.
+The vault now holds the decision log (`vault/18`) and the change history (`vault/20`) — consult them
+before answering how something came to be.
 
-## 28. Obsidian documentation to create later
+## 28. Obsidian documentation
 
-The future vault should contain:
-
-```text
-00 - Project Purpose
-01 - Existing Yoyo Gym Audit
-02 - Confirmed Existing Features
-03 - Protected Existing Functions
-04 - Yoyo Gyms Platform
-05 - Main Platform Admin Panel
-06 - Tenant Architecture
-07 - Owner Workflows
-08 - Member Workflows
-09 - QR-Code Architecture
-10 - Mobile App
-11 - Subscription Decisions
-12 - Database Architecture
-13 - Authentication and Roles
-14 - Security and Privacy
-15 - Store Compliance
-16 - API Documentation
-17 - Open Questions
-18 - Decision Log
-19 - Implementation Phases
-20 - Change History
-```
-
-The vault structure must not be created until the architecture decisions are reviewed.
+The vault exists at `vault/` (notes 00–22); `ls vault` lists them.
 
 ## 29. Source-of-truth rules
 
@@ -1099,28 +837,27 @@ does not describe.
 
 ## 30. Current confirmed unknowns
 
-The following are not finalized **[undecided]**:
+**[updated 2026-09-29]** Decided since (see the decision log):
 
-- Tenancy model.
-- Platform location.
-- Subscription plans.
-- Subscription prices.
-- Trial period.
-- Payment flow for gym-owner subscriptions.
-- Platform revenue model.
-- Whether Yoyo takes a share of member payments.
-- Owner application documents.
-- Owner approval rules.
-- Owner activation sequence.
-- Mobile framework.
-- App-store billing strategy.
-- Global versus gym-scoped member identity.
+- ~~Tenancy model.~~ One project, a schema per gym (D-016 → D-096).
+- ~~Platform location.~~ This repository (`platform/`), the same deployment.
+- ~~Subscription plans and prices.~~ Basic / Medium / Prime, as data (§18, §41).
+- ~~Trial period.~~ 30 days. ~~Payment flow.~~ Paystack card, monthly (§45.1 Q2).
+- ~~Platform revenue model.~~ The gym's monthly plan. ~~A share of member payments.~~ No — members
+  pay their gym directly (2026-09-21).
+- ~~Owner application documents, approval rules, activation sequence.~~ §40.1, §42, §43.
+- ~~Mobile framework.~~ One Capacitor app for Android and iPhone (D-038).
+- ~~Whether vault notes are committed.~~ Yes — `vault/` is in git.
+- ~~Provisioning model.~~ The platform builds each gym's schema on approval (Stage 6).
+- ~~Where platform code lives.~~ This repository.
+
+Still not finalized **[undecided]**:
+
+- App-store billing strategy (owners pay on the website today).
+- Global versus gym-scoped member identity (gym-scoped today).
 - Biometric retention policy.
 - Face-recognition legal and technical model.
 - Obsidian note versioning.
-- Whether vault notes are committed to Git.
-- Provisioning model for 10,000 gyms.
-- Whether platform code lives in this repository, a sibling repository, or a monorepo.
 - ~~Jurisdictions beyond South Africa.~~ **DECIDED 2026-09-22 (D-125): worldwide.** What remains
   open is per-jurisdiction *data-protection law*, not whether the product serves them.
 - Object storage strategy for photos and biometric templates.
@@ -1236,162 +973,50 @@ decision exists to be recorded.
 ## 35. Stage status
 
 ```text
-BUILT 2026-09-22 — STAGES 4-7, code complete, NOT DEPLOYED, NOT PUSHED.
-  222 tests pass. Vault validates. No SQL has been run against any database.
+LAST UPDATED 2026-09-29 — checked against the code and the live data.
 
-  Stage 4  boundary + resolution ....... platform/ imports nothing from server/
-                                         or src/ (verified); AsyncLocalStorage
-                                         resolution at getSupabase()
-  Stage 5  platform admin panel ........ login (2FA required), application
-                                         queue, decisions, GYM REGISTRY,
-                                         suspend/reactivate, drift report
-  Stage 6  onboarding + provisioning ... public /platform/apply, 7-step
-                                         provisioner (schema-per-gym), trial
-                                         opened as part of provisioning
-  Stage 7  subscriptions ............... plans as data, entitlement gating,
-                                         trial -> charge -> grace -> suspend,
-                                         Paystack webhook, nightly cron
-  Also     member-facing gym finder at /platform/find; public gym search API
+LIVE on production (yoyogym.vercel.app, branch main) and the preview
+(stage-8-app) — the same commit. 1122 tests. Stages 0-7 are done and live.
+  Tenancy (Stage 1): D-016 refined by D-096 — ONE Supabase project, ONE SCHEMA
+    PER GYM, the registry in schema `platform`. KOM is tenant #1 in schema
+    `gym` (D-146). COCATE GYM (gym_cocate_gym, Medium) is the first gym BUILT
+    BY THE PLATFORM (2026-09-29); its owner has activated and signed in.
+  Main admin panel (§16, §40): applications in three steps with the three
+    required documents (§42); approve -> build the gym -> 10-minute activation
+    link (§43); a failed build is retried from the application page (D-167);
+    gyms (suspend, plan, services, owner, setup help), owners, team, plans and
+    prices, finances, security, audit, settings.
+  Each gym: its own admin panel, member portal and app screens; services by
+    plan, per gym and by the owner (§41); starter membership plans (§45);
+    scheduled jobs for EVERY gym; its own owner alerts (never KOM's).
 
-  DEFAULTS THAT MATTER: provisioning is a DRY RUN unless
-  PLATFORM_PROVISION_LIVE=true; billing is a DRY RUN unless
-  PLATFORM_BILLING_LIVE=true. Neither moves without an explicit env var.
+STAGE 8 (mobile app, Capacitor, apps/mobile): BUILT — not yet verified on a
+  real phone. Gate: gym search, QR entry and both sign-ins on a real device.
+STAGE 9 (QR and deep links, App Links / Universal Links): NOT BUILT.
+STAGE 10 (store compliance and release): NOT STARTED — checklist in the
+  store-compliance skill; store rules are re-checked then, never from memory.
 
-  NOT BUILT: Stage 8 (Capacitor mobile app), Stage 9 (deep links),
-             Stage 10 (store compliance). Application document upload
-             (Supabase Storage + multipart) is still unwired.
-
-  ALSO BUILT 2026-09-22 (second pass): owner activation (link + 6-digit code,
-  hashes only), gym-owner login (password; staff still need 2FA), the owner's
-  own page at /platform/my-gym, and application document upload straight to
-  Supabase Storage via signed URL. 270 tests pass.
-
-  ARCHITECTURE REVIEW 2026-09-22 — four surfaces verified, four defects found:
-    F-1  NOT FIXED, protected surface. server/lib/auth.js verifyToken() does
-         not check the token audience, and memberauth.js signs with the SAME
-         JWT_SECRET. A MEMBER TOKEN IS A STRUCTURALLY VALID ADMIN TOKEN.
-         Reproduced. 4 handlers use bare authenticate() with no role check.
-         One-line backward-compatible fix written and awaiting approval in
-         vault/17 §0.2. DO NOT deploy the platform on a gym's domain first.
-    F-2  FIXED. platform/auth.js fell back to JWT_SECRET; combined with F-1 a
-         platform session would have been accepted by the gym API.
-    F-3  FIXED. /platform/applications needed only a session — any gym owner
-         could read every competitor's application and documents.
-    F-4  FIXED. A dependency-factory collision silently dropped the suspend
-         reason and the subscription re-sync.
-
-  THIRD PASS 2026-09-22: document review loop (open a document via a 5-minute
-  signed URL, audited; accept/reject with a reason), retention purge (D-054,
-  own switch PLATFORM_RETENTION_LIVE), and the Stage 6 gate review of
-  /api/document. 292 tests pass.
-
-  STAGE 6 GATE ITEM DONE — /api/document re-reviewed (D-123). D-034 assumed
-  the risk was GUESSING; measurement says otherwise. The code is 40 bits
-  (1.1e12), ~35 years at 1000 req/s, so brute force is not the threat. The
-  threat is select('*'), which returns id_number (SA ID) and the biometric
-  face templates, plus PAR-Q health data, to anyone holding a permanent
-  reusable code, with NO rate limiting. Recommended and NOT APPLIED (protected
-  surface): (1) explicit column list, (2) per-gym rate limit — neither breaks
-  anything; (3) session-binding is the real fix and is your decision.
-
-  VAULT CORRECTED (D-122): vault/14 claimed admin/member token separation
-  "rests entirely on the audience claim". It rests on nothing — see F-1.
-
-  ALL THREE OPEN DECISIONS ANSWERED BY THE USER 2026-09-22, AND APPLIED:
-    Q-46 (D-124) — verifying the owner's email OPENS THE GYM. D-049 superseded.
-    F-1  (D-126) — verifyToken() now refuses a foreign audience. Written as
-                   "reject foreign aud", not "require aud===admin", so NO LIVE
-                   SESSION IS LOGGED OUT. 8 tests.
-    D-123 (D-127) — /api/document returns an explicit 18-column list (no ID
-                   number, no biometric templates) and is rate limited 10/min.
-                   Option 3, session-binding, is still open.
-
-  WORLDWIDE (D-125, user 2026-09-22) — resolves the §30 open item on
-  jurisdictions. "Local" belongs to the GYM, not the software: HOME_COUNTRY is
-  now a FALLBACK, homeCountryFor(gym.country) is the answer. Only ZA keeps a
-  strict ID format check, because the SA ID is the only one this codebase can
-  validate. §5 and §30 below are updated accordingly.
-
-  PLATFORM PANEL COMPLETED 2026-09-22 (D-128/D-129), after the user asked
-  whether it was really built. It was half built. Added: plans and prices
-  (price_cents was NULL and nothing could set it — BILLING WAS CHARGING
-  NOBODY), the audit log reader (everything wrote, nothing read), gym and
-  owner search, owner deactivation, a finance summary, and moving one gym to
-  another plan. §16 is now covered except the three items below.
-
-  STILL NOT BUILT, stated plainly:
-    · Monitor gym activity — no activity feed.
-    · Per-gym member statistics — NOT an oversight. §16 asks for them and
-      D-044 says support must never see member data; counting means reaching
-      into a gym's schema, which is the boundary the POPIA position rests on
-      (D-014). Raised as D-130 rather than quietly crossed.
-    · Security alerts — the audit log filter is the nearest thing today.
-
-  SURFACES CORRECTED BY THE USER 2026-09-22 (D-133/D-134):
-    THE WEBSITE IS ONLY THE MAIN ADMIN PANEL — Yoyo staff, HTML, cookies.
-    THE APP is for gym owners and gym members — JSON, Bearer tokens.
-    ONE BACKEND: platform/api.js calls the SAME injected dependencies as the
-    HTML routes, so a rule is enforced in one place and both doors get it.
-    /apply, /activate, /my-gym, /find still render HTML, but as the WEB
-    FALLBACK §14 already requires (activation email link, scanned QR, app not
-    installed) — each has a JSON twin which is the primary path.
-    No app route approves an application or suspends a gym.
-
-  LIVE 2026-09-23 — THE ARCHITECTURE IS PROVEN ON REAL DATA.
-    SQL run in the existing Supabase project. Owner account claimed with 2FA.
-    The panel works: applications, registry, owners, plans, finances,
-    security, audit, account.
-    KOM is tenant #1 — the existing gym, WITHOUT MOVING ANY DATA. Its
-    gym_connections.schema_name is simply 'gym', the schema the records were
-    already in (D-146). /platform/registry shows it with a live member count;
-    /g/kom/member resolves through gymcontext -> resolveGym -> runWithGym ->
-    getSupabase and serves the real member portal.
-    The website root now redirects to /platform/login.
-
-  536 tests pass.
-
-  SUPERSEDED BLOCKING QUESTION (kept for history): Q-46 — D-049 (first payment activates) and D-070 (30-day
-  trial) contradict each other. A trialing gym currently cannot serve traffic.
-  See vault/17 §0.1 for the three options.
-
-STAGE 1 DECIDED (D-016, 2026-09-21) — TENANCY MODEL:
-  One shared application deployment + one Supabase project per gym.
-  Gym resolution injected at getSupabase(). Per-gym secrets store.
-  Orchestrated migration runner. Each gym's data stays physically separate.
-  ACCEPTED RISK: U-1, max Supabase projects per organisation, is undocumented.
-  If a ceiling exists below target, D-016 and D-014 must both be reopened.
-
-CLOSED:       Stage 0, Stage 1, Stage 2, Stage 3
-              Stage 3 = platform data model APPROVED (D-022), 14 tables designed.
-              APPROVED IS NOT BUILT: no table exists, no migration written.
-OPEN STAGE:   none — awaiting the user's word on which opens next
-READY:        Stage 4 (platform boundary and gym resolution)
-              Payment-removal slot — design in vault/21, awaiting approval.
-              Order is load-bearing: wire activation into manual capture FIRST
-              (D-017), verify, THEN remove. Reversed, every newly registered
-              member is stranded at status 'new'.
-              D-021: server/lib/paystack.js is KEPT — platform billing needs it.
-
---- superseded status below, retained for history ---
-OPEN STAGE:   Stage 2 — Obsidian vault foundation (audit note delivered)
-CLOSED:       Stage 0 — Discovery and documentation
-              · this file approved as written (user, 2026-09-21)
-              · previous single-gym audit declared PERMANENTLY ABSENT (user, 2026-09-21)
-              · the 2026-09-21 repository inspection is the source of truth
-DEFERRED:     Stage 1 — Tenancy decision. Explicitly NOT open by user instruction;
-              Stage 2 was brought forward so the decision is made against written
-              evidence. Stage 1 still gates Stages 3-10.
-VAULT:        vault/ at the repository root. All 21 notes (00-20) created and
-              cross-linked; every note carries YAML aliases so both
-              [[Existing Yoyo Gym Audit]] and [[01 - Existing Yoyo Gym Audit]] resolve.
-              Q-25..Q-29 resolved from code. Graphify NOT yet run (awaiting approval).
-OPEN IN S2:   Q-23 — are vault notes committed to git? .obsidian/, .smart-env/,
-              CLAUDE.md and vault/ are all still untracked.
-NEXT:         Evaluate tenancy options, then open Stage 1.
-LAST UPDATED: 2026-09-22
+WAITING ON THE USER:
+  Vercel (§45.1): PAYSTACK_SECRET_KEY (test key), PLATFORM_BILLING_LIVE=true,
+    PLATFORM_RETENTION_LIVE=true, PLATFORM_PRIVACY_CONTACT=hello@mulesoo.com;
+    after reading them, PLATFORM_PRIVACY_APPROVED / PLATFORM_TERMS_APPROVED.
+  The Gym Owner Agreement rewrite (§45): the supplier's legal details first.
+  COCATE GYM: price a starter plan and switch it on, so members can join.
+ON HOLD: §44 — Google and Apple sign-in for owners.
+OPEN DECISIONS: WhatsApp on the app's Help screen (§41); /api/document
+  session-binding (D-127 option 3); PAR-Q health flags sent through WhatsApp /
+  Telegram owner alerts; biometric retention; member identity (§25, §30).
+KNOWN LIMITS AT SCALE: the scheduled jobs run gym by gym inside one 60-second
+  function; every new gym's schema is appended to PostgREST's exposed list,
+  and exposing one reloads it for all gyms (D-097). Both need work well before
+  10,000 gyms.
 ```
 
+The full history of how each stage was built is in the decision log (`vault/18`) and the change
+history (`vault/20`), and in §36–§45 below.
+
 Claude updates this block when a gate is passed, and only after the user has approved the pass.
+
 
 ---
 
@@ -1877,6 +1502,7 @@ rules, never for text.
   the gym's name printed beside it. *This replaces Q2's "a gym's own logo wins everywhere" for
   documents: documents always carry the Yoyo Gyms logo.*
 - **Q8 — someone new** (no gym chosen yet, member or owner) sees the **Yoyo Gyms** front page.
+
 
 ---
 
@@ -2390,3 +2016,13 @@ the right price box per kind (it only had "Monthly price", and turned a blank in
 refusal in the form; the platform nightly job now runs from the 06:00 daily job (production only),
 records each run, and "Nightly job" is green only when it ran in the last 36 hours. The amber lines
 that need the user's keys and decisions are listed in Q2–Q5.
+
+> Added mid-build (the user, 2026-09-29): *"search detail what needed to be added on term and condtion
+> clearly explains"* — researched the same day against POPIA ss 19–21, 26–27 (operator contract, security,
+> special personal information), ECTA s 43 (what an online supplier must disclose) and common B2B SaaS
+> terms. The current Gym Owner Agreement (8 short sections, version 2026-09-24) lacks: the supplier's legal
+> details, a proper operator (data-processing) clause, breach notification, sub-processors and cross-border
+> transfer, special personal information (health, biometrics), the owner's own duties, acceptable use,
+> suspension causes, data export on exit, intellectual property, confidentiality, service levels and
+> support, liability and indemnity, price changes and taxes, governing law and disputes, notices and
+> general terms. The rewrite waits for the user's decisions (company details first); it stays DRAFT.
