@@ -328,13 +328,25 @@ function activationDeps(status, emailed = true) {
   };
 }
 
-test('F-40.9 A GYM WAITING FOR ITS OWNER CAN BE SENT A NEW LINK — and the old one is retired', async () => {
+test('F-40.9 A GYM WAITING FOR ITS OWNER CAN BE SENT A NEW LINK', async () => {
   const d = activationDeps('pending');
   const r = await call({ method: 'POST', url: '/platform/registry/g1/resend-activation', body: `csrf=${csrf()}` }, d);
   assert.equal(r.statusCode, 302);
   assert.equal(r.headers.location, '/platform/registry/g1?sent=activation');
-  assert.deepEqual(d.calls.retired, [['owner-1', 'g1']]);
   assert.deepEqual(d.calls.issued, [{ userId: 'owner-1', gymId: 'g1' }]);
+  // Old links are retired INSIDE issueActivation, after the once-a-day check,
+  // so a refused resend never kills the owner's working link (§43.1 Q1).
+  assert.deepEqual(d.calls.retired, []);
+});
+
+test('§43.1 Q1 ONE LINK A DAY — a second resend is refused, and says when the next is possible', async () => {
+  const d = activationDeps('pending');
+  d.issueActivation = async (a) => { d.calls.issued.push(a); return { limited: true, nextAt: new Date(Date.now() + 5 * 3_600_000).toISOString() }; };
+  const r = await call({ method: 'POST', url: '/platform/registry/g1/resend-activation', body: `csrf=${csrf()}` }, d);
+  assert.equal(r.statusCode, 409);
+  assert.match(r.body, /A link was already sent today/);
+  assert.match(r.body, /in about 5 hours/);
+  assert.doesNotMatch(r.body, /123456/, 'no code is shown — none was made');
 });
 
 test('F-40.9 with no email, the link and code are handed to the reviewer once', async () => {

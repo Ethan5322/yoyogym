@@ -84,7 +84,7 @@ export async function sendEmail({ to, subject, html, text }) {
  * chats, and the code is what proves the person using it is the person the
  * email was sent to.
  */
-export function activationEmail({ gymName, link, code, expiresInHours = 48 }) {
+export function activationEmail({ gymName, link, code, expiresInMinutes = 10 }) {
   const safeName = escapeHtml(gymName || 'your gym');
 
   return {
@@ -96,8 +96,8 @@ export function activationEmail({ gymName, link, code, expiresInHours = 48 }) {
   <li>Enter this code: <b style="font-size:20px;letter-spacing:3px">${escapeHtml(code)}</b></li>
 </ol>
 <p>Then choose a password, and your gym opens for members straight away.</p>
-<p><b>This link expires in ${expiresInHours} hours.</b> If it does, ask us for a new one — we can
-send another in a moment.</p>
+<p><b>This link and code expire in ${expiresInMinutes} minutes.</b> Please use them now. If they expire,
+open the link again and ask for a new one — you can receive one link a day.</p>
 <p style="color:#666;font-size:12px">If you did not apply to list a gym with us, ignore this
 email. Nothing happens until someone uses both the link and the code.</p>`,
     text: `${gymName || 'Your gym'} has been approved.
@@ -106,7 +106,7 @@ email. Nothing happens until someone uses both the link and the code.</p>`,
 2. Enter this code: ${code}
 
 Then choose a password, and your gym opens for members straight away.
-This link expires in ${expiresInHours} hours.`,
+This link and code expire in ${expiresInMinutes} minutes. If they expire, open the link again and ask for a new one (one link a day).`,
   };
 }
 

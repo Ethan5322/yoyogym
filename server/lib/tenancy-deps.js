@@ -111,6 +111,35 @@ export function tenancyDeps() {
       return (data || []).map((g) => String(g.slug).toLowerCase());
     },
 
+    /**
+     * The open gyms owned by the Yoyo account with this email (CLAUDE.md §43.1
+     * Q2: owners sign in with email + password alone). Only a gym-owner
+     * account, only an active one, only open gyms. Says nothing about the
+     * password — each gym checks that against its own account.
+     */
+    ownerGymSlugs: async (email) => {
+      const db = platformClient();
+      const wanted = String(email || '').trim().toLowerCase();
+      if (!wanted.includes('@')) return [];
+      const { data: owner, error } = await db
+        .from('platform_users')
+        .select('id')
+        .eq('email', wanted)
+        .eq('kind', 'gym_owner')
+        .eq('is_active', true)
+        .maybeSingle();
+      if (error) throw new Error(`Could not look up the owner: ${error.message}`);
+      if (!owner) return [];
+      const { data: gyms, error: gymError } = await db
+        .from('gyms')
+        .select('slug')
+        .eq('owner_user_id', owner.id)
+        .eq('status', 'active')
+        .order('created_at', { ascending: true });
+      if (gymError) throw new Error(`Could not list the owner's gyms: ${gymError.message}`);
+      return (gyms || []).map((g) => String(g.slug).toLowerCase());
+    },
+
     /** The registry row for a slug, with its connection. */
     lookupGym: async (slug) => {
       const key = String(slug).toLowerCase();

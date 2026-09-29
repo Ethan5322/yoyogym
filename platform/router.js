@@ -93,7 +93,7 @@ import { setupAllowed, beginSetup, completeSetup } from './setup.js';
 import { platformHealth } from './health.js';
 import { regenerateRecoveryCodes, remainingCodes } from './account.js';
 import { startCheckout, completeCheckout } from './checkout.js';
-import { completeActivation } from './activation.js';
+import { completeActivation, waitText, ACTIVATION_TTL_MINUTES } from './activation.js';
 import { validateUploadRequest, pathBelongsTo, documentRow } from './documents.js';
 import { verifySignature } from './paystack.js';
 import { PLANS, planByKey, EVERY_PLAN_INCLUDES, livePlansForOwners, SUPPORT_BY_PLAN } from './plans.js';
@@ -738,7 +738,7 @@ async function handleExtraRoutes(req, res, deps, { url, path, method }) {
     if (method === 'GET') {
       const token = url.searchParams.get('token') || '';
       const context = (await deps.activationContext?.(token)) || {};
-      html(res, 200, activatePage({ token, gymName: context.gymName, email: context.email }));
+      html(res, 200, activatePage({ token, gymName: context.gymName, email: context.email, expired: context.expired === true }));
       return true;
     }
 
@@ -766,7 +766,7 @@ async function handleExtraRoutes(req, res, deps, { url, path, method }) {
         // The token is echoed back so a mistyped code can be corrected without
         // digging the email out again. The code is not — retyping it is the
         // point.
-        html(res, 400, activatePage({ token: form.token, email: form.username, error: result.reason }));
+        html(res, 400, activatePage({ token: form.token, email: form.username, error: result.reason, expired: result.expired === true }));
         return true;
       }
 
@@ -792,6 +792,46 @@ async function handleExtraRoutes(req, res, deps, { url, path, method }) {
       }));
       return true;
     }
+  }
+
+  // ---- a new link, asked for from an expired one (CLAUDE.md §43.1 Q1) ---------
+  // The expired link is the proof of who is asking: it was only ever emailed to
+  // them. At most one link a day, whoever asks — issueActivation enforces it.
+  if (path === 'activate/renew' && method === 'POST') {
+    const form = await readFormBody(req);
+    // This part of the router says "handled" by returning true.
+    const page = (title, message, extra = {}) => {
+      html(res, extra.status || 200, problemPage({ title, message, back: extra.back || null }));
+      return true;
+    };
+
+    const check = await deps.renewActivation(form.token);
+    if (!check.ok) {
+      if (check.reason === 'used') {
+        return page('Your account is already active', 'This link was already used. Sign in with your email and the password you chose.', { back: { href: '/platform/login?as=owner', label: 'Sign in' } });
+      }
+      if (check.reason === 'still_valid') {
+        redirect(res, `/platform/activate?token=${encodeURIComponent(form.token || '')}`);
+        return true;
+      }
+      return page('That link is not valid', 'Please use the newest link in your email.', { status: 400 });
+    }
+
+    const activation = await deps.issueActivation({ userId: check.userId, gymId: check.gymId });
+    if (activation.limited) {
+      return page(
+        'One link a day',
+        `A link was already sent in the last 24 hours. You can ask for a new one ${waitText(activation.nextAt)} — open this same link again then.`,
+        { status: 429 }
+      );
+    }
+    await deps.audit({ action: 'platform.owner.activation_renewed', actor_kind: 'gym_owner', actor_user_id: check.userId, entity: 'gym', entity_id: check.gymId });
+    return page(
+      activation.emailed ? 'A new link is on its way' : 'We could not send the email',
+      activation.emailed
+        ? `Check your email now. The new link and code work for ${ACTIVATION_TTL_MINUTES} minutes.`
+        : 'Please write to hello@mulesoo.com and we will help you finish activating.'
+    );
   }
 
   // ---- the gym owner's own page --------------------------------------------
@@ -1778,8 +1818,21 @@ async function handleExtraRoutes(req, res, deps, { url, path, method }) {
       return true;
     }
 
-    await deps.retireActivations?.(gym.owner_user_id, gym.id);
+    // Old links are retired INSIDE issueActivation, after the once-a-day check:
+    // retired here first, a refused resend would kill the owner's working link
+    // and give them nothing in its place.
     const activation = await deps.issueActivation({ userId: gym.owner_user_id, gymId: gym.id });
+    if (activation.limited) {
+      html(res, 409, problemPage({
+        title: 'A link was already sent today',
+        message: `The owner can receive one activation link a day, and one was sent less than 24 hours ago. ` +
+          `The next can be sent ${waitText(activation.nextAt)}. The link they have lasts 10 minutes; once it ` +
+          `expires they can ask for the next one themselves from the same page.`,
+        back: { href: `/platform/registry/${gym.id}`, label: 'Back to the gym' },
+        user: await viewer(deps, session),
+      }));
+      return true;
+    }
     await deps.audit({
       action: 'platform.owner.activation_resent',
       actor_user_id: session.sub,

@@ -17,6 +17,8 @@ const NotFound = lazy(() => import('./pages/NotFound.jsx'));
 
 // Admin
 const AdminLogin = lazy(() => import('./pages/admin/Login.jsx'));
+// Owners sign in with email + password alone (CLAUDE.md §43.1 Q2).
+const OwnerLogin = lazy(() => import('./pages/OwnerLogin.jsx'));
 const Dashboard = lazy(() => import('./pages/admin/Dashboard.jsx'));
 const VerifyScreen = lazy(() => import('./pages/admin/VerifyScreen.jsx'));
 const MembersList = lazy(() => import('./pages/admin/MembersList.jsx'));
@@ -107,6 +109,7 @@ export default function App() {
         <Route path="/g/:slug/admin/*" element={<Navigate to="/admin" replace />} />
 
         {/* Admin */}
+        <Route path="/owner/login" element={<OwnerLogin />} />
         <Route path="/admin/login" element={<AdminLogin />} />
         <Route path="/admin" element={guard(mgr, <Dashboard />)} />
         <Route path="/admin/verify" element={guard(recep, <VerifyScreen />)} />

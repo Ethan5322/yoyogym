@@ -1884,7 +1884,19 @@ ${list(report.dangling || [], (d) => `<li><b>${h(d.gym_id)}</b> → ${h(d.schema
  * typed, because the whole purpose of the second half is that it is not in the
  * link — putting it in the URL too would make it decoration.
  */
-export function activatePage({ token = '', gymName = '', error = '', code = '', email = '' } = {}) {
+export function activatePage({ token = '', gymName = '', error = '', code = '', email = '', expired = false } = {}) {
+  if (expired) {
+    return layout({
+      title: 'Activate your account',
+      body: `<h1>This link has expired</h1>
+<p class="muted">Activation links and codes work for 10 minutes. You can receive one link a day.</p>
+<form class="card" method="post" action="/platform/activate/renew">
+  <input type="hidden" name="token" value="${h(token)}">
+  <p>We will email a new link and code to the address you applied with.</p>
+  <button type="submit">Send me a new link</button>
+</form>`,
+    });
+  }
   return layout({
     title: 'Activate your account',
     body: `<h1>Activate your account</h1>
@@ -1892,7 +1904,8 @@ export function activatePage({ token = '', gymName = '', error = '', code = '', 
       gymName
         ? `Your gym <b>${h(gymName)}</b> has been approved.`
         : 'Your gym has been approved.'
-    } Enter the six-digit code from your email and choose a password.</p>
+    } Enter the six-digit code from your email and choose a password. The link and code work for
+    <b>10 minutes</b>.</p>
 ${error ? `<p class="err">${h(error)}</p>` : ''}
 
 <form class="card" method="post" action="/platform/activate">
@@ -2598,8 +2611,9 @@ export function activationHandoverPage({ activation = {}, gymName = '', applicat
   <p><input readonly value="${h(activation.link)}" style="width:100%" onclick="this.select()"></p>
   <p><b>Code</b></p>
   <p style="font-size:28px;letter-spacing:6px"><b>${h(activation.code)}</b></p>
-  <p class="muted">Both are needed. The link alone is not enough, and it expires in
-  ${h(activation.expiresInHours || 48)} hours.</p>
+  <p class="muted">Both are needed. The link alone is not enough, and it expires
+  <b>${h(activation.expiresInMinutes || 10)} minutes</b> after it was made — send it now. Once it has
+  expired, the owner can ask for the next one from the link itself (one a day).</p>
 </div>
 
 <div class="card">
@@ -3709,10 +3723,10 @@ export function welcomePage() {
     </section>
     <section class="land-card">
       <h2>I’m a gym owner</h2>
-      <p class="muted">Open your gym’s admin panel — you and your staff — or bring your gym to Yoyo.</p>
-      <a class="btn" href="/platform/find?next=admin">Owner login</a>
+      <p class="muted">Open your gym’s admin panel with your email and password, or bring your gym to Yoyo.</p>
+      <a class="btn" href="/owner/login">Owner login</a>
       <a class="btn ghost" href="/platform/apply">Apply to join Yoyo Gyms</a>
-      <p class="land-small"><a href="/platform/login?as=owner">Check application status</a></p>
+      <p class="land-small"><a href="/platform/find?next=admin">Gym staff sign in</a> · <a href="/platform/login?as=owner">Check application status</a></p>
     </section>
   </div>
 

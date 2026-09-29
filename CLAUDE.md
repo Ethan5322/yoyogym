@@ -2238,3 +2238,60 @@ Only a submitted application reaches the review queue.
 box per document, PDF or photo, photos converted on the device; a review page with a required tick), Submit
 refused on the server without the three documents, drafts shown to reviewers as "Not sent yet", every
 document open and download audited, and the app's JSON twin on the same rule. No SQL.
+
+---
+
+## 43. Activation link limits, and owners signing in from the app (user instruction, 2026-09-29)
+
+> The user's words, word for word. Clarified one question at a time in §43.1, which wins over the text
+> above it. Not built until §43.1 is answered.
+
+> the email link sent to ne person one times a day and the email link and activation code must
+> expaired after 10 minutes and after activating code and creating pasword for gym the gym owner
+> should open hisapp and click as existing app add email that used during regestration and pasword
+> created, be sure that that thing works for all gym owners,
+
+> also web app download shaw old single gym sytem fix issue ,
+
+### 43.1 Clarifications — answered by the user, one at a time
+
+Checked against the code on 2026-09-29:
+- **Today an activation link and code last 48 hours** (`ACTIVATION_TTL_HOURS`), and a new one can be sent
+  any number of times, by Yoyo staff only ("Send a new activation link" on the gym's page). Approving
+  sends the first one automatically.
+- **Today the app's owner sign-in is:** I'm a Gym Owner → Owner login → **search for and pick the gym** →
+  that gym's sign-in (email or username + password) — as decided in §36.1 Q2.
+- **The first real owner (COCATE GYM) activated at 09:52 and was then refused**: the sign-in reached the
+  right account and the password did not match. Most likely the browser filled in the password saved at
+  application (not proven). Fixed in `182f03d`: a "Forgot your password?" on the gym sign-in (owners reset
+  by email; it sets the Yoyo account and the gym sign-in together), and the activation page now makes the
+  browser replace its saved password.
+- **The installed web app is the old single-gym one** (`public/manifest.webmanifest`): named "Gym
+  Membership" / "My Gym", and it opens `/member` — on the main address that is KOM's member sign-in,
+  whichever gym it was installed from. The service worker is network-first, so it is not serving an old
+  copy; the install settings themselves are the old ones.
+- **Q1 — activation link limits:** a link and code **expire 10 minutes** after they are sent, and a person
+  receives **at most one a day**. An owner who misses the 10 minutes asks for the next link themselves on
+  the expired-link page, and it can be sent only once the day's link is used up (24 hours after the last);
+  Yoyo staff cannot send extras either. The approval email counts as that day's link.
+- **Q2 — owners sign in from the app with email + password only.** The owner enters the email they applied
+  with and their password; the app finds their gym and opens its admin panel — no searching for the gym
+  first. Staff (manager, reception, trainer) still choose the gym first: they have no Yoyo account.
+  *This revises §36.1 Q2 for owners only.*
+- **Q3 — no web app.** In the user's words: *"the app must be native app no web app should downloaded, so
+  its known how androaid app and apple app supposed to look"*. The website stops offering itself as an
+  installable app (no install manifest, no home-screen app mode); the only app is the Android and iPhone
+  store app. *This reverses the part of D-038 (§15) that kept the PWA as the gym's web surface* — the
+  website pages themselves stay, in the browser and inside the store app.
+
+All three answered 2026-09-29. **The build:** activation links that expire in 10 minutes, one per person
+per day, re-requested by the owner from the expired page; the app's owner sign-in by email + password
+alone, landing in their own gym's admin panel (staff keep choosing the gym); the website no longer
+installable. Tested for any gym owner, not only COCATE.
+
+**Built 2026-09-29** — vault D-168: activation links and codes expire in 10 minutes; one link per person per
+24 hours, whoever asks (the approval, a Yoyo staff resend — refused with the wait, without killing the
+current link — or the owner's "Send me a new link" on the expired page); owners sign in with email +
+password at `/owner/login` (the app's Owner login, and the website's), the password checked by their own
+gym, and land in its admin panel; staff keep "Gym staff sign in" → choose the gym; the website has no
+install manifest, and a browser that installed the old web app has its service worker removed. No SQL.

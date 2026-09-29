@@ -10,7 +10,10 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
 import {
-  ACTIVATION_TTL_HOURS,
+  ACTIVATION_TTL_MINUTES,
+  ACTIVATION_GAP_HOURS,
+  nextActivationAllowedAt,
+  waitText,
   issueActivation,
   checkActivation,
   completeActivation,
@@ -18,6 +21,8 @@ import {
 
 const T0 = new Date('2026-04-01T00:00:00Z');
 const hours = (n, from = T0) => new Date(from.getTime() + n * 3_600_000);
+// Inside the 10-minute window (CLAUDE.md §43.1 Q1).
+const soon = new Date(T0.getTime() + 5 * 60_000);
 
 // ---------------------------------------------------------------------------
 // Issuing
@@ -37,9 +42,27 @@ test('issuing returns the secrets once and stores only hashes', () => {
   assert.equal(row.used_at, null);
 });
 
-test('the activation expires, and the window is stated not implied', () => {
+test('the activation expires after TEN MINUTES (CLAUDE.md §43.1 Q1), stated not implied', () => {
   const { row } = issueActivation({ userId: 'u1', gymId: 'g1', now: T0 });
-  assert.equal(new Date(row.expires_at).toISOString(), hours(ACTIVATION_TTL_HOURS).toISOString());
+  assert.equal(ACTIVATION_TTL_MINUTES, 10);
+  assert.equal(new Date(row.expires_at).toISOString(), new Date(T0.getTime() + 10 * 60_000).toISOString());
+});
+
+test('a code that is right at minute 9 is refused at minute 11', () => {
+  const { row, token, code } = issueActivation({ userId: 'u1', gymId: 'g1', now: T0 });
+  assert.equal(checkActivation(row, { token, code }, new Date(T0.getTime() + 9 * 60_000)).ok, true);
+  const late = checkActivation(row, { token, code }, new Date(T0.getTime() + 11 * 60_000));
+  assert.equal(late.ok, false);
+  assert.equal(late.expired, true, 'said as expired, so the page can offer the next link');
+});
+
+test('ONE LINK A DAY: the next is allowed 24 hours after the last, not before', () => {
+  assert.equal(ACTIVATION_GAP_HOURS, 24);
+  assert.equal(nextActivationAllowedAt(null, T0), null, 'never sent: now');
+  const next = nextActivationAllowedAt(T0, hours(3));
+  assert.equal(next.toISOString(), hours(24).toISOString());
+  assert.equal(nextActivationAllowedAt(T0, hours(24)), null, 'a full day later: now');
+  assert.equal(waitText(next, hours(3)), 'in about 21 hours');
 });
 
 test('two activations never collide', () => {
@@ -56,24 +79,24 @@ test('two activations never collide', () => {
 
 test('the right token and the right code pass', () => {
   const { row, token, code } = issueActivation({ userId: 'u1', gymId: 'g1', now: T0 });
-  assert.equal(checkActivation(row, { token, code }, hours(1)).ok, true);
+  assert.equal(checkActivation(row, { token, code }, soon).ok, true);
 });
 
 test('the right token with the WRONG code is refused', () => {
   // Both halves are required, or the emailed link alone would be enough and
   // the code would be decoration.
   const { row, token } = issueActivation({ userId: 'u1', gymId: 'g1', now: T0 });
-  assert.equal(checkActivation(row, { token, code: '000000' }, hours(1)).ok, false);
+  assert.equal(checkActivation(row, { token, code: '000000' }, soon).ok, false);
 });
 
 test('the right code with the WRONG token is refused', () => {
   const { row, code } = issueActivation({ userId: 'u1', gymId: 'g1', now: T0 });
-  assert.equal(checkActivation(row, { token: 'not-the-token', code }, hours(1)).ok, false);
+  assert.equal(checkActivation(row, { token: 'not-the-token', code }, soon).ok, false);
 });
 
 test('an expired activation is refused even when both halves are correct', () => {
   const { row, token, code } = issueActivation({ userId: 'u1', gymId: 'g1', now: T0 });
-  const result = checkActivation(row, { token, code }, hours(ACTIVATION_TTL_HOURS + 1));
+  const result = checkActivation(row, { token, code }, hours(1));
 
   assert.equal(result.ok, false);
   assert.match(result.reason, /expired/i);
@@ -129,7 +152,7 @@ test('completing sets the password, consumes the activation and audits it', asyn
   const result = await completeActivation(
     d,
     { token: d.issued.token, code: d.issued.code, password: 'a-long-enough-password' },
-    { now: hours(1) }
+    { now: soon }
   );
 
   assert.equal(result.ok, true);
@@ -145,7 +168,7 @@ test('a short password is refused BEFORE the activation is consumed', async () =
   const result = await completeActivation(
     d,
     { token: d.issued.token, code: d.issued.code, password: 'short' },
-    { now: hours(1) }
+    { now: soon }
   );
 
   assert.equal(result.ok, false);
@@ -158,7 +181,7 @@ test('a wrong code sets no password and consumes nothing', async () => {
   const result = await completeActivation(
     d,
     { token: d.issued.token, code: '000000', password: 'a-long-enough-password' },
-    { now: hours(1) }
+    { now: soon }
   );
 
   assert.equal(result.ok, false);
@@ -178,7 +201,7 @@ test('activation OPENS THE GYM — that is what makes "30 days free" true', asyn
   const result = await completeActivation(
     d,
     { token: d.issued.token, code: d.issued.code, password: 'a-long-enough-password' },
-    { now: hours(1) }
+    { now: soon }
   );
 
   assert.deepEqual(d.calls.gyms[0], { gymId: 'g1', status: 'active' });
@@ -192,7 +215,7 @@ test('a caller with a reason can still activate the owner WITHOUT opening the gy
   const result = await completeActivation(
     d,
     { token: d.issued.token, code: d.issued.code, password: 'a-long-enough-password' },
-    { now: hours(1), activatesGym: false }
+    { now: soon, activatesGym: false }
   );
 
   assert.equal(d.calls.gyms.length, 0);
@@ -205,7 +228,7 @@ test('a failed activation never opens the gym', async () => {
   await completeActivation(
     d,
     { token: d.issued.token, code: '000000', password: 'a-long-enough-password' },
-    { now: hours(1) }
+    { now: soon }
   );
 
   assert.equal(d.calls.gyms.length, 0);

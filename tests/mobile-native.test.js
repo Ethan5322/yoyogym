@@ -321,18 +321,29 @@ test('WELCOME TO [GYM]: JOIN LEADS TO "JOIN [GYM]", SIGN IN TO "SIGN IN TO [GYM]
   assert.ok(visible(doc, 'join'));
 });
 
-test('OWNER LOGIN IS THE GYM\'S OWN ADMIN SIGN-IN, FOR OWNER AND STAFF', async () => {
+test('OWNER LOGIN IS EMAIL + PASSWORD ALONE — no choosing the gym (CLAUDE.md §43.1 Q2)', () => {
+  const { doc, window } = boot();
+  click(doc, window, '[data-go="owner"]');
+  assert.match(text(doc, '#owner-welcome .y-title'), /Welcome, Gym Owner/);
+  const options = [...doc.querySelectorAll('#owner-welcome .y-option b')].map((b) => b.textContent);
+  assert.deepEqual(options, ['Apply to join Yoyo Gyms', 'Owner login', 'Gym staff sign in', 'Check application status']);
+  assert.match(text(doc, '#owner-welcome [data-go="owner-signin"] small'), /email you applied with/);
+
+  click(doc, window, '[data-go="owner-signin"]');
+  // Off to the website's email sign-in (where the admin panel keeps its
+  // session); remembered, so reopening the app goes back there.
+  assert.equal(window.localStorage.getItem('yoyo.lastrole'), 'owner-email');
+  assert.ok(!visible(doc, 'pick'), 'no gym search for an owner');
+});
+
+test('GYM STAFF STILL CHOOSE THEIR GYM, THEN ITS OWN ADMIN SIGN-IN', async () => {
   const routes = {
     ...ROUTES,
     'GET /platform/api/gyms': { status: 200, body: { gyms: [{ slug: 'bos-gym', name: 'BOS GYM', city: 'Durban' }] } },
   };
   const { doc, window } = boot({ routes });
   click(doc, window, '[data-go="owner"]');
-  assert.match(text(doc, '#owner-welcome .y-title'), /Welcome, Gym Owner/);
-  const options = [...doc.querySelectorAll('#owner-welcome .y-option b')].map((b) => b.textContent);
-  assert.deepEqual(options, ['Apply to join Yoyo Gyms', 'Owner login', 'Check application status']);
-
-  click(doc, window, '[data-go="owner-signin"]');
+  click(doc, window, '[data-go="staff-signin"]');
   assert.equal(text(doc, '#pick-title'), 'Gym owner login');
   assert.match(text(doc, '#pick-sub'), /staff/);
   assert.ok(!visible(doc, 'forgot'), 'the member recovery route is not offered to owners');

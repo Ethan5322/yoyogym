@@ -196,6 +196,16 @@
     go(adminPath(slug) + '?app=1&back=' + encodeURIComponent(appHome()));
   }
 
+  /**
+   * The owners' email sign-in (§43.1 Q2). It lives on the website, where the
+   * gym admin panel keeps its session; a phone already signed in goes straight
+   * on to the owner's gym from there.
+   */
+  function ownerSignIn() {
+    setLastRole('owner-email');
+    go('/owner/login?app=1&back=' + encodeURIComponent(appHome()));
+  }
+
   /** On opening: back to this phone's gym, or the Yoyo front page for someone new. */
   function resumeLast() {
     if (new URLSearchParams(window.location.search).get('home') === '1') {
@@ -210,6 +220,8 @@
     } else if (role === 'owner') {
       var admin = myGym(ADMIN_MINE);
       if (admin) goAdmin(admin.slug);
+    } else if (role === 'owner-email') {
+      ownerSignIn();
     }
   }
 
@@ -339,7 +351,10 @@
     if (where === 'help') return show('help');
     if (where === 'owner-apply') return show('owner-apply');
     if (where === 'find') return openPick('member');
-    if (where === 'owner-signin') return openPick('owner');
+    // An OWNER signs in with email + password alone (CLAUDE.md §43.1 Q2); the
+    // website finds their gym. Staff have no Yoyo account: they choose theirs.
+    if (where === 'owner-signin') return ownerSignIn();
+    if (where === 'staff-signin') return openPick('owner');
 
     if (where === 'privacy') return go('/platform/privacy');
     if (where === 'delete-account') return go('/platform/delete-account');

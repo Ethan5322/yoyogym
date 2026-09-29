@@ -80,7 +80,8 @@ test('THE LOCKOUT STILL COUNTS: WRONG PASSWORDS AGAINST AN EMAIL HIT THE SAME AC
   // so five wrong tries by email lock the owner exactly as five by username.
   const { readFileSync } = await import('node:fs');
   const handler = readFileSync('server/handlers/auth/login.js', 'utf8');
-  assert.match(handler, /const \{ user, error \} = await findAdminAccount\(supabase, username\);/);
+  // In attemptLogin since §43.1 Q2, shared with the owners' email sign-in.
+  assert.match(handler, /const \{ user, error \} = await findAdminAccount\(supabase, identifier\);/);
   assert.match(handler, /\.update\(update\)\.eq\('id', user\.id\)/, 'lockout is by account id');
   assert.match(handler, /Invalid username or password/, 'the same generic refusal either way');
 });

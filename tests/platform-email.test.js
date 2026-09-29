@@ -58,7 +58,10 @@ test('the activation email carries the link and the code as SEPARATE things', ()
 
 test('the activation email says when the link dies', () => {
   const mail = activationEmail({ gymName: 'BOS GYM', link: 'https://x', code: '000000' });
-  assert.match(mail.html, /48 hours/);
+  // Ten minutes, and how to get the next one (CLAUDE.md §43.1 Q1).
+  assert.match(mail.html, /expire in 10 minutes/);
+  assert.match(mail.html, /one link a day/);
+  assert.match(mail.text, /10 minutes/);
 });
 
 test('a gym name with HTML in it cannot break the email', () => {

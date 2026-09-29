@@ -62,6 +62,73 @@ export async function findAdminAccount(supabase, identifier) {
   return rowError ? { user: null, error: rowError } : { user: user || null };
 }
 
+/**
+ * One sign-in attempt against THIS gym's accounts — the gym in scope. The
+ * steps the sign-in always had, in one place, so the owners' email sign-in
+ * (owner-login.js, CLAUDE.md §43.1 Q2) runs exactly the same checks: the
+ * lockout, disabled accounts, failed-attempt counting and the generic refusal.
+ *
+ * @returns {Promise<{ok: true, token, user} | {ok: false, message, final?: boolean, error?: boolean}>}
+ *   `final` means stop trying other gyms: the account was found and is locked
+ *   or disabled, which is worth saying rather than hiding behind "invalid".
+ */
+export async function attemptLogin(supabase, identifier, password, { remember = false } = {}) {
+  // Username, or the account's email (see findAdminAccount).
+  const { user, error } = await findAdminAccount(supabase, identifier);
+  if (error) return { ok: false, error: true, message: 'Login failed' };
+
+  // Generic message — never reveal whether the username exists.
+  const INVALID = 'Invalid username or password';
+  if (!user) return { ok: false, message: INVALID };
+
+  if (!user.is_active) {
+    return { ok: false, final: true, message: 'This account is disabled. Contact the gym owner.' };
+  }
+
+  // Locked out?
+  if (user.locked_until && new Date(user.locked_until) > new Date()) {
+    return { ok: false, final: true, message: 'Account temporarily locked. Try again later.' };
+  }
+
+  const valid = await verifyPassword(password, user.password_hash);
+  if (!valid) {
+    const attempts = (user.failed_logins || 0) + 1;
+    const update = { failed_logins: attempts, updated_at: new Date().toISOString() };
+    if (attempts >= MAX_FAILED_ATTEMPTS) {
+      update.locked_until = new Date(Date.now() + LOCK_MINUTES * 60_000).toISOString();
+      update.failed_logins = 0;
+    }
+    await supabase.from('admin_users').update(update).eq('id', user.id);
+    return { ok: false, message: INVALID };
+  }
+
+  // Success: reset counters, stamp last login.
+  await supabase
+    .from('admin_users')
+    .update({
+      failed_logins: 0,
+      locked_until: null,
+      last_login_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', user.id);
+
+  // `remember`: the app keeps staff signed in until they sign out (§38.1 Q3).
+  const token = signToken(user, { gym: gymSlug(), remember: remember === true });
+  return {
+    ok: true,
+    token,
+    user: {
+      id: user.id,
+      username: user.username,
+      full_name: user.full_name,
+      email: user.email,
+      role: user.role,
+      trainer_id: user.trainer_id,
+    },
+  };
+}
+
 export default async function handler(req, res) {
   if (!allowMethods(req, res, ['POST'])) return;
   if (!(await rateLimit(req, res, { key: 'admin-login', limit: 10, windowMs: 60_000 }))) return;
@@ -72,61 +139,10 @@ export default async function handler(req, res) {
       return badRequest(res, 'Username and password are required');
     }
 
-    const supabase = getSupabase();
-    // Username, or the account's email (see findAdminAccount).
-    const { user, error } = await findAdminAccount(supabase, username);
-
-    if (error) return serverError(res, 'Login failed');
-
-    // Generic message — never reveal whether the username exists.
-    const INVALID = 'Invalid username or password';
-    if (!user) return unauthorized(res, INVALID);
-
-    if (!user.is_active) {
-      return unauthorized(res, 'This account is disabled. Contact the gym owner.');
-    }
-
-    // Locked out?
-    if (user.locked_until && new Date(user.locked_until) > new Date()) {
-      return unauthorized(res, 'Account temporarily locked. Try again later.');
-    }
-
-    const valid = await verifyPassword(password, user.password_hash);
-    if (!valid) {
-      const attempts = (user.failed_logins || 0) + 1;
-      const update = { failed_logins: attempts, updated_at: new Date().toISOString() };
-      if (attempts >= MAX_FAILED_ATTEMPTS) {
-        update.locked_until = new Date(Date.now() + LOCK_MINUTES * 60_000).toISOString();
-        update.failed_logins = 0;
-      }
-      await supabase.from('admin_users').update(update).eq('id', user.id);
-      return unauthorized(res, INVALID);
-    }
-
-    // Success: reset counters, stamp last login.
-    await supabase
-      .from('admin_users')
-      .update({
-        failed_logins: 0,
-        locked_until: null,
-        last_login_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      })
-      .eq('id', user.id);
-
-    // `remember`: the app keeps staff signed in until they sign out (§38.1 Q3).
-    const token = signToken(user, { gym: gymSlug(), remember: remember === true });
-    return ok(res, {
-      token,
-      user: {
-        id: user.id,
-        username: user.username,
-        full_name: user.full_name,
-        email: user.email,
-        role: user.role,
-        trainer_id: user.trainer_id,
-      },
-    });
+    const result = await attemptLogin(getSupabase(), username, password, { remember });
+    if (result.error) return serverError(res, result.message);
+    if (!result.ok) return unauthorized(res, result.message);
+    return ok(res, { token: result.token, user: result.user });
   } catch (err) {
     console.error('login error:', err.message);
     return serverError(res, 'Login failed');

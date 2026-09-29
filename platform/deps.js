@@ -14,7 +14,7 @@ import { approveApplication, rejectApplication, requestMoreInfo, retryProvisioni
 import { provisionGym } from './provisioning.js';
 import { schemaRunnerDeps, gymSchemaChecksum, runSql, canReachProject } from './schema-runner.js';
 import { runBilling } from './billing-runner.js';
-import { issueActivation, activationLookupHash } from './activation.js';
+import { issueActivation, activationLookupHash, nextActivationAllowedAt, ACTIVATION_TTL_MINUTES } from './activation.js';
 import { DOCUMENT_BUCKET, REQUIRED_DOCUMENTS, DOCUMENT_LABELS } from './documents.js';
 import {
   sendEmail,
@@ -1186,18 +1186,19 @@ export function activationDeps(db = platformDb()) {
       if (!token) return {};
       const { data } = await db
         .from('owner_activations')
-        .select('gym_id, user_id')
+        .select('gym_id, user_id, expires_at')
         .eq('token_hash', activationLookupHash(token))
         .is('used_at', null)
         .maybeSingle();
       if (!data) return {};
+      const expired = new Date(data.expires_at).getTime() <= Date.now();
 
       const [{ data: gym }, { data: owner }] = await Promise.all([
         db.from('gyms').select('search_name').eq('id', data.gym_id).maybeSingle(),
         // Shown only to whoever holds the emailed link — sent to this address.
         db.from('platform_users').select('email').eq('id', data.user_id).maybeSingle(),
       ]);
-      return { gymName: gym?.search_name ?? '', email: owner?.email ?? '' };
+      return { gymName: gym?.search_name ?? '', email: owner?.email ?? '', expired };
     },
 
     findActivation: async (tokenHash) => {
@@ -1339,7 +1340,32 @@ export function activationDeps(db = platformDb()) {
     },
 
     issueActivation: async ({ userId, gymId }) => {
+      // ONE LINK A DAY PER PERSON (CLAUDE.md §43.1 Q1) — whoever asks: the
+      // approval, a Yoyo staff resend, or the owner on the expired page.
+      // Refused BEFORE anything is created, and nothing is retired, so the
+      // link the owner already has keeps working until its own 10 minutes end.
+      const { data: last } = await db
+        .from('owner_activations')
+        .select('created_at')
+        .eq('user_id', userId)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      const nextAt = nextActivationAllowedAt(last?.created_at);
+      if (nextAt) {
+        return { limited: true, nextAt: nextAt.toISOString(), emailed: null, link: null, code: null };
+      }
+
       const { row, token, code } = issueActivation({ userId, gymId });
+
+      // A new link retires the old ones (F-40.9) — only now, once it is certain
+      // a new one is being sent.
+      await db
+        .from('owner_activations')
+        .update({ used_at: new Date().toISOString() })
+        .eq('user_id', userId)
+        .eq('gym_id', gymId)
+        .is('used_at', null);
 
       const { error } = await db.from('owner_activations').insert(row);
       if (error) throw new Error(`Could not create the activation: ${error.message}`);
@@ -1354,7 +1380,7 @@ export function activationDeps(db = platformDb()) {
         actor_kind: 'system',
         entity: 'gym',
         entity_id: gymId,
-        detail: { user_id: userId, expires_in_hours: 48 },
+        detail: { user_id: userId, expires_in_minutes: ACTIVATION_TTL_MINUTES },
       });
 
       // Send it. A failure here does NOT undo the approval — the gym is
@@ -1378,7 +1404,25 @@ export function activationDeps(db = platformDb()) {
         });
       }
 
-      return { link, code, expiresInHours: 48, emailed: sent.ok, emailReason: sent.reason ?? null, to: owner?.email ?? null };
+      return { link, code, expiresInMinutes: ACTIVATION_TTL_MINUTES, emailed: sent.ok, emailReason: sent.reason ?? null, to: owner?.email ?? null };
+    },
+
+    /**
+     * The owner asks for a new link from the EXPIRED one (§43.1 Q1). The old
+     * link is the proof of who is asking: it was only ever emailed to them.
+     * A link already used means the account is active — nothing to renew.
+     */
+    renewActivation: async (token) => {
+      if (!token) return { ok: false, reason: 'invalid' };
+      const { data: record } = await db
+        .from('owner_activations')
+        .select('user_id, gym_id, used_at, expires_at')
+        .eq('token_hash', activationLookupHash(token))
+        .maybeSingle();
+      if (!record) return { ok: false, reason: 'invalid' };
+      if (record.used_at) return { ok: false, reason: 'used' };
+      if (new Date(record.expires_at).getTime() > Date.now()) return { ok: false, reason: 'still_valid' };
+      return { ok: true, userId: record.user_id, gymId: record.gym_id };
     },
 
     audit: (entry) => audit(db, entry),

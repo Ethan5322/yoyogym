@@ -15,6 +15,17 @@ occurrence is answered from notes rather than rediscovered.
 
 ---
 
+## 2026-09-29 — Ten-minute links, email sign-in for owners, no web app (D-168)
+
+Built from §43.1. Also found on the way: staff "Send a new activation link" retired the owner's link BEFORE
+issuing a new one, so under a daily limit a refused resend would have left them with none — retiring now
+happens inside the issue step, after the check. A new router block returned nothing after answering and
+was overwritten by "Not found" (that part of the router says "handled" by returning true) — caught by its
+test. The sign-in steps are one function (`attemptLogin`) shared by the gym sign-in and the owners' email
+sign-in. 1109 tests; website build checked (no manifest ships).
+
+---
+
 ## 2026-09-29 — The owner activated, and the gym sign-in still refused the password
 
 **Evidence (read-only).** Activation completed at 09:52:17 (`gym_admin_created: true`, gym `active`); the

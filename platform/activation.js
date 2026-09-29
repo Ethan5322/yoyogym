@@ -14,8 +14,38 @@ import { createHash, randomBytes, timingSafeEqual } from 'node:crypto';
 import { hashPassword } from './auth.js';
 import { OWNER_USERNAME } from './gym-admin.js';
 
-/** How long an activation link lives. Long enough to find the email; not a week. */
-export const ACTIVATION_TTL_HOURS = 48;
+/**
+ * How long an activation link and code live: TEN MINUTES (CLAUDE.md §43.1 Q1,
+ * the user's rule — it was 48 hours). The link is opened and the code typed
+ * while the email is in front of the owner, or it is dead.
+ */
+export const ACTIVATION_TTL_MINUTES = 10;
+
+/**
+ * And a person receives at most ONE link a day (§43.1 Q1): the approval email,
+ * a Yoyo staff resend and the owner's own request all count. A rolling 24
+ * hours from the last one sent — "a day" that does not depend on anyone's
+ * time zone.
+ */
+export const ACTIVATION_GAP_HOURS = 24;
+
+/**
+ * When may this person be sent another link? null means now.
+ *
+ * @param {string|Date|null} lastSentAt  when the newest link was sent, if ever
+ */
+export function nextActivationAllowedAt(lastSentAt, now = new Date()) {
+  if (!lastSentAt) return null;
+  const next = new Date(new Date(lastSentAt).getTime() + ACTIVATION_GAP_HOURS * 3_600_000);
+  return next.getTime() > now.getTime() ? next : null;
+}
+
+/** "in about 7 hours" — no clock time, so no time zone to get wrong. */
+export function waitText(next, now = new Date()) {
+  const hours = Math.ceil((new Date(next).getTime() - now.getTime()) / 3_600_000);
+  if (hours <= 1) return 'in about an hour';
+  return `in about ${hours} hours`;
+}
 
 /** The shortest owner password we will accept. Matches the signup form. */
 export const MIN_PASSWORD_LENGTH = 10;
@@ -63,7 +93,7 @@ export function issueActivation({ userId, gymId, now = new Date() }) {
       gym_id: gymId,
       token_hash: sha256(token),
       code_hash: sha256(code),
-      expires_at: new Date(now.getTime() + ACTIVATION_TTL_HOURS * 3_600_000).toISOString(),
+      expires_at: new Date(now.getTime() + ACTIVATION_TTL_MINUTES * 60_000).toISOString(),
       used_at: null,
     },
   };
@@ -83,9 +113,9 @@ export function checkActivation(record, { token, code } = {}, now = new Date()) 
 
   if (new Date(record.expires_at).getTime() <= now.getTime()) {
     // The one refusal that says something different, because "expired" is
-    // actionable — the owner asks for a new link — and knowing a link once
-    // existed reveals nothing to someone who already held it.
-    return { ok: false, reason: 'That activation link has expired. Please ask for a new one.' };
+    // actionable — the owner asks for a new link, on this page — and knowing a
+    // link once existed reveals nothing to someone who already held it.
+    return { ok: false, expired: true, reason: `That activation link has expired — links last ${ACTIVATION_TTL_MINUTES} minutes.` };
   }
 
   // Both halves, both constant-time. Evaluated without short-circuiting so the
@@ -130,7 +160,7 @@ export async function completeActivation(deps, { token, code, password } = {}, o
 
   const record = await deps.findActivation(sha256(token));
   const check = checkActivation(record, { token, code }, now);
-  if (!check.ok) return { ok: false, reason: check.reason };
+  if (!check.ok) return { ok: false, reason: check.reason, expired: check.expired === true };
 
   // Hashed before the link is consumed: if bcrypt throws, the owner still has
   // a working link.
