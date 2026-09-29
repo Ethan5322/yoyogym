@@ -12,7 +12,7 @@ import { verifyPassword, hashPassword, verifyTotp, base32Decode, verifyRecoveryC
 import { schemaNameFor } from './provisioning.js';
 import { approveApplication, rejectApplication, requestMoreInfo } from './applications.js';
 import { provisionGym } from './provisioning.js';
-import { schemaRunnerDeps, gymSchemaChecksum, runSql } from './schema-runner.js';
+import { schemaRunnerDeps, gymSchemaChecksum, runSql, canReachProject } from './schema-runner.js';
 import { runBilling } from './billing-runner.js';
 import { issueActivation, activationLookupHash } from './activation.js';
 import { DOCUMENT_BUCKET } from './documents.js';
@@ -343,6 +343,7 @@ export function platformDeps() {
           await db.from('application_documents').update({ retention_until: until }).eq('application_id', applicationId);
         },
         provisionGym: (application, opts) => provisionGym(application, provisioningDeps(db), { ...opts, schemaChecksum: safeChecksum() }),
+        canReachProject: () => canReachProject({ projectRef: process.env.SUPABASE_PROJECT_REF }),
         audit: (e) => audit(db, e),
       };
 

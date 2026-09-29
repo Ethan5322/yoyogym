@@ -15,6 +15,34 @@ occurrence is answered from notes rather than rediscovered.
 
 ---
 
+## 2026-09-29 — Before the first live gym: three defects in provisioning, found by reading it
+
+The user switched gym creation on (`PLATFORM_PROVISION_LIVE`, project ID, `sbp_` token; Settings
+shows **ready**) and confirmed read-only that `authenticator.rolconfig` holds
+`pgrst.db_schemas=public, graphql_public, gym, platform` — so `exposeSchema` (D-151) reads the real
+list and only appends. Nothing has been provisioned yet. Before the first approval:
+
+1. **A new gym's schema would have been closed to the server.** `db/schema.sql` grants nothing, and
+   a schema created by SQL is closed to the API roles until granted (Supabase, "Using custom
+   schemas" — checked in the docs, not assumed). `gym` and `platform` were granted by hand. The
+   first gym would have been created, registered, exposed — and every read refused with
+   "permission denied for schema". **Fix:** `applySchema` now also runs `accessGrantsFor(schema)`:
+   usage, all tables / sequences / routines, and default privileges — to **`service_role` only**.
+   The guide also grants `anon` and `authenticated`; here that would open the gym to the public key
+   the moment any policy existed (§21).
+2. **A wrong token would have stranded the application.** Readiness checks only the settings'
+   shape; the first real call was `createSchema`, after "approved" is recorded, and an approved
+   application can never be approved again. **Fix:** `canReachProject()` (`select 1`) runs after
+   the document check and before anything is written; a refusal says so and leaves it waiting.
+3. **Four tables had no RLS in a new gym.** `admin_inbox`, `announcements`, `progress_entries`,
+   `referrals` get RLS from their migrations in KOM, but were missing from `db/schema.sql`'s RLS list.
+   Added; a test now fails if any table in the file is missing from the list.
+
+Still true, stated plainly: a provision that fails after the approval is recorded has **no retry
+button** — it needs a hand fix. The checks above remove the known causes; they do not add a retry.
+
+---
+
 ## 2026-09-29 — Price changes were never audited (found while saving the support WhatsApp)
 
 **Failure.** Saving the Prime WhatsApp line (`+27688529333`, on the user's instruction) left no

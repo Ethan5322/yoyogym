@@ -101,6 +101,24 @@ export async function approveApplication(applicationId, actor, deps, options = {
     };
   }
 
+  // THE SAVED TOKEN, TRIED FOR REAL, STILL BEFORE ANYTHING IS WRITTEN.
+  //
+  // The readiness check only looks at the settings' shape. A wrong token or
+  // project ID would pass it, fail at the first provisioning step — after
+  // "approved" is recorded — and strand the application for good.
+  if (deps.canReachProject) {
+    const reach = await deps.canReachProject();
+    if (!reach?.ok) {
+      return {
+        ok: false,
+        error:
+          `Nothing was approved: this server could not reach the Supabase project (${reach?.reason || 'no answer'}). ` +
+          'Check SUPABASE_PROJECT_REF and SUPABASE_MANAGEMENT_TOKEN in Vercel, redeploy, and approve again. ' +
+          'The application is still waiting.',
+      };
+    }
+  }
+
   const now = new Date().toISOString();
 
   // The decision is recorded BEFORE provisioning is attempted. If provisioning

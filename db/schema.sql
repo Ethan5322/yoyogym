@@ -653,7 +653,8 @@ begin
     'class_bookings','training_sessions','notifications_log','settings',
     'qr_scan_analytics','events','visitors','incidents','audit_log',
     'membership_pauses','rewards','reward_claims','challenges','challenge_entries',
-    'member_groups','member_group_links'
+    'member_groups','member_group_links',
+    'admin_inbox','announcements','progress_entries','referrals'
   ]
   loop
     execute format('alter table gym.%I enable row level security;', t);

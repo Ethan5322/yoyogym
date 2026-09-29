@@ -82,6 +82,52 @@ export function gymSchemaSqlFor(schema) {
     .replace(/set search_path = gym, public;/g, `set search_path = ${schema}, public;`);
 }
 
+/**
+ * Let the server's key into a new gym's schema.
+ *
+ * A schema created by SQL is closed to the API roles until it is granted —
+ * Supabase's own guide for custom schemas lists these statements. Without them
+ * the gym is created, registered and exposed, and then every read of it fails
+ * with "permission denied for schema". Found by reading the provisioner
+ * before its first live run: db/schema.sql has no grants, and `gym` and
+ * `platform` were granted by hand.
+ *
+ * SERVICE_ROLE ONLY. The browser never talks to Supabase (CLAUDE.md §21); the
+ * guide also grants anon and authenticated, which here would open every gym to
+ * anyone holding the public key the moment an RLS policy is added.
+ *
+ * The default privileges are for the role running this — the same role the
+ * migration runner uses later — so tables added by a future migration are
+ * reachable too.
+ */
+export function accessGrantsFor(schema) {
+  assertSafe(schema);
+  return [
+    `grant usage on schema ${schema} to service_role;`,
+    `grant all on all tables in schema ${schema} to service_role;`,
+    `grant all on all sequences in schema ${schema} to service_role;`,
+    `grant all on all routines in schema ${schema} to service_role;`,
+    `alter default privileges in schema ${schema} grant all on tables to service_role;`,
+    `alter default privileges in schema ${schema} grant all on sequences to service_role;`,
+    `alter default privileges in schema ${schema} grant all on routines to service_role;`,
+  ].join('\n');
+}
+
+/**
+ * Can this server reach the project with the saved token? Asked BEFORE an
+ * approval is recorded: a wrong token or project ID otherwise fails at the
+ * first provisioning step, after "approved" is written, and the application
+ * can never be approved again. Returns the HTTP status only — never a body.
+ */
+export async function canReachProject({ projectRef = process.env.SUPABASE_PROJECT_REF } = {}) {
+  try {
+    await runSql('select 1;', { projectRef });
+    return { ok: true };
+  } catch (err) {
+    return { ok: false, reason: err?.message || 'unreachable' };
+  }
+}
+
 /** Provisioning's DDL dependencies, against a real Supabase project. */
 export function schemaRunnerDeps({ projectRef } = {}) {
   const opts = { projectRef };
@@ -94,6 +140,7 @@ export function schemaRunnerDeps({ projectRef } = {}) {
 
     applySchema: async (schema) => {
       await runSql(gymSchemaSqlFor(schema), opts);
+      await runSql(accessGrantsFor(schema), opts);
     },
 
     seed: async (schema, application) => {

@@ -158,3 +158,34 @@ test('a failed provision does not leave the application looking successful', asy
   assert.equal(last.event, 'provision_failed', 'but the failure is recorded as its own event');
   assert.ok(last.detail.error);
 });
+
+// Found before the first live run (2026-09-29): the readiness check reads only
+// the settings' SHAPE. A wrong token passed it and failed at the first
+// provisioning step — after "approved" was written, stranding the application.
+test('a token that cannot reach the project is refused BEFORE anything is recorded', async () => {
+  const app = submitted();
+  const d = { ...deps(app), canReachProject: async () => ({ ok: false, reason: 'Supabase query failed: 401' }) };
+
+  const r = await approveApplication('app-1', reviewer, d, { dryRun: false });
+
+  assert.equal(r.ok, false);
+  assert.match(r.error, /Nothing was approved/);
+  assert.match(r.error, /401/);
+  assert.match(r.error, /still waiting/);
+  assert.equal(app.status, 'submitted', 'the application stays open, so it can be approved later');
+  assert.equal(d.updates.length, 0);
+  assert.equal(d.events.length, 0);
+  assert.equal(d.provisioned.length, 0);
+});
+
+test('a token that reaches the project lets the approval go ahead', async () => {
+  const app = submitted();
+  let asked = 0;
+  const d = { ...deps(app), canReachProject: async () => { asked += 1; return { ok: true }; } };
+
+  const r = await approveApplication('app-1', reviewer, d, { dryRun: false });
+
+  assert.equal(r.ok, true);
+  assert.equal(asked, 1);
+  assert.equal(app.status, 'approved');
+});
