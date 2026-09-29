@@ -32,7 +32,10 @@ export function restorePlatformPath(req) {
 
   url.searchParams.delete(PLATFORM_PATH_KEY);
   url.searchParams.delete('path');
-  const path = carried.replace(/^\/+/, '');
+  // .trim() and the trailing-plus strip: a modifier left behind in the
+  // destination (":rest+") arrives as "+", which a query reads back as a
+  // space — and "applications/<id> " matches no route.
+  const path = carried.trim().replace(/\++$/, '').replace(/^\/+/, '');
   const query = url.searchParams.toString();
   req.url = `/platform/${path}${query ? `?${query}` : ''}`;
   return req;

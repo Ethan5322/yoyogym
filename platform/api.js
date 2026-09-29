@@ -395,6 +395,8 @@ export async function handlePlatformApi(req, res, deps, { path, method, url }) {
   // Not an API path this module knows. The caller falls through to the
   // website routes rather than 404ing here.
   if (path.startsWith('api/')) {
+    // Which address was unknown: the requester's own, so nothing is disclosed.
+    res.setHeader?.('X-Platform-Path', encodeURIComponent(path));
     return json(res, 404, { error: 'Unknown endpoint.' }), true;
   }
 

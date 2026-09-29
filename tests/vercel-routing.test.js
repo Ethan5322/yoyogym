@@ -23,7 +23,10 @@ test('multi-segment platform addresses are rewritten to the function file by nam
   const sources = vercel.rewrites.map((r) => r.source);
   const multi = vercel.rewrites.find((r) => r.source === '/platform/:first/:rest+');
   assert.ok(multi, 'a rule for two or more segments exists');
-  assert.equal(multi.destination, `/api/platform/[...path]?${PLATFORM_PATH_KEY}=:first/:rest+`);
+  assert.equal(multi.destination, `/api/platform/[...path]?${PLATFORM_PATH_KEY}=:first/:rest`);
+  // NO modifier in the destination: Vercel substitutes ":rest" and leaves a "+"
+  // behind, which the query reads back as a space (found live, 2026-09-29).
+  for (const r of vercel.rewrites) assert.doesNotMatch(r.destination, /:[a-z]+\+/);
 
   // BEFORE the one-segment rule, or that rule would take them to the same dead end.
   assert.ok(sources.indexOf('/platform/:first/:rest+') < sources.indexOf('/platform/:path*'));
@@ -83,4 +86,12 @@ test('a rewritten request reaches the right route: the app\'s gym search', async
   assert.equal(status, 200);
   assert.equal(asked[0].query, 'kom');
   assert.equal(JSON.parse(sent).gyms[0].slug, 'kom');
+});
+
+test('a stray trailing plus or space is not part of the address', () => {
+  for (const tail of ['+', ' ', '%2B', '%20']) {
+    const req = { url: `/api/platform/[...path]?${PLATFORM_PATH_KEY}=applications/abc-123${tail}&tab=waiting` };
+    restorePlatformPath(req);
+    assert.equal(req.url, '/platform/applications/abc-123?tab=waiting', `tail ${tail}`);
+  }
 });

@@ -432,7 +432,7 @@ export async function handlePlatform(req, res, deps) {
   // because they authenticate differently from everything above.
   if (await handleExtraRoutes(req, res, deps, { url, path, method })) return;
 
-  res.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8' });
+  res.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8', 'X-Platform-Path': encodeURIComponent(path) });
   res.end('Not found.');
 }
 
