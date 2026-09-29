@@ -138,6 +138,15 @@ export async function approveApplication(applicationId, actor, deps, options = {
     created_at: now,
   });
 
+  return provisionAndActivate(application, actor, deps, dryRun);
+}
+
+/**
+ * Build the gym, then give the owner their way in. Shared by approval and by
+ * the retry after a failed build, so the two can never drift apart.
+ */
+async function provisionAndActivate(application, actor, deps, dryRun) {
+  const applicationId = application.id;
   const result = await deps.provisionGym(application, { dryRun });
 
   if (!result.ok) {
@@ -148,12 +157,14 @@ export async function approveApplication(applicationId, actor, deps, options = {
       detail: {
         failed_at: result.failedAt,
         error: result.error,
-        // Surfaced here too: a stranded project is a bill nobody is tracking.
-        orphaned_project_ref: result.orphanedProjectRef ?? null,
+        // Surfaced here too: a half-built schema nobody is tracking.
+        orphaned_schema: result.orphanedSchema ?? null,
       },
       created_at: new Date().toISOString(),
     });
-    return { ok: false, error: result.error, provision: result };
+    // The DECISION stands; only the building failed — said as such, so the
+    // reviewer knows to press "Try again" rather than to approve again.
+    return { ok: false, provisionFailed: true, error: result.error, provision: result };
   }
 
   await deps.appendEvent({
@@ -190,6 +201,55 @@ export async function approveApplication(applicationId, actor, deps, options = {
   }
 
   return { ok: true, application, gym: result.gym, activation, dryRun };
+}
+
+/**
+ * Try again to build the gym for an application that was approved but whose
+ * gym was not fully created (CLAUDE.md §42 follow-up, 2026-09-29).
+ *
+ * The approval was a human decision and it stands; only the building failed.
+ * Every provisioning step finds and reuses what an earlier attempt already
+ * saved, so running it again completes the gym rather than making a second.
+ * Allowed only when the LATEST build attempt failed — never on a gym that was
+ * built, never on an application that was not approved.
+ */
+export async function retryProvisioning(applicationId, actor, deps, options = {}) {
+  const dryRun = options.dryRun !== false;
+  const application = await deps.getApplication(applicationId);
+
+  if (!application) return refuse(deps, null, actor, 'Application not found.');
+  if (!can(actor, 'application.approve')) {
+    return refuse(deps, application, actor, 'You do not have permission to create gyms.');
+  }
+  if (application.status !== 'approved') {
+    return refuse(deps, application, actor, 'Only an approved application has a gym to create.');
+  }
+  const last = deps.lastProvisionEvent ? await deps.lastProvisionEvent(applicationId) : null;
+  if (!last || last.event !== 'provision_failed') {
+    return refuse(deps, application, actor, 'This gym was already created. There is nothing to retry.');
+  }
+  if (dryRun) {
+    return {
+      ok: false,
+      dryRun: true,
+      error: 'Nothing was created: creating gyms is switched off on this server. Set PLATFORM_PROVISION_LIVE=true and redeploy.',
+    };
+  }
+  if (deps.canReachProject) {
+    const reach = await deps.canReachProject();
+    if (!reach?.ok) {
+      return { ok: false, error: `Nothing was created: this server could not reach the Supabase project (${reach?.reason || 'no answer'}).` };
+    }
+  }
+
+  await deps.appendEvent({
+    application_id: applicationId,
+    event: 'provision_retried',
+    actor_user_id: actor.id,
+    detail: { after: last.detail?.failed_at ?? null },
+    created_at: new Date().toISOString(),
+  });
+  return provisionAndActivate(application, actor, deps, dryRun);
 }
 
 /**

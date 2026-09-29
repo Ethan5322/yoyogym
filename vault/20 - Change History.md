@@ -15,6 +15,35 @@ occurrence is answered from notes rather than rediscovered.
 
 ---
 
+## 2026-09-29 — The first live gym failed to build: the wrong owner field (D-167)
+
+**Reported:** COCATE GYM was approved, and its owner's gym sign-in said "Invalid username or password".
+
+**Read the actual evidence first** (platform audit log, read-only): `gym.provision.failed` at 08:22:27,
+`failed_at: saveConnection`, `Cannot read properties of null (reading 'id')`, `orphaned_schema: gym_cocate_gym`.
+No `gyms` row existed. So no activation was issued and no owner account was ever created in the gym —
+every sign-in was refused because there was nothing to sign in to.
+
+**Cause, from the code.** `provisionGym` saved `owner_user_id: application.owner_user_id`; a
+`gym_applications` row has `applicant_user_id` and no `owner_user_id`. `gyms.owner_user_id` is NOT NULL,
+so Postgres refused the row — and `saveGym` discarded the returned error and handed back null, which
+crashed the next step with a message that named neither. **Why tests passed:** the provisioning test's
+fixture carried `owner_user_id: 'user-1'`, a field no real application has. Also found: the gym was
+never given the plan the owner chose (`plan_key` unset, trial opened with `plan_id` null).
+
+**Fix.** The owner comes from `applicant_user_id` and is checked before anything is created; the gym gets
+`requested_plan_key` and its trial opens on that plan's row. Every provisioning step now throws the
+database's own message, and finds and reuses what an earlier attempt saved. A failed build is retried from
+the application page ("The gym was not fully created … Try again"), allowed only when the latest attempt
+failed; it records `provision_retried`, finishes the gym, and issues the activation. The failure event now
+records `orphaned_schema` (it recorded a project ref, from the retired project-per-gym design). The test
+fixture is a real application row. 1078 tests.
+
+**Lesson.** A test fixture typed by hand can agree with the code and disagree with the database. Build
+fixtures from the real row shape, and never let a helper swallow a returned `{ error }`.
+
+---
+
 ## 2026-09-29 — The application in three steps (D-166)
 
 **Built:** details → documents → check and submit. The details save a **draft** and sign the owner in, so

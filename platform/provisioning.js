@@ -88,6 +88,22 @@ export async function provisionGym(application, deps, options = {}) {
     };
   }
 
+  // THE OWNER, CHECKED BEFORE ANYTHING IS CREATED.
+  //
+  // An application names its owner as `applicant_user_id`. This read
+  // `application.owner_user_id` — a field applications do not have — so the
+  // first real gym (COCATE GYM, 2026-09-29) was built, seeded, and then refused
+  // by gyms.owner_user_id NOT NULL, leaving a schema and no gym. The tests used
+  // a hand-made application that happened to carry the wrong field.
+  const ownerId = application.applicant_user_id ?? application.owner_user_id ?? null;
+  if (!ownerId) {
+    return { ok: false, failedAt: 'owner', error: 'The application does not say who the owner is. Nothing was created.', orphanedSchema: null };
+  }
+
+  // The plan the owner chose when applying (D-099). Without it the gym, and
+  // its trial, had no plan at all.
+  const planKey = options.plan?.key ?? application.requested_plan_key ?? null;
+
   if (dryRun) {
     return {
       dryRun: true,
@@ -119,7 +135,8 @@ export async function provisionGym(application, deps, options = {}) {
       search_name: application.proposed_gym_name,
       // Provisioned but NOT live: the first payment activates it (D-049).
       status: 'pending',
-      owner_user_id: application.owner_user_id,
+      owner_user_id: ownerId,
+      plan_key: planKey,
       application_id: application.id,
       country: application.country,
       city: application.city,

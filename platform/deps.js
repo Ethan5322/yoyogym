@@ -10,7 +10,7 @@
 import { createClient } from '@supabase/supabase-js';
 import { verifyPassword, hashPassword, verifyTotp, base32Decode, verifyRecoveryCode } from './auth.js';
 import { schemaNameFor } from './provisioning.js';
-import { approveApplication, rejectApplication, requestMoreInfo } from './applications.js';
+import { approveApplication, rejectApplication, requestMoreInfo, retryProvisioning } from './applications.js';
 import { provisionGym } from './provisioning.js';
 import { schemaRunnerDeps, gymSchemaChecksum, runSql, canReachProject } from './schema-runner.js';
 import { runBilling } from './billing-runner.js';
@@ -342,7 +342,25 @@ export function platformDeps() {
         setDocumentRetention: async (applicationId, until) => {
           await db.from('application_documents').update({ retention_until: until }).eq('application_id', applicationId);
         },
-        provisionGym: (application, opts) => provisionGym(application, provisioningDeps(db), { ...opts, schemaChecksum: safeChecksum() }),
+        // The plan the owner chose, as a row: its key names the gym's plan,
+        // its id opens the trial on it.
+        provisionGym: async (application, opts) => {
+          const { data: plan } = application.requested_plan_key
+            ? await db.from('platform_plans').select('id, key').eq('key', application.requested_plan_key).maybeSingle()
+            : { data: null };
+          return provisionGym(application, provisioningDeps(db), { ...opts, plan, schemaChecksum: safeChecksum() });
+        },
+        lastProvisionEvent: async (id) => {
+          const { data } = await db
+            .from('application_events')
+            .select('event, detail, created_at')
+            .eq('application_id', id)
+            .in('event', ['provisioned', 'provision_failed'])
+            .order('created_at', { ascending: false })
+            .limit(1)
+            .maybeSingle();
+          return data ?? null;
+        },
         canReachProject: () => canReachProject({ projectRef: process.env.SUPABASE_PROJECT_REF }),
         audit: (e) => audit(db, e),
       };
@@ -362,6 +380,14 @@ export function platformDeps() {
           };
         }
         return approveApplication(applicationId, actor, appDeps, { dryRun });
+      }
+
+      if (action === 'retry_provision') {
+        const readiness = provisioningReadiness();
+        if (readiness.live && !readiness.ready) {
+          return { ok: false, notReady: true, error: 'Nothing was created: this server is not fully set up to create gyms. ' + readiness.problems.join(' ') };
+        }
+        return retryProvisioning(applicationId, actor, appDeps, { dryRun });
       }
 
       const outcome =
@@ -625,15 +651,33 @@ function slugify(name) {
 export function provisioningDeps(db = platformDb()) {
   return {
     ...schemaRunnerDeps({ projectRef: process.env.SUPABASE_PROJECT_REF }),
+    // EVERY STEP CHECKS ITS ERROR. supabase-js RETURNS a refusal rather than
+    // throwing it, so these used to hand back null — and the failure surfaced
+    // one step later as "Cannot read properties of null (reading 'id')", with
+    // the database's real reason thrown away.
+    //
+    // AND EVERY STEP CAN RUN AGAIN. A failed provision is retried from the
+    // application page, so a row a previous attempt already saved is found
+    // and reused rather than inserted twice.
     saveGym: async (row) => {
-      const { data } = await db.from('gyms').insert(row).select('*').single();
+      if (row.application_id) {
+        const { data: existing } = await db.from('gyms').select('*').eq('application_id', row.application_id).maybeSingle();
+        if (existing) return existing;
+      }
+      const { data, error } = await db.from('gyms').insert(row).select('*').single();
+      if (error || !data) throw new Error(`Could not save the gym: ${error?.message || 'nothing was returned'}`);
       return data;
     },
     saveConnection: async (row) => {
-      const { data } = await db.from('gym_connections').insert(row).select('*').single();
+      const { data: existing } = await db.from('gym_connections').select('*').eq('gym_id', row.gym_id).maybeSingle();
+      if (existing) return existing;
+      const { data, error } = await db.from('gym_connections').insert(row).select('*').single();
+      if (error || !data) throw new Error(`Could not save the gym's connection: ${error?.message || 'nothing was returned'}`);
       return data;
     },
     startSubscription: async (row) => {
+      const { data: existing } = await db.from('platform_subscriptions').select('*').eq('gym_id', row.gym_id).maybeSingle();
+      if (existing) return existing;
       const { data, error } = await db.from('platform_subscriptions').insert(row).select('*').single();
       // Checked, not ignored: a gym provisioned without a subscription row is
       // refused with a 402 the first time anyone opens it, and the cause would
@@ -642,11 +686,20 @@ export function provisioningDeps(db = platformDb()) {
       return data;
     },
     saveSecretRef: async (row) => {
-      await db.from('gym_secrets').insert(row);
+      const { error } = await db.from('gym_secrets').insert(row);
+      if (error) throw new Error(`Could not save the gym's secret reference: ${error.message}`);
       return row;
     },
     recordMigrationBaseline: async (row) => {
-      await db.from('migration_runs').insert(row);
+      const { data: existing } = await db
+        .from('migration_runs')
+        .select('id')
+        .eq('gym_id', row.gym_id)
+        .eq('migration_id', row.migration_id)
+        .maybeSingle();
+      if (existing) return row;
+      const { error } = await db.from('migration_runs').insert(row);
+      if (error) throw new Error(`Could not record the schema version: ${error.message}`);
       return row;
     },
     audit: (e) => audit(db, e),

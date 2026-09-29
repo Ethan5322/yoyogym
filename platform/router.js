@@ -462,7 +462,7 @@ export async function handlePlatform(req, res, deps) {
     const session = requireSession(req, res, { csrfToken: form.csrf });
     if (!session) return; // 302 or 403 already written
 
-    const ACTIONS = new Set(['approve', 'reject', 'request_info']);
+    const ACTIONS = new Set(['approve', 'reject', 'request_info', 'retry_provision']);
     if (!ACTIONS.has(form.action)) {
       // Refuse rather than guess. An unrecognised action on a state-changing
       // endpoint is a bug or an attack, never something to interpret.
@@ -482,6 +482,8 @@ export async function handlePlatform(req, res, deps) {
         problemPage({
           title: outcome.missingDocuments
             ? 'Documents still needed'
+            : outcome.provisionFailed
+              ? 'Approved — but the gym was not fully created'
             : outcome.dryRun
               ? 'Creating gyms is switched off'
               : outcome.notReady
@@ -492,6 +494,9 @@ export async function handlePlatform(req, res, deps) {
           fix: outcome.missingDocuments
             ? 'Accept each one on the application page once the owner has uploaded it. ' +
               'If one is missing, use "Request information" to ask the owner for it.'
+            : outcome.provisionFailed
+              ? 'The approval is recorded and nothing is lost. Go back to the application and press ' +
+                '"Try again" — it finishes the gym from where it stopped, then emails the owner their activation link.'
             : outcome.dryRun || outcome.notReady
               ? 'In Vercel, open Settings → Environment Variables and fix what is listed above. ' +
                 'Redeploy, then approve the application again — it is still waiting.'

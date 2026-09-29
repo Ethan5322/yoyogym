@@ -22,7 +22,11 @@ const application = {
   city: 'Cape Town',
   latitude: -33.9249,
   longitude: 18.4241,
-  owner_user_id: 'user-1',
+  // THE REAL COLUMN. This fixture used to say `owner_user_id`, which real
+  // applications do not have — so the tests passed while the first live gym
+  // failed on it (2026-09-29). Shaped like a gym_applications row now.
+  applicant_user_id: 'user-1',
+  requested_plan_key: 'medium',
 };
 
 function deps({ failAt = null } = {}) {
@@ -190,4 +194,35 @@ test('with a checksum it proceeds as normal', async () => {
   assert.equal(r.ok, true);
   const baseline = d.calls.find((c) => c.name === 'recordMigrationBaseline');
   assert.equal(baseline.payload.checksum, 'abc123', 'recorded, so drift can be spotted later');
+});
+
+// ---------------------------------------------------------------------------
+// The first live gym (COCATE GYM, 2026-09-29) failed here
+// ---------------------------------------------------------------------------
+
+test("THE GYM IS SAVED WITH ITS OWNER, from the application's applicant_user_id", async () => {
+  const d = deps();
+  await provisionGym(application, d, { dryRun: false, schemaChecksum: CHECKSUM });
+  const gym = d.calls.find((c) => c.name === 'saveGym').payload;
+  assert.equal(gym.owner_user_id, 'user-1', 'gyms.owner_user_id is NOT NULL');
+});
+
+test('the gym gets the plan the owner chose, and its trial opens on it', async () => {
+  const d = deps();
+  await provisionGym(application, d, { dryRun: false, schemaChecksum: CHECKSUM, plan: { id: 'plan-medium', key: 'medium' } });
+  assert.equal(d.calls.find((c) => c.name === 'saveGym').payload.plan_key, 'medium');
+  assert.equal(d.calls.find((c) => c.name === 'startSubscription').payload.plan_id, 'plan-medium');
+
+  const noRow = deps();
+  await provisionGym(application, noRow, { dryRun: false, schemaChecksum: CHECKSUM });
+  assert.equal(noRow.calls.find((c) => c.name === 'saveGym').payload.plan_key, 'medium', 'from the application when no plan row is given');
+});
+
+test('an application with no owner is refused BEFORE anything is created', async () => {
+  const d = deps();
+  const { applicant_user_id, ...ownerless } = application;
+  const r = await provisionGym(ownerless, d, { dryRun: false, schemaChecksum: CHECKSUM });
+  assert.equal(r.ok, false);
+  assert.equal(r.failedAt, 'owner');
+  assert.equal(d.calls.length, 0, 'no schema, no rows');
 });

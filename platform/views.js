@@ -652,6 +652,24 @@ ${events
   }
 </div>`;
 
+  // The LATEST build attempt, whatever order the events arrive in.
+  const lastBuild = [...events]
+    .filter((e) => e.event === 'provisioned' || e.event === 'provision_failed')
+    .sort((x, y) => String(y.created_at).localeCompare(String(x.created_at)))[0];
+  const buildFailed = a.status === 'approved' && lastBuild?.event === 'provision_failed';
+  const retry = buildFailed
+    ? `<form class="card" method="post" action="/platform/applications/${h(a.id)}/decide" style="border-left:4px solid var(--bad)">
+  <input type="hidden" name="csrf" value="${h(csrfToken)}">
+  <h2>The gym was not fully created</h2>
+  <p>Approved, but building the gym stopped${lastBuild.detail?.failed_at ? ` at <b>${h(lastBuild.detail.failed_at)}</b>` : ''}${
+      lastBuild.detail?.error ? `: <span class="muted">${h(lastBuild.detail.error)}</span>` : '.'
+    }</p>
+  <p class="muted">The owner has not been emailed yet. Trying again finishes the gym from where it stopped —
+  nothing already built is made twice — and then emails the owner their activation link.</p>
+  <button type="submit" name="action" value="retry_provision">Try again</button>
+</form>`
+    : '';
+
   const decision = a.status === 'draft'
     ? `<div class="card"><h2>Not sent yet</h2><p class="muted">The owner is still uploading their documents and
 checking what they wrote. Nothing can be decided until they press Submit; it then appears under
@@ -701,6 +719,8 @@ ${
 ${who}
 ${gym}
 </div>
+
+${retry}
 
 ${checklist}
 
