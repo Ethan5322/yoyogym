@@ -40,6 +40,14 @@ and was normalised before editing.
 with pause and family, the member portal's status (pause, family) and Rewards tab; the app's Rewards
 tab, pause and family through its own tests.
 
+**Live 2026-09-29.** The user ran both SQL files; checked read-only afterwards — the seven gym tables
+answer, and the plans hold Basic = pause; Medium = + rewards, family; Prime = + challenges. Pushed to
+the preview (`stage-8-app`), CI and Vercel passed; then, on the user's "deploy", to production
+(`main` = `544d2f9`, Parts 1 and 2 of §41 together). Production checked signed out: health `ok` with
+no pending migrations or missing columns, KOM found by the gym search, the apply page shows the
+plans, "Every plan includes", the DRAFT terms and the required tick, and the new owner and member
+routes answer 401 (asking for sign-in) rather than crashing.
+
 ---
 
 ## 2026-09-28 — The outage, and services as data (D-164)
