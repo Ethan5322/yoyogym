@@ -15,6 +15,22 @@ occurrence is answered from notes rather than rediscovered.
 
 ---
 
+## 2026-09-29 — Why COCATE's features were locked and its sign-ups closed; the nightly job that never ran (D-169)
+
+**Read first (live, read-only).** COCATE resolves to Medium: 16 of 23 services; the 7 locked are exactly
+the Prime-only ones, and the admin menu reads the same list the server enforces — the locks were the plan,
+not a fault. Sign-ups were closed because its catalog was EMPTY (KOM's 9 plans were set up by hand before
+the platform). The waiver, contract and privacy texts fall back to built-in ones, so those were fine.
+
+**Found while fixing:** the owner's Catalog screen sent `Number("")` — a blank price became R0 — and had
+only a "Monthly price" box, so a day pass, pack or trial could never be given its real price; a refused
+save showed nothing. The platform nightly job had no schedule at all ("Nightly job: set" described its
+secret, not a job), so switched-on billing would have charged nobody. The new filter was checked against
+KOM's nine live plans first: none hidden. A quote slip in a new message broke the plans handler at load
+— caught by the tests before anything shipped. 1121 tests.
+
+---
+
 ## 2026-09-29 — Ten-minute links, email sign-in for owners, no web app (D-168)
 
 Built from §43.1. Also found on the way: staff "Send a new activation link" retired the owner's link BEFORE

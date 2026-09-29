@@ -29,6 +29,25 @@ export const DEFAULT_CONTRACT_DISCOUNTS = {
 
 const round2 = (n) => Math.round((Number(n) || 0) * 100) / 100;
 
+/**
+ * The price a plan of each kind is SOLD at — the field computeMembership
+ * charges from. A new gym's starter plans have none yet (CLAUDE.md §45.1 Q1),
+ * and a plan switched on without it would sell at R0 by accident.
+ */
+export const PRICE_FIELD = {
+  full: 'monthly_price',
+  session_pack: 'session_pack_price',
+  day_pass: 'day_pass_price',
+  trial: 'trial_price',
+};
+
+/** True when the plan has no price to sell at. Zero is a price — a deliberate free plan. */
+export function planPriceMissing(plan = {}) {
+  const field = PRICE_FIELD[plan.visit_type] || 'monthly_price';
+  const v = plan[field];
+  return v === null || v === undefined || v === '' || !Number.isFinite(Number(v));
+}
+
 export function formatZAR(n) {
   return (
     'R' +

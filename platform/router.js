@@ -2050,6 +2050,10 @@ async function handleExtraRoutes(req, res, deps, { url, path, method }) {
 
     const readiness = provisioningReadiness();
     const env = process.env;
+    // When the nightly job last ran — evidence, not the mere presence of its
+    // secret (§45). 36 hours: one missed night is late, two is broken.
+    const lastRun = (await deps.listAuditLog?.({ action: 'platform.cron.ran', limit: 1 }).catch(() => []))?.[0] || null;
+    const ranRecently = Boolean(lastRun && Date.now() - new Date(lastRun.created_at).getTime() < 36 * 3_600_000);
     // NAMES AND STATES ONLY — never a value (settingsPage explains why).
     const switches = [
       {
@@ -2090,9 +2094,13 @@ async function handleExtraRoutes(req, res, deps, { url, path, method }) {
         label: 'Nightly job',
         what: 'Billing, the drift report and document retention, every night.',
         name: 'PLATFORM_CRON_SECRET',
-        on: Boolean(env.PLATFORM_CRON_SECRET),
-        onText: 'set',
-        offText: 'not set — the nightly job cannot run',
+        on: Boolean(env.PLATFORM_CRON_SECRET) && ranRecently,
+        onText: `ran ${lastRun ? new Date(lastRun.created_at).toISOString().slice(0, 16).replace('T', ' ') + ' UTC' : ''}`,
+        offText: !env.PLATFORM_CRON_SECRET
+          ? 'not set — the nightly job cannot run'
+          : lastRun
+            ? `last ran ${new Date(lastRun.created_at).toISOString().slice(0, 16).replace('T', ' ')} UTC — overdue`
+            : 'set, but has not run yet — it runs with the 06:00 daily job',
         warn: true,
       },
       {
@@ -2325,6 +2333,19 @@ async function handleExtraRoutes(req, res, deps, { url, path, method }) {
     } catch (err) {
       retention = { ok: false, error: err?.message || 'Retention run failed.' };
     }
+
+    // Recorded — counts only — so the Settings page can say when it last ran
+    // instead of only that its secret exists (§45).
+    await deps.audit({
+      action: 'platform.cron.ran',
+      actor_kind: 'system',
+      detail: {
+        billing_live: !dryRun,
+        retention_live: process.env.PLATFORM_RETENTION_LIVE === 'true',
+        drift_ok: drift?.ok !== false,
+        retention_ok: retention?.ok !== false,
+      },
+    });
 
     res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
     res.end(JSON.stringify({ ...report, drift, retention }));

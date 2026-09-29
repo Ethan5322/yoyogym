@@ -2295,3 +2295,98 @@ current link — or the owner's "Send me a new link" on the expired page); owner
 password at `/owner/login` (the app's Owner login, and the website's), the password checked by their own
 gym, and land in its admin panel; staff keep "Gym staff sign in" → choose the gym; the website has no
 install manifest, and a browser that installed the old web app has its service worker removed. No SQL.
+
+---
+
+## 44. Gym owners may sign in with Google or Apple as well as a password (user instruction, 2026-09-29)
+
+> The user's words, word for word. Clarified one question at a time in §44.1, which wins over the text
+> above it. Not built until §44.1 is answered.
+
+> also hear addtional improvement for option, one thing after the link sent person activate by
+> verfication code give option to create pasword how it work in addtion if person can create account
+> with google or apple account and when person click one of them it must create automatically, next
+> time gym owner whant to login he can logn the option h choosed , may be email and pasword, google
+> account and apple account be sure that in any cause the only one profile account created and main
+> admin pannel record
+
+### 44.1 Clarifications — answered by the user, one at a time
+
+Checked against the code and the rules on 2026-09-29:
+- **Today an owner has one Yoyo account** (email + password, `platform.platform_users`) **and one account
+  inside their gym** (username `owner` + password). Since §43 the owner signs in to the gym with email +
+  password alone, checked by the gym.
+- **Google sign-in needs a Google Cloud sign-in client** (free), created by the user in their Google
+  account; **Apple sign-in needs the paid Apple Developer Program** (99 USD a year) and a sign-in key.
+  Neither exists yet, and neither can be created on the user's behalf.
+- **App Store rule (Guideline 4.8):** an iPhone app offering Google sign-in must also offer Sign in with
+  Apple, or an equivalent. So Google alone would be refused at the iPhone app's review.
+- **One profile per person** is possible whichever way they sign in: Google or Apple is LINKED to the
+  owner's existing account at activation (the activation link already proves which account it is), so
+  a different email at Google, or Apple's "hide my email" address, still lands on the same profile.
+- CLAUDE.md §20 already allows Google and Apple as future methods, and says existing members are not
+  moved to them; this instruction is about gym owners.
+- **Q1 — Google first, Apple later.** Both are built; Google is switched on for the website and Android as soon
+  as the user creates the Google sign-in client; the iPhone app offers both once the Apple Developer account
+  exists (App Store rule 4.8). Claude gives step-by-step setup instructions for each.
+  **Found while checking:** Google refuses its sign-in inside an app's embedded web view, so in the app
+  "Continue with Google" must be the phone's own Google sign-in, not the website's button.
+- **Q2 — several ways in, one profile.** An owner can add Google or Apple later from their account page, and
+  remove one as long as another is left; every way opens the same single profile. The main admin panel
+  shows which ways each owner uses, and every link and unlink is in the audit log.
+- **Follows from Q1–Q2 (no question needed):** a profile is only ever CREATED by applying. Google or Apple is
+  linked to it at activation or from the account page; signing in with a Google or Apple account that is
+  not linked is accepted only when that provider has verified the SAME email as the owner's profile (then
+  it is linked, once), and is otherwise refused — never a second profile. The gym still decides who gets
+  in: the owner's own account in their gym issues the session.
+
+---
+
+## 45. A new gym's features, its sign-ups, and a fully green platform Settings page (user instruction, 2026-09-29)
+
+> The user's words, word for word. Clarified one question at a time in §45.1, which wins over the text
+> above it. §44 (Google sign-in) is ON HOLD at the user's word.
+
+> hold on google sign in now we will back for it, i sucesfull login after change pasword in email link
+> sent and open owner admin pannel and sme fetures are locked its not like another kom gym so all feture
+> must be available depend on their plan, so when i try to register as memberit says not talking
+> signups yet, also yoyo gyms admin pannel shawing some fetures still not ready, look setting on yoyo
+> gyms admin pannel setting and fix all issue make all of them grean
+
+### 45.1 Clarifications — answered by the user, one at a time
+
+Checked against the code and the live data on 2026-09-29 (read-only):
+- **The locks are the plan, exactly.** COCATE GYM is on **Medium** (16 of 23 services); KOM is on **Prime**
+  (23). COCATE's locked services are precisely the seven Prime-only ones: face recognition, door access
+  control, advanced analytics, marketing, referrals, the gym audit log, challenges. The admin panel's
+  menu reads the same list the server enforces. To unlock them: move COCATE to Prime (main admin panel →
+  its gym page → Plan), or add a service for that gym alone (its Services switches).
+- **Sign-ups are closed because COCATE has no membership plans** (its catalog is empty; KOM has 9 plans
+  and 10 add-ons, set up by hand before the platform existed). A gym cannot take a member without a plan
+  to sell. The waiver, contract and privacy texts are fine: a gym without its own gets the built-in ones.
+- **The platform nightly job never runs.** "Nightly job: set" checks only that its secret exists; nothing
+  calls it (it is not a Vercel cron, `platform/CRON.md`), so billing, the drift report and document
+  retention would never happen even when switched on.
+- **What each amber line needs** (Vercel → Settings → Environment Variables, Production, then redeploy):
+  Billing gyms `PLATFORM_BILLING_LIVE=true` · Card payments `PAYSTACK_SECRET_KEY` (from the user's Paystack
+  account) · Deleting old documents `PLATFORM_RETENTION_LIVE=true` · Privacy policy
+  `PLATFORM_PRIVACY_APPROVED=true` · Privacy contact `PLATFORM_PRIVACY_CONTACT=<an email>` · Gym Owner
+  Agreement `PLATFORM_TERMS_APPROVED=true`. These are the user's keys and decisions; Claude cannot set them.
+- **Q1 — every new gym starts with STARTER membership plans, switched off, with no price** — Monthly,
+  3 months, 12 months and a Day pass. The owner types their prices and switches them on in Catalog; sign-ups
+  open the moment one is on. No invented price ever reaches a member. COCATE GYM gets them too.
+- **Q2 — billing in TEST mode first:** Paystack's test secret key (`sk_test_…`) and
+  `PLATFORM_BILLING_LIVE=true`; checked end to end with no real money; then the live key replaces it.
+- **Q3 — the legal texts:** the user reads `/platform/privacy` and `/platform/terms` first, then sets
+  `PLATFORM_PRIVACY_APPROVED=true` and `PLATFORM_TERMS_APPROVED=true` themselves.
+- **Q4 — privacy contact:** `PLATFORM_PRIVACY_CONTACT=hello@mulesoo.com`.
+- **Q5 — delete old documents:** `PLATFORM_RETENTION_LIVE=true` — a rejected applicant's documents are
+  deleted when the retention period ends; an approved gym's are kept while it trades.
+
+**Built 2026-09-29** — vault D-169: new gyms get two starter plans (Monthly membership, Day Pass), off
+and unpriced, only into an empty catalog (COCATE given them); a plan cannot be switched on without the
+price its kind is sold at, and the public catalog never lists one; the owner's Catalog screen offers
+the right price box per kind (it only had "Monthly price", and turned a blank into R0) and shows a
+refusal in the form; the platform nightly job now runs from the 06:00 daily job (production only),
+records each run, and "Nightly job" is green only when it ran in the last 36 hours. The amber lines
+that need the user's keys and decisions are listed in Q2–Q5.

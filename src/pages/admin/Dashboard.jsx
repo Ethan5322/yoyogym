@@ -46,7 +46,7 @@ export default function Dashboard() {
         d.enabled_plans === 0 && {
           tone: 'bad',
           to: '/admin/catalog',
-          text: 'Add your membership plans — members cannot join until you do',
+          text: 'Price and switch on a membership plan in Catalog — members cannot join until you do',
         },
         // A legal request (POPIA) comes first — one row per member.
         ...(d.deletion_requests || []).map((m) => ({

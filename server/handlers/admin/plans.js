@@ -3,6 +3,11 @@
 import { getSupabase } from '../../lib/supabase.js';
 import { allowMethods, readJsonBody, ok, badRequest, serverError } from '../../lib/http.js';
 import { requireRole } from '../../lib/auth.js';
+import { planPriceMissing } from '../../../shared/pricing.js';
+
+// A plan goes on sale only with its price (CLAUDE.md §45.1 Q1): a new gym's
+// starter plans arrive switched off and unpriced.
+const NO_PRICE = "Set this plan's price before switching it on — members would otherwise join at no charge. (Zero is allowed for a free plan: type 0.)";
 
 const FIELDS = [
   'name', 'tier', 'visit_type', 'description', 'benefits', 'monthly_price', 'joining_fee',
@@ -29,6 +34,7 @@ export default async function handler(req, res) {
     if (req.method === 'POST') {
       const body = pick(await readJsonBody(req));
       if (!body.name) return badRequest(res, 'Plan name is required.');
+      if (body.is_enabled !== false && planPriceMissing({ visit_type: 'full', ...body })) return badRequest(res, NO_PRICE);
       const { data, error } = await supabase.from('plans').insert(body).select('id').single();
       if (error) return serverError(res, error.message);
       return ok(res, { id: data.id });
@@ -36,6 +42,10 @@ export default async function handler(req, res) {
     if (req.method === 'PATCH') {
       if (!id) return badRequest(res, 'id is required.');
       const body = pick(await readJsonBody(req));
+      // Judged on the plan as it WILL be: what is stored, with this change on top.
+      const { data: current } = await supabase.from('plans').select('*').eq('id', id).maybeSingle();
+      const after = { ...(current || {}), ...body };
+      if (after.is_enabled && planPriceMissing(after)) return badRequest(res, NO_PRICE);
       body.updated_at = new Date().toISOString();
       const { error } = await supabase.from('plans').update(body).eq('id', id);
       if (error) return serverError(res, error.message);

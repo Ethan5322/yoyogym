@@ -3,6 +3,7 @@ import { json, ok, allowMethods } from '../../server/lib/http.js';
 import { withGym } from '../../server/lib/gymcontext.js';
 import { authorizeCron } from '../../server/lib/cron.js';
 import { forEveryGym } from '../../server/lib/every-gym.js';
+import { runPlatformNightly } from '../../server/lib/platform-nightly.js';
 import { captureError } from '../../server/lib/observability.js';
 import daily, { runDaily } from '../../server/handlers/cron/daily.js';
 import billing, { runReminders } from '../../server/handlers/cron/billing.js';
@@ -53,7 +54,10 @@ export default async function handler(req, res) {
       if (!allowMethods(req, res, ['GET', 'POST'])) return;
       if (!authorizeCron(req, res)) return;
       const gyms = await forEveryGym(perGym[seg]);
-      return ok(res, { ran: true, at: new Date().toISOString(), gyms });
+      // The platform's own nightly job rides on the morning run (§45): it had
+      // no schedule of its own, so it never ran.
+      const platform = seg === 'daily' ? await runPlatformNightly() : undefined;
+      return ok(res, { ran: true, at: new Date().toISOString(), gyms, platform });
     }
     return await withGym(req, res, () => fn(req, res), json);
   } catch (err) {

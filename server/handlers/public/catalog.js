@@ -4,7 +4,7 @@
 // database (spec STEP 8/9 — never hardcoded in the frontend).
 import { getSupabase } from '../../lib/supabase.js';
 import { allowMethods, ok, serverError } from '../../lib/http.js';
-import { DEFAULT_CONTRACT_DISCOUNTS } from '../../../shared/pricing.js';
+import { DEFAULT_CONTRACT_DISCOUNTS, planPriceMissing } from '../../../shared/pricing.js';
 
 export default async function handler(req, res) {
   if (!allowMethods(req, res, ['GET'])) return;
@@ -35,7 +35,8 @@ export default async function handler(req, res) {
         : DEFAULT_CONTRACT_DISCOUNTS;
 
     return ok(res, {
-      plans: plans || [],
+      // Never a plan with no price to sell at, whatever its switch says.
+      plans: (plans || []).filter((p) => !planPriceMissing(p)),
       addons: addons || [],
       contract_discounts,
     });

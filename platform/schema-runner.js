@@ -128,6 +128,27 @@ export async function canReachProject({ projectRef = process.env.SUPABASE_PROJEC
   }
 }
 
+/**
+ * A new gym's starter membership plans (CLAUDE.md §45.1 Q1): switched OFF and
+ * with NO price, so nothing is sold until the owner prices one and switches it
+ * on in Catalog. A gym with no plans could not take a single member.
+ *
+ * Only into an EMPTY catalog, so a retried build never adds them twice and a
+ * gym that already has its own plans is never touched. Membership length —
+ * month-to-month, 3, 6 or 12 months — is chosen by the member at sign-up.
+ */
+export function starterPlansSql(schema) {
+  assertSafe(schema);
+  return `insert into ${schema}.plans (name, tier, visit_type, description, benefits, is_enabled, sort_order)
+select * from (values
+  ('Monthly membership', 'standard', 'full',
+   'Full access to the gym. Choose month-to-month, 3, 6 or 12 months when you join.',
+   '["Full gym access"]'::jsonb, false, 1),
+  ('Day Pass', null, 'day_pass', 'One visit, for one day.', '[]'::jsonb, false, 2)
+) as starter(name, tier, visit_type, description, benefits, is_enabled, sort_order)
+where not exists (select 1 from ${schema}.plans);`;
+}
+
 /** Provisioning's DDL dependencies, against a real Supabase project. */
 export function schemaRunnerDeps({ projectRef } = {}) {
   const opts = { projectRef };
@@ -165,6 +186,8 @@ export function schemaRunnerDeps({ projectRef } = {}) {
          on conflict (key) do update set value = excluded.value || ${schema}.settings.value;`,
         opts
       );
+
+      await runSql(starterPlansSql(schema), opts);
     },
 
     /**
