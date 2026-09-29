@@ -146,26 +146,58 @@
   // Branding — the gym's own name and colour
   // -------------------------------------------------------------------------
 
-  /**
-   * The text colour that reads ON a gym's colour: white, unless white is under
-   * 3:1 on it (as on the Yoyo lime) — then the dark ink. The same WCAG rule as
-   * shared/brand.js inkOn(), written out because the shell has no modules.
-   */
-  function inkOn(hex) {
+  /** WCAG luminance and contrast — shared/brand.js, written out because the shell has no modules. */
+  function luminance(hex) {
     var n = parseInt(hex.slice(1), 16);
     var lum = [(n >> 16) & 255, (n >> 8) & 255, n & 255].map(function (v) {
       var c = v / 255;
       return c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4);
     });
-    var L = 0.2126 * lum[0] + 0.7152 * lum[1] + 0.0722 * lum[2];
-    return 1.05 / (L + 0.05) >= 3 ? '#ffffff' : '#0b1400';
+    return 0.2126 * lum[0] + 0.7152 * lum[1] + 0.0722 * lum[2];
   }
+
+  function contrast(a, b) {
+    var x = luminance(a), y = luminance(b);
+    return (Math.max(x, y) + 0.05) / (Math.min(x, y) + 0.05);
+  }
+
+  /**
+   * The text colour that reads ON a gym's colour: white, unless white is under
+   * 3:1 on it (as on the Yoyo lime) — then the dark ink.
+   */
+  function inkOn(hex) {
+    return contrast(hex, '#FFFFFF') >= 3 ? '#FFFFFF' : '#0B1400';
+  }
+
+  /**
+   * The gym's colour made safe to put words on — shared/brand.js accentPair(),
+   * the same rule: the ink above, and the colour nudged a shade until the pair
+   * reaches 4.5:1. A red gym keeps white on red; its red deepens slightly.
+   * Used by the member area AND the app's gym screens (app.js), through
+   * window.YOYO_BRAND, so there is one copy of the rule in the app.
+   */
+  function accentPair(hex) {
+    var ink = inkOn(hex);
+    var white = ink === '#FFFFFF';
+    var n = parseInt(hex.slice(1), 16);
+    var rgb = [(n >> 16) & 255, (n >> 8) & 255, n & 255];
+    var toHex = function (c) {
+      return ('#' + c.map(function (v) { return ('0' + Math.round(v).toString(16)).slice(-2); }).join('')).toUpperCase();
+    };
+    for (var i = 0; i < 60 && contrast(toHex(rgb), ink) < 4.5; i++) {
+      rgb = rgb.map(function (v) { return white ? v * 0.97 : v + (255 - v) * 0.1; });
+    }
+    return { accent: toHex(rgb), ink: ink };
+  }
+
+  window.YOYO_BRAND = Object.freeze({ inkOn: inkOn, accentPair: accentPair, contrast: contrast });
 
   function applyBrand(branding) {
     var colour = branding && /^#[0-9a-fA-F]{6}$/.test(branding.accent_color || '') ? branding.accent_color : null;
     if (colour) {
-      root.style.setProperty('--m-accent', colour);
-      root.style.setProperty('--m-accent-ink', inkOn(colour));
+      var pair = accentPair(colour);
+      root.style.setProperty('--m-accent', pair.accent);
+      root.style.setProperty('--m-accent-ink', pair.ink);
     } else {
       // No colour chosen: the Yoyo lime from the stylesheet (CLAUDE.md §37).
       root.style.removeProperty('--m-accent');

@@ -70,6 +70,28 @@ export function inkOn(hex) {
 }
 
 /**
+ * A gym's colour made safe to put words on (design critique 2026-09-29): the
+ * ink inkOn() chooses, unchanged, and the colour itself nudged a shade — darker
+ * under white ink, lighter under dark ink — until the pair reaches 4.5:1, the
+ * WCAG minimum for ordinary text. A red gym keeps white on red (§37); its red
+ * only deepens slightly, from 4.2:1 to 4.5:1. A colour that already passes
+ * comes back exactly as the gym chose it.
+ *
+ * The app's copy of this rule is in apps/mobile/www/member.js (the shell has
+ * no modules); tests/brand-pair.test.js keeps the two identical.
+ */
+export function accentPair(hex, min = 4.5) {
+  const ink = inkOn(hex);
+  const white = ink === '#FFFFFF';
+  const toHex = (c) => `#${c.map((v) => Math.round(v).toString(16).padStart(2, '0')).join('')}`.toUpperCase();
+  let rgb = hexToRgb(accentOrDefault(hex));
+  for (let i = 0; i < 60 && contrast(toHex(rgb), ink) < min; i++) {
+    rgb = rgb.map((v) => (white ? v * 0.97 : v + (255 - v) * 0.1));
+  }
+  return { accent: toHex(rgb), ink };
+}
+
+/**
  * The accent as TEXT on white paper. Lime on white is unreadable, so a light
  * accent is swapped for the logo's navy; a dark accent (a gym's red) is kept.
  * A light accent still works as a band or a rule — just not as letters.
