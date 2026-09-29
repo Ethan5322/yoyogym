@@ -44,6 +44,9 @@ const GROUPS = [
       { to: '/admin/attendance', label: 'Attendance', icon: 'attendance', roles: ['owner', 'manager', 'reception'], feature: 'reporting' },
       { to: '/admin/trainers', label: 'Trainers', icon: 'trainers', roles: ['owner', 'manager'], feature: 'trainers' },
       { to: '/admin/clients', label: 'My Clients', icon: 'clients', roles: ['owner', 'manager', 'trainer'], feature: 'trainers' },
+      // The member services (CLAUDE.md §41.1 Q3). Reception hands rewards over.
+      { to: '/admin/rewards', label: 'Rewards', icon: 'rewards', roles: ['owner', 'manager', 'reception'], feature: 'rewards' },
+      { to: '/admin/challenges', label: 'Challenges', icon: 'challenges', roles: ['owner', 'manager'], feature: 'challenges' },
     ],
   },
   {

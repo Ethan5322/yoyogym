@@ -2169,3 +2169,9 @@ plans, with what every plan includes, support by plan, the key terms and a requi
 facilities; each gym's plans, add-ons, services and facilities shown to members on the web, in the
 portal and in the app; setup help tracked; support contacts editable; every control at least 44 px.
 SQL: `platform/migrations/2026-09-28-services.sql`. **Part 2 — the four new services — next.**
+
+**Part 2 built 2026-09-29** — vault D-165: Pause my membership, Rewards and streaks, Challenges and
+leaderboard, Family and group memberships — each with its rules, the owner's screen, the member's
+screen on the web and in the app, and its switch; points and progress counted from check-ins; the
+morning job ends pauses; starting plans per Q4. SQL: `db/migrations/2026-09-29-member-services.sql`
+(each existing gym schema) and `platform/migrations/2026-09-29-plan-services.sql`.

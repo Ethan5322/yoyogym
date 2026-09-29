@@ -11,6 +11,7 @@ import FaceCapture from '../chatbot/components/FaceCapture.jsx';
 import GymIcon from '../components/GymIcon.jsx';
 import GymBackdrop from '../components/GymBackdrop.jsx';
 import GymOffer from '../components/GymOffer.jsx';
+import { RewardsTab, PausePanel, FamilyPanel } from '../components/MemberServicesPortal.jsx';
 
 /**
  * The URL a member's own QR card should contain.
@@ -40,13 +41,19 @@ const TABS = [
   ['progress', 'Progress', 'progress'],
   ['history', 'History', null],
   ['contact', 'Contact', 'messaging'],
+  // Rewards and challenges share a tab: shown if the gym offers either (§41.1 Q3).
+  ['rewards', 'Rewards', ['rewards', 'challenges']],
 ];
+
+/** May this member use a service here: in the gym's plan, and not switched off by its owner? */
+export function serviceOn(features, off, feature) {
+  return (!features || features.includes(feature)) && !(off || []).includes(feature);
+}
 
 export function visibleTabs(features, off = []) {
   // Not in the plan, or switched off by the owner (CLAUDE.md §41): not shown.
-  return TABS.filter(
-    ([, , needs]) => !needs || ((!features || features.includes(needs)) && !(off || []).includes(needs))
-  );
+  // A tab that needs several services shows if any one of them is on.
+  return TABS.filter(([, , needs]) => !needs || [].concat(needs).some((f) => serviceOn(features, off, f)));
 }
 
 export default function MemberPortal() {
@@ -98,15 +105,13 @@ export default function MemberPortal() {
         </button>
       </header>
 
-      <nav
-        className="grid border-b border-white/5 bg-surface text-xs"
-        style={{ gridTemplateColumns: `repeat(${visibleTabs(features, off).length}, minmax(0, 1fr))` }}
-      >
+      {/* Scrolls sideways when a gym offers many services, rather than squeezing. */}
+      <nav className="flex overflow-x-auto border-b border-white/5 bg-surface text-xs">
         {visibleTabs(features, off).map(([key, label]) => (
           <button
             key={key}
             onClick={() => setTab(key)}
-            className={`py-3 font-display uppercase tracking-wide ${
+            className={`min-w-[72px] flex-1 whitespace-nowrap px-2 py-3 font-display uppercase tracking-wide ${
               tab === key ? 'border-b-2 border-accent text-accent' : 'text-muted'
             }`}
           >
@@ -119,6 +124,9 @@ export default function MemberPortal() {
         {tab === 'status' && (
           <>
             <StatusTab />
+            {/* Pause and family, where the gym offers them (CLAUDE.md §41.1 Q3). */}
+            {serviceOn(features, off, 'freeze') && <div className="mt-4"><PausePanel /></div>}
+            {serviceOn(features, off, 'family') && <div className="mt-4"><FamilyPanel /></div>}
             {/* What the gym offers, after joining too (CLAUDE.md §41.1 Q1). */}
             <div className="mt-8">
               <GymOffer heading="Your gym offers" />
@@ -130,6 +138,7 @@ export default function MemberPortal() {
         {tab === 'progress' && <ProgressTab />}
         {tab === 'history' && <HistoryTab />}
         {tab === 'contact' && <ContactTab />}
+        {tab === 'rewards' && <RewardsTab canUse={(f) => serviceOn(features, off, f)} />}
       </main>
     </div>
   );

@@ -32,6 +32,13 @@ export const FEATURES = {
   MARKETING: 'marketing',
   REFERRALS: 'referrals',
   AUDIT: 'audit',
+  // Member services added 2026-09-29 (CLAUDE.md §41.1 Q3). Where each starts
+  // is platform/plans.js; every one is switchable per plan, per gym and by
+  // the owner.
+  FREEZE: 'freeze',
+  REWARDS: 'rewards',
+  FAMILY: 'family',
+  CHALLENGES: 'challenges',
 };
 
 /**
@@ -86,6 +93,11 @@ export const ROUTE_FEATURES = {
   broadcast: FEATURES.MARKETING,
   referrals: FEATURES.REFERRALS,
   audit: FEATURES.AUDIT,
+  // §41.1 Q3 — the owner's screens for the four member services.
+  pauses: FEATURES.FREEZE,
+  rewards: FEATURES.REWARDS,
+  challenges: FEATURES.CHALLENGES,
+  'member-groups': FEATURES.FAMILY,
 };
 
 /**
@@ -122,6 +134,12 @@ export const MEMBER_ROUTE_FEATURES = {
   refer: FEATURES.REFERRALS,
   'face-login': FEATURES.FACE,
   'enroll-face': FEATURES.FACE,
+
+  // §41.1 Q3 — the four member services.
+  pause: FEATURES.FREEZE,
+  rewards: FEATURES.REWARDS,
+  challenges: FEATURES.CHALLENGES,
+  family: FEATURES.FAMILY,
 };
 
 /**
@@ -182,6 +200,10 @@ export const SERVICE_INFO = {
   [FEATURES.MARKETING]: { label: 'Bulk email to your members', group: 'running', forMembers: null },
   [FEATURES.REFERRALS]: { label: 'Member referral programme', group: 'members', forMembers: 'Refer friends and be credited for it' },
   [FEATURES.AUDIT]: { label: 'Full audit log of staff actions', group: 'running', forMembers: null },
+  [FEATURES.FREEZE]: { label: 'Pause my membership', group: 'members', forMembers: 'Pause their membership from the app when they travel or are injured' },
+  [FEATURES.REWARDS]: { label: 'Rewards and streaks', group: 'members', forMembers: 'Earn points and badges for showing up, and claim rewards' },
+  [FEATURES.FAMILY]: { label: 'Family and group memberships', group: 'members', forMembers: 'One payer for a family or group, each with their own card' },
+  [FEATURES.CHALLENGES]: { label: 'Challenges and leaderboard', group: 'members', forMembers: 'Join challenges and see how they rank' },
 };
 
 export const SERVICE_GROUPS = [
@@ -201,6 +223,10 @@ export const OWNER_SWITCHABLE = [
   FEATURES.PROGRESS,
   FEATURES.FACE,
   FEATURES.REFERRALS,
+  FEATURES.FREEZE,
+  FEATURES.REWARDS,
+  FEATURES.FAMILY,
+  FEATURES.CHALLENGES,
 ];
 
 /** Every service key, in display order. */

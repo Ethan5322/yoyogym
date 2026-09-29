@@ -33,6 +33,15 @@ const OPTIONAL_COLUMNS = {
     arcface_templates: '2026-07-10-face-galleries.sql',
     arcface_embedding: '2026-07-10-face-galleries.sql',
   },
+  // The four member services (CLAUDE.md §41.1 Q3): without these tables the
+  // services are switched on in the plans but cannot work.
+  membership_pauses: { ends_on: '2026-09-29-member-services.sql' },
+  rewards: { points: '2026-09-29-member-services.sql' },
+  reward_claims: { status: '2026-09-29-member-services.sql' },
+  challenges: { target_visits: '2026-09-29-member-services.sql' },
+  challenge_entries: { show_on_board: '2026-09-29-member-services.sql' },
+  member_groups: { payer_member_id: '2026-09-29-member-services.sql' },
+  member_group_links: { member_id: '2026-09-29-member-services.sql' },
 };
 
 async function missingColumns(supabase) {

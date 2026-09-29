@@ -13,6 +13,7 @@ import { FACILITIES, MAX_CUSTOM_FACILITIES, MAX_CUSTOM_LENGTH } from '../../../s
 import { useAuth } from '../../lib/auth.jsx';
 
 export default function Settings() {
+  const { hasFeature } = useAuth();
   const [s, setS] = useState(null);
   const [error, setError] = useState('');
   const [savedKey, setSavedKey] = useState('');
@@ -78,6 +79,25 @@ export default function Settings() {
       <MemberServicesSection initial={s.member_services} saved={savedKey === 'member_services'} onSave={(v) => save('member_services', v, 'services')} />
 
       <FacilitiesSection initial={s.facilities} saved={savedKey === 'facilities'} onSave={(v) => save('facilities', v, 'services')} />
+
+      {/* The member services' own rules (CLAUDE.md §41.1 Q3), where the gym has them. */}
+      {hasFeature('freeze') && (
+        <Section title="Pause rules" saved={savedKey === 'pause_rules'}
+          note="How members may pause their membership from the app. Their end date moves on by the days paused; a fee, if any, is paid at reception."
+          initial={{ min_days: 7, max_days: 30, max_per_year: 2, fee: 0, ...(s.pause_rules || {}) }}
+          fields={[['min_days', 'Shortest pause (days)'], ['max_days', 'Longest pause (days)'], ['max_per_year', 'Pauses allowed per year'], ['fee', 'Fee per pause, in rand (0 = free)']]}
+          numeric
+          onSave={(v) => save('pause_rules', v, 'services')} />
+      )}
+
+      {hasFeature('family') && (
+        <Section title="Family & group pricing" saved={savedKey === 'group_pricing'}
+          note="The discount each extra member gets. The payer pays the full price; staff apply the discount when recording payments."
+          initial={{ family_discount_pct: 10, group_discount_pct: 5, max_members: 6, ...(s.group_pricing || {}) }}
+          fields={[['family_discount_pct', 'Family discount (%)'], ['group_discount_pct', 'Group discount (%)'], ['max_members', 'Most members in one family or group']]}
+          numeric
+          onSave={(v) => save('group_pricing', v, 'services')} />
+      )}
 
       <PasswordSection />
 

@@ -24,6 +24,10 @@ import announcements from '../../server/handlers/member/announcements.js';
 import progress from '../../server/handlers/member/progress.js';
 import refer from '../../server/handlers/member/refer.js';
 import enrollFace from '../../server/handlers/member/enroll-face.js';
+import pause from '../../server/handlers/member/pause.js';
+import memberRewards from '../../server/handlers/member/rewards.js';
+import memberChallenges from '../../server/handlers/member/challenges.js';
+import family from '../../server/handlers/member/family.js';
 
 const routes = {
   login,
@@ -43,6 +47,11 @@ const routes = {
   progress,
   refer,
   'enroll-face': enrollFace,
+  // The four member services (CLAUDE.md §41.1 Q3).
+  pause,
+  rewards: memberRewards,
+  challenges: memberChallenges,
+  family,
 };
 
 export default async function handler(req, res) {

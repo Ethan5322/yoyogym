@@ -99,24 +99,31 @@ on conflict do nothing;
 insert into platform.platform_plans (key, label, description, max_active_members, max_locations, features, price_cents, currency)
 values
   ('basic', 'Basic', 'Everything needed to run a small gym.', 40, 1,
-   '["members","checkin","payments","catalog","settings","staff","qr"]'::jsonb,
+   '["members","checkin","payments","catalog","settings","staff","qr",
+     "freeze"]'::jsonb,
    null, 'ZAR'),
 
   ('medium', 'Medium', 'For a growing gym running classes and personal training.', 150, 1,
    '["members","checkin","payments","catalog","settings","staff","qr",
-     "classes","trainers","messaging","reporting","progress","data_io"]'::jsonb,
+     "freeze",
+     "classes","trainers","messaging","reporting","progress","data_io",
+     "rewards","family"]'::jsonb,
    null, 'ZAR'),
 
   ('prime', 'Prime', 'The complete system, including face recognition at the door.', 500, 1,
    '["members","checkin","payments","catalog","settings","staff","qr",
+     "freeze",
      "classes","trainers","messaging","reporting","progress","data_io",
-     "face","access_control","advanced_analytics","marketing","referrals","audit"]'::jsonb,
+     "rewards","family",
+     "face","access_control","advanced_analytics","marketing","referrals","audit",
+     "challenges"]'::jsonb,
    null, 'ZAR')
+-- Re-running this file names the plans again and NOTHING ELSE. The services
+-- and the member limit are the platform owner's to set on the Plans page
+-- (CLAUDE.md §41); overwriting them here would silently undo those choices.
 on conflict (key) do update
   set label = excluded.label,
       description = excluded.description,
-      max_active_members = excluded.max_active_members,
-      features = excluded.features,
       updated_at = now();
 
 -- =============================================================================

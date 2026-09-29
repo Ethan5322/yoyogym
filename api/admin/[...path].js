@@ -43,6 +43,10 @@ import inbox from '../../server/handlers/admin/inbox.js';
 import message from '../../server/handlers/admin/message.js';
 import membersImport from '../../server/handlers/admin/members-import.js';
 import announcements from '../../server/handlers/admin/announcements.js';
+import pauses from '../../server/handlers/admin/pauses.js';
+import rewards from '../../server/handlers/admin/rewards.js';
+import challenges from '../../server/handlers/admin/challenges.js';
+import memberGroups from '../../server/handlers/admin/member-groups.js';
 
 const routes = {
   dashboard,
@@ -83,6 +87,11 @@ const routes = {
   message,
   'members-import': membersImport,
   announcements,
+  // The four member services (CLAUDE.md §41.1 Q3).
+  pauses,
+  rewards,
+  challenges,
+  'member-groups': memberGroups,
 };
 
 export default async function handler(req, res) {

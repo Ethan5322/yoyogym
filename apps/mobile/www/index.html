@@ -389,6 +389,20 @@
       .m-chips { display: flex; flex-wrap: wrap; gap: 8px; }
       .m-chips span { border: 1px solid var(--m-line); border-radius: 99px; padding: 6px 12px; font-size: 14px;
                       background: rgba(255, 255, 255, 0.03); }
+      /* The member services (CLAUDE.md §41.1 Q3). */
+      .m-stats { display: grid; grid-template-columns: repeat(3, 1fr); text-align: center; gap: 8px; }
+      .m-stats b { display: block; font-size: 26px; font-weight: 800; }
+      .m-stats div:first-child b { color: var(--m-accent); }
+      .m-stats span { color: var(--m-muted); font-size: 12px; }
+      .m-chips span.is-on { border-color: color-mix(in srgb, var(--m-accent) 55%, transparent); }
+      .m-chips span.is-off { opacity: 0.5; }
+      .m-mini { min-height: 40px; padding: 0 16px; border: 0; border-radius: 20px; background: var(--m-accent);
+                color: var(--m-accent-ink); font-weight: 800; font-size: 14px; flex: none; }
+      .m-mini.is-ghost { background: rgba(255, 255, 255, 0.08); color: #fff; }
+      .m-mini:disabled { opacity: 0.5; }
+      .m-board { list-style: none; padding: 0; margin: 12px 0 4px; display: grid; gap: 6px; }
+      .m-board li { display: flex; justify-content: space-between; }
+      .m-board li.is-you { color: var(--m-accent); font-weight: 700; }
       .m-main { flex: 1; padding: 0 24px calc(96px + env(safe-area-inset-bottom)); }
       .m-hello { margin: 8px 0 24px; }
 

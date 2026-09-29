@@ -30,7 +30,7 @@ const STATUS = {
   features: ['members', 'checkin'],
 };
 
-function boot({ url = 'https://localhost/', storage = {}, brand = BRAND } = {}) {
+function boot({ url = 'https://localhost/', storage = {}, brand = BRAND, status = STATUS, extra = {} } = {}) {
   const dom = new JSDOM(read('index.html').replace(/<script src="[^"]+"><\/script>/g, ''), {
     url, runScripts: 'outside-only', pretendToBeVisual: true, virtualConsole: new VirtualConsole(),
   });
@@ -42,7 +42,8 @@ function boot({ url = 'https://localhost/', storage = {}, brand = BRAND } = {}) 
     const path = String(u).replace('https://yoyogym.vercel.app', '').split('?')[0];
     const routes = {
       'GET /api/content': { status: 200, body: { branding: brand } },
-      'GET /api/member/status': { status: 200, body: STATUS },
+      'GET /api/member/status': { status: 200, body: status },
+      ...extra,
     };
     const r = routes[`${init.method || 'GET'} ${path}`] || { status: 404, body: {} };
     return { ok: r.status < 400, status: r.status, json: async () => r.body };
@@ -147,4 +148,70 @@ test("a poster that is not a plain https picture is never put into the page's st
   const member = doc.getElementById('member');
   assert.ok(!member.classList.contains('has-poster'));
   assert.equal(member.style.getPropertyValue('--m-poster'), '');
+});
+
+// ---------------------------------------------------------------------------
+// The four member services in the app (CLAUDE.md §41.1 Q3)
+// ---------------------------------------------------------------------------
+
+const WITH_SERVICES = { ...STATUS, features: ['members', 'checkin', 'rewards', 'challenges', 'freeze', 'family'], services_off: [] };
+const REWARDS = {
+  visits: 23, earned: 230, spent: 100, balance: 130, streak_weeks: 5, streak_target: 2, points_per_visit: 10,
+  next_badge: { label: '25 visits', visits_to_go: 2 },
+  badges: [{ key: 'b1', label: 'First visit', earned: true }, { key: 'b2', label: '25 visits', earned: false }],
+  rewards: [{ id: 'r1', name: 'Protein shake', points: 100, can_claim: true }, { id: 'r2', name: 'PT session', points: 500, can_claim: false }],
+  claims: [],
+};
+const CHALLENGES = { challenges: [{ id: 'c1', title: '12 visits', target_visits: 12, starts_on: '2026-10-01', ends_on: '2026-10-31', state: 'running', joined: true, progress: 7, done: false, people: 3,
+  board: [{ rank: 1, name: 'Sipho D.', progress: 11 }, { rank: 2, name: 'Thandi M.', progress: 7, you: true }] }] };
+
+test("THE APP'S REWARDS TAB SHOWS POINTS, BADGES, WHAT CAN BE CLAIMED AND THE CHALLENGE BOARD", async () => {
+  const { doc, window } = boot({
+    storage: SIGNED_IN_AT_KOM,
+    status: WITH_SERVICES,
+    extra: { 'GET /api/member/rewards': { status: 200, body: REWARDS }, 'GET /api/member/challenges': { status: 200, body: CHALLENGES } },
+  });
+  await tick();
+  const tab = doc.querySelector('[data-tab="rewards"]');
+  assert.ok(tab, 'the tab is there when the gym offers rewards or challenges');
+  tab.dispatchEvent(new window.Event('click', { bubbles: true }));
+  await tick();
+  assert.match(text(doc, '.m-stats'), /130/);
+  assert.ok(doc.querySelector('[data-claim="r1"]'), 'enough points: a Claim button');
+  assert.equal(doc.querySelector('[data-claim="r2"]'), null, 'not enough: no button');
+  assert.match(doc.querySelector('.m-board').textContent, /Thandi M\. \(you\)/);
+});
+
+test('the Rewards tab is hidden when the gym offers neither rewards nor challenges', async () => {
+  const { doc } = boot({ storage: SIGNED_IN_AT_KOM, status: { ...STATUS, features: ['members', 'checkin'] } });
+  await tick();
+  assert.equal(doc.querySelector('[data-tab="rewards"]'), null);
+});
+
+test('...and hidden when the owner switched both off for their members', async () => {
+  const { doc } = boot({ storage: SIGNED_IN_AT_KOM, status: { ...WITH_SERVICES, services_off: ['rewards', 'challenges'] } });
+  await tick();
+  assert.equal(doc.querySelector('[data-tab="rewards"]'), null);
+});
+
+test("THE APP'S PROFILE OFFERS A PAUSE AND SHOWS THE FAMILY, where the gym has them", async () => {
+  const { doc, window } = boot({
+    storage: SIGNED_IN_AT_KOM,
+    status: WITH_SERVICES,
+    extra: {
+      'GET /api/member/pause': { status: 200, body: { rules: { min_days: 7, max_days: 30, max_per_year: 2, fee: 0 }, current: null, used_this_year: 0, left_this_year: 2, can_pause: true } },
+      'GET /api/member/family': { status: 200, body: { group: { name: 'The Mokoenas', kind: 'family', discount_pct: 10, you_pay: true, members: [{ name: 'Thandi', is_payer: true, is_you: true }, { name: 'Lindiwe', is_payer: false, is_you: false }] } } },
+    },
+  });
+  await tick();
+  doc.querySelector('[data-tab="profile"]').dispatchEvent(new window.Event('click', { bubbles: true }));
+  await tick();
+  assert.ok(doc.querySelector('[data-m="pause"]'), 'a Pause button');
+  assert.equal(doc.getElementById('m-pause-days').value, '14');
+  assert.match(doc.getElementById('m-extras').textContent, /The Mokoenas/);
+  assert.match(doc.getElementById('m-extras').textContent, /You pay for everyone/);
+});
+
+test('a paused member reads "Paused", not "Frozen"', () => {
+  assert.match(read('member.js'), /frozen: \{ tone: 'warn', text: 'Paused' \}/);
 });

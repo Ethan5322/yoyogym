@@ -11,6 +11,9 @@ import { recordAudit } from '../../lib/audit.js';
 import { currentGym } from '../../lib/tenancy.js';
 import { MEMBER_SERVICES_KEY, readOff, forgetServicesOff } from '../../lib/member-services.js';
 import { FACILITIES_KEY, cleanFacilities } from '../../../shared/facilities.js';
+import { PAUSE_RULES_KEY, cleanPauseRules } from '../../lib/pauses.js';
+import { REWARD_RULES_KEY, cleanRewardRules } from '../../lib/loyalty.js';
+import { GROUP_PRICING_KEY, cleanGroupPricing } from '../../lib/groups.js';
 
 /** The most a gym's logo may weigh: it is sent to every member on every visit. */
 const LOGO_MAX_CHARS = 300 * 1024;
@@ -100,6 +103,9 @@ export default async function handler(req, res) {
       let stored = value ?? {};
       if (key === MEMBER_SERVICES_KEY) stored = { off: readOff(value) };
       if (key === FACILITIES_KEY) stored = cleanFacilities(value);
+      if (key === PAUSE_RULES_KEY) stored = cleanPauseRules(value);
+      if (key === REWARD_RULES_KEY) stored = cleanRewardRules(value);
+      if (key === GROUP_PRICING_KEY) stored = cleanGroupPricing(value);
       const { error } = await supabase.from('settings').upsert(
         { key, value: stored, category: category || null, updated_by: admin.sub, updated_at: new Date().toISOString() },
         { onConflict: 'key' }

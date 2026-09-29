@@ -29,6 +29,8 @@ const Analytics = lazy(() => import('./pages/admin/Analytics.jsx'));
 const Communications = lazy(() => import('./pages/admin/Communications.jsx'));
 const CalendarAdmin = lazy(() => import('./pages/admin/CalendarAdmin.jsx'));
 const Catalog = lazy(() => import('./pages/admin/Catalog.jsx'));
+const Rewards = lazy(() => import('./pages/admin/Rewards.jsx'));
+const Challenges = lazy(() => import('./pages/admin/Challenges.jsx'));
 const Settings = lazy(() => import('./pages/admin/Settings.jsx'));
 const ManualRegister = lazy(() => import('./pages/admin/ManualRegister.jsx'));
 const QrCodes = lazy(() => import('./pages/admin/QrCodes.jsx'));
@@ -123,6 +125,8 @@ export default function App() {
         <Route path="/admin/communications" element={guard(mgr, <Communications />)} />
         <Route path="/admin/register-member" element={guard(recep, <ManualRegister />)} />
         <Route path="/admin/catalog" element={guard(mgr, <Catalog />)} />
+        <Route path="/admin/rewards" element={guard(recep, <Rewards />)} />
+        <Route path="/admin/challenges" element={guard(mgr, <Challenges />)} />
         <Route path="/admin/qr-codes" element={guard(mgr, <QrCodes />)} />
         <Route path="/admin/settings" element={guard(owner, <Settings />)} />
         <Route path="/admin/staff" element={guard(owner, <Staff />)} />

@@ -15,6 +15,33 @@ occurrence is answered from notes rather than rediscovered.
 
 ---
 
+## 2026-09-29 — Four new member services (D-165)
+
+**Built one at a time, each end to end:** rules as pure functions (`pauses.js`, `loyalty.js`,
+`groups.js`), handlers for the owner and the member, the morning job, the owner's screens, the
+member portal, the app. **Every figure is counted from what happened** — points and challenge
+progress from check-ins, never a number anyone can type.
+
+**Found on the way:** re-running `platform/seed.sql` overwrote each plan's services and member limit
+with the defaults (`on conflict … set features = excluded.features`). Harmless while nothing else set
+them; since the Plans page switches services, it would have silently undone the platform owner's
+choices. The seed now names plans and nothing else on a re-run.
+
+**Test approach:** the handlers run against an in-memory stand-in for the database
+(`tests/fake-db.js`), inside the gym's scope, exactly as the router runs them. It throws on any query
+it does not understand, so a test cannot pass by accident. One honest limit, written into the test:
+the stand-in does not apply column defaults (a claim's `pending` comes from `db/schema.sql`).
+
+**Lesson applied:** every new file name was checked free before writing — the outage of 2026-09-28
+came from one that was not. `server/handlers/cron/daily.js` had drifted to CRLF in the working copy
+and was normalised before editing.
+
+**Verified.** 1027 tests. Screens checked: the owner's Rewards and Challenges pages, a member's page
+with pause and family, the member portal's status (pause, family) and Rewards tab; the app's Rewards
+tab, pause and family through its own tests.
+
+---
+
 ## 2026-09-28 — The outage, and services as data (D-164)
 
 **THE OUTAGE, and the fault was ours.** The user reported "Request failed (500)" inside the admin

@@ -11,6 +11,7 @@ import PersonalQr from '../../components/PersonalQr.jsx';
 import IdCardButton from '../../components/IdCardButton.jsx';
 import { countryByCode } from '../../../shared/countries.js';
 import { accentOrDefault } from '../../../shared/brand.js';
+import { PauseCard, FamilyCard } from '../../components/MemberExtras.jsx';
 
 const zar = (n) => 'R' + Number(n || 0).toLocaleString('en-ZA', { minimumFractionDigits: 2 });
 const country = (code) => {
@@ -28,7 +29,7 @@ const ADH = {
 export default function MemberDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const { user, hasFeature } = useAuth();
   const toast = useToast();
   const branding = useBranding();
   const [data, setData] = useState(null);
@@ -220,6 +221,10 @@ export default function MemberDetail() {
             <Row key={i} label={`${fmt(b.session_date)} · ${b.classes?.name || 'Class'}`} value={b.status} />
           )) : <p className="text-sm text-muted">No bookings.</p>}
         </Section>
+
+        {/* The member services, where the gym offers them (CLAUDE.md §41.1 Q3). */}
+        {hasFeature('freeze') && <PauseCard memberId={id} status={m.status} onChange={load} />}
+        {hasFeature('family') && <FamilyCard memberId={id} memberName={m.full_name} />}
 
         <Section title="Incidents">
           {data.incidents?.length ? data.incidents.map((i) => (

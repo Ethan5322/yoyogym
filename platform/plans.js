@@ -63,7 +63,8 @@ export const PLANS = [
     label: 'Basic',
     maxActiveMembers: 40,
     maxLocations: 1,
-    features: [...CORE],
+    // §41.1 Q4: Pause starts in every plan.
+    features: [...CORE, FEATURES.FREEZE],
     summary: 'Everything needed to run a small gym.',
     memberBenefits: [
       'Join online in minutes, from their phone',
@@ -78,7 +79,8 @@ export const PLANS = [
     label: 'Medium',
     maxActiveMembers: 150,
     maxLocations: 1,
-    features: [...CORE, ...MEDIUM_ADDS],
+    // §41.1 Q4: Medium adds Rewards, and Family and group.
+    features: [...CORE, FEATURES.FREEZE, ...MEDIUM_ADDS, FEATURES.REWARDS, FEATURES.FAMILY],
     summary: 'For a growing gym running classes and personal training.',
     memberBenefits: [
       'Everything in Basic',
@@ -93,7 +95,8 @@ export const PLANS = [
     label: 'Prime',
     maxActiveMembers: 500,
     maxLocations: 1,
-    features: [...CORE, ...MEDIUM_ADDS, ...PRIME_ADDS],
+    // §41.1 Q4: Prime adds Challenges.
+    features: [...CORE, FEATURES.FREEZE, ...MEDIUM_ADDS, FEATURES.REWARDS, FEATURES.FAMILY, ...PRIME_ADDS, FEATURES.CHALLENGES],
     summary: 'The complete system, including face recognition at the door.',
     memberBenefits: [
       'Everything in Medium',

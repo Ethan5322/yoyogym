@@ -370,11 +370,13 @@
     { id: 'home', label: 'Home', icon: '<path d="M3 11l9-7 9 7v9a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"/>' },
     { id: 'card', label: 'Card', icon: '<rect x="3" y="5" width="18" height="14" rx="3"/><path d="M7 15h4M7 11h10"/>' },
     { id: 'classes', label: 'Classes', icon: '<rect x="3" y="5" width="18" height="16" rx="3"/><path d="M8 3v4M16 3v4M3 11h18"/>', needs: 'classes' },
+    // Rewards and challenges share a tab, shown if the gym offers either (§41.1 Q3).
+    { id: 'rewards', label: 'Rewards', icon: '<path d="M20 12v9H4v-9M2 7h20v5H2zM12 21V7M12 7H7.5a2.5 2.5 0 1 1 0-5C11 2 12 7 12 7zM12 7h4.5a2.5 2.5 0 1 0 0-5C13 2 12 7 12 7z"/>', needs: ['rewards', 'challenges'] },
     { id: 'profile', label: 'Profile', icon: '<circle cx="12" cy="8" r="4"/><path d="M4 21c1.5-4 5-6 8-6s6.5 2 8 6"/>' },
   ];
 
   function visibleTabs() {
-    return TABS.filter(function (t) { return !t.needs || has(t.needs); });
+    return TABS.filter(function (t) { return !t.needs || [].concat(t.needs).some(has); });
   }
 
   function render() {
@@ -398,7 +400,7 @@
       '</nav>';
 
     var main = document.getElementById('m-main');
-    ({ home: renderHome, card: renderCard, classes: renderClasses, profile: renderProfile })[state.tab](main);
+    ({ home: renderHome, card: renderCard, classes: renderClasses, rewards: renderRewards, profile: renderProfile })[state.tab](main);
   }
 
   /** Fetch the member's status; keep a copy so the card works offline. */
@@ -425,7 +427,7 @@
       new: { tone: 'warn', text: 'Waiting for activation' },
       lapsed: { tone: 'bad', text: 'Expired' },
       suspended: { tone: 'bad', text: 'Suspended' },
-      frozen: { tone: 'warn', text: 'Frozen' },
+      frozen: { tone: 'warn', text: 'Paused' },
     };
     var st = map[member.status] || { tone: 'warn', text: member.status || 'Unknown' };
     var until = ms.end_date ? 'until ' + dateText(ms.end_date) : '';
@@ -684,6 +686,8 @@
       '<section class="m-card m-list">' +
       row('Phone', m.phone) + row('Emergency contact', [m.emergency_name, m.emergency_phone].filter(Boolean).join(' · ')) +
       '</section>' +
+      // Pause and family, filled in once loaded (§41.1 Q3).
+      '<div id="m-extras"></div>' +
       '<section class="m-card m-list">' +
       '  <button type="button" class="m-row" data-m="web">Open the full member area<span>›</span></button>' +
       '  <button type="button" class="m-row" data-m="switch">Switch gym<span>›</span></button>' +
@@ -691,6 +695,104 @@
       '</section>' +
       '<button type="button" class="m-secondary" data-m="signout">Sign out</button>' +
       '<button type="button" class="m-danger" data-m="delete">Request data deletion</button>';
+    loadExtras();
+  }
+
+  // ---- The member services (CLAUDE.md §41.1 Q3) ------------------------------
+
+  function shortDate(ymd) {
+    return new Date(String(ymd).slice(0, 10) + 'T00:00:00').toLocaleDateString('en-ZA', { day: 'numeric', month: 'short' });
+  }
+
+  /** Rewards and challenges: whichever of the two this gym offers. */
+  function renderRewards(main) {
+    main.innerHTML = '<section class="m-hello"><h1>Rewards</h1></section><div id="m-rw"></div><div id="m-ch"></div>';
+    if (has('rewards')) {
+      api('/member/rewards').then(function (d) {
+        var box = document.getElementById('m-rw');
+        if (!box) return;
+        box.innerHTML =
+          '<section class="m-card m-stats">' +
+          '<div><b class="m-num">' + d.balance + '</b><span>points</span></div>' +
+          '<div><b class="m-num">' + d.streak_weeks + '</b><span>week streak</span></div>' +
+          '<div><b class="m-num">' + d.visits + '</b><span>visits</span></div>' +
+          '</section>' +
+          '<p class="m-hint">' + esc(d.points_per_visit + ' points a visit · a week counts at ' + d.streak_target + ' visits' +
+            (d.next_badge ? ' · ' + d.next_badge.visits_to_go + ' to go for “' + d.next_badge.label + '”' : '')) + '</p>' +
+          '<h3 class="m-offer__h">Badges</h3><div class="m-chips">' + d.badges.map(function (b) {
+            return '<span class="' + (b.earned ? 'is-on' : 'is-off') + '">' + (b.earned ? '★ ' : '') + esc(b.label) + '</span>';
+          }).join('') + '</div>' +
+          '<h3 class="m-offer__h">Claim a reward</h3>' +
+          (d.rewards.length
+            ? '<div class="m-card m-list">' + d.rewards.map(function (r) {
+                return '<div class="m-list__row"><span><b>' + esc(r.name) + '</b><small>' + esc(r.points + ' points' + (r.description ? ' · ' + r.description : '')) + '</small></span>' +
+                  (r.can_claim
+                    ? '<button type="button" class="m-mini" data-claim="' + esc(r.id) + '" data-claim-name="' + esc(r.name) + '">Claim</button>'
+                    : '<span class="m-sub">' + (r.points - d.balance) + ' more</span>') + '</div>';
+              }).join('') + '</div>'
+            : '<p class="m-hint">Your gym has not added rewards yet.</p>');
+      }, function (e) { toast(e.message, 'bad'); });
+    }
+    if (has('challenges')) {
+      api('/member/challenges').then(function (d) {
+        var box = document.getElementById('m-ch');
+        if (!box) return;
+        box.innerHTML = '<h3 class="m-offer__h">Challenges</h3>' + (d.challenges.length ? d.challenges.map(function (c) {
+          var pct = Math.min(100, Math.round((c.progress / c.target_visits) * 100));
+          return '<section class="m-card">' +
+            '<b>' + esc(c.title) + '</b><p class="m-sub">' + esc(c.target_visits + ' visits · ' + shortDate(c.starts_on) + ' – ' + shortDate(c.ends_on) + ' · ' + c.people + ' taking part') + '</p>' +
+            (c.joined
+              ? '<div class="m-bar"><i style="width:' + pct + '%"></i></div><p class="m-sub">' + esc(c.done ? 'Done — well played!' : c.progress + ' of ' + c.target_visits + ' visits') + '</p>' +
+                (c.board.length ? '<ol class="m-board">' + c.board.map(function (b) {
+                  return '<li class="' + (b.you ? 'is-you' : '') + '"><span>' + b.rank + '. ' + esc(b.name) + (b.you ? ' (you)' : '') + '</span><b>' + b.progress + '</b></li>';
+                }).join('') + '</ol>' : '') +
+                '<button type="button" class="y-link" data-leave-ch="' + esc(c.id) + '">Leave</button>'
+              : '<div class="m-actions"><button type="button" class="m-mini" data-join-ch="' + esc(c.id) + '">Join</button>' +
+                '<button type="button" class="m-mini is-ghost" data-join-ch="' + esc(c.id) + '" data-off-board="1">Join, off the board</button></div>') +
+            '</section>';
+        }).join('') : '<p class="m-hint">No challenges running right now.</p>');
+      }, function (e) { toast(e.message, 'bad'); });
+    }
+  }
+
+  /** Pause and family, under the member's profile. */
+  function loadExtras() {
+    var box = document.getElementById('m-extras');
+    if (!box) return;
+    var parts = [];
+    var done = function () { if (document.getElementById('m-extras')) box.innerHTML = parts.join(''); };
+    if (has('freeze')) {
+      api('/member/pause').then(function (d) {
+        var r = d.rules;
+        parts[0] = '<section class="m-card"><h2>Pause my membership</h2>' + (d.current
+          ? '<p>Paused until <b>' + esc(shortDate(d.current.ends_on)) + '</b>. Your end date has moved on by ' + d.current.days + ' days.</p>' +
+            '<button type="button" class="m-secondary" data-m="resume">I\'m back — end my pause</button>'
+          : d.can_pause
+            ? '<p class="m-sub">Travelling or injured? Pause for ' + r.min_days + '–' + r.max_days + ' days; your end date moves on by the same. ' +
+              d.left_this_year + ' left this year.' + (r.fee > 0 ? ' A fee of R' + esc(r.fee) + ' is paid at reception.' : '') + '</p>' +
+              '<label for="m-pause-days">Days</label><input id="m-pause-days" type="number" inputmode="numeric" min="' + r.min_days + '" max="' + r.max_days + '" value="' + Math.min(r.max_days, Math.max(r.min_days, 14)) + '">' +
+              '<button type="button" class="m-primary" data-m="pause">Pause</button>'
+            : '<p class="m-sub">' + (d.left_this_year === 0 ? 'You have used your pauses for this year.' : 'Pausing opens once your membership is active.') + '</p>') +
+          '</section>';
+        done();
+      }, function () { /* not offered, or not set up yet: nothing shown */ });
+    }
+    if (has('family')) {
+      api('/member/family').then(function (d) {
+        if (!d.group) return;
+        var g = d.group;
+        parts[1] = '<section class="m-card"><h2>' + (g.kind === 'group' ? 'Your group' : 'Your family') + ': ' + esc(g.name) + '</h2><div class="m-chips">' +
+          g.members.map(function (m) {
+            return '<span class="' + (m.is_you ? 'is-on' : '') + '">' + esc(m.name) + (m.is_you ? ' (you)' : '') + (m.is_payer ? ' · pays' : '') + '</span>';
+          }).join('') + '</div><p class="m-sub">' + (g.you_pay ? 'You pay for everyone.' : 'Paid for by the payer.') +
+          ' Each extra member gets ' + g.discount_pct + '% off. Everyone keeps their own card.</p></section>';
+        done();
+      }, function () { /* nothing to show */ });
+    }
+  }
+
+  function afterAction(p, message) {
+    return p.then(function (d) { haptic(); toast(d.message || message); render(); refresh(); }, function (e) { toast(e.message, 'bad'); render(); });
   }
 
   function row(label, value) {
@@ -721,6 +823,23 @@
       return;
     }
 
+    var claim = e.target.closest('[data-claim]');
+    if (claim) {
+      if (confirm('Claim ' + claim.dataset.claimName + '?')) { claim.disabled = true; afterAction(api('/member/rewards', { method: 'POST', body: { reward_id: claim.dataset.claim } }), 'Claimed.'); }
+      return;
+    }
+    var joinCh = e.target.closest('[data-join-ch]');
+    if (joinCh) {
+      joinCh.disabled = true;
+      afterAction(api('/member/challenges', { method: 'POST', body: { challenge_id: joinCh.dataset.joinCh, action: 'join', show_on_board: !joinCh.dataset.offBoard } }), 'Joined.');
+      return;
+    }
+    var leaveCh = e.target.closest('[data-leave-ch]');
+    if (leaveCh) {
+      if (confirm('Leave this challenge?')) afterAction(api('/member/challenges', { method: 'POST', body: { challenge_id: leaveCh.dataset.leaveCh, action: 'leave' } }), 'Left the challenge.');
+      return;
+    }
+
     var act = e.target.closest('[data-m]');
     if (!act) return;
     var go = window.YOYO_APP.go;
@@ -732,6 +851,16 @@
       case 'switch': setLastRole(''); return close();
       case 'signout': setLastRole(''); return signOut(false);
       case 'delete': return requestDeletion();
+      case 'pause': {
+        var days = Number((document.getElementById('m-pause-days') || {}).value);
+        if (confirm('Pause for ' + days + ' days from today? You cannot check in while paused.')) {
+          afterAction(api('/member/pause', { method: 'POST', body: { days: days } }), 'Paused.');
+        }
+        return;
+      }
+      case 'resume':
+        if (confirm('Come back now? The days you did not use come off your end date.')) afterAction(api('/member/pause', { method: 'POST', body: { action: 'resume' } }), 'Welcome back.');
+        return;
       case 'scan-card': return scanCard();
       case 'help':
         close();

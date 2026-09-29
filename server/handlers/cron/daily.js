@@ -12,6 +12,7 @@ import { runReminders as billingReminders } from './billing.js';
 import { run as expiry } from './expiry.js';
 import { run as classReminders } from './class-reminders.js';
 import { run as reengagement } from './reengagement.js';
+import { run as resumePauses } from './resume-pauses.js';
 // NOTE: daily_summary runs on its own 8 PM schedule (spec Part 5 #10), so it is
 // intentionally NOT included in this morning orchestrator.
 
@@ -26,6 +27,8 @@ export default async function handler(req, res) {
     ['expiry', expiry],
     ['class_reminders', classReminders],
     ['reengagement', reengagement],
+    // A pause ends on its last day without anyone remembering (§41.1 Q3).
+    ['resume_pauses', resumePauses],
   ];
 
   const results = {};

@@ -550,6 +550,98 @@ create table if not exists gym.audit_log (
 create index if not exists audit_created_idx on gym.audit_log(created_at);
 
 -- =============================================================================
+-- MEMBER SERVICES (CLAUDE.md §41.1 Q3) — pause, rewards, challenges, family.
+-- Each is switched per plan, per gym and by the owner; these tables hold only
+-- what a member or the owner actually did.
+-- =============================================================================
+
+-- A member's pause: the membership's end date moves on by the days paused,
+-- and the member cannot check in until it ends.
+create table if not exists gym.membership_pauses (
+  id            uuid primary key default gen_random_uuid(),
+  member_id     uuid not null references gym.members(id) on delete cascade,
+  membership_id uuid references gym.memberships(id) on delete set null,
+  starts_on     date not null,
+  ends_on       date not null,
+  days          integer not null check (days > 0),
+  reason        text,
+  created_by    text not null default 'member',   -- member | staff
+  resumed_at    timestamptz,                      -- ended early, or by the daily job
+  created_at    timestamptz not null default now()
+);
+create index if not exists membership_pauses_member_idx on gym.membership_pauses(member_id);
+create index if not exists membership_pauses_open_idx   on gym.membership_pauses(ends_on) where resumed_at is null;
+
+-- What a member can claim with their points, as the owner lists it.
+create table if not exists gym.rewards (
+  id          uuid primary key default gen_random_uuid(),
+  name        text not null,
+  description text,
+  points      integer not null check (points > 0),
+  is_enabled  boolean not null default true,
+  created_at  timestamptz not null default now(),
+  updated_at  timestamptz not null default now()
+);
+
+-- A claim, handed over at the gym. The name and points are copied, so a later
+-- edit to the reward does not rewrite what was claimed.
+create table if not exists gym.reward_claims (
+  id          uuid primary key default gen_random_uuid(),
+  reward_id   uuid references gym.rewards(id) on delete set null,
+  member_id   uuid not null references gym.members(id) on delete cascade,
+  reward_name text not null,
+  points      integer not null check (points > 0),
+  status      text not null default 'pending',     -- pending | given | cancelled
+  decided_at  timestamptz,
+  decided_by  uuid,
+  created_at  timestamptz not null default now()
+);
+create index if not exists reward_claims_member_idx on gym.reward_claims(member_id);
+create index if not exists reward_claims_status_idx on gym.reward_claims(status);
+
+-- A challenge the owner runs: visits between two dates, counted from check-ins.
+create table if not exists gym.challenges (
+  id            uuid primary key default gen_random_uuid(),
+  title         text not null,
+  description   text,
+  target_visits integer not null check (target_visits > 0),
+  starts_on     date not null,
+  ends_on       date not null,
+  is_active     boolean not null default true,
+  created_at    timestamptz not null default now(),
+  updated_at    timestamptz not null default now(),
+  check (ends_on >= starts_on)
+);
+
+-- Who joined. Joining is the member's choice, and so is the leaderboard.
+create table if not exists gym.challenge_entries (
+  challenge_id  uuid not null references gym.challenges(id) on delete cascade,
+  member_id     uuid not null references gym.members(id) on delete cascade,
+  show_on_board boolean not null default true,
+  joined_at     timestamptz not null default now(),
+  primary key (challenge_id, member_id)
+);
+
+-- A family or group: several members, one payer.
+create table if not exists gym.member_groups (
+  id              uuid primary key default gen_random_uuid(),
+  name            text not null,
+  kind            text not null default 'family',   -- family | group
+  payer_member_id uuid references gym.members(id) on delete set null,
+  created_at      timestamptz not null default now(),
+  updated_at      timestamptz not null default now()
+);
+
+create table if not exists gym.member_group_links (
+  group_id  uuid not null references gym.member_groups(id) on delete cascade,
+  member_id uuid not null references gym.members(id) on delete cascade,
+  added_at  timestamptz not null default now(),
+  primary key (group_id, member_id)
+);
+-- A member belongs to one family or group at a time.
+create unique index if not exists member_group_links_member_uniq on gym.member_group_links(member_id);
+
+-- =============================================================================
 -- ROW LEVEL SECURITY — enable on every table (default-deny; service role bypasses)
 -- =============================================================================
 do $$
@@ -559,7 +651,9 @@ begin
     'admin_users','trainers','plans','addon_services','members','memberships',
     'parq_responses','member_addons','payments','checkins','classes',
     'class_bookings','training_sessions','notifications_log','settings',
-    'qr_scan_analytics','events','visitors','incidents','audit_log'
+    'qr_scan_analytics','events','visitors','incidents','audit_log',
+    'membership_pauses','rewards','reward_claims','challenges','challenge_entries',
+    'member_groups','member_group_links'
   ]
   loop
     execute format('alter table gym.%I enable row level security;', t);
