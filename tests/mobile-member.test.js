@@ -151,7 +151,9 @@ test('an inactive membership cannot press check-in, and is told why', async () =
     'GET /api/member/status': { status: 200, body: { ...STATUS, member: { ...STATUS.member, status: 'new' } } },
   });
   assert.equal(doc.getElementById('m-checkin').disabled, true);
-  assert.match(text(doc, '.m-hint'), /once your membership is active/);
+  // The NEXT STEP, not just the state: a new member pays their gym, and the
+  // gym recording that payment is what activates them (critique 2026-09-29).
+  assert.match(text(doc, '.m-hint'), /records your first payment\. Pay at reception/);
 });
 
 // ---------------------------------------------------------------------------
@@ -274,4 +276,66 @@ test('a colour that is not a colour is not applied', async () => {
   window.YOYO_MEMBER.open('bos-gym', {});
   await tick();
   assert.equal(doc.getElementById('member').style.getPropertyValue('--m-accent'), '');
+});
+
+// ---------------------------------------------------------------------------
+// Hardened after the design critique (2026-09-29)
+// ---------------------------------------------------------------------------
+
+test('SIGNING IN MOVES FOCUS TO THE NEW SCREEN AND NAMES THE PAGE', async () => {
+  const { doc } = await signIn();
+  assert.equal(doc.activeElement.tagName, 'H1', 'a screen reader follows the member into their gym');
+  assert.equal(doc.activeElement.textContent, 'Monthly Gold');
+  assert.match(doc.title, /^Home · BOS GYM$/);
+});
+
+test('changing tab moves focus into the new section, never back to the page', async () => {
+  const { doc, window } = await signIn();
+  doc.querySelector('[data-tab="card"]').dispatchEvent(new window.MouseEvent('click', { bubbles: true }));
+  await tick();
+  assert.match(doc.title, /^Card · /);
+  const el = doc.activeElement;
+  assert.notEqual(el.tagName, 'BODY', 'focus is not lost to the page');
+  // The card has no heading, so its main region — labelled "Card" — takes focus.
+  assert.ok(['H1', 'H2'].includes(el.tagName) || (el.tagName === 'MAIN' && el.getAttribute('aria-label') === 'Card'), el.tagName);
+});
+
+test("PRICES ARE IN THE GYM'S OWN CURRENCY, not always Rand", async () => {
+  const routes = {
+    ...SIGNED_IN_ROUTES,
+    'GET /api/content': { status: 200, body: { branding: { name: 'COCATE GYM', currency: 'ETB', dial: '251' }, offer: { services: [], facilities: [] } } },
+    'GET /api/catalog': { status: 200, body: { plans: [{ id: 'p1', name: 'Monthly membership', visit_type: 'full', monthly_price: 1200 }], addons: [] } },
+  };
+  const { doc } = await signIn(routes);
+  await tick();
+  const offer = doc.querySelector('.m-offer')?.textContent || '';
+  assert.match(offer, /ETB|Br/, 'Ethiopian birr, however this phone writes it');
+  assert.doesNotMatch(offer, /R1[\s,.]?200/, 'not Rand');
+});
+
+test("the phone example follows the gym's country", async () => {
+  const app = boot({ 'GET /api/content': { status: 200, body: { branding: { name: 'COCATE GYM', dial: '251' } } } });
+  app.window.YOYO_MEMBER.open('cocate-gym', { name: 'COCATE GYM' });
+  await tick();
+  assert.equal(app.doc.getElementById('m-ph').placeholder, '+251 and your number');
+  assert.doesNotMatch(app.doc.body.innerHTML, /082 123 4567/, 'no South African example anywhere');
+});
+
+test('each membership state says what to do next, not only that check-in is closed', async () => {
+  for (const [status, words] of [['lapsed', /Renew at reception/], ['suspended', /speak to reception/], ['frozen', /Resume it in Profile/]]) {
+    const { doc } = await signIn({ ...SIGNED_IN_ROUTES, 'GET /api/member/status': { status: 200, body: { ...STATUS, member: { ...STATUS.member, status } } } });
+    assert.match(text(doc, '.m-hint'), words, status);
+  }
+});
+
+test('profile rows end in a drawn chevron, not a "›" a screen reader reads aloud', async () => {
+  const { doc, window } = await signIn();
+  doc.querySelector('[data-tab="profile"]').dispatchEvent(new window.MouseEvent('click', { bubbles: true }));
+  await tick();
+  const rows = [...doc.querySelectorAll('.m-row[data-m]')];
+  assert.ok(rows.length >= 3);
+  for (const r of rows) {
+    assert.ok(!r.textContent.includes('›'), r.textContent);
+    assert.equal(r.querySelector('svg.m-row__chev')?.getAttribute('aria-hidden'), 'true');
+  }
 });

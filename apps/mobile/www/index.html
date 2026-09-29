@@ -93,6 +93,9 @@
         margin-top: 8px; cursor: pointer;
       }
       button:focus-visible, a:focus-visible { outline: 2px solid var(--y-lime); outline-offset: 2px; }
+      /* A heading focused so a screen reader follows a screen change: no ring,
+         it is not something to press. */
+      h1[tabindex="-1"]:focus, h2[tabindex="-1"]:focus { outline: none; }
       .hidden { display: none !important; }
       /* Inside a gym, buttons wear THE GYM'S colour — the Yoyo lime until the
          gym chooses one (§37.1 Q2) — with the text colour that reads on it,
@@ -494,6 +497,7 @@
       .m-row + .m-row { border-top: 1px solid var(--m-line); }
       .m-row.is-static { flex-direction: column; align-items: flex-start; justify-content: center; gap: 0; padding: 8px 24px; }
       .m-row span:last-child { color: var(--m-muted); }
+      .m-row .m-row__chev { width: 18px; height: 18px; flex: none; color: var(--m-muted); }
 
       .m-primary { background: var(--m-accent); }
       .m-secondary { background: rgba(255, 255, 255, 0.08); color: #fff; }
@@ -670,7 +674,7 @@
       </div>
       <div class="y-field">
         <label for="ph">Phone number</label>
-        <input id="ph" type="tel" inputmode="tel" autocomplete="tel" placeholder="082 123 4567" />
+        <input id="ph" type="tel" inputmode="tel" autocomplete="tel" placeholder="The number you joined with" />
       </div>
       <button id="find" type="button" class="y-btn y-btn--primary">Find my gym</button>
       <p class="note" id="find-note" data-note role="status"></p>

@@ -7,6 +7,7 @@ import { currentGym } from '../../lib/tenancy.js';
 import { readOff, MEMBER_SERVICES_KEY } from '../../lib/member-services.js';
 import { FACILITIES_KEY, facilityLabels } from '../../../shared/facilities.js';
 import { SERVICE_INFO, ALL_SERVICES } from '../../../shared/features.js';
+import { homeCountryFor, currencyForCountry, dialForCountry } from '../../../shared/countries.js';
 
 /**
  * The services a member of this gym can use, in words. `features` is null in
@@ -61,6 +62,10 @@ export default async function handler(req, res) {
     // The gym's own saved name; else its name in the Yoyo registry; else a
     // neutral default — never another gym's, or the old single-gym name.
     const gymName = profile.name || currentGym()?.gym?.search_name || DEFAULTS.gym_name;
+    // Where the gym is, so the app shows ITS money and phone format — an
+    // Ethiopian gym's prices are not in Rand (critique 2026-09-29). The gym's
+    // own profile first, then the registry, then the default home country.
+    const country = homeCountryFor(profile.country || currentGym()?.gym?.country);
 
     return ok(res, {
       gym_name: gymName,
@@ -81,6 +86,9 @@ export default async function handler(req, res) {
         phone: profile.phone || null,
         email: profile.email || null,
         address: profile.address || null,
+        country,
+        currency: currencyForCountry(country),
+        dial: dialForCountry(country) || null,
       },
       indemnity_text: (map.indemnity_text?.text || DEFAULTS.indemnity_text).replaceAll(
         '[GYM NAME]',

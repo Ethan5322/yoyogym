@@ -49,6 +49,23 @@
     if (name === 'member-welcome') renderMine();
     if (name === 'pick') renderAdminMine();
     window.scrollTo(0, 0);
+    announce(views[name]);
+  }
+
+  // A SCREEN CHANGE IS SAID. Focus used to stay on the button that had just
+  // been hidden, so a screen reader announced nothing and lost its place after
+  // every tap (critique 2026-09-29). Focus moves to the new screen's heading,
+  // and the page is named after it. Not on the very first screen: nothing has
+  // changed yet, and focus there would only scroll a sighted person.
+  var booted = false;
+  function announce(view) {
+    var heading = view && view.querySelector('h1');
+    var label = heading ? heading.textContent.replace(/\s+/g, ' ').trim() : '';
+    document.title = label ? label + ' · Yoyo Gyms' : 'Yoyo Gyms';
+    if (!booted) { booted = true; return; }
+    if (!heading) return;
+    if (!heading.hasAttribute('tabindex')) heading.setAttribute('tabindex', '-1');
+    heading.focus({ preventScroll: true });
   }
 
   /** Go forward to a screen. Home resets the stack: it is the root. */
@@ -408,8 +425,15 @@
     var url = shell.defaultServer.replace(/\/+$/, '') + '/platform/api/gyms?' + params.toString();
     if (!allowed(url)) return;
 
+    // A search that takes a moment says so — after 300 ms, so a quick answer
+    // never flashes a message.
+    var slow = setTimeout(function () {
+      if (mine === searchSeq) out.innerHTML = '<p class="note" role="status">Searching…</p>';
+    }, 300);
+
     fetch(url)
       .then(function (r) {
+        clearTimeout(slow);
         // A failed search is NOT an empty one. Rendered as "no gyms found" it
         // tells a member their gym is not on Yoyo Gyms, when the truth is
         // that we are having a problem.
@@ -421,6 +445,7 @@
         showResults(d.gyms || []);
       })
       .catch(function () {
+        clearTimeout(slow);
         if (mine !== searchSeq) return;
         out.innerHTML = '';
         say('Could not reach Yoyo Gyms. Check your connection and try again.', 'err');

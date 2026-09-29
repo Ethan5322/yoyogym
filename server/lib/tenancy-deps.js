@@ -152,7 +152,7 @@ export function tenancyDeps() {
 
       const { data: gym } = await db
         .from('gyms')
-        .select('id, slug, status, plan_key, search_name')
+        .select('id, slug, status, plan_key, search_name, country')
         .eq('slug', key)
         .maybeSingle();
 

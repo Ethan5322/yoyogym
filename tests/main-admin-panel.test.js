@@ -219,9 +219,9 @@ test('Q3 with all three accepted, approval goes ahead', async () => {
 test('Q3 the Approve button is greyed out, and says which documents are missing', () => {
   const page = (documents) =>
     applicationDetailPage({ application: { id: 'a1', proposed_gym_name: 'Bos', status: 'submitted' }, documents, events: [] });
-  assert.match(page([]), /value="approve" disabled/);
+  assert.match(page([]), /value="approve" formnovalidate disabled/);
   assert.match(page([]), /unavailable until the required documents are accepted/);
-  assert.ok(!/value="approve" disabled/.test(page(ACCEPTED.map((d, i) => ({ ...d, id: `d${i}` })))));
+  assert.ok(!/value="approve" formnovalidate disabled/.test(page(ACCEPTED.map((d, i) => ({ ...d, id: `d${i}` })))));
 });
 
 test('Q3 a refused approval says "Documents still needed", with the way back', async () => {

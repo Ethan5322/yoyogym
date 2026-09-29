@@ -69,6 +69,24 @@ const STYLE = `
   input, textarea, select { font:inherit; min-height:44px; padding:10px 12px; border:1px solid var(--line);
                     border-radius:6px; background:var(--bg); color:inherit; width:100%; }
   input:focus, textarea:focus, select:focus { outline:2px solid var(--accent); outline-offset:1px; }
+  /* Keyboard focus on every control, in the brand's lime — the browser's own
+     ring was the only one links, buttons and disclosures had. */
+  a:focus-visible, button:focus-visible, summary:focus-visible, label:focus-visible, .btn:focus-visible {
+    outline:2px solid var(--accent); outline-offset:2px; border-radius:8px; }
+  main:focus { outline:none; }
+  /* Skip past the menu: first thing a keyboard reaches on every page. */
+  .skip { position:absolute; left:12px; top:-60px; z-index:50; background:var(--accent); color:var(--accent-ink);
+          font-weight:800; padding:10px 16px; border-radius:99px; text-decoration:none; }
+  .skip:focus { top:12px; }
+  /* A second, explicit click before switching anyone off (CLAUDE.md §45 critique). */
+  details.confirm { display:inline-block; }
+  details.confirm > summary { list-style:none; cursor:pointer; display:inline-flex; align-items:center; min-height:44px;
+                              padding:0 16px; border-radius:99px; font-weight:700; border:1px solid rgba(255,107,94,.55);
+                              color:var(--bad); }
+  details.confirm > summary::-webkit-details-marker { display:none; }
+  details.confirm[open] > summary { background:rgba(255,107,94,.1); }
+  details.confirm form { margin:10px 0 0; max-width:340px; white-space:normal; }
+  details.confirm p { margin:0 0 10px; font-size:14px; color:var(--ink); }
   /* Every control at least 44 px tall — a comfortable target for a finger, and
      big enough to read at a glance (CLAUDE.md §41). */
   button { font:inherit; font-size:15px; font-weight:700; min-height:44px; padding:10px 20px; border:0; border-radius:99px;
@@ -142,12 +160,14 @@ const STYLE = `
           border-right:1px solid var(--line); padding:18px 12px; display:flex; flex-direction:column; }
   .side .brand { display:block; padding:4px 10px 8px; }
   .side .brand img { display:block; height:44px; width:auto; }
-  .navt { position:absolute; opacity:0; pointer-events:none; }
+  /* The phone menu's switch. On a computer it is display:none, so it is not
+     an invisible stop in the keyboard order. */
+  .navt { display:none; }
   .navt-label { display:none; }
   .side nav { display:flex; flex-direction:column; gap:2px; }
   .side .grp { font-size:11px; font-weight:700; letter-spacing:.14em; text-transform:uppercase;
                color:rgba(255,255,255,.38); margin:18px 12px 6px; }
-  .side nav a { display:flex; align-items:center; gap:10px; padding:9px 12px; border-radius:10px;
+  .side nav a { display:flex; align-items:center; gap:10px; min-height:44px; padding:9px 12px; border-radius:10px;
                 color:rgba(255,255,255,.74); text-decoration:none; font-weight:600; font-size:14px; }
   .side nav a svg { width:18px; height:18px; flex:none; }
   .side nav a:hover { background:rgba(255,255,255,.05); color:#fff; }
@@ -188,7 +208,13 @@ const STYLE = `
   .checklist li.ok::before { content:'●'; color:#8ee07a; }
   dl.facts { display:grid; grid-template-columns:minmax(120px,max-content) 1fr; gap:8px 18px; margin:0; }
   dl.facts dt { color:var(--muted); font-size:13px; }
-  dl.facts dd { margin:0; overflow-wrap:anywhere; }
+  dl.facts dd { margin:0; overflow-wrap:break-word; min-width:0; }
+  /* A phone stacks the label above the value, so a long email keeps its whole
+     line instead of breaking mid-word ("sam@example.c om"). */
+  @media (max-width: 520px) {
+    dl.facts { grid-template-columns:1fr; gap:2px 0; }
+    dl.facts dd { margin-bottom:10px; }
+  }
   .grid2 { display:grid; grid-template-columns:repeat(auto-fit,minmax(320px,1fr)); gap:16px; }
   .grid2 > .card { margin:0; }
 
@@ -201,6 +227,7 @@ const STYLE = `
             padding:10px 16px; }
     .side .brand { padding:0; }
     .side .brand img { height:34px; }
+    .navt { display:block; position:absolute; opacity:0; width:1px; height:1px; pointer-events:none; }
     .navt-label { display:inline-flex; margin-left:auto; border:1px solid var(--line); border-radius:99px;
                   padding:7px 14px; font-weight:700; cursor:pointer; }
     .side nav, .side .me { display:none; width:100%; }
@@ -314,7 +341,7 @@ export function layout({
   // A sign-in page stands alone: no panel header, the brand instead.
   if (bare) {
     return `${head}<body class="${bodyClass}">
-<main>
+<main id="main" tabindex="-1">
 ${body}
 </main>
 </body>
@@ -324,6 +351,7 @@ ${body}
   // Yoyo staff: the main admin panel.
   if (user && user.kind !== 'gym_owner') {
     return `${head}<body class="panel">
+<a class="skip" href="#main">Skip to content</a>
 <aside class="side">
   <a class="brand" href="/platform/home"><img src="${LOGO_ON_DARK}" width="720" height="531" alt="Yoyo Gyms"></a>
   <input type="checkbox" id="navt" class="navt" aria-label="Show the menu">
@@ -337,7 +365,7 @@ ${staffNav(user, active)}
     <a href="/platform/logout">${icon('signout')}Sign out</a>
   </div>
 </aside>
-<main>
+<main id="main" tabindex="-1">
 ${body}
 </main>
 </body>
@@ -348,6 +376,7 @@ ${body}
   // two links — never the staff menu (CLAUDE.md §40.1 F-40.2).
   const owner = Boolean(user);
   return `${head}<body>
+<a class="skip" href="#main">Skip to content</a>
 <header>
   <a class="brand" href="${owner ? '/platform/my-gym' : '/platform/welcome'}"><img src="${LOGO_ON_DARK}" width="720" height="531" alt="Yoyo Gyms"></a>
   ${
@@ -360,7 +389,7 @@ ${body}
   }
   <span class="muted">${owner ? h(user.email) : ''}</span>
 </header>
-<main>
+<main id="main" tabindex="-1">
 ${body}
 </main>
 </body>
@@ -587,8 +616,8 @@ ${documents
         d.status === 'pending'
           ? `<form method="post" action="/platform/documents/${h(d.id)}/decide" class="row">
         <input type="hidden" name="csrf" value="${h(csrfToken)}">
-        <button type="submit" name="action" value="accept">Accept</button>
-        <input name="reason" placeholder="Reason, if rejecting">
+        <button type="submit" name="action" value="accept" formnovalidate>Accept</button>
+        <input name="reason" required aria-label="Reason for rejecting this document" placeholder="Reason, if rejecting">
         <button type="submit" name="action" value="reject" class="ghost">Reject</button>
       </form>`
           : '<span class="muted">decided</span>'
@@ -685,10 +714,10 @@ may submit a new application.${
   <input type="hidden" name="csrf" value="${h(csrfToken)}">
   <h2>Decision</h2>
   <label>Message to the owner
-    <textarea name="reason" rows="3" placeholder="Required to reject or to ask for more. The owner is emailed this."></textarea>
+    <textarea name="reason" rows="3" required placeholder="Required to reject or to ask for more. The owner is emailed this."></textarea>
   </label>
   <div class="row">
-    <button type="submit" name="action" value="approve"${missing.length ? ' disabled' : ''}>Approve and provision</button>
+    <button type="submit" name="action" value="approve" formnovalidate${missing.length ? ' disabled' : ''}>Approve and provision</button>
     <button type="submit" name="action" value="request_info" class="ghost">Request information</button>
     <button type="submit" name="action" value="reject" class="danger">Reject</button>
   </div>
@@ -1190,6 +1219,8 @@ ${OPTIONAL_DOCUMENTS.map((t) => docBox(t, documents, { required: false })).join(
   async function send(input) {
     var box = input.closest('.doc-box');
     var note = box.querySelector('.doc-note');
+    // An error reads as an error (it was grey, like progress).
+    function say(text, isError) { note.textContent = text; note.className = 'doc-note ' + (isError ? 'err' : 'muted'); }
     var file = input.files && input.files[0];
     if (!file) return;
     box.classList.add('busy');
@@ -1197,7 +1228,7 @@ ${OPTIONAL_DOCUMENTS.map((t) => docBox(t, documents, { required: false })).join(
     try {
       file = await asJpeg(file);
       var type = file.type || (isHeic(file) ? 'image/heic' : '');
-      if (file.size > MAX) { note.textContent = 'That file is larger than 10 MB. Please send a smaller scan or photo.'; return; }
+      if (file.size > MAX) { say('That file is larger than 10 MB. Please send a smaller scan or photo.', true); return; }
 
       var params = new URLSearchParams({
         csrf: CSRF, application_id: APPLICATION, doc_type: input.dataset.type,
@@ -1207,27 +1238,27 @@ ${OPTIONAL_DOCUMENTS.map((t) => docBox(t, documents, { required: false })).join(
       // 1. The server decides WHERE it goes.
       var ask = await post('/platform/my-gym/documents/request', params);
       var target = await ask.json().catch(function () { return {}; });
-      if (!ask.ok) { note.textContent = target.error || 'That file was not accepted.'; return; }
+      if (!ask.ok) { say(target.error || 'That file was not accepted.', true); return; }
 
       // 2. The bytes go straight to private storage, never through our server.
-      note.textContent = 'Uploading…';
+      say('Uploading… a large photo can take a minute on a slow connection.');
       var put = await fetch(target.uploadUrl, {
         method: 'PUT',
         headers: { 'Content-Type': type, Authorization: 'Bearer ' + target.token },
         body: file
       });
-      if (!put.ok) { note.textContent = 'The upload did not finish. Please try again.'; return; }
+      if (!put.ok) { say('The upload did not finish. Please try again.', true); return; }
 
       // 3. Recorded, so a reviewer can find it.
       params.set('storage_ref', target.path);
       params.set('respond', 'json');
       var done = await post('/platform/my-gym/documents/confirm', params);
-      if (!done.ok) { note.textContent = 'We could not record that upload. Please try again.'; return; }
+      if (!done.ok) { say('We could not record that upload. Please try again.', true); return; }
 
       note.textContent = 'Uploaded ✓';
       location.reload();
     } catch (err) {
-      note.textContent = 'Something went wrong. Please check your connection and try again.';
+      say('The upload stopped — please check your connection and try again.', true);
     } finally {
       box.classList.remove('busy');
       input.value = '';
@@ -2494,12 +2525,20 @@ ${owners
       <td>${statusTag(o.is_active === false ? 'switched off' : 'active')}${
         o.closure_requested_at && o.is_active !== false ? ` ${statusTag('asked to close')}` : ''
       }</td>
-      <td><form method="post" action="/platform/owners/${h(o.id)}/${
-        o.is_active === false ? 'reactivate' : 'deactivate'
-      }">
+      <td>${
+        o.is_active === false
+          ? `<form method="post" action="/platform/owners/${h(o.id)}/reactivate">
         <input type="hidden" name="csrf" value="${h(csrfToken)}">
-        <button type="submit"${o.is_active === false ? '' : ' class="danger"'}>${o.is_active === false ? 'Switch on' : 'Switch off'}</button>
-      </form></td>
+        <button type="submit">Switch on</button>
+      </form>`
+          : `<details class="confirm"><summary>Switch off</summary>
+        <form method="post" action="/platform/owners/${h(o.id)}/deactivate">
+          <input type="hidden" name="csrf" value="${h(csrfToken)}">
+          <p><b>${h(o.email || 'This owner')}</b> can no longer sign in to their Yoyo Gyms account or with Owner login.
+          Their gym stays open, and its staff and members are not affected. You can switch them on again.</p>
+          <button type="submit" class="danger">Yes, switch off</button>
+        </form></details>`
+      }</td>
     </tr>`
   )
   .join('\n')}
@@ -2673,7 +2712,7 @@ export function documentReviewPage({
     ? `${tools}<img src="${src}" alt="${h(doc.filename)}" style="max-width:100%;border:1px solid var(--line);border-radius:12px"
   onerror="this.outerHTML='<div class=&quot;empty&quot;><p>This browser cannot show this photo. Use <b>Download</b> above to open it.</p></div>'">`
     : `${tools}<object data="${src}" type="application/pdf" style="width:100%;height:78vh;border:1px solid var(--line);border-radius:12px;background:#fff">
-  <div class="empty">
+  <div class="empty" style="color:#1d2329;border-color:rgba(7,12,16,.18);background:#fff">
     <p>This browser cannot show the PDF here. Use <b>Open in a new tab</b> or <b>Download</b> above.</p>
   </div>
 </object>`;
@@ -3410,10 +3449,19 @@ ${staff
           <button type="submit" class="ghost">New invite link</button>
         </form>`
                 : ''
-            }<form method="post" action="/platform/team/${h(s.id)}/${s.is_active === false ? 'reactivate' : 'deactivate'}">
+            }${
+              s.is_active === false
+                ? `<form method="post" action="/platform/team/${h(s.id)}/reactivate">
           <input type="hidden" name="csrf" value="${h(csrfToken)}">
-          <button type="submit"${s.is_active === false ? '' : ' class="danger"'}>${s.is_active === false ? 'Switch on' : 'Switch off'}</button>
-        </form></div>`
+          <button type="submit">Switch on</button>
+        </form>`
+                : `<details class="confirm"><summary>Switch off</summary>
+          <form method="post" action="/platform/team/${h(s.id)}/deactivate">
+            <input type="hidden" name="csrf" value="${h(csrfToken)}">
+            <p><b>${h(s.email || 'This person')}</b> loses the main admin panel from their next click. You can switch them on again.</p>
+            <button type="submit" class="danger">Yes, switch off</button>
+          </form></details>`
+            }</div>`
       }</td>
     </tr>`;
   })

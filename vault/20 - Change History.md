@@ -15,6 +15,30 @@ occurrence is answered from notes rather than rediscovered.
 
 ---
 
+## 2026-09-29 — Design critique, then the harden pass; the first Android test build
+
+**Critique** (`/impeccable critique`, two isolated reviews: design director + automated detector): app
+28/40, website 25/40; snapshots in `.impeccable/critique/`. **Harden** (the user's scope: everything,
+app member experience first):
+- **App:** a screen change moves focus to its heading and names the page (it stayed on the hidden
+  button); member views keep focus through loading and redraws; prices in the GYM's currency (always Rand
+  before — COCATE is Ethiopian), the phone example from its dialling code (content now returns
+  country/currency/dial); each inactive status says the next step (a new member: pay at reception —
+  recording that payment activates them); "Searching…" on slow gym search; drawn chevrons, not "›".
+- **Website:** skip link and a focusable main on every page; a lime focus ring on links, buttons and
+  disclosures; the phone menu switch no longer an invisible keyboard stop; 44px sidebar links; switching
+  an owner or team member off takes a second click after the consequence is stated; Reject and Request
+  information need the message (Approve and Accept skip it); the PDF fallback readable on its white box
+  (detector-found: light text on white); upload errors styled as errors; facts stack on a phone so an
+  email does not break mid-word.
+
+**Android:** the first test APK built after two fixes, each read from the real error: Android Studio's
+Java 25 is too new for Gradle 8.14 ("class file major version 69") — a portable Java 21 now in
+`~/.jdks`; and the QR scanner needs Android 8.0 (`minSdkVersion` 24 → 26). The build took 87 minutes
+inside OneDrive. 1138 tests.
+
+---
+
 ## 2026-09-29 — Final check before the build: KOM's owner could not use "Owner login"; CLAUDE.md brought up to date
 
 Asked by the user to check for anything left over before the final build. **Found:** the email sign-in

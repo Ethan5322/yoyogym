@@ -409,3 +409,32 @@ test('EVERY SCRIPT THE APP LOADS IS VALID JAVASCRIPT', async () => {
     assert.doesNotThrow(() => new Script(read(src), { filename: src }), src);
   }
 });
+
+// ---------------------------------------------------------------------------
+// Hardened after the design critique (2026-09-29)
+// ---------------------------------------------------------------------------
+
+test('A SCREEN CHANGE MOVES FOCUS TO ITS HEADING AND NAMES THE PAGE', () => {
+  const { doc, window } = boot();
+  click(doc, window, '[data-go="member"]');
+  assert.equal(doc.activeElement.tagName, 'H1', 'a screen reader follows the member to the new screen');
+  assert.equal(doc.activeElement.textContent, 'Welcome, Member');
+  assert.equal(doc.title, 'Welcome, Member · Yoyo Gyms');
+  click(doc, window, '[data-go="back"]');
+  assert.match(doc.title, /Yoyo Gyms/);
+});
+
+test('a gym search that takes a moment says "Searching…" instead of showing nothing', async () => {
+  let release;
+  const slow = new Promise((r) => { release = r; });
+  const { doc, window } = boot();
+  window.fetch = async () => { await slow; return { ok: true, status: 200, json: async () => ({ gyms: [] }) }; };
+  click(doc, window, '[data-go="member"]');
+  click(doc, window, '[data-go="find"]');
+  const q = doc.getElementById('q');
+  q.value = 'coc';
+  q.dispatchEvent(new window.Event('input'));
+  await new Promise((r) => setTimeout(r, 700));
+  assert.match(doc.getElementById('results').textContent, /Searching…/);
+  release();
+});

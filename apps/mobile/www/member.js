@@ -99,6 +99,9 @@
 
   function firstName(full) { return String(full || '').trim().split(/\s+/)[0] || 'there'; }
 
+  // The row chevron, drawn from the app's own icon set.
+  var CHEV = '<svg class="y-i m-row__chev" aria-hidden="true"><use href="#i-chev"/></svg>';
+
   function dateText(ymd) {
     if (!ymd) return '';
     var d = new Date(String(ymd).slice(0, 10) + 'T00:00:00');
@@ -184,6 +187,9 @@
       phone: text(b.phone),
       email: text(b.email),
       address: text(b.address),
+      // Where the gym is: its money and its phone format (critique 2026-09-29).
+      currency: typeof b.currency === 'string' && /^[A-Z]{3}$/.test(b.currency) ? b.currency : '',
+      dial: typeof b.dial === 'string' && /^[0-9]{1,4}$/.test(b.dial) ? b.dial : '',
     };
 
     // The gym's POSTER behind every member screen (CLAUDE.md §39.1 Q3, Q4) —
@@ -260,6 +266,8 @@
     loadBrand().then(function () {
       root.querySelectorAll('[data-gym-name]').forEach(function (el) { el.textContent = state.gymName || el.textContent; });
       paintIcons();
+      var ph = document.getElementById('m-ph');
+      if (ph && !ph.value) ph.placeholder = phoneHint();
       // Signed in: redraw so the gym's own cover, notice and contact appear.
       // (Never the sign-in form, which may hold what the member is typing.)
       if (state.token && root.querySelector('.m-main')) render();
@@ -267,7 +275,7 @@
 
     if (state.token) {
       setLastRole('member');
-      render();
+      render({ moveFocus: true });
       refresh();
     } else {
       renderSignIn();
@@ -320,7 +328,7 @@
       '    <label for="m-mn">Membership number</label>' +
       '    <input id="m-mn" autocapitalize="characters" autocomplete="off" placeholder="GYM-2026-000123" value="' + esc(state.prefill) + '" required>' +
       '    <label for="m-ph">Phone number</label>' +
-      '    <input id="m-ph" type="tel" inputmode="tel" autocomplete="tel" placeholder="082 123 4567" required>' +
+      '    <input id="m-ph" type="tel" inputmode="tel" autocomplete="tel" placeholder="' + esc(phoneHint()) + '" required>' +
       '    <p class="m-err" id="m-login-err" role="alert"></p>' +
       '    <button type="submit" class="m-primary" id="m-login-btn">Sign in</button>' +
       '  </form>' +
@@ -332,6 +340,9 @@
       '    <button type="button" class="y-link" data-m="help">Need help?</button>' +
       '  </div>' +
       '</div>';
+
+    title('Sign in');
+    focusHeading();
 
     var form = document.getElementById('m-login');
     form.addEventListener('submit', function (e) {
@@ -352,7 +363,7 @@
           save('token', d.token);
           setLastRole('member');
           state.tab = 'home';
-          render();
+          render({ moveFocus: true });
           refresh();
         }, function (e2) {
           err.textContent = e2.message;
@@ -379,7 +390,36 @@
     return TABS.filter(function (t) { return !t.needs || [].concat(t.needs).some(has); });
   }
 
-  function render() {
+  /** The page's name, for the screen reader and the app switcher. */
+  function title(section) {
+    document.title = section + ' · ' + (state.gymName || 'Yoyo Gyms');
+  }
+
+  /**
+   * Focus the view's heading, so a screen reader says where the member is now.
+   * A view with no heading (the card) focuses its labelled main region; one
+   * still loading (the home before the status arrives) is focused again once
+   * its content is drawn, so focus is never simply lost to the page.
+   */
+  function focusHeading() {
+    var h = root.querySelector('#m-main h1, #m-main h2, .m-signin h1');
+    state.pendingFocus = !h && !state.status && Boolean(root.querySelector('#m-main'));
+    var target = h || document.getElementById('m-main');
+    if (!target) return;
+    if (!target.hasAttribute('tabindex')) target.setAttribute('tabindex', '-1');
+    target.focus({ preventScroll: true });
+  }
+
+  /**
+   * Draw the signed-in area.
+   * @param {object} [opts] { moveFocus } — true when the member went somewhere
+   *   (a tab, just signed in). A redraw because fresh data arrived keeps focus
+   *   where it was instead of throwing it back to the top of the page.
+   */
+  function render(opts) {
+    opts = opts || {};
+    var active = document.activeElement;
+    var keep = active && root.contains(active) && active.dataset && active.dataset.tab ? active.dataset.tab : null;
     if (!visibleTabs().some(function (t) { return t.id === state.tab; })) state.tab = 'home';
     // On the home the gym's own hero carries its name and icon, so the small
     // header does not repeat them.
@@ -390,7 +430,7 @@
       '  <span class="m-gymhead"><span data-gym-icon="32">' + gymIcon(32) + '</span>' +
       '  <span class="m-gym" data-gym-name>' + esc(state.gymName || 'My gym') + '</span></span>' +
       '</header>' +
-      '<main class="m-main" id="m-main"></main>' +
+      '<main class="m-main" id="m-main" aria-label="' + esc((TABS.filter(function (t) { return t.id === state.tab; })[0] || {}).label || 'Home') + '"></main>' +
       '<nav class="m-tabs" aria-label="Sections">' +
       visibleTabs().map(function (t) {
         return '<button type="button" class="m-tab' + (t.id === state.tab ? ' is-on' : '') + '" data-tab="' + t.id + '"' +
@@ -401,6 +441,14 @@
 
     var main = document.getElementById('m-main');
     ({ home: renderHome, card: renderCard, classes: renderClasses, rewards: renderRewards, profile: renderProfile })[state.tab](main);
+
+    var tab = TABS.filter(function (t) { return t.id === state.tab; })[0];
+    title(tab ? tab.label : 'Home');
+    if (opts.moveFocus || state.pendingFocus) focusHeading();
+    else if (keep) {
+      var again = root.querySelector('[data-tab="' + keep + '"]');
+      if (again) again.focus({ preventScroll: true });
+    }
   }
 
   /** Fetch the member's status; keep a copy so the card works offline. */
@@ -434,8 +482,42 @@
     return { tone: st.tone, text: st.text, plan: ms.plan_name || 'Membership', until: until };
   }
 
+  /**
+   * Money in the GYM's currency — it was always Rand, so an Ethiopian gym's
+   * prices read as R. Formatted the way this phone formats money. A gym that
+   * has not said where it is keeps the Rand it always had.
+   */
   function money(n) {
-    return 'R' + Number(n || 0).toLocaleString('en-ZA', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    var currency = (state.brand && state.brand.currency) || 'ZAR';
+    try {
+      return new Intl.NumberFormat(undefined, { style: 'currency', currency: currency }).format(Number(n || 0));
+    } catch (e) {
+      return currency + ' ' + Number(n || 0).toFixed(2);
+    }
+  }
+
+  /** The phone example for this gym's country: its dialling code, not a South African number. */
+  function phoneHint() {
+    var dial = state.brand && state.brand.dial;
+    return dial ? '+' + dial + ' and your number' : 'The number you joined with';
+  }
+
+  /**
+   * What stands between the member and checking in, and what to do about it.
+   * "Waiting for activation" used to end the joining journey with no next step
+   * — the real one, since members pay their gym directly, is paying at
+   * reception, which is what activates them (2026-09-21).
+   */
+  function checkinHint(s) {
+    var gym = state.gymName || 'your gym';
+    switch (s.member && s.member.status) {
+      case 'active': return 'Tap when you arrive.';
+      case 'new': return 'Your membership starts when ' + gym + ' records your first payment. Pay at reception and check-in opens straight away.';
+      case 'frozen': return 'Your membership is paused. Resume it in Profile to check in again.';
+      case 'lapsed': return 'Your membership has ended. Renew at reception to check in again.';
+      case 'suspended': return 'Check-in is on hold for your account. Please speak to reception.';
+      default: return 'Check-in opens once your membership is active.';
+    }
   }
 
   /**
@@ -512,9 +594,7 @@
       '  <span class="m-checkin__ring" aria-hidden="true"></span>' +
       '  <span class="m-checkin__label">Check in</span>' +
       '</button>' +
-      (s.member && s.member.status !== 'active'
-        ? '<p class="m-hint">Check-in opens once your membership is active.</p>'
-        : '<p class="m-hint">Tap when you arrive.</p>') +
+      '<p class="m-hint">' + esc(checkinHint(s)) + '</p>' +
 
       '<section class="m-card m-progress">' +
       '  <div class="m-progress__top"><span>Last 30 days</span><b class="m-num">' + visits + (expected ? '<small> / ' + expected + '</small>' : '') + '</b></div>' +
@@ -689,9 +769,9 @@
       // Pause and family, filled in once loaded (§41.1 Q3).
       '<div id="m-extras"></div>' +
       '<section class="m-card m-list">' +
-      '  <button type="button" class="m-row" data-m="web">Open the full member area<span>›</span></button>' +
-      '  <button type="button" class="m-row" data-m="switch">Switch gym<span>›</span></button>' +
-      '  <button type="button" class="m-row" data-m="privacy">Privacy policy<span>›</span></button>' +
+      '  <button type="button" class="m-row" data-m="web">Open the full member area' + CHEV + '</button>' +
+      '  <button type="button" class="m-row" data-m="switch">Switch gym' + CHEV + '</button>' +
+      '  <button type="button" class="m-row" data-m="privacy">Privacy policy' + CHEV + '</button>' +
       '</section>' +
       '<button type="button" class="m-secondary" data-m="signout">Sign out</button>' +
       '<button type="button" class="m-danger" data-m="delete">Request data deletion</button>';
@@ -701,7 +781,7 @@
   // ---- The member services (CLAUDE.md §41.1 Q3) ------------------------------
 
   function shortDate(ymd) {
-    return new Date(String(ymd).slice(0, 10) + 'T00:00:00').toLocaleDateString('en-ZA', { day: 'numeric', month: 'short' });
+    return new Date(String(ymd).slice(0, 10) + 'T00:00:00').toLocaleDateString(undefined, { day: 'numeric', month: 'short' });
   }
 
   /** Rewards and challenges: whichever of the two this gym offers. */
@@ -812,7 +892,7 @@
 
   root.addEventListener('click', function (e) {
     var tab = e.target.closest('[data-tab]');
-    if (tab) { state.tab = tab.dataset.tab; render(); return; }
+    if (tab) { state.tab = tab.dataset.tab; render({ moveFocus: true }); return; }
 
     var book = e.target.closest('[data-book]');
     if (book) { book.disabled = true; bookOrCancel(book.dataset.book, '/member/book-class', 'Booked.'); return; }
