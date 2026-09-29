@@ -2034,7 +2034,7 @@ ${entries
       <td class="muted">${h(exact(e.created_at))}</td>
       <td><b>${h(e.action)}</b></td>
       <td>${h(e.actor_kind || '')}${e.actor_user_id ? `<br><span class="muted">${h(e.actor_user_id)}</span>` : ''}</td>
-      <td>${h(e.entity || '')}${e.entity_id ? `<br><span class="muted">${h(e.entity_id)}</span>` : ''}</td>
+      <td>${h(e.entity || '')}${e.entity_id || e.detail?.entity_key ? `<br><span class="muted">${h(e.entity_id || e.detail.entity_key)}</span>` : ''}</td>
       <td class="muted">${h(detailText(e.detail))}</td>
     </tr>`
   )

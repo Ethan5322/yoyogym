@@ -15,6 +15,23 @@ occurrence is answered from notes rather than rediscovered.
 
 ---
 
+## 2026-09-29 — Price changes were never audited (found while saving the support WhatsApp)
+
+**Failure.** Saving the Prime WhatsApp line (`+27688529333`, on the user's instruction) left no
+audit entry. `platform_audit_log.entity_id` is a **uuid** column; plan changes pass the plan key
+(`'basic'`) and support-contact changes pass `'support'`, so Postgres refused the whole row. And
+supabase-js **returns** its error instead of throwing, so the `try/catch` in `audit()` never saw it.
+Live evidence: all three plans priced, **zero** `platform.plan.updated` entries — the one record
+D-128 promised ("who changed the price, and when") had never been written.
+
+**Fix** (`platform/deps.js` `audit()`): a value that is not a uuid moves to `detail.entity_key` and
+`entity_id` stays null; a refused insert is now logged with its action. The audit page shows the key
+where the id would be. Two tests. The support change was recorded again with the fix. No SQL.
+
+**Lesson.** A helper that "never throws" must still look at the `{ error }` it is handed back.
+
+---
+
 ## 2026-09-29 — Four new member services (D-165)
 
 **Built one at a time, each end to end:** rules as pure functions (`pauses.js`, `loyalty.js`,

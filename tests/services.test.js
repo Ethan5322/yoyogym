@@ -16,7 +16,7 @@ import { readApplication } from '../platform/application-form.js';
 import { handlePlatform } from '../platform/router.js';
 import { sessionCookie, issueCsrfToken } from '../platform/http.js';
 import { signupPage, gymDetailPage, ownerDashboardPage, settingsPage, plansPage } from '../platform/views.js';
-import { cleanSupport } from '../platform/deps.js';
+import { cleanSupport, audit } from '../platform/deps.js';
 
 const STAFF = { id: 'staff-1', email: 'me@yoyogyms.com', kind: 'platform_staff' };
 const OWNER = { id: 'owner-1', email: 'ann@bos.co', kind: 'gym_owner' };
@@ -344,4 +344,40 @@ test('every control in the main admin panel is at least 44 px tall', () => {
 
 test('ownerFacingPlan still describes the defaults without a price', () => {
   assert.equal(ownerFacingPlan(planByKey('prime')).price, null);
+});
+
+// The audit log's entity_id is a uuid column. A plan key ('basic') or
+// 'support' made Postgres refuse the whole row, silently: no price change and
+// no support-contact change was ever recorded (found live, 2026-09-29).
+test('an audit entry named by a key, not an id, is still recorded', async () => {
+  const rows = [];
+  const db = { from: () => ({ insert: async (row) => {
+    if (row.entity_id !== null && !/^[0-9a-f-]{36}$/i.test(row.entity_id)) return { error: { message: 'invalid input syntax for type uuid' } };
+    rows.push(row);
+    return { error: null };
+  } }) };
+
+  await audit(db, { action: 'platform.plan.updated', entity: 'plan', entity_id: 'basic', detail: { price_cents: 49900 } });
+  await audit(db, { action: 'platform.settings.support_changed', entity: 'settings', entity_id: 'support' });
+  await audit(db, { action: 'gym.suspended', entity: 'gym', entity_id: '0b6a9a52-2a8e-4f7c-9d7e-1c2b3a4d5e6f' });
+
+  assert.equal(rows.length, 3, 'all three recorded');
+  assert.equal(rows[0].entity_id, null);
+  assert.deepEqual(rows[0].detail, { price_cents: 49900, entity_key: 'basic' });
+  assert.deepEqual(rows[1].detail, { entity_key: 'support' });
+  assert.equal(rows[2].entity_id, '0b6a9a52-2a8e-4f7c-9d7e-1c2b3a4d5e6f', 'a real id is kept as it is');
+  assert.equal(rows[2].detail, null);
+});
+
+test('a refused audit entry is reported, not swallowed', async () => {
+  const db = { from: () => ({ insert: async () => ({ error: { message: 'permission denied' } }) }) };
+  const said = [];
+  const original = console.error;
+  console.error = (...args) => said.push(args.join(' '));
+  try {
+    await audit(db, { action: 'gym.suspended', entity: 'gym', entity_id: null });
+  } finally {
+    console.error = original;
+  }
+  assert.ok(said.some((s) => s.includes('gym.suspended') && s.includes('permission denied')));
 });

@@ -94,17 +94,32 @@ export function platformDb() {
   return _db;
 }
 
-/** Append to the platform audit log. Never throws into a request. */
-async function audit(db, entry) {
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/**
+ * Append to the platform audit log. Never throws into a request.
+ *
+ * `entity_id` is a uuid column. A plan is named by its key ('basic') and the
+ * support contacts by 'support', and either one made Postgres refuse the WHOLE
+ * row — so no price change and no support-contact change was ever recorded.
+ * A key that is not an id is kept in `detail.entity_key` instead.
+ *
+ * supabase-js RETURNS its error rather than throwing it, so the catch below
+ * never saw one: the refusal was silent. It is now logged.
+ */
+export async function audit(db, entry) {
+  const id = entry.entity_id ?? null;
+  const isId = id === null || UUID.test(String(id));
   try {
-    await db.from('platform_audit_log').insert({
+    const { error } = await db.from('platform_audit_log').insert({
       actor_user_id: entry.actor_user_id ?? null,
       actor_kind: entry.actor_kind ?? 'platform_staff',
       action: entry.action,
       entity: entry.entity ?? null,
-      entity_id: entry.entity_id ?? null,
-      detail: entry.detail ?? null,
+      entity_id: isId ? id : null,
+      detail: isId ? entry.detail ?? null : { ...(entry.detail || {}), entity_key: String(id) },
     });
+    if (error) console.error('platform audit failed:', entry.action, error.message);
   } catch (err) {
     console.error('platform audit failed:', err?.message);
   }
