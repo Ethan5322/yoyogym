@@ -70,6 +70,22 @@ export function countryByCode(code) {
   return code ? BY_CODE[String(code).toUpperCase()] : undefined;
 }
 
+/**
+ * A country as a person reads it — "South Africa", never "ZA". A code not in
+ * the list is named by the browser or server's own country names; failing
+ * that, it is shown as given.
+ */
+export function countryName(code) {
+  if (!code) return '';
+  const known = countryByCode(code);
+  if (known) return known.name;
+  try {
+    return new Intl.DisplayNames(['en'], { type: 'region' }).of(String(code).toUpperCase()) || String(code);
+  } catch {
+    return String(code);
+  }
+}
+
 /** ISO-4217 currency for a country code, or 'ZAR' when unknown. */
 export function currencyForCountry(code) {
   return countryByCode(code)?.currency || 'ZAR';

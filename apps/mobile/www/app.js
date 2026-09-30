@@ -591,8 +591,14 @@
    * One gym in a list. Its mark starts as a plain letter; paintResults() then
    * gives it the gym's own logo or colour — never a Yoyo badge.
    */
+  /** "South Africa", never "ZA" — the phone's own country names. */
+  function countryLabel(code) {
+    if (!code) return '';
+    try { return new Intl.DisplayNames(['en'], { type: 'region' }).of(String(code).toUpperCase()) || code; } catch (e) { return code; }
+  }
+
   function gymButton(g) {
-    var where = [g.city, g.country].filter(Boolean).map(esc).join(', ');
+    var where = [g.city, countryLabel(g.country)].filter(Boolean).map(esc).join(', ');
     var far = g.distance_km == null ? '' : ' · ' + esc(g.distance_km) + ' km away';
     var initial = esc(String(g.name || g.slug || '?').trim().charAt(0).toUpperCase());
     return (

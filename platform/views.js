@@ -23,7 +23,7 @@ import { REQUIRED_DOCUMENTS, DOCUMENT_LABELS, missingRequiredDocuments, MAX_DOCU
 import { INVITE_TTL_HOURS } from './team.js';
 import { SERVICE_INFO, SERVICE_GROUPS, ALL_SERVICES, CORE_FEATURES, effectiveFeatures } from '../shared/features.js';
 import { planByKey, EVERY_PLAN_INCLUDES } from './plans.js';
-import { COUNTRIES } from '../shared/countries.js';
+import { COUNTRIES, countryName } from '../shared/countries.js';
 import { closeBy } from './owner-closure.js';
 
 /** Escape text for safe interpolation into markup or an attribute. */
@@ -166,7 +166,8 @@ const STYLE = `
   .card { background:var(--card); border:1px solid var(--line); border-radius:16px; padding:20px 22px; margin:16px 0; }
   .card > :first-child { margin-top:0; } .card > :last-child { margin-bottom:0; }
   .tag { display:inline-block; font-size:12px; font-weight:700; padding:3px 10px; border-radius:99px;
-         border:1px solid var(--line); color:var(--muted); white-space:nowrap; text-transform:capitalize; }
+         border:1px solid var(--line); color:var(--muted); white-space:nowrap; }
+  .tag::first-letter { text-transform:uppercase; }
   .tag--good { color:#8ee07a; background:rgba(142,224,122,.1); border-color:rgba(142,224,122,.3); }
   .tag--warn { color:#f5c451; background:rgba(245,196,81,.1); border-color:rgba(245,196,81,.3); }
   .tag--bad  { color:#ff8a7e; background:rgba(255,107,94,.1); border-color:rgba(255,107,94,.32); }
@@ -198,6 +199,9 @@ const STYLE = `
   .row > input[type=checkbox], .row > input[type=radio] { flex:none; }
   body.panel form.card.row { display:flex; flex-wrap:wrap; align-items:flex-end; }
   body.panel form.card.row > label { flex:1 1 220px; }
+  /* The search field is the widest thing in its row, and on a phone it takes
+     the whole row (an inline flex:1 once squeezed it to a sliver). */
+  body.panel form.card.row > label.grow { flex:3 1 260px; }
   body.panel form.card > button, body.panel form.card > .row { justify-self:start; }
 
   /* THE MAIN ADMIN PANEL (CLAUDE.md §40.1 F-40.6): a sidebar grouped by job,
@@ -856,7 +860,7 @@ ${APPLICATION_TABS.map(([key, label, states]) => {
         [['Gym'], ['City'], ['Plan'], ['Status'], ['Submitted']],
         applications.map((a) => [
           `<a href="/platform/applications/${h(a.id)}"><b>${h(a.proposed_gym_name || 'Unnamed')}</b></a>`,
-          `${h(a.city)}${a.country ? ` <span class="muted">${h(a.country)}</span>` : ''}`,
+          `${h(a.city)}${a.country ? ` <span class="muted">${h(countryName(a.country))}</span>` : ''}`,
           a.requested_plan_key ? h(planName(a.requested_plan_key)) : '—',
           statusTag(a.status),
           { html: h(when(a.submitted_at)), cls: 'muted' },
@@ -886,7 +890,7 @@ ${liveSearch({
   action: '/platform/applications',
   regions: ['applications-list', 'applications-tabs'],
   hidden: `<input type="hidden" name="tab" value="${h(tab)}">\n  `,
-  fields: `<label style="flex:1">Search by gym name or city<input type="search" name="q" value="${h(query)}" autocomplete="off"></label>`,
+  fields: `<label class="grow">Search by gym name or city<input type="search" name="q" value="${h(query)}" autocomplete="off"></label>`,
 })}
 <div id="applications-list" data-summary="${h(summary)}">
 ${list}
@@ -977,7 +981,7 @@ ${events
   <dl class="facts">
     <dt>Name</dt><dd><b>${h(a.proposed_gym_name || '—')}</b></dd>
     <dt>Street address</dt><dd>${h(a.gym_address) || '<span class="muted">not given</span>'}</dd>
-    <dt>City</dt><dd>${h(a.city) || '—'}${a.country ? `, ${h(a.country)}` : ''}</dd>
+    <dt>City</dt><dd>${h(a.city) || '—'}${a.country ? `, ${h(countryName(a.country))}` : ''}</dd>
     <dt>Web address</dt><dd class="muted">${a.slug ? `/g/${h(a.slug)}/` : '—'}</dd>
     <dt>What they need</dt><dd>${h(a.owner_needs) || '<span class="muted">nothing added</span>'}</dd>
   </dl>
@@ -1050,7 +1054,7 @@ may submit a new application.${
     user,
     body: `<p><a href="/platform/applications">← All applications</a></p>
 <h1>${h(a.proposed_gym_name || 'Application')}</h1>
-<p class="row">${statusTag(a.status)} <span class="muted">${h(a.city)} ${h(a.country)}</span></p>
+<p class="row">${statusTag(a.status)} <span class="muted">${[a.city, countryName(a.country)].filter(Boolean).map(h).join(', ')}</span></p>
 ${a.decision_reason ? `<div class="card"><b>Reason given:</b> ${h(a.decision_reason)}</div>` : ''}
 ${
   a.status === 'info_requested' && a.review_notes
@@ -1679,7 +1683,7 @@ ${error ? `<p class="err" role="alert">${h(error)}</p>` : ''}
     ${fact('Gym name', a.proposed_gym_name)}
     ${fact('Street address', a.gym_address)}
     ${fact('City', a.city)}
-    ${fact('Country', a.country)}
+    ${fact('Country', countryName(a.country))}
     ${fact('Plan', plan?.label || a.requested_plan_key)}
     ${fact('Roughly how many members', a.estimated_members != null ? String(a.estimated_members) : '')}
     ${fact('Anything else you need', a.owner_needs)}
@@ -1779,7 +1783,7 @@ export function registryPage({ gyms = [], user = null, canSuspend = false, filte
           const unreachable = s && s.reachable === false;
           return [
             `<a href="/platform/registry/${h(g.id)}"><b>${h(g.search_name || g.slug)}</b></a><br><span class="muted">${h(g.city)}${
-              g.country ? `, ${h(g.country)}` : ''
+              g.country ? `, ${h(countryName(g.country))}` : ''
             }</span>`,
             g.plan_key ? h(planName(g.plan_key)) : '—',
             statusTag(g.status),
@@ -1813,7 +1817,7 @@ ${liveSearch({
   regions: ['registry-list'],
   // A search inside "waiting for setup help" stays inside it.
   hidden: filter.setup ? '<input type="hidden" name="setup" value="1">\n  ' : '',
-  fields: `<label style="flex:1">Search by gym name, city or web address<input type="search" name="q" value="${h(filter.query)}" autocomplete="off"></label>
+  fields: `<label class="grow">Search by gym name, city or web address<input type="search" name="q" value="${h(filter.query)}" autocomplete="off"></label>
   <label>Status
     <select name="status">
       <option value="">Any</option>
@@ -2030,7 +2034,7 @@ written to the audit log with your name on it.</p>`
     body: `<p><a href="/platform/registry">← All gyms</a></p>
 <h1>${h(gym.search_name || gym.slug)}</h1>
 <p class="row">${statusTag(gym.status)} <span class="tag">${h(planLabel || 'no plan')}</span>
-<span class="muted">${h(gym.city)}${gym.country ? `, ${h(gym.country)}` : ''}</span></p>
+<span class="muted">${h(gym.city)}${gym.country ? `, ${h(countryName(gym.country))}` : ''}</span></p>
 ${notice ? `<div class="card tone-good">${h(notice)}</div>` : ''}
 
 ${activity}
@@ -2962,7 +2966,7 @@ and it deletes nothing — suspend the gym itself if that is what you mean.</p>
 ${liveSearch({
   action: '/platform/owners',
   regions: ['owners-list'],
-  fields: `<label style="flex:1">Search by name or email<input type="search" name="q" value="${h(filter.query)}" autocomplete="off"></label>`,
+  fields: `<label class="grow">Search by name or email<input type="search" name="q" value="${h(filter.query)}" autocomplete="off"></label>`,
 })}
 <div id="owners-list" data-summary="${h(summary)}">
 ${rows}
@@ -3152,7 +3156,7 @@ export function documentReviewPage({
   <table>
     <tbody>
       <tr><td class="muted">Gym</td><td><b>${h(application.proposed_gym_name)}</b></td></tr>
-      <tr><td class="muted">City</td><td>${h(application.city)} ${h(application.country)}</td></tr>
+      <tr><td class="muted">City</td><td>${[application.city, countryName(application.country)].filter(Boolean).map(h).join(', ')}</td></tr>
       <tr><td class="muted">Document type</td><td>${h(DOCUMENT_LABELS[doc.doc_type] || doc.doc_type)}</td></tr>
       <tr><td class="muted">Applied</td><td>${h(when(application.submitted_at))}</td></tr>
     </tbody>

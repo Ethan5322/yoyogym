@@ -97,6 +97,11 @@
         margin-top: 8px; cursor: pointer;
       }
       button:focus-visible, a:focus-visible { outline: 2px solid var(--y-lime); outline-offset: 2px; }
+      /* The parts nobody draws still wear the brand: selection, caret, scrollbar. */
+      ::selection { background: rgba(191, 246, 66, 0.32); color: #fff; }
+      input, textarea { caret-color: var(--y-lime); }
+      #member input { caret-color: var(--m-accent-text); }
+      html { scrollbar-color: rgba(255, 255, 255, 0.2) transparent; }
       /* A heading focused so a screen reader follows a screen change: no ring,
          it is not something to press. */
       h1[tabindex="-1"]:focus, h2[tabindex="-1"]:focus { outline: none; }

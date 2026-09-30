@@ -947,7 +947,10 @@
     return '<section class="m-card m-contact">' +
       '<h2>' + esc(state.gymName || 'Your gym') + '</h2>' +
       (withNotice ? '<p class="m-contact__row"><span class="m-sub">Notice</span><b class="m-pre">' + esc(b.notice) + '</b></p>' : '') +
-      (b.hours ? '<p class="m-contact__row"><span class="m-sub">Opening hours</span><b>' + esc(b.hours) + '</b></p>' : '') +
+      // "Mon–Fri 05:00–21:00 · Sat–Sun 07:00–18:00": one line per part, so a
+      // phone never breaks a time in two.
+      (b.hours ? '<p class="m-contact__row"><span class="m-sub">Opening hours</span><b>' +
+        b.hours.split(/\s*[·•|]\s*/).filter(Boolean).map(esc).join('<br>') + '</b></p>' : '') +
       (b.address ? '<p class="m-contact__row"><span class="m-sub">Address</span><b>' + esc(b.address) + '</b></p>' : '') +
       (actions ? '<div class="m-actions">' + actions + '</div>' : '') +
       '</section>';

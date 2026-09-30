@@ -95,7 +95,17 @@ export default function MemberPortal() {
     setMember(null);
   }
 
-  if (signedIn === null) return <div className="min-h-[100dvh]" aria-busy="true" />;
+  // While the server says whether this browser is signed in: the gym's own
+  // mark, not a blank page (a slow first load showed nothing at all).
+  if (signedIn === null) {
+    return (
+      <div className="flex min-h-[100dvh] flex-col items-center justify-center gap-4" aria-busy="true">
+        <GymBackdrop />
+        <GymIcon size={56} alt="" />
+        <p className="text-sm text-muted" role="status">One moment…</p>
+      </div>
+    );
+  }
   if (!signedIn) return <MemberLogin onLoggedIn={onLoggedIn} />;
 
   return (

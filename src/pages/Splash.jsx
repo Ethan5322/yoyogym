@@ -41,7 +41,8 @@ export default function Splash() {
         </div>
 
         <p className="mt-10 text-xs text-muted">
-          Secure &amp; private registration · POPIA compliant
+          {/* POPIA is South African law: named only for a gym in South Africa. */}
+          Secure &amp; private registration{b?.country === 'ZA' || !b?.country ? ' · POPIA compliant' : ''}
         </p>
       </div>
 
