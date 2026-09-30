@@ -15,6 +15,19 @@ occurrence is answered from notes rather than rediscovered.
 
 ---
 
+## 2026-09-30 — Polish, then §47: each gym's look, sign-out, the plans' promises
+
+**Polish** (`0562d08`, deployed): clicked through 35 screens with Playwright (from the npx cache, driving
+the installed Chrome) and fixed what they showed — a blank web member page while it checked the session,
+a panel search squeezed to a sliver by an inline `flex:1`, tags in Title Case, raw country codes, hours
+split mid-time, "POPIA compliant" shown for non-South-African gyms.
+
+**§47** (D-172). The user stopped the build mid-way ("do not build … reverse to where it was"), everything
+was reverted, then resumed with one limit: the chatbot steps stay untouched. **Found on screen, not in
+tests:** a logo in the app's search results and gym welcome drew as an EMPTY white tile — `padding: 12%` on
+the tile is a percentage of the ROW it sits in, which left the picture 0 × 0. Measured in the browser
+(`getBoundingClientRect`), then fixed by sizing the picture inside the tile.
+
 ## 2026-09-30 — The critique's ten points; the production audit (§46)
 
 **Design pass** (D-170), deployed to production and the preview as `8991a3f`: four agents in parallel,

@@ -16,12 +16,16 @@ export default function GymBackdrop() {
   const b = useBranding();
   const [failed, setFailed] = useState(false);
   if (!b.poster_url || failed || !SAFE.test(b.poster_url)) return null;
+  // The poster WHOLE, never cropped (CLAUDE.md §47.1 Q3): its own colours,
+  // blurred, fill the screen; the poster itself sits on top, fitted — phone
+  // width on a computer — under a veil dark enough for every word.
   return (
-    <div aria-hidden="true" className="pointer-events-none fixed inset-0 -z-10 overflow-hidden">
+    <div aria-hidden="true" className="pointer-events-none fixed inset-0 -z-10 overflow-hidden bg-bg">
+      <img src={b.poster_url} alt="" className="absolute inset-0 h-full w-full scale-110 object-cover opacity-50 blur-2xl" />
       <img
         src={b.poster_url}
         alt=""
-        className="h-full w-full scale-105 object-cover blur-[2px]"
+        className="absolute inset-y-0 left-1/2 h-full w-full max-w-[520px] -translate-x-1/2 object-contain object-top"
         onError={() => setFailed(true)}
       />
       <div

@@ -152,6 +152,7 @@ export default function AdminShell({ children }) {
             stays, small, as the platform mark (§37.1 Q7). */}
         <div className={`admin-brand ${poster ? 'has-poster' : ''}`}>
           {poster && <img src={poster} alt="" className="admin-brand__poster" />}
+          {poster && <img src={poster} alt="" className="admin-brand__poster-whole" />}
           <div className="admin-brand__body">
             <BrandLogo alt="Yoyo Gyms" className="h-9 w-auto self-start" />
             <span className="admin-brand__name">{gymName}</span>

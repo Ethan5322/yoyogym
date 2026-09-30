@@ -96,7 +96,7 @@ import { startCheckout, completeCheckout } from './checkout.js';
 import { completeActivation, waitText, ACTIVATION_TTL_MINUTES } from './activation.js';
 import { validateUploadRequest, pathBelongsTo, documentRow } from './documents.js';
 import { verifySignature } from './paystack.js';
-import { PLANS, planByKey, EVERY_PLAN_INCLUDES, livePlansForOwners, SUPPORT_BY_PLAN } from './plans.js';
+import { PLANS, planByKey, EVERY_PLAN_INCLUDES, livePlansForOwners, supportFor, PLAN_PROMISES } from './plans.js';
 import {
   requireSession,
   readSession,
@@ -889,7 +889,10 @@ async function handleExtraRoutes(req, res, deps, { url, path, method }) {
       ...view,
       inApp: isStoreApp(req.headers['user-agent']),
       support,
-      planSupport: view.gym ? SUPPORT_BY_PLAN[view.gym.plan_key] || SUPPORT_BY_PLAN.basic : null,
+      // What this gym's plan promises NOW, from its switches (§47.1 Q4).
+      planSupport: view.gym
+        ? supportFor(((await deps.listPlans?.().catch(() => [])) || []).find((p) => p.key === view.gym.plan_key) || { key: view.gym.plan_key })
+        : null,
       user: await viewer(deps, session),
       csrfToken: issueCsrfToken(session.sub),
     }));
@@ -1200,12 +1203,17 @@ async function handleExtraRoutes(req, res, deps, { url, path, method }) {
     // THE PLAN'S SERVICES (§41.1 Q2), from its switches. Core services are
     // always kept on, whatever was sent: a gym without them is not running.
     const features = ALL_SERVICES.filter((f) => CORE_FEATURES.includes(f) || form[`svc_${f}`] === '1');
+    // What a person at Yoyo delivers, and the free trial (CLAUDE.md §47.1 Q4).
+    const promises = PLAN_PROMISES.map(([k]) => k).filter((k) => form[`promise_${k}`] === '1');
+    const trialDays = Number.parseInt(form.trial_days, 10);
 
     await deps.updatePlan(planUpdate[1], {
       price_cents: priceCents,
       max_active_members: Number.isInteger(maxMembers) && maxMembers > 0 ? maxMembers : null,
       is_enabled: form.is_enabled === '1',
       features,
+      promises,
+      trial_days: Number.isInteger(trialDays) && trialDays >= 0 && trialDays <= 365 ? trialDays : 30,
     });
 
     // Audited because this single number decides what every gym on the plan
@@ -1216,7 +1224,7 @@ async function handleExtraRoutes(req, res, deps, { url, path, method }) {
       actor_user_id: session.sub,
       entity: 'plan',
       entity_id: planUpdate[1],
-      detail: { price_cents: priceCents, max_active_members: maxMembers, is_enabled: form.is_enabled === '1', features },
+      detail: { price_cents: priceCents, max_active_members: maxMembers, is_enabled: form.is_enabled === '1', features, promises, trial_days: trialDays },
     });
 
     redirect(res, '/platform/plans');

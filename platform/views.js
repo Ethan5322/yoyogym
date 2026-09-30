@@ -22,7 +22,7 @@ import { BRAND, LOGO_ON_DARK } from '../shared/brand.js';
 import { REQUIRED_DOCUMENTS, DOCUMENT_LABELS, missingRequiredDocuments, MAX_DOCUMENT_BYTES } from './documents.js';
 import { INVITE_TTL_HOURS } from './team.js';
 import { SERVICE_INFO, SERVICE_GROUPS, ALL_SERVICES, CORE_FEATURES, effectiveFeatures } from '../shared/features.js';
-import { planByKey, EVERY_PLAN_INCLUDES } from './plans.js';
+import { planByKey, EVERY_PLAN_INCLUDES, PLAN_PROMISES, promisesOf, trialDaysOf } from './plans.js';
 import { COUNTRIES, countryName } from '../shared/countries.js';
 import { closeBy } from './owner-closure.js';
 
@@ -1128,7 +1128,7 @@ function planChoice(plan, { selected = false, previous = null, recommended = fal
     recommended ? ' <span class="plan-badge">Recommended</span>' : ''
   }</span> <span class="plan-price store-hide">${planPrice(plan)}</span></label>
   <div id="${h(id)}-d">
-    <p class="plan-limit">${h(plan.memberLimit)}</p>
+    <p class="plan-limit">${h(plan.memberLimit)}${trialLine(plan)}</p>
     <ul class="ticks">${previous ? `<li class="plan-lead">Everything in ${h(previous.label)}, plus:</li>` : ''}${adds
       .slice(0, 3)
       .map((f) => `<li>${h(f)}</li>`)
@@ -1239,7 +1239,7 @@ ${applySteps(1)}
 <p class="lede">${
       editing
         ? 'Change anything below. You check it all again before you submit.'
-        : 'Your first 30 days are free, and a person checks every application before a gym goes live.'
+        : 'Every plan starts with a free trial, and a person checks every application before a gym goes live.'
     } <a href="/platform/welcome#owners">What you get with Yoyo Gyms</a></p>
 ${error ? `<p class="err" role="alert">${h(error)}</p>` : ''}
 
@@ -2797,6 +2797,7 @@ ${plans
     p.is_enabled === false ? '' : 'checked'
   }> Offered to new gyms</label>
   ${serviceSwitches(p.features)}
+  ${promiseSwitches(p)}
   <button type="submit" class="ghost">Save ${h(p.label || planName(p.key))}</button>
 </form>`
   )
@@ -2810,6 +2811,30 @@ billing date. Every change here is written to the audit log.</p>`,
 // ---------------------------------------------------------------------------
 // The audit log
 // ---------------------------------------------------------------------------
+
+/** " · 30 days free" — the plan's own trial (CLAUDE.md §47.1 Q4); nothing for none. */
+function trialLine(plan) {
+  const days = Number(plan?.trialDays);
+  return Number.isInteger(days) && days > 0 ? ` · ${h(days)} days free` : '';
+}
+
+/**
+ * What a PERSON at Yoyo delivers on this plan, and its free trial, as switches
+ * (CLAUDE.md §47.1 Q4). Every line an owner reads about support comes from here.
+ */
+function promiseSwitches(plan) {
+  const on = new Set(promisesOf(plan));
+  return `<p class="svc-h">From Yoyo Gyms, by people</p>
+  <div class="svc-grid">
+    ${PLAN_PROMISES.map(
+      ([k, label]) => `<label class="svc"><input type="checkbox" name="promise_${h(k)}" value="1"${on.has(k) ? ' checked' : ''}>
+      <span><b>${h(label)}</b></span></label>`
+    ).join('\n    ')}
+  </div>
+  <label style="max-width:260px">Free trial for new gyms (days)
+    <input name="trial_days" inputmode="numeric" value="${h(trialDaysOf(plan))}">
+  </label>`;
+}
 
 /**
  * A plan's services as switches (CLAUDE.md §41.1 Q2). Core services are shown
@@ -4211,7 +4236,7 @@ export function welcomePage({ plans = [], includes = EVERY_PLAN_INCLUDES } = {})
         p.key === 'medium' ? '<span class="plan-badge">Recommended</span>' : ''
       }</div>
       <p class="plan-price store-hide">${planPrice(p)}</p>
-      <p class="plan-limit">${h(p.memberLimit)}</p>
+      <p class="plan-limit">${h(p.memberLimit)}${trialLine(p)}</p>
       ${p.summary ? `<p class="muted">${h(p.summary)}</p>` : ''}
       ${planDetails(p, i > 0 ? plans[i - 1] : null)}
     </section>`
@@ -4317,8 +4342,8 @@ export function welcomePage({ plans = [], includes = EVERY_PLAN_INCLUDES } = {})
 <section class="pitch" id="owners" aria-labelledby="owners-h">
   <h2 id="owners-h">Bring your gym to Yoyo Gyms</h2>
   <p class="pitch-lede">Your own branded member app, check-in at the door, payments, classes and more, and we set it up
-  with you. Your first 30 days are free.</p>
-  <p class="pitch-points"><span>Verified gyms only</span><span>30 days free</span><span>Setup help included</span><span>Your data kept separate</span></p>
+  with you. Every plan starts with a free trial.</p>
+  <p class="pitch-points"><span>Verified gyms only</span><span>A free trial</span><span>Your own branded app</span><span>Your data kept separate</span></p>
   ${
     includes.length
       ? `<div class="apply-sec">

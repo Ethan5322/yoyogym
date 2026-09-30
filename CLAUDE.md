@@ -2156,3 +2156,60 @@ account" finished within 30 days; website sessions in HttpOnly cookies with CSRF
 in the Keychain / Keystore; the Upstash line on Settings. SQL for the user: the deletion date in each gym
 schema, the closing date on the platform. The app needs a rebuild for the two new plugins and its user
 agent mark.
+
+---
+
+## 47. Before the app build — each gym's look, colour, sign-ups, sign-out and KOM (user instruction, 2026-09-30)
+
+> The user's words, word for word, from two messages. Clarified one question at a time in §47.1, which
+> wins over the text above it. The user stopped the build once the same day ("do not build do not change
+> anything just stop ok, reverse to whre it was" — everything was reverted), then resumed it: *"we going
+> still not toach chatboat steps so finish it and pus"*.
+
+> before you build app let me tell you what is not going well , when each gym put their poster or logo
+> the system must display it as profetional not half not big, also when gym change their colour in
+> setting the colour must apply on app but it still keep yoyo orginal colour, what i did not tested is
+> payment how cann i check the payment link is working perfectly or not, also on COCATE gym when member
+> try to register it says it not started yet check plan , so all plans of yoyo gyms provide has allow
+> member of each gym to regester regardles of their plan, also when we try to log out and and want to
+> sign up it must display new app of yoyo gyms not loged out gym app and colour,in KOM gyms it desplay
+> old stracture either person login or before regester so kom gym must look like the some like another
+> gym and no carrie old ugly mention before sign in
+
+> in addtion check be sure that yoyo gyms plan sercide all writen are really provide by yoyo gyms if its
+> not add togle to new plan that mentioned but not on yoyo gyms setting, be sure that yoyo gyms manage
+> all those service by on and off togle a
+
+### 47.1 Clarifications — answered by the user, one at a time
+
+Checked against the code and the live site on 2026-09-30:
+- **COCATE's sign-ups are closed by its own catalog, not its Yoyo plan:** its two starter plans are off and
+  unpriced (§45.1 Q1). Member registration is core in every Yoyo plan.
+- **The gym colour is a free-text box in Settings:** a typo is dropped silently and the app shows the
+  Yoyo lime. COCATE has no colour saved. The phone app on the user's desktop is also an OLD build.
+- **After signing out, the app stays on the gym's sign-in screen, in the gym's colours.**
+- **Promises on the plans with no switch:** support by plan and the list of what every plan includes.
+- **Q1 — a gym with no priced plan still takes members** (register; "plan chosen at the gym"; staff choose
+  it at the first payment). **NOT BUILT:** it lives in the chatbot registration steps, which the user has
+  said not to touch. COCATE opens sign-ups the moment its owner prices a plan in Catalog.
+- **Q2 — KOM looks like every other gym:** the same screens and layout for every gym; a gym's plans appear
+  once priced; KOM keeps its nine real plans; KOM's old saved welcome message and tagline are cleared.
+- **Q3 — pictures: the whole poster, a neat logo.** The poster is always shown whole, never cropped — its
+  own blurred colours fill the rest of the screen, a dark veil keeps words readable; on a computer it sits
+  in a phone-width panel. The logo always sits in the same rounded light tile, fitted inside with a
+  margin, one size per place, never stretched or cut. In the app and on the website.
+- **Q4 — what a person at Yoyo delivers becomes a switch on each plan:** setup help, help moving your
+  members, email support, same-day replies, a WhatsApp line, a named account manager — and the free-trial
+  length, a number per plan. Facts built into the software (verified listing, the gym's branded app, data
+  kept apart, members' privacy, QR posters, the signed agreement) stay fixed statements.
+- **No question needed:** signing out of the app returns to the Yoyo front page; the gym colour in Settings
+  becomes a colour picker the server checks; payment testing is explained to the user (Paystack test mode).
+
+**Built 2026-09-30** — vault D-172: signing out of the app (and deleting the account) returns to the Yoyo
+front page; the gym colour is a picker with a preview, refused by the server unless it is a real colour;
+KOM's old welcome message and tagline cleared (only those two keys); the poster shown whole — its own
+blurred colours around it, a veil for the words, phone-width on a computer — in the app, on the gym's web
+pages and in the admin sidebar; every logo in one light tile; what a person at Yoyo delivers and the free
+trial are switches on each plan (Plans page), read by the apply, welcome and owner pages and by the trial
+itself; the app's owner screen names only facts no switch can change. Not built: Q1 (chatbot steps).
+SQL for the user: `platform/migrations/2026-09-30-plan-promises.sql`.

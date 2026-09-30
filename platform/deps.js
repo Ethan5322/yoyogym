@@ -348,7 +348,7 @@ export function platformDeps() {
         // its id opens the trial on it.
         provisionGym: async (application, opts) => {
           const { data: plan } = application.requested_plan_key
-            ? await db.from('platform_plans').select('id, key').eq('key', application.requested_plan_key).maybeSingle()
+            ? await db.from('platform_plans').select('*').eq('key', application.requested_plan_key).maybeSingle()
             : { data: null };
           return provisionGym(application, provisioningDeps(db), { ...opts, plan, schemaChecksum: safeChecksum() });
         },
@@ -1819,10 +1819,18 @@ export function platformControlDeps(db = platformDb()) {
     },
 
     updatePlan: async (key, patch) => {
-      const { error } = await db
+      let { error } = await db
         .from('platform_plans')
         .update({ ...patch, updated_at: new Date().toISOString() })
         .eq('key', key);
+      // Before 2026-09-30-plan-promises.sql runs, the promise and trial
+      // columns do not exist: the price and the services still save, and the
+      // caller is told the rest did not.
+      if (error && /promises|trial_days/.test(error.message || '')) {
+        const { promises, trial_days, ...rest } = patch;
+        ({ error } = await db.from('platform_plans').update({ ...rest, updated_at: new Date().toISOString() }).eq('key', key));
+        if (!error) return { partial: true };
+      }
       // Checked: a silently failed price change means every gym on that plan
       // carries on being billed the old amount, or nothing at all.
       if (error) throw new Error(`Could not save that plan: ${error.message}`);

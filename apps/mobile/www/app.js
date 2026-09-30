@@ -956,7 +956,12 @@
   // screen the member came from, the scanner, and Help.
   window.YOYO_APP = Object.freeze({
     go: go,
-    home: function () { show('home'); },
+    // The Yoyo front page, with a line for the person who has just left
+    // their gym (signed out, or asked to delete their account).
+    home: function (notice) {
+      show('home');
+      if (notice) say(notice);
+    },
     resume: function () { render(current()); },
     help: function () { show('help'); },
     scan: scanQr,

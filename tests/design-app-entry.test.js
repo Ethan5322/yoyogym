@@ -171,5 +171,7 @@ test('owners and staff have separate doors, each with its own icon, and the staf
 test('the owner apply screen says what every new gym gets — and nothing it does not', () => {
   const { doc } = boot();
   const promises = [...doc.querySelectorAll('#owner-apply .y-promises li')].map((li) => li.textContent.trim());
-  assert.deepEqual(promises, ['A 30-day free trial', 'A verified listing in the Yoyo Gyms app', 'Setup help for every new gym']);
+  // Only facts built into the software: the trial and the help a person gives
+  // are switched per plan now (CLAUDE.md §47.1 Q4), and the app sells nothing.
+  assert.deepEqual(promises, ['A verified listing in the Yoyo Gyms app', "Your gym's own branded app for members", "Each gym's data kept apart and private"]);
 });

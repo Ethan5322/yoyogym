@@ -268,11 +268,14 @@
         transition: background-color 0.2s ease, color 0.2s ease;
       }
       .g-mark:not(.is-known) { background: rgba(255, 255, 255, 0.08); color: var(--y-text); box-shadow: inset 0 0 0 1px var(--y-line); }
-      .g-mark.has-logo { background: transparent; box-shadow: none; }
-      .g-mark img { display: block; width: 100%; height: 100%; object-fit: contain; }
+      /* A logo in the same rounded light tile as every gym, fitted with a
+         margin (CLAUDE.md §47.1 Q3). */
+      /* The picture is sized INSIDE the tile. A percentage padding is taken
+         from the row around the tile, not the tile, and left the picture no
+         room at all (0 × 0). */
+      .g-mark.has-logo { display: flex; align-items: center; justify-content: center; background: #ffffff; }
+      .g-mark img { display: block; width: 76%; height: 76%; object-fit: contain; }
       .g-mark--hero { width: 72px; height: 72px; border-radius: 22px; font-size: 32px; margin: 0 auto 24px; box-shadow: 0 12px 28px rgba(0, 0, 0, 0.36); }
-      .g-mark--hero.has-logo { width: fit-content; min-width: 72px; }
-      .g-mark--hero.has-logo img { width: auto; max-width: 200px; }
 
       /* What a gym owner gets. */
       .y-feats { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin: 0 0 16px; padding: 0; list-style: none; }
@@ -355,11 +358,16 @@
          (#member.has-poster), blurred and darkened further so the words and
          buttons always win over a busy picture. Only a plain https URL. */
       .g-screen.has-poster::before {
-        content: ''; position: fixed; inset: -24px; z-index: -1; pointer-events: none;
+        content: ''; position: fixed; inset: -40px; z-index: -1; pointer-events: none;
+        background: var(--g-poster) center / cover no-repeat;
+        filter: blur(28px) brightness(0.5);
+      }
+      /* The poster whole, never cropped (CLAUDE.md §47.1 Q3). */
+      .g-screen.has-poster::after {
+        content: ''; position: fixed; inset: 0; z-index: -1; pointer-events: none;
         background:
-          linear-gradient(180deg, rgba(7, 12, 16, 0.74) 0%, rgba(7, 12, 16, 0.86) 55%, rgba(7, 12, 16, 0.96) 100%),
-          var(--g-poster) center / cover no-repeat;
-        filter: blur(8px);
+          linear-gradient(180deg, rgba(7, 12, 16, 0.76) 0%, rgba(7, 12, 16, 0.86) 55%, rgba(7, 12, 16, 0.96) 100%),
+          var(--g-poster) center top / contain no-repeat;
       }
 
       /* The cover: a full-bleed hero at the top that melts into whatever is
@@ -447,7 +455,8 @@
       .m-gymhead { display: inline-flex; align-items: center; gap: 12px; }
       .m-gymicon { display: inline-flex; align-items: center; justify-content: center; flex: none;
                    background: var(--m-accent); color: var(--m-accent-ink); font-weight: 800; line-height: 1; }
-      .m-gymicon--img { width: auto; max-width: 180px; object-fit: contain; background: none; }
+      .m-gymicon--logo { background: #ffffff; }
+      .m-gymicon--logo img { display: block; width: 100%; height: 100%; object-fit: contain; }
       .m-hero__icon { margin-bottom: 16px; }
 
       /* The gym's own home (CLAUDE.md §38.1): cover, icon and name; its notice;
@@ -458,14 +467,19 @@
          softly blurred and darkened so every word stays readable. Painted
          between #member's own ground and its content (isolation + z-index -1). */
       #member { isolation: isolate; }
+      /* The poster WHOLE, never cropped (CLAUDE.md §47.1 Q3): its own colours,
+         blurred, fill the screen (::before); the poster itself sits on top,
+         fitted, under a veil dark enough for every word (::after). */
       #member.has-poster::before {
-        content: ''; position: fixed; inset: -32px; z-index: -1; pointer-events: none;
+        content: ''; position: fixed; inset: -40px; z-index: -1; pointer-events: none;
+        background: var(--m-poster) center / cover no-repeat;
+        filter: blur(28px) brightness(0.5);
+      }
+      #member.has-poster::after {
+        content: ''; position: fixed; inset: 0; z-index: -1; pointer-events: none;
         background:
-          linear-gradient(180deg, rgba(14, 20, 22, 0.80) 0%, rgba(14, 20, 22, 0.88) 55%, rgba(14, 20, 22, 0.96) 100%),
-          var(--m-poster) center / cover no-repeat;
-        /* Atmosphere, not a busy photo (design critique 2026-09-29: 2px under
-           a 70% veil read as clutter). One fixed layer, cheap on old Android. */
-        filter: blur(14px);
+          linear-gradient(180deg, rgba(14, 20, 22, 0.78) 0%, rgba(14, 20, 22, 0.86) 55%, rgba(14, 20, 22, 0.96) 100%),
+          var(--m-poster) center top / contain no-repeat;
       }
       #member.has-poster .m-card { background: rgba(23, 32, 36, 0.86); backdrop-filter: blur(6px); }
       #member.has-poster .m-top { background: linear-gradient(rgba(14, 20, 22, 0.9) 70%, transparent); }
@@ -899,11 +913,13 @@
         <li><svg class="y-i"><use href="#i-bars"/></svg>Daily operations</li>
       </ul>
       <div class="y-bottom">
-        <!-- Only what is true for every new gym today (CLAUDE.md §17, §41.1 Q6). -->
+        <!-- Only facts built into the software, true for every gym whatever its
+             plan's switches (CLAUDE.md §47.1 Q4). No price or trial: the app
+             sells nothing (§46.1 Q4). -->
         <ul class="y-promises">
-          <li><svg class="y-i" aria-hidden="true"><use href="#i-check"/></svg>A 30-day free trial</li>
           <li><svg class="y-i" aria-hidden="true"><use href="#i-check"/></svg>A verified listing in the Yoyo Gyms app</li>
-          <li><svg class="y-i" aria-hidden="true"><use href="#i-check"/></svg>Setup help for every new gym</li>
+          <li><svg class="y-i" aria-hidden="true"><use href="#i-check"/></svg>Your gym's own branded app for members</li>
+          <li><svg class="y-i" aria-hidden="true"><use href="#i-check"/></svg>Each gym's data kept apart and private</li>
         </ul>
         <p class="y-small">You’ll tell us about yourself and your gym, and later upload
           verification documents. A person at Yoyo Gyms reviews every application.</p>

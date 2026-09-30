@@ -40,13 +40,16 @@ const SERVING = new Set(['trialing', 'active', 'past_due']);
  * buy something it cannot look at.
  */
 export function startTrial({ gymId, plan, now = new Date() }) {
+  // The plan's own free trial (CLAUDE.md §47.1 Q4), or TRIAL_DAYS.
+  const n = Number(plan?.trial_days);
+  const days = plan?.trial_days !== null && plan?.trial_days !== undefined && Number.isInteger(n) && n >= 0 ? n : TRIAL_DAYS;
   return {
     gym_id: gymId,
     plan_id: plan?.id ?? null,
     status: 'trialing',
-    trial_ends_at: iso(plus(now, TRIAL_DAYS)),
+    trial_ends_at: iso(plus(now, days)),
     current_period_start: iso(now),
-    current_period_end: iso(plus(now, TRIAL_DAYS)),
+    current_period_end: iso(plus(now, days)),
     grace_ends_at: null,
   };
 }

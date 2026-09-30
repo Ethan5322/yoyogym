@@ -13,15 +13,17 @@ export default function GymIcon({ size = 48, className = '', alt }) {
   const [failed, setFailed] = useState(false);
   const name = b.name || '';
 
+  // A logo sits in the same rounded light tile as every gym, fitted inside
+  // with a margin — never stretched, cut, or wider than the tile (CLAUDE.md
+  // §47.1 Q3). The same size as the letter badge it replaces.
   if (b.logo_url && !failed) {
     return (
-      <img
-        src={b.logo_url}
-        alt={alt ?? name}
-        style={{ height: size, width: 'auto', maxWidth: size * 3 }}
-        className={`object-contain ${className}`}
-        onError={() => setFailed(true)}
-      />
+      <span
+        style={{ width: size, height: size, borderRadius: Math.round(size * 0.28), padding: Math.max(3, Math.round(size * 0.12)) }}
+        className={`inline-flex flex-none items-center justify-center bg-white ${className}`}
+      >
+        <img src={b.logo_url} alt={alt ?? name} className="h-full w-full object-contain" onError={() => setFailed(true)} />
+      </span>
     );
   }
   return (

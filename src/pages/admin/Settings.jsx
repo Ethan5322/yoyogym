@@ -7,7 +7,7 @@ import { apiFetch } from '../../lib/api.js';
 import FaceCapture from '../../chatbot/components/FaceCapture.jsx';
 import IdPhotoUpload from '../../components/IdPhotoUpload.jsx';
 import CredentialActions from '../../components/CredentialActions.jsx';
-import { DEFAULT_ACCENT } from '../../../shared/brand.js';
+import { DEFAULT_ACCENT, accentPair } from '../../../shared/brand.js';
 import { OWNER_SWITCHABLE, SERVICE_INFO } from '../../../shared/features.js';
 import { FACILITIES, MAX_CUSTOM_FACILITIES, MAX_CUSTOM_LENGTH } from '../../../shared/facilities.js';
 import { useAuth } from '../../lib/auth.jsx';
@@ -50,7 +50,7 @@ export default function Settings() {
       <Section title="Gym Profile" saved={savedKey === 'gym_profile'}
         note="Your brand identity. The name and accent colour appear on the splash screen, membership card, emails and PDFs."
         initial={{ ...DEFAULTS.gym_profile, ...(s.gym_profile || {}) }}
-        fields={[['name', 'Gym name'], ['tagline', 'Tagline (shown on the splash screen)'], ['accent_color', 'Brand accent colour (hex — Yoyo lime is #BFF642)'], ['phone', 'Contact phone'], ['email', 'Contact email'], ['website', 'Website (optional)'], ['address', 'Physical address'], ['operating_hours', 'Operating hours'], ['welcome_message', 'Welcome message (splash screen)'], ['notice', 'Notice for members, e.g. “Closed on Friday” — shown on your gym’s home in the app (leave empty for none)']]}
+        fields={[['name', 'Gym name'], ['tagline', 'Tagline (shown on the splash screen)'], ['accent_color', 'Brand colour — used for buttons in your app and on your pages', 'color'], ['phone', 'Contact phone'], ['email', 'Contact email'], ['website', 'Website (optional)'], ['address', 'Physical address'], ['operating_hours', 'Operating hours'], ['welcome_message', 'Welcome message (splash screen)'], ['notice', 'Notice for members, e.g. “Closed on Friday” — shown on your gym’s home in the app (leave empty for none)']]}
         onSave={(v) => save('gym_profile', v, 'gym_profile')} />
 
       <LogoSection profile={{ ...DEFAULTS.gym_profile, ...(s.gym_profile || {}) }} saved={savedKey === 'gym_profile_logo'}
@@ -540,27 +540,79 @@ function Field({ label, children }) {
   );
 }
 
+const HEX_COLOUR = /^#[0-9a-fA-F]{6}$/;
+
+/**
+ * The gym's colour, picked — not typed (CLAUDE.md §47). A free-text box let a
+ * typo ("red", a code without "#") through, and the app quietly showed the
+ * Yoyo lime instead. The picker, the code beside it and a preview of a button
+ * in that colour, with the text colour the app will put on it.
+ */
+function ColourField({ id, value, onChange }) {
+  const valid = HEX_COLOUR.test(value || '');
+  const pair = accentPair(valid ? value : DEFAULT_ACCENT);
+  return (
+    <div>
+      <div className="flex items-center gap-2">
+        <input
+          type="color"
+          aria-label="Pick your colour"
+          className="h-11 w-14 flex-none cursor-pointer rounded-lg border border-white/10 bg-transparent p-1"
+          value={(valid ? value : DEFAULT_ACCENT).toLowerCase()}
+          onChange={(e) => onChange(e.target.value.toUpperCase())}
+        />
+        <input
+          id={id}
+          className="field font-mono uppercase"
+          value={value ?? ''}
+          maxLength={7}
+          placeholder={DEFAULT_ACCENT}
+          aria-invalid={!valid}
+          onChange={(e) => onChange(e.target.value.trim())}
+        />
+        <span
+          className="flex-none rounded-full px-4 py-2 text-xs font-semibold"
+          style={{ background: pair.accent, color: pair.ink }}
+          aria-hidden="true"
+        >
+          Check in
+        </span>
+      </div>
+      {!valid && value ? (
+        <p className="mt-1 text-xs text-error">A colour is # and six digits or letters A–F, for example {DEFAULT_ACCENT}.</p>
+      ) : null}
+    </div>
+  );
+}
+
 function Section({ title, fields, initial, numeric, note, onSave, saved }) {
   const [v, setV] = useState(initial);
   useEffect(() => setV(initial), [JSON.stringify(initial)]); // eslint-disable-line
+  // A colour that is not a colour is never saved (the server refuses it too).
+  const badColour = fields.some(([key, , kind]) => kind === 'color' && v[key] && !HEX_COLOUR.test(v[key]));
   return (
     <div className="card mt-6">
       <h2 className="mb-3 font-display uppercase text-body">{title}</h2>
       {note && <p className="mb-3 text-xs text-muted">{note}</p>}
       <div className="grid gap-3 sm:grid-cols-2">
-        {fields.map(([key, label]) => (
+        {fields.map(([key, label, kind]) => (
           <div key={key}>
-            <label className="mb-1 block text-xs text-muted">{label}</label>
-            <input
-              className="field"
-              value={v[key] ?? ''}
-              onChange={(e) => setV({ ...v, [key]: numeric ? Number(e.target.value) : e.target.value })}
-            />
+            <label htmlFor={`f-${key}`} className="mb-1 block text-xs text-muted">{label}</label>
+            {kind === 'color' ? (
+              <ColourField id={`f-${key}`} value={v[key] ?? ''} onChange={(c) => setV({ ...v, [key]: c })} />
+            ) : (
+              <input
+                id={`f-${key}`}
+                className="field"
+                value={v[key] ?? ''}
+                onChange={(e) => setV({ ...v, [key]: numeric ? Number(e.target.value) : e.target.value })}
+              />
+            )}
           </div>
         ))}
       </div>
       <div className="mt-3 flex items-center gap-3">
-        <button className="btn-primary px-4 py-2 text-sm" onClick={() => onSave(v)}>Save</button>
+        <button className="btn-primary px-4 py-2 text-sm" disabled={badColour} onClick={() => onSave(v)}>Save</button>
         {saved && <span className="text-sm text-success">Saved ✓</span>}
       </div>
     </div>

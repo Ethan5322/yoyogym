@@ -211,7 +211,8 @@ export function ownerFacingPlan(plan, all = null) {
     included: features.map(label).filter(Boolean),
     memberBenefits: features.map((f) => SERVICE_INFO[f]?.forMembers).filter(Boolean),
     nextPlanAdds: nextFeatures.filter((f) => !features.includes(f)).map(label).filter(Boolean),
-    support: SUPPORT_BY_PLAN[plan.key] || SUPPORT_BY_PLAN.basic,
+    support: supportFor(plan),
+    trialDays: trialDaysOf(plan),
     // Only a price someone SET, from platform_plans. Never a number written here.
     price: Number.isInteger(plan.price_cents) && plan.price_cents > 0 ? plan.price_cents : null,
     currency: plan.currency || 'ZAR',
@@ -219,30 +220,65 @@ export function ownerFacingPlan(plan, all = null) {
 }
 
 /**
- * What Yoyo Gyms itself commits to, by plan (CLAUDE.md §41.1 Q6): promises
- * a person on the user's team keeps, so they are stated once, here, and shown
- * the same wherever they appear.
+ * What a PERSON at Yoyo Gyms delivers, switched on or off per plan on the
+ * Plans page (CLAUDE.md §47.1 Q4) — the software's own services are switched
+ * in `features`. Stored in platform_plans.promises; a plan without that
+ * column yet keeps the defaults below, which are what §41.1 Q6 promised.
  */
-export const SUPPORT_BY_PLAN = {
-  basic: ['Setup help for your first week', 'Email support'],
-  medium: ['Setup help for your first week', 'Email support with same-business-day replies'],
-  prime: [
-    'Setup help for your first week',
-    'Email support with same-business-day replies',
-    'A WhatsApp support line',
-    'A named account manager who checks in monthly',
-  ],
+export const PLAN_PROMISES = [
+  ['setup_help', 'Setup help for your first week'],
+  ['member_import_help', 'Help moving your existing members across'],
+  ['email_support', 'Email support'],
+  ['same_day_replies', 'Email support with same-business-day replies'],
+  ['whatsapp_line', 'A WhatsApp support line'],
+  ['account_manager', 'A named account manager who checks in monthly'],
+];
+const PROMISE_KEYS = PLAN_PROMISES.map(([k]) => k);
+const PROMISE_LABEL = Object.fromEntries(PLAN_PROMISES);
+
+export const DEFAULT_PROMISES = {
+  basic: ['setup_help', 'member_import_help', 'email_support'],
+  medium: ['setup_help', 'member_import_help', 'email_support', 'same_day_replies'],
+  prime: ['setup_help', 'member_import_help', 'email_support', 'same_day_replies', 'whatsapp_line', 'account_manager'],
 };
 
-/** True of every plan, today, in the software (§41.1 Q6). */
+/** Days free before a new gym's first charge, unless its plan says otherwise. */
+export const DEFAULT_TRIAL_DAYS = 30;
+
+/** The plan's switched-on promises, as keys, in their fixed order. */
+export function promisesOf(plan) {
+  const list = Array.isArray(plan?.promises) ? plan.promises : DEFAULT_PROMISES[plan?.key] || DEFAULT_PROMISES.basic;
+  return PROMISE_KEYS.filter((k) => list.includes(k));
+}
+
+/** The plan's free trial, in days: its own number, or the default. */
+export function trialDaysOf(plan) {
+  const n = Number(plan?.trial_days);
+  return plan?.trial_days !== null && plan?.trial_days !== undefined && Number.isInteger(n) && n >= 0 ? n : DEFAULT_TRIAL_DAYS;
+}
+
+/**
+ * The promises as an owner reads them. Same-day replies ARE email support, so
+ * the two read as one line.
+ */
+export function supportFor(plan) {
+  const keys = promisesOf(plan);
+  return keys.filter((k) => !(k === 'email_support' && keys.includes('same_day_replies'))).map((k) => PROMISE_LABEL[k]);
+}
+
+/** The defaults, as lines — for anywhere that has no live plan to hand. */
+export const SUPPORT_BY_PLAN = Object.fromEntries(Object.keys(DEFAULT_PROMISES).map((k) => [k, supportFor({ key: k })]));
+
+/**
+ * True of every plan, in the software itself (§41.1 Q6) — facts no switch
+ * could turn off. What a person delivers, and the free trial, are per plan.
+ */
 export const EVERY_PLAN_INCLUDES = [
   ['Verified listing', 'Every gym is checked by a person before members can find it, so yours stands next to real gyms only.'],
   ['Your own branded app', 'Members see your name, logo, colours, cover and poster, in the app and on the web.'],
   ['Your data, kept apart', "Each gym's members live in their own separate area of the database. No other gym can reach them."],
   ["Your members' privacy", "Yoyo staff see counts only, never your members' names, phone numbers or health answers."],
   ['QR posters, ready to print', 'Join, sign-in and check-in codes for your walls and front desk.'],
-  ['Bring your members', 'We help you move your existing members across during setup.'],
-  ['30 days free', 'Nothing is charged during your 30-day trial.'],
   ['A signed agreement', 'Your Gym Owner Agreement and Owner ID as a PDF, for your records.'],
 ];
 

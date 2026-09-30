@@ -338,8 +338,12 @@
    * its colour. Members see their gym here, not the Yoyo Gyms logo.
    */
   function gymIcon(size) {
+    // A logo sits in the same rounded light tile as every other gym's, fitted
+    // inside with a margin — never stretched, cut, or wider than the tile
+    // (CLAUDE.md §47.1 Q3).
     if (state.logo) {
-      return '<img class="m-gymicon m-gymicon--img" src="' + esc(state.logo) + '" alt="" style="height:' + size + 'px">';
+      return '<span class="m-gymicon m-gymicon--logo" style="width:' + size + 'px;height:' + size + 'px;border-radius:' +
+        Math.round(size * 0.28) + 'px;padding:' + Math.max(3, Math.round(size * 0.12)) + 'px"><img src="' + esc(state.logo) + '" alt=""></span>';
     }
     var letter = (String(state.gymName || '').trim().charAt(0) || '·').toUpperCase();
     return '<span class="m-gymicon" aria-hidden="true" style="width:' + size + 'px;height:' + size + 'px;font-size:' +
@@ -443,6 +447,23 @@
     root.classList.add('hidden');
     root.innerHTML = '';
     if (window.YOYO_APP) window.YOYO_APP.resume();
+  }
+
+  /**
+   * Signing out ON PURPOSE — or deleting the account — returns to the Yoyo
+   * Gyms front page, in the Yoyo look, not to the gym's sign-in in the gym's
+   * colours (CLAUDE.md §47). A session that merely expired still asks to sign
+   * in again, here (signOut below).
+   */
+  function signOutToYoyo(notice) {
+    writeToken(null);
+    save('status', null);
+    save('checkedIn', null);
+    state.token = null;
+    state.status = null;
+    setLastRole('');
+    close();
+    if (window.YOYO_APP) window.YOYO_APP.home(notice || '');
   }
 
   function signOut(expired, notice) {
@@ -1087,8 +1108,7 @@
     if (!confirm('Delete your account at ' + gym + '?\n\nYour details, check-ins, bookings, health answers and any face data are erased within 30 days, sooner if ' +
       gym + ' does it first. Payment records the law requires are kept without your name. This cannot be undone.')) return;
     api('/member/request-deletion', { method: 'POST' }).then(function (d) {
-      setLastRole('');
-      signOut(false, d.message || 'Your account will be deleted within 30 days.');
+      signOutToYoyo(d.message || 'Your account will be deleted within 30 days.');
     }, function (e) { toast(e.message, 'bad'); });
   }
 
@@ -1137,7 +1157,7 @@
       case 'web': return go('/g/' + encodeURIComponent(state.slug) + '/member');
       case 'privacy': return go('/platform/privacy');
       case 'switch': setLastRole(''); return close();
-      case 'signout': setLastRole(''); return signOut(false);
+      case 'signout': return signOutToYoyo('You are signed out.');
       case 'delete': return requestDeletion();
       case 'pause': {
         var days = Number((document.getElementById('m-pause-days') || {}).value);

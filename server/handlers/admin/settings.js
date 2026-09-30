@@ -91,6 +91,15 @@ export default async function handler(req, res) {
       const { key, value, category } = await readJsonBody(req);
       if (!key) return badRequest(res, 'key is required.');
       if (key === 'gym_profile') {
+        // The gym's colour is a colour or nothing (CLAUDE.md §47): a typo
+        // stored here made the app fall back to the Yoyo lime without a word.
+        if (value && typeof value.accent_color === 'string') {
+          const colour = value.accent_color.trim();
+          if (colour && !/^#[0-9a-fA-F]{6}$/.test(colour)) {
+            return badRequest(res, 'The brand colour must be # and six digits or letters A–F, for example #BFF642.');
+          }
+          value.accent_color = colour ? colour.toUpperCase() : null;
+        }
         const problem =
           logoProblem(value?.logo_url) ||
           pictureProblem('cover', value?.cover_url, folderPrefix()) ||

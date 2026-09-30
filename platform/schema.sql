@@ -409,6 +409,9 @@ create table if not exists platform.platform_plans (
   created_at         timestamptz not null default now(),
   updated_at         timestamptz not null default now()
 );
+-- What a person at Yoyo delivers, and the free trial, per plan (CLAUDE.md §47.1 Q4).
+alter table platform.platform_plans add column if not exists promises jsonb;
+alter table platform.platform_plans add column if not exists trial_days integer;
 create index if not exists platform_plans_enabled_idx on platform.platform_plans(is_enabled);
 
 -- -----------------------------------------------------------------------------
