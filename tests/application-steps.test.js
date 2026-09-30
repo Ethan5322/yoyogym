@@ -160,7 +160,7 @@ test('with all three uploaded, the owner can go on to check and submit', () => {
   assert.match(page, /<b>3 of 3<\/b>/);
   assert.match(page, /<a class="cta" href="\/platform\/apply\/review">/);
   assert.match(page, /href="\/platform\/apply\/documents\/doc-id_document"/, 'each file can be opened to check it');
-  assert.match(page, /Replace — PDF or photo/);
+  assert.match(page, /Replace the file/);
 });
 
 test('step 3 shows everything written and every document before it is sent', () => {
@@ -193,7 +193,8 @@ const draftDeps = (documents = []) => ({
 test('the documents page needs the signed-in owner, and only a draft', async () => {
   const signedOut = await call({ url: '/platform/apply/documents', who: null }, draftDeps());
   assert.equal(signedOut.statusCode, 302);
-  assert.match(signedOut.headers.location, /\/platform\/login/);
+  // Signed out: the OWNER door, not the staff one (design critique 2026-09-29).
+  assert.equal(signedOut.headers.location, '/owner/login?next=account');
 
   const noDraft = await call({ url: '/platform/apply/documents', who: OTHER }, draftDeps());
   assert.equal(noDraft.headers.location, '/platform/my-gym', 'nothing to fill in: their page says where it stands');

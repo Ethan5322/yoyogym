@@ -74,9 +74,11 @@ test('the front page leads to joining a gym and to listing one', async () => {
   const page = welcomePage();
   assert.match(page, /href="\/platform\/find\?next=join"/, 'members: join a gym');
   assert.match(page, /href="\/platform\/find\?next=signin"/, 'members: sign in');
-  assert.match(page, /href="\/platform\/find\?next=admin"/, 'owners: their gym\'s admin sign-in');
+  assert.match(page, /href="\/platform\/find\?next=admin"/, 'gym staff: their gym\'s admin sign-in');
   assert.match(page, /href="\/platform\/apply"/, 'owners: apply');
-  assert.match(page, /href="\/platform\/login\?as=owner"/, 'owners: application status');
+  // Application status is the same owner door now (design critique 2026-09-29).
+  assert.match(page, /href="\/owner\/login"/, 'owners: the one owner door');
+  assert.doesNotMatch(page, /as=owner/);
   assert.match(page, /href="\/platform\/login"/, 'and Yoyo staff');
   assert.match(page, /landing-hero\.jpg/, 'the user\'s photograph');
   assert.ok(!/<header>/.test(page), 'no header logo above a photo that already carries the logo');
@@ -92,7 +94,7 @@ test('THE GYM FINDER TAKES EACH CHOICE TO THE RIGHT PLACE', async () => {
   assert.match(finderPage({ next: 'signin' }), /var NEXT_PATH = "\/member";/);
   const admin = finderPage({ next: 'admin' });
   assert.match(admin, /var NEXT_PATH = "\/admin\/login";/, 'the gym\'s OWN admin sign-in, never the Yoyo panel');
-  assert.match(admin, /Gym owner login/);
+  assert.match(admin, /Gym staff sign in/, 'the staff door; owners have their own');
   assert.match(finderPage({ next: '"><script>' }), /var NEXT_PATH = "";/, 'anything else is the plain finder');
 });
 
@@ -101,14 +103,12 @@ test('the sign-in page says who it is for, and points members to their gym', () 
   // own version of it from the app's "Check application status".
   const page = loginPage();
   assert.match(page, /Platform administrator login/);
-  assert.match(page, /href="\/platform\/login\?as=owner"/);
+  assert.match(page, /href="\/owner\/login"/, 'owners: the one owner door (design critique 2026-09-29)');
   assert.match(page, /href="\/platform\/find"/);
   assert.match(page, /name="totp"/, 'the 6-digit code stays');
-
-  const owner = loginPage({ audience: 'owner' });
-  assert.match(owner, /Gym owner account/);
-  assert.ok(!/Platform administrator/.test(owner), 'an owner is not told this is the admin login');
-  assert.match(owner, /name="as" value="owner"/, 'and keeps that heading after a wrong password');
+  // No owner version of this page any more: ?as=owner goes to /owner/login
+  // (tests/design-web-public.test.js).
+  assert.doesNotMatch(page, /name="as"/);
 });
 
 test('a gym\'s own page keeps the gym in its Join and Sign-in links', () => {

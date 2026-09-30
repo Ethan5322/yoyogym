@@ -120,6 +120,18 @@ const redirect = (res, location, headers = {}) => {
 /** Generic on purpose: never reveal whether an email exists. */
 
 /**
+ * A signed-out visitor to an OWNER'S page is sent to the owner door, asking
+ * for the account page — not to the staff sign-in, which is where
+ * requireSession sends everyone (design critique 2026-09-29: one owner door).
+ * Only the redirect differs; the session check itself is unchanged.
+ */
+function toOwnerDoor(req, res) {
+  if (readSession(req)) return false;
+  redirect(res, '/owner/login?next=account');
+  return true;
+}
+
+/**
  * Handle a request under /platform/*.
  *
  * @param {object} deps  { findUserByEmail, verifyPassword, verifySecondFactor,
@@ -169,7 +181,6 @@ export async function handlePlatform(req, res, deps) {
         plans,
         terms: agreementTerms(),
         termsApproved: termsApproved(),
-        includes: EVERY_PLAN_INCLUDES,
         ...extra,
       });
 
@@ -252,6 +263,7 @@ export async function handlePlatform(req, res, deps) {
   // Only the signed-in owner's own DRAFT. Anything else — no draft, already
   // sent — goes to their page, which says where the application stands.
   if ((path === 'apply/documents' || path === 'apply/review') && method === 'GET') {
+    if (toOwnerDoor(req, res)) return;
     const session = requireSession(req, res);
     if (!session) return;
     const draft = await deps.findOwnDraft(session.sub);
@@ -343,14 +355,37 @@ export async function handlePlatform(req, res, deps) {
 
   // ---- sign in -----------------------------------------------------------
   if (path === 'login') {
-    // Which heading the page wears, and nothing else: login.js decides who
-    // may enter, whatever the page said.
-    const asOwner = (value) => (value === 'owner' ? 'owner' : 'staff');
-    if (method === 'GET') return html(res, 200, loginPage({ audience: asOwner(url.searchParams.get('as')) }));
+    // ONE OWNER DOOR (design critique 2026-09-29): /owner/login. It tries the
+    // owner's gym first; when no open gym takes the details, it hands the same
+    // form on to here with as=owner, for the Yoyo owner account — an applicant
+    // whose gym is not open yet. `as` still decides nothing about who may
+    // enter (login.js does, identically for every door); it only decides
+    // where a refusal is SHOWN: back on the owner door, with a fixed code the
+    // page turns into its one message. Never the message itself in the URL.
+    const owner = (value) => value === 'owner';
+    const ownerDoor = (query) => `/owner/login${query.toString() ? `?${query}` : ''}`;
+
+    if (method === 'GET') {
+      // Every old "owner account" link — emails, the app's "Check application
+      // status" — lands on the one door, still meaning the ACCOUNT page.
+      if (owner(url.searchParams.get('as'))) {
+        const keep = new URLSearchParams({ next: 'account' });
+        for (const k of ['app', 'back']) if (url.searchParams.get(k)) keep.set(k, url.searchParams.get(k));
+        return redirect(res, ownerDoor(keep));
+      }
+      return html(res, 200, loginPage());
+    }
 
     if (method === 'POST') {
       const form = await readFormBody(req);
-      const again = (error) => loginPage({ error, audience: asOwner(form.as) });
+      // The same refusal as always, drawn where the person signed in.
+      const again = (error, code) => {
+        if (!owner(form.as)) return loginPage({ error });
+        const back = new URLSearchParams({ error: code });
+        if (form.next === 'account') back.set('next', 'account');
+        return { redirectTo: ownerDoor(back) };
+      };
+      const send = (out) => (out?.redirectTo ? redirect(res, out.redirectTo) : html(res, 200, out));
 
       // The decision is platform/login.js, shared with the app door so the two
       // cannot drift apart. Only the representation is decided here.
@@ -362,26 +397,25 @@ export async function handlePlatform(req, res, deps) {
 
       if (outcome === 'needs2fa') {
         await deps.audit({ action: 'platform.login.blocked_no_2fa', actor_user_id: user.id });
-        return html(
-          res,
-          200,
+        return send(
           again(
             'This account requires two-factor authentication before it can be used. ' +
-              'Ask a platform owner to finish setting up your authenticator app.'
+              'Ask a platform owner to finish setting up your authenticator app.',
+            'needs2fa'
           )
         );
       }
 
       if (outcome === 'locked') {
         await deps.audit({ action: 'platform.login.locked', actor_user_id: user.id, detail: { email: form.email } });
-        return html(res, 200, again(LOCKED));
+        return send(again(LOCKED, 'locked'));
       }
 
       if (outcome !== 'ok') {
         // Every failure takes the same path and says the same thing, so the
         // response cannot be used to discover which accounts exist.
         await deps.audit({ action: 'platform.login.failed', detail: { email: form.email } });
-        return html(res, 200, again(INVALID));
+        return send(again(INVALID, 'invalid'));
       }
 
       await deps.audit({ action: 'platform.login', actor_user_id: user.id });
@@ -839,6 +873,7 @@ async function handleExtraRoutes(req, res, deps, { url, path, method }) {
   // their own gym admin panel, which is the existing single-gym system and is
   // untouched (§32). This is the account: application, documents, subscription.
   if (path === 'my-gym' && method === 'GET') {
+    if (toOwnerDoor(req, res)) return true;
     const session = requireSession(req, res);
     if (!session) return true;
 
@@ -877,8 +912,10 @@ async function handleExtraRoutes(req, res, deps, { url, path, method }) {
 
   // ---- how to delete your account — the web route the stores require -------
   // ---- the website's front door (vercel.json sends / here) ------------------
+  // What an owner gets is on this page now, from the live plans (§41), not at
+  // the top of the application form (design critique 2026-09-29).
   if (path === 'welcome' && method === 'GET') {
-    html(res, 200, welcomePage());
+    html(res, 200, welcomePage({ plans: await livePlansForOwners(deps), includes: EVERY_PLAN_INCLUDES }));
     return true;
   }
 

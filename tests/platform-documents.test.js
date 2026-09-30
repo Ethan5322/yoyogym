@@ -78,7 +78,8 @@ test('the owner page requires a session', async () => {
   await handlePlatform(req({ url: '/platform/my-gym' }), r, deps());
 
   assert.equal(r.statusCode, 302);
-  assert.equal(r.headers.location, '/platform/login');
+  // The owner door, asking for the account page (design critique 2026-09-29).
+  assert.equal(r.headers.location, '/owner/login?next=account');
 });
 
 test('an owner sees their own application and can upload to it', async () => {
