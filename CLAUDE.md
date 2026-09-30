@@ -2148,3 +2148,11 @@ Pay buttons and payment links there; applying opens the browser; (3) deletion in
 for owners through Yoyo staff (SQL for a deletion date, given to the user on its own); (4) sessions —
 secure storage in the app, HttpOnly cookies with CSRF protection on the website; (5) the Settings line
 for Upstash, with setup steps for the user.
+
+**Built 2026-09-30** — vault D-171 (`ee7c022`, `e4afb7d`, `0fba260`, `9f43a42`, `b482790` and the Settings
+line): the safe fixes; React Router 7 and Vite 8 (no known vulnerability left in the website's
+dependencies); no payment for the subscription inside the store app; "Delete my account" / "Close my
+account" finished within 30 days; website sessions in HttpOnly cookies with CSRF protection, the app's
+in the Keychain / Keystore; the Upstash line on Settings. SQL for the user: the deletion date in each gym
+schema, the closing date on the platform. The app needs a rebuild for the two new plugins and its user
+agent mark.

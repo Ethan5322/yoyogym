@@ -2173,6 +2173,18 @@ async function handleExtraRoutes(req, res, deps, { url, path, method }) {
         warn: true,
       },
       {
+        // The stricter limits on sign-in, registration and documents count
+        // across every server instance only with a shared store (CLAUDE.md
+        // §46.1 Q2). Without it they still work, per instance.
+        label: 'Shared rate limits',
+        what: 'Sign-in, registration and document limits, counted across every server.',
+        name: 'UPSTASH_REDIS_REST_URL + UPSTASH_REDIS_REST_TOKEN',
+        on: Boolean(env.UPSTASH_REDIS_REST_URL && env.UPSTASH_REDIS_REST_TOKEN),
+        onText: 'set',
+        offText: 'not set — limits count on each server separately',
+        warn: true,
+      },
+      {
         label: 'Deleting old documents',
         what: "A rejected applicant's identity documents are deleted after the retention period.",
         name: 'PLATFORM_RETENTION_LIVE',

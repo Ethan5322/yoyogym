@@ -170,3 +170,23 @@ test('every run of the platform nightly job is recorded', () => {
   const src = readFileSync(new URL('../platform/router.js', import.meta.url), 'utf8');
   assert.match(src, /action: 'platform\.cron\.ran'/);
 });
+
+test('"Shared rate limits" says whether Upstash is connected — names only, never a value (CLAUDE.md §46.1 Q2)', async () => {
+  const saved = [process.env.UPSTASH_REDIS_REST_URL, process.env.UPSTASH_REDIS_REST_TOKEN];
+  try {
+    delete process.env.UPSTASH_REDIS_REST_URL;
+    delete process.env.UPSTASH_REDIS_REST_TOKEN;
+    const off = await settingsPage(null);
+    assert.match(off, /Shared rate limits/);
+    assert.match(off, /not set — limits count on each server separately/);
+
+    process.env.UPSTASH_REDIS_REST_URL = 'https://example-upstash.invalid';
+    process.env.UPSTASH_REDIS_REST_TOKEN = 'secret-token-value';
+    const on = await settingsPage(null);
+    assert.doesNotMatch(on, /not set — limits count on each server separately/);
+    assert.doesNotMatch(on, /secret-token-value|example-upstash/, 'the value is never shown');
+  } finally {
+    if (saved[0] === undefined) delete process.env.UPSTASH_REDIS_REST_URL; else process.env.UPSTASH_REDIS_REST_URL = saved[0];
+    if (saved[1] === undefined) delete process.env.UPSTASH_REDIS_REST_TOKEN; else process.env.UPSTASH_REDIS_REST_TOKEN = saved[1];
+  }
+});

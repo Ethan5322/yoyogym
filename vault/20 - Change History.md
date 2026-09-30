@@ -15,6 +15,26 @@ occurrence is answered from notes rather than rediscovered.
 
 ---
 
+## 2026-09-30 — The critique's ten points; the production audit (§46)
+
+**Design pass** (D-170), deployed to production and the preview as `8991a3f`: four agents in parallel,
+one git worktree each, split by file. **What went wrong, for next time:** the Agent tool's own
+`isolation: worktree` refused this OneDrive repo (and based its worktrees on `origin/main`), so the
+worktrees were made by hand under `.claude/worktrees/`, where `node_modules` resolves from the parent.
+All four agents then hit the account's session limit at once, mid-edit; one kept showing "running" for 12
+hours with no file changing (check the files' times, not the status). The user: *"multiple agents consume
+to much token, only proced with one agent"* — from then on one at a time, each resumed from its own
+transcript or finished by the lead. The four branches merged without a conflict.
+
+**Audit** (D-171), before the store build. Found and fixed: the database's own error text reached the
+browser from 55 handlers; four staff lookups put typed text inside PostgREST filter strings; no request
+size limit; no general rate limit; no deadline on database calls; an erasure that deleted a member's
+PAYMENTS with them and left their email in the message log; the owner sign-in route skipped the size
+and rate guard. Built on the user's answers: cookie / Keychain sessions, "Delete my account" within 30
+days, no payment for the subscription inside the app, React Router 7 + Vite 8. **Lesson:** the Bash
+tool collapses `\` inside heredocs, so a Python script written that way loses regex backslashes —
+write such scripts with the Write tool, or edit regex-heavy lines with Edit.
+
 ## 2026-09-29 — Design critique, then the harden pass; the first Android test build
 
 **Critique** (`/impeccable critique`, two isolated reviews: design director + automated detector): app
