@@ -2081,4 +2081,70 @@ that need the user's keys and decisions are listed in Q2–Q5.
 
 ### 46.1 Clarifications — answered by the user, one at a time
 
-(Filled in as the audit finds what needs the user's decision.)
+Checked against the code on 2026-09-30:
+- **Already sound:** no secret in the code (`.env` is git-ignored; only `.env.example` is tracked); every
+  query goes through the supabase-js query builder, which parameterises values — no SQL is built from
+  input; each gym's data is in its own schema, a member's own endpoints use the id in their token, and
+  the owner pages check ownership (F-3); Yoyo staff sessions are HttpOnly cookies; sign-in,
+  registration and documents have their own rate limits; the app handles offline and failed calls
+  with plain messages. **No AI features** exist (face check-in is matching, not generated content).
+  **No social login** exists — §44 is on hold, and §44.1 Q1 already requires Sign in with Apple
+  with Google on the iPhone.
+- **Fixed (`ee7c022`), no decision needed:** F-46.1 — 55 handlers sent the database's own error text
+  to the browser (table and column names, sometimes the clashing value); now a plain sentence, the
+  cause logged with values masked. F-46.2 — four gym admin lookups put typed text inside a PostgREST
+  filter string; now cleaned first. F-46.3 — no limit on request size; now 1 MB (4 MB for face
+  photos, logos and member imports). F-46.4 — no general rate limit; now 300 requests a minute per
+  address per server instance. F-46.5 — no deadline on database calls; now 15 seconds. F-46.6 —
+  dependency security updates that break nothing.
+- **Needs the user's decision:** F-46.7 — session tokens: the app keeps the member's sign-in in its
+  web storage, and the gym admin panel and member web pages keep theirs in the browser's
+  localStorage (readable by any script that runs on the page). F-46.8 — the stricter rate limits
+  are shared between server instances only with Upstash (`UPSTASH_REDIS_REST_URL/TOKEN`). F-46.9 —
+  account deletion: a member can only REQUEST deletion (the gym erases by hand) and an owner can
+  only ask to close their account. F-46.10 — owners pay the Yoyo subscription with Paystack on the
+  website, and the owner area opens inside the app. F-46.11 — two upgrades are major versions: Vite
+  8 (a build tool; its issues touch only the development server) and React Router 7 (a moderate
+  redirect issue; our redirects are already checked).
+- **Q1 — sessions (F-46.7): both, fully.** In the app, the member's sign-in moves to the phone's secure
+  storage (iPhone Keychain, Android Keystore) through one new app plugin; the app is rebuilt. On the
+  website, the gym admin panel and the member pages keep their sessions in HttpOnly, Secure cookies,
+  with CSRF protection on every change. A deliberate change to the protected sign-in (§32); everyone
+  signs in once more.
+- **Q2 — shared rate limits (F-46.8): yes.** The user creates a free Upstash Redis database and sets
+  `UPSTASH_REDIS_REST_URL` and `UPSTASH_REDIS_REST_TOKEN` in Vercel; the limits switch to it by
+  themselves. The platform Settings page shows whether they are set.
+- **Store rules, checked 2026-09-30 from the official pages** (Apple: Offering account deletion in your
+  app; App Store Review Guidelines 3.1.1, 3.1.1(a), 3.1.3(a)–(f), 5.1.1(v). Google Play: Understanding
+  account deletion requirements (answer 13327111); Payments policy (answer 9858738)):
+  **Deletion** — Apple: an app that supports account creation must let people START deletion inside
+  the app; a manual process is acceptable if the person is told how long it takes and is confirmed
+  when it is done; no phone, email or support steps outside highly regulated industries; all personal
+  data is deleted except what the law requires, and people are told. Google: an in-app path AND a web
+  link; data kept for security, fraud or legal reasons is allowed if the privacy policy says so.
+  **Payments** — a gym membership is a physical service: Apple 3.1.3(e) forbids in-app purchase for
+  it, and Google names "gym memberships" as exempt from Play Billing. The OWNER's Yoyo subscription
+  is software: Google requires Play Billing for "cloud software and services" and forbids leading
+  users to any other payment method "in-app promotions, webviews, buttons, links, messaging … sign-up
+  flows"; Apple forbids buttons or links to other purchase methods in the app outside the US storefront
+  (3.1.1(a)), and 3.1.3(c) (enterprise) and 3.1.3(f) (free companion to a paid web tool) allow no
+  purchasing or calls to action inside the app.
+- **Q3 — account deletion (F-46.9): in the app, finished within 30 days.** A member taps "Delete my
+  account" in the app (and on the web link) and is told it is finished within 30 days; the gym sees the
+  request in its admin panel and can erase at once; if nothing has happened by day 30, the nightly job
+  erases it. Records the law requires (payments) are kept without the name, as the privacy policy says.
+  A confirmation email when it is done, where there is an email. Owners the same, handled by Yoyo staff.
+- **Q4 — payments in the app (F-46.10): none.** Inside the store app, owners never see prices, Pay
+  buttons or payment links for the Yoyo subscription — only their status (trial, active, suspended).
+  Paying stays on the website, in the phone's browser; applying to join opens the website outside the
+  app. Members are not affected: they pay their gym in person (a physical service, allowed by both).
+- **Q5 — major upgrades (F-46.11): both now.** React Router 7 and Vite 8, then every page tested and the
+  site rebuilt.
+
+All five answered 2026-09-30. **The build, one part at a time, each tested and committed:** (1) the two
+upgrades; (2) no payment in the app — the app's web view identifies itself, and owner pages hide prices,
+Pay buttons and payment links there; applying opens the browser; (3) deletion in the app within 30 days
+— the member's own button, the gym's list, the nightly job at day 30, the confirmation email, the same
+for owners through Yoyo staff (SQL for a deletion date, given to the user on its own); (4) sessions —
+secure storage in the app, HttpOnly cookies with CSRF protection on the website; (5) the Settings line
+for Upstash, with setup steps for the user.

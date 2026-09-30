@@ -23,6 +23,12 @@ const initials = (name) =>
 
 const plural = (n, one, many) => `${n} ${n === 1 ? one : many}`;
 
+/** 30 days after a member asked to delete their account (CLAUDE.md §46.1 Q3). */
+function eraseDate(requestedAt) {
+  const t = new Date(requestedAt || Date.now()).getTime() + 30 * 24 * 60 * 60 * 1000;
+  return new Date(t).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
+}
+
 export default function Dashboard() {
   const { user } = useAuth();
   const [d, setD] = useState(null);
@@ -52,7 +58,8 @@ export default function Dashboard() {
         ...(d.deletion_requests || []).map((m) => ({
           tone: 'bad',
           to: `/admin/members/${m.id}`,
-          text: `${m.full_name} asked for their data to be deleted`,
+          // Erased by the morning job 30 days after asking (CLAUDE.md §46.1 Q3).
+          text: `${m.full_name} asked to delete their account — erased automatically on ${eraseDate(m.data_deletion_requested_at || m.updated_at)}`,
         })),
         d.failed_payments > 0 && {
           tone: 'bad',

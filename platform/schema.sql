@@ -320,6 +320,8 @@ create table if not exists platform.platform_settings (
 -- An owner asking to close their account (store requirement). Recorded, not acted on:
 -- closing an account closes a gym, and a person must look at that.
 alter table platform.platform_users add column if not exists closure_requested_at timestamptz;
+-- Set when the account is closed: by Yoyo staff, or by the nightly job on day 30 (CLAUDE.md §46.1 Q3).
+alter table platform.platform_users add column if not exists closure_completed_at timestamptz;
 
 
 -- -----------------------------------------------------------------------------

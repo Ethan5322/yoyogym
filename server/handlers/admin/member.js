@@ -6,8 +6,7 @@ import { allowMethods, readJsonBody, ok, badRequest, serverError, failed } from 
 import { requireRole } from '../../lib/auth.js';
 import { loadCompliance, expectedVisits, adherence } from '../../lib/compliance.js';
 import { recordAudit } from '../../lib/audit.js';
-import { unindexMember } from '../../lib/member-index.js';
-import { currentGym } from '../../lib/tenancy.js';
+import { eraseMember } from '../../lib/member-erasure.js';
 
 export default async function handler(req, res) {
   if (!allowMethods(req, res, ['GET', 'PATCH', 'DELETE'])) return;
@@ -24,41 +23,26 @@ export default async function handler(req, res) {
 
   try {
     if (req.method === 'DELETE') {
-      // Read BEFORE deleting: the number and phone are what the platform's
-      // routing index is keyed on, and they are gone once the row is.
-      const { data: doomed } = await supabase
-        .from('members')
-        .select('membership_number, phone')
-        .eq('id', id)
-        .maybeSingle();
+      // One erasure for this button and for the day-30 job (CLAUDE.md §46.1
+      // Q3; server/lib/member-erasure.js): payments stay without the person,
+      // their messages and the message log go, and so does the platform's
+      // "which gym did I join?" pointer. A member who asked is emailed.
+      const result = await eraseMember(supabase, id, { confirm: 'if-asked' });
+      if (!result.ok && !result.notFound) return failed(res, result.error);
+      const indexCleared = result.notFound ? true : result.index_cleared;
 
-      // POPIA erasure: cascading FKs remove memberships, parq, checkins, etc.
-      const { error } = await supabase.from('members').delete().eq('id', id);
-      if (error) return failed(res, error);
-
-      // ...and the copy OUTSIDE this gym's schema. The platform's "which gym
-      // did I join?" index kept a pointer to the person after their data was
-      // erased, which made the erasure incomplete. Reported, not hidden: the
-      // owner is carrying out a legal request and must know if part of it
-      // failed.
-      const unfiled = doomed
-        ? await unindexMember({
-            membershipNumber: doomed.membership_number,
-            phone: doomed.phone,
-            gymSlug: currentGym()?.gym?.slug ?? null,
-          })
-        : { ok: true };
-
+      // Reported, not hidden: the owner is carrying out a legal request and
+      // must know if part of it failed.
       await recordAudit(supabase, admin, {
         action: 'member.delete',
         entity: 'member',
         entity_id: id,
-        detail: unfiled.ok ? null : `platform index not cleared: ${unfiled.reason}`,
+        detail: indexCleared ? null : `platform index not cleared: ${result.reason}`,
       });
       return ok(res, {
         deleted: true,
-        index_cleared: unfiled.ok,
-        ...(unfiled.ok ? {} : { warning: 'The member was deleted, but their gym lookup entry could not be removed. Please tell Yoyo Gyms support.' }),
+        index_cleared: indexCleared,
+        ...(indexCleared ? {} : { warning: 'The member was deleted, but their gym lookup entry could not be removed. Please tell Yoyo Gyms support.' }),
       });
     }
 

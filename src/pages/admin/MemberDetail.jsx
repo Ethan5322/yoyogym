@@ -260,7 +260,9 @@ export default function MemberDetail() {
 
       {m.data_deletion_requested && (
         <p className="mt-4 rounded-lg bg-error/10 px-3 py-2 text-sm text-error">
-          ⚠ This member has requested data deletion (POPIA).
+          ⚠ This member asked to delete their account
+          {m.data_deletion_requested_at ? ` on ${new Date(m.data_deletion_requested_at).toLocaleDateString('en-GB')}` : ''}.
+          It is erased automatically 30 days after they asked, unless you erase it sooner below.
         </p>
       )}
       {user?.role === 'owner' && (

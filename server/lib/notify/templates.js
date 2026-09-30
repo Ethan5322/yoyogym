@@ -296,6 +296,18 @@ const rawMemberTemplates = {
        ${signoff(gymName)}`
     ),
   }),
+
+  // "Your account has been deleted" (CLAUDE.md §46.1 Q3). Sent after the
+  // erasure, to the address the member had.
+  account_deleted: ({ gymName, member }) => ({
+    subject: `${gymName} — your account has been deleted`,
+    html: shell(
+      gymName,
+      `<p>Hi ${member.full_name?.split(' ')[0] || 'there'},</p>
+       <p>As you asked, your ${gymName} account has been deleted: your details, check-ins, bookings, health answers and any face data.</p>
+       <p style="color:#9A9590;font-size:13px">Payment records the law requires the gym to keep are kept, without your name. If you did not ask for this, please contact ${gymName}.</p>`
+    ),
+  }),
 };
 
 /** Each member template, with the gym's colour filled in: pass `accent`. */

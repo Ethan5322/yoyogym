@@ -812,7 +812,8 @@ function OutstandingNotice({ amount }) {
 function DeletionRequest() {
   const [msg, setMsg] = useState('');
   async function request() {
-    if (!confirm('Request deletion of your personal data (POPIA)? Our team will action this.')) return;
+    // CLAUDE.md §46.1 Q3: finished within 30 days, sooner if the gym does it first.
+    if (!confirm('Delete your account? Your details, check-ins, bookings, health answers and any face data are erased within 30 days, sooner if your gym does it first. Payment records the law requires are kept without your name. This cannot be undone.')) return;
     try {
       const r = await memberFetch('/member/request-deletion', { method: 'POST' });
       setMsg(r.message);
@@ -826,7 +827,7 @@ function DeletionRequest() {
         <p className="text-xs text-muted">{msg}</p>
       ) : (
         <button onClick={request} className="text-xs text-muted underline hover:text-error">
-          Request data deletion (POPIA)
+          Delete my account
         </button>
       )}
     </div>

@@ -19,6 +19,8 @@ const OPTIONAL_COLUMNS = {
     // Without it a member's "Request data deletion" fails outright — a
     // store requirement and a POPIA right.
     data_deletion_requested: '2026-09-24-member-deletion-request.sql',
+    // Without it the day-30 erasure cannot tell when a member asked (§46.1 Q3).
+    data_deletion_requested_at: '2026-09-30-member-deletion-date.sql',
     // Without it the gym cannot sign a member out everywhere ("lost phone").
     session_version: '2026-09-28-stay-signed-in.sql',
   },

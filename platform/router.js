@@ -1427,6 +1427,31 @@ async function handleExtraRoutes(req, res, deps, { url, path, method }) {
     return true;
   }
 
+  // "Close now" (CLAUDE.md §46.1 Q3): what the nightly job does on day 30,
+  // done sooner by Yoyo staff — gyms suspended, sign-in off, details erased.
+  const ownerClose = /^owners\/([A-Za-z0-9-]+)\/close$/.exec(path);
+  if (ownerClose && method === 'POST') {
+    const form = await readFormBody(req);
+    const session = requireSession(req, res, { csrfToken: form.csrf });
+    if (!session) return true;
+    if (!(await may(deps, session, 'platform.manage'))) {
+      forbid(res, 'You do not have permission to manage gym owners.');
+      return true;
+    }
+    const result = await deps.closeOwnerAccount(ownerClose[1]);
+    if (result.ok && !result.already) {
+      await deps.audit({
+        action: 'platform.owner.closed',
+        actor_user_id: session.sub,
+        entity: 'platform_user',
+        entity_id: ownerClose[1],
+        detail: { gyms_suspended: result.gymsSuspended, emailed: result.emailed, by: 'staff' },
+      });
+    }
+    redirect(res, '/platform/owners');
+    return true;
+  }
+
   const ownerToggle = /^owners\/([A-Za-z0-9-]+)\/(deactivate|reactivate)$/.exec(path);
   if (ownerToggle && method === 'POST') {
     const form = await readFormBody(req);
@@ -2378,6 +2403,25 @@ async function handleExtraRoutes(req, res, deps, { url, path, method }) {
       retention = { ok: false, error: err?.message || 'Retention run failed.' };
     }
 
+    // Accounts whose owner asked to close them 30 days ago (CLAUDE.md §46.1
+    // Q3). The stores' promise — "finished within 30 days" — holds even when
+    // nobody at Yoyo acts on it. A failure must not lose the results above.
+    let closures = null;
+    try {
+      closures = (await deps.closeDueAccounts?.({ now: new Date() })) ?? null;
+      for (const id of closures?.closed || []) {
+        await deps.audit({
+          action: 'platform.owner.closed',
+          actor_kind: 'system',
+          entity: 'platform_user',
+          entity_id: id,
+          detail: { by: 'nightly job', after_days: 30 },
+        });
+      }
+    } catch (err) {
+      closures = { ok: false, error: err?.message || 'Closing accounts failed.' };
+    }
+
     // Recorded — counts only — so the Settings page can say when it last ran
     // instead of only that its secret exists (§45).
     await deps.audit({
@@ -2388,11 +2432,13 @@ async function handleExtraRoutes(req, res, deps, { url, path, method }) {
         retention_live: process.env.PLATFORM_RETENTION_LIVE === 'true',
         drift_ok: drift?.ok !== false,
         retention_ok: retention?.ok !== false,
+        closures_ok: closures?.ok !== false,
+        accounts_closed: closures?.closed?.length ?? 0,
       },
     });
 
     res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
-    res.end(JSON.stringify({ ...report, drift, retention }));
+    res.end(JSON.stringify({ ...report, drift, retention, closures }));
     return true;
   }
 

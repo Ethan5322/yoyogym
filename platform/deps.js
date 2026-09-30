@@ -26,6 +26,7 @@ import {
   decisionEmail,
   staffInviteEmail,
 } from './email.js';
+import { closeOwnerAccount, closeDueAccounts } from './owner-closure.js';
 import { purgeExpiredDocuments } from './retention.js';
 import { directoryRow } from './member-directory.js';
 import { fileFacts } from './forensics.js';
@@ -1864,7 +1865,9 @@ export function platformControlDeps(db = platformDb()) {
       };
 
       const BASE = 'id, email, full_name, is_active, created_at';
-      let result = await build(`${BASE}, closure_requested_at`);
+      let result = await build(`${BASE}, closure_requested_at, closure_completed_at`);
+      // Before 2026-09-30-account-closure-done.sql runs, the closing date is missing.
+      if (result.error) result = await build(`${BASE}, closure_requested_at`);
       // Before 2026-09-24-account-closure.sql runs the column does not exist.
       // Without this retry the query fails and the owner list comes back
       // EMPTY — a list that looks complete and says there are no owners.
@@ -1887,6 +1890,13 @@ export function platformControlDeps(db = platformDb()) {
       withCounts.total = owners.total;
       return withCounts;
     },
+
+    /**
+     * Close an owner's account now — Yoyo staff's "Close now", and the nightly
+     * job on day 30 (CLAUDE.md §46.1 Q3; platform/owner-closure.js).
+     */
+    closeOwnerAccount: (userId) => closeOwnerAccount(db, userId, { sendEmail }),
+    closeDueAccounts: (opts = {}) => closeDueAccounts(db, { sendEmail, ...opts }),
 
     /** Owners who have asked to close their account and are still active. */
     countClosureRequests: async () => {

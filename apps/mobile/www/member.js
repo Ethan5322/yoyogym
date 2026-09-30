@@ -384,13 +384,13 @@
     if (window.YOYO_APP) window.YOYO_APP.resume();
   }
 
-  function signOut(expired) {
+  function signOut(expired, notice) {
     save('token', null);
     save('status', null);
     save('checkedIn', null);
     state.token = null;
     state.status = null;
-    renderSignIn(expired ? 'Please sign in again.' : '');
+    renderSignIn(notice || (expired ? 'Please sign in again.' : ''));
   }
 
   // -------------------------------------------------------------------------
@@ -907,7 +907,7 @@
       '  <button type="button" class="m-row" data-m="privacy">Privacy policy' + CHEV + '</button>' +
       '</section>' +
       '<button type="button" class="m-secondary" data-m="signout">Sign out</button>' +
-      '<button type="button" class="m-danger" data-m="delete">Request data deletion</button>';
+      '<button type="button" class="m-danger" data-m="delete">Delete my account</button>';
     loadExtras();
   }
 
@@ -1012,10 +1012,19 @@
     return '<div class="m-row is-static"><span class="m-sub">' + esc(label) + '</span><b>' + esc(value || '—') + '</b></div>';
   }
 
+  /**
+   * "Delete my account" (CLAUDE.md §46.1 Q3; both stores require it inside the
+   * app). Finished within 30 days — sooner if the gym does it first. The
+   * member is signed out on this phone, and told the date on the sign-in
+   * screen, where they now are.
+   */
   function requestDeletion() {
-    if (!confirm('Ask ' + (state.gymName || 'your gym') + ' to delete your personal data? They will be told straight away. This cannot be undone once they act on it.')) return;
+    var gym = state.gymName || 'your gym';
+    if (!confirm('Delete your account at ' + gym + '?\n\nYour details, check-ins, bookings, health answers and any face data are erased within 30 days, sooner if ' +
+      gym + ' does it first. Payment records the law requires are kept without your name. This cannot be undone.')) return;
     api('/member/request-deletion', { method: 'POST' }).then(function (d) {
-      toast(d.message || 'Your request has been sent to your gym.');
+      setLastRole('');
+      signOut(false, d.message || 'Your account will be deleted within 30 days.');
     }, function (e) { toast(e.message, 'bad'); });
   }
 

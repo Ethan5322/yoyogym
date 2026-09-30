@@ -200,6 +200,23 @@ export async function notifyMemberEmail(supabase, member, templateKey, vars = {}
   }
 }
 
+/**
+ * "Your account has been deleted" (CLAUDE.md §46.1 Q3). Sent straight to the
+ * address and NOT logged: the log keeps the recipient, and this person has
+ * just been erased. True when the email went.
+ */
+export async function emailErasureConfirmation(supabase, { email, fullName }) {
+  try {
+    const cfg = await loadConfig(supabase);
+    const { subject, html } = memberTemplates.account_deleted({ gymName: cfg.gymName, accent: cfg.accent, member: { full_name: fullName } });
+    const result = await sendEmail({ to: email, toName: fullName, subject, html, sender: cfg.sender });
+    return Boolean(result?.ok);
+  } catch (err) {
+    console.error('erasure email error:', err.message);
+    return false;
+  }
+}
+
 /** Low-level: send an owner alert by template key + text (used by cron jobs). */
 export async function notifyOwner(supabase, templateKey, text, memberId = null) {
   try {

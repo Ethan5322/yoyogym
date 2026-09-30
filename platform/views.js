@@ -24,6 +24,7 @@ import { INVITE_TTL_HOURS } from './team.js';
 import { SERVICE_INFO, SERVICE_GROUPS, ALL_SERVICES, CORE_FEATURES, effectiveFeatures } from '../shared/features.js';
 import { planByKey, EVERY_PLAN_INCLUDES } from './plans.js';
 import { COUNTRIES } from '../shared/countries.js';
+import { closeBy } from './owner-closure.js';
 
 /** Escape text for safe interpolation into markup or an attribute. */
 export function escapeHtml(value) {
@@ -2652,17 +2653,20 @@ ${documents
   // person who wants to leave should not have to find an email address.
   // Recorded, not instant — closing an account closes a gym with members in
   // it, and the page says exactly what happens next.
+  // Finished within 30 days (CLAUDE.md §46.1 Q3; both stores require it).
   const closure = closureRequestedAt
     ? `<div class="card">
   <h2>Closing your account</h2>
-  <p>You asked to close your account on ${h(when(closureRequestedAt))}. We will contact you to confirm
-  before anything is switched off.</p>
+  <p>You asked to close your account on ${h(when(closureRequestedAt))}. It will be closed by
+  <b>${h(until(closeBy(closureRequestedAt).toISOString()))}</b>, sooner if Yoyo Gyms does it first, and
+  you will get an email when it is done.</p>
 </div>`
     : `<details class="card">
   <summary>Close my account</summary>
-  <p>We will contact you to confirm. Then your gym is closed to members, your sign-in is switched
-  off, and your gym's data is kept for 90 days in case you change your mind, then deleted once we have
-  confirmed it with you. <b>Download anything you want to keep first.</b></p>
+  <p>Your account is closed within 30 days, and you get an email when it is done. Your gym is closed to
+  its members and staff, your sign-in is switched off, and your personal details are erased from your
+  account. Your gym's data, including the documents you sent, is kept for 90 days in case you change
+  your mind, then deleted. <b>Download anything you want to keep first.</b></p>
   <form method="post" action="/platform/my-gym/close">
     <input type="hidden" name="csrf" value="${h(csrfToken)}">
     <button type="submit" class="ghost">Ask to close my account</button>
@@ -2707,19 +2711,22 @@ export function deleteAccountPage() {
 
   <h2>If you are a gym member</h2>
   <ol>
-    <li><a href="/platform/find">Find your gym</a> and sign in with your membership number and phone number.</li>
-    <li>On the <b>Status</b> screen, scroll to the bottom and choose <b>Request data deletion</b>.</li>
-    <li>Your gym is told straight away and deletes your records: your details, check-ins, bookings,
-    health answers and any face data.</li>
+    <li>In the Yoyo Gyms app, sign in to your gym, open <b>Profile</b> and choose <b>Delete my account</b>.
+    On the web, <a href="/platform/find">find your gym</a>, sign in with your membership number and phone
+    number, and choose <b>Delete my account</b> at the bottom of the <b>Status</b> screen.</li>
+    <li>Your account is deleted within 30 days, sooner if your gym does it first, and you get an email when
+    it is done. Your details, check-ins, bookings, health answers and any face data are erased. Payment
+    records the law requires your gym to keep are kept, without your name.</li>
   </ol>
   <p class="muted">Cannot sign in? Ask your gym directly. They hold your records and can delete them.</p>
 
   <h2>If you own a gym</h2>
   <ol>
     <li><a href="/owner/login?next=account">Sign in to your Yoyo Gyms account</a>.</li>
-    <li>Choose <b>Close my account</b>. We contact you to confirm, close the gym to members and switch
-    off your sign-in. Your gym's data is kept for 90 days in case you change your mind, then deleted
-    once we have confirmed it with you.</li>
+    <li>Choose <b>Close my account</b>, on the web or in the Yoyo Gyms app. Your account is closed within
+    30 days and you get an email when it is done: your gym is closed to its members and staff, your
+    sign-in is switched off, and your personal details are erased. Your gym's data is kept for 90 days in
+    case you change your mind, then deleted.</li>
   </ol>
   <p class="muted">Forgot your password? <a href="/platform/forgot">Reset it</a> first.</p>
   <p class="muted"><a href="/platform/privacy">Privacy policy</a></p>
@@ -2904,10 +2911,25 @@ export function ownersPage({ owners = [], user = null, csrfToken = '', filter = 
           h(o.full_name || '—'),
           h(o.email),
           h(num(o.gym_count ?? 0)),
-          `${statusTag(o.is_active === false ? 'switched off' : 'active')}${
-            o.closure_requested_at && o.is_active !== false ? ` ${statusTag('asked to close')}` : ''
-          }`,
-          o.is_active === false
+          o.closure_completed_at
+            ? statusTag('closed')
+            : `${statusTag(o.is_active === false ? 'switched off' : 'active')}${
+                o.closure_requested_at && o.is_active !== false
+                  ? ` ${statusTag('asked to close')} <span class="muted">closes ${h(until(closeBy(o.closure_requested_at).toISOString()))}</span>`
+                  : ''
+              }`,
+          o.closure_completed_at
+            ? '<span class="muted">Account closed</span>'
+            : o.closure_requested_at && o.is_active !== false
+            ? `<details class="confirm"><summary>Close now</summary>
+        <form method="post" action="/platform/owners/${h(o.id)}/close">
+          <input type="hidden" name="csrf" value="${h(csrfToken)}">
+          <p><b>${h(o.email || 'This owner')}</b> asked to close their account. Closing it now suspends their gym
+          (closed to its members and staff), switches off their sign-in and erases their personal details.
+          They are emailed. The nightly job does the same on day 30.</p>
+          <button type="submit" class="danger">Yes, close the account</button>
+        </form></details>`
+            : o.is_active === false
             ? `<form method="post" action="/platform/owners/${h(o.id)}/reactivate">
         <input type="hidden" name="csrf" value="${h(csrfToken)}">
         <button type="submit" class="ghost">Switch on</button>
@@ -4140,7 +4162,7 @@ export function privacyPage({ approved = false, contact = '', operator = 'MuleSo
 
   <h2>Your rights</h2>
   <p>You can ask to see, correct or delete what is held about you. Members: ask your gym, or use
-  <b>Request data deletion</b> in the member area. Everyone: <a href="/platform/delete-account">how to
+  <b>Delete my account</b> in the app or the member area. Everyone: <a href="/platform/delete-account">how to
   delete your account</a>. In South Africa you may also complain to the Information Regulator.</p>
 
   <h2>Changes</h2>

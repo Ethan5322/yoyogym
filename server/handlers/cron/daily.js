@@ -13,6 +13,7 @@ import { run as expiry } from './expiry.js';
 import { run as classReminders } from './class-reminders.js';
 import { run as reengagement } from './reengagement.js';
 import { run as resumePauses } from './resume-pauses.js';
+import { run as eraseRequested } from './erase-requested.js';
 // NOTE: daily_summary runs on its own 8 PM schedule (spec Part 5 #10), so it is
 // intentionally NOT included in this morning orchestrator.
 
@@ -26,6 +27,8 @@ export async function runDaily(supabase) {
     ['reengagement', reengagement],
     // A pause ends on its last day without anyone remembering (§41.1 Q3).
     ['resume_pauses', resumePauses],
+    // A member's "Delete my account" is finished within 30 days (§46.1 Q3).
+    ['erase_requested', eraseRequested],
   ];
 
   const results = {};

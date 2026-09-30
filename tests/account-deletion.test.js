@@ -24,18 +24,21 @@ import { deleteAccountPage, ownerDashboardPage, dashboardPage } from '../platfor
 // ---------------------------------------------------------------------------
 
 test('ERASING A MEMBER ALSO REMOVES THEM FROM THE PLATFORM\'S GYM LOOKUP', () => {
+  // The owner's button and the day-30 job share one erasure (CLAUDE.md §46.1 Q3).
   const handler = readFileSync('server/handlers/admin/member.js', 'utf8');
   const del = handler.slice(handler.indexOf("req.method === 'DELETE'"), handler.indexOf("req.method === 'PATCH'"));
+  assert.match(del, /eraseMember\(supabase, id/);
 
   // Read first — the number and phone are gone once the row is.
-  assert.ok(del.indexOf("select('membership_number, phone')") < del.indexOf('.delete()'));
-  assert.match(del, /unindexMember\(/);
+  const erase = readFileSync('server/lib/member-erasure.js', 'utf8');
+  assert.ok(erase.indexOf('membership_number, phone') < erase.indexOf(".from('members').delete()"));
+  assert.match(erase, /unindexMember\(/);
 });
 
 test('a lookup entry that could not be removed is REPORTED to the owner', () => {
   // They are carrying out a legal request and must know if part of it failed.
   const handler = readFileSync('server/handlers/admin/member.js', 'utf8');
-  assert.match(handler, /index_cleared: unfiled\.ok/);
+  assert.match(handler, /index_cleared: indexCleared/);
   assert.match(readFileSync('src/pages/admin/MemberDetail.jsx', 'utf8'), /if \(result\?\.warning\) alert/);
 });
 
@@ -76,10 +79,15 @@ test('the page explains for members AND owners, and deletes nothing itself', () 
 });
 
 test('the member instructions match the real button, on the real screen', () => {
-  // The button is at the bottom of the Status tab, labelled "Request data deletion".
+  // In the app: Profile → "Delete my account". On the web: the bottom of the
+  // Status tab, the same words (CLAUDE.md §46.1 Q3).
   const portal = readFileSync('src/pages/MemberPortal.jsx', 'utf8');
-  assert.match(portal, /Request data deletion/);
-  assert.match(deleteAccountPage(), /<b>Status<\/b> screen[\s\S]*Request data deletion/);
+  assert.match(portal, /Delete my account/);
+  assert.match(readFileSync('apps/mobile/www/member.js', 'utf8'), /data-m="delete">Delete my account</);
+  const page = deleteAccountPage();
+  assert.match(page, /<b>Profile<\/b> and choose <b>Delete my account<\/b>/);
+  assert.match(page, /<b>Delete my account<\/b> at the bottom of the <b>Status<\/b> screen/);
+  assert.match(page, /within 30 days/);
 });
 
 // ---------------------------------------------------------------------------

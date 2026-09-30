@@ -143,7 +143,7 @@ export default async function handler(req, res) {
     // indefinitely. Named here so the owner can act on each one.
     const { data: deletionRequests } = await supabase
       .from('members')
-      .select('id, full_name, updated_at')
+      .select('id, full_name, updated_at, data_deletion_requested_at')
       .eq('data_deletion_requested', true)
       .order('updated_at', { ascending: true })
       .limit(20);
