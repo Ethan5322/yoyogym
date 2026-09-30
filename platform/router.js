@@ -107,6 +107,7 @@ import {
   readRawBody,
 } from './http.js';
 import { isStoreApp } from '../shared/store-app.js';
+import { readPayTicket, payTicketKey } from '../shared/pay-ticket.js';
 
 const html = (res, status, body) => {
   res.writeHead(status, { 'Content-Type': 'text/html; charset=utf-8' });
@@ -885,14 +886,17 @@ async function handleExtraRoutes(req, res, deps, { url, path, method }) {
     // What Yoyo Gyms commits to for this owner's plan, and how to reach it
     // (§41.1 Q6, Q7). Best-effort: the page loads without it.
     const support = view.gym ? await deps.ownerSupport?.(view.gym).catch(() => null) : null;
+    const plans = view.gym ? (await deps.listPlans?.().catch(() => [])) || [] : [];
     html(res, 200, ownerDashboardPage({
       ...view,
       inApp: isStoreApp(req.headers['user-agent']),
       support,
       // What this gym's plan promises NOW, from its switches (§47.1 Q4).
       planSupport: view.gym
-        ? supportFor(((await deps.listPlans?.().catch(() => [])) || []).find((p) => p.key === view.gym.plan_key) || { key: view.gym.plan_key })
+        ? supportFor(plans.find((p) => p.key === view.gym.plan_key) || { key: view.gym.plan_key })
         : null,
+      // The plan the subscription is billed on — the fee Pay now takes (§48).
+      plan: plans.find((p) => p.id === view.subscription?.plan_id) || plans.find((p) => p.key === view.gym?.plan_key) || null,
       user: await viewer(deps, session),
       csrfToken: issueCsrfToken(session.sub),
     }));
@@ -1026,18 +1030,51 @@ async function handleExtraRoutes(req, res, deps, { url, path, method }) {
     return true;
   }
 
+  // ---- "Pay now" from the gym's own admin panel (CLAUDE.md §48) --------------
+  // The owner is signed in to their GYM there, not to this site, so the gym's
+  // server — having checked that this is the gym's owner — hands the page a
+  // five-minute ticket naming the gym (shared/pay-ticket.js). The ticket opens
+  // the payment page for that gym at its plan's price, and does nothing else.
+  if (path === 'pay/start' && method === 'POST') {
+    if (isStoreApp(req.headers['user-agent'])) return redirect(res, '/platform/my-gym'), true;
+    const form = await readFormBody(req);
+    const ticket = readPayTicket(form.ticket, payTicketKey());
+    const back = ticket?.slug
+      ? { href: `/g/${encodeURIComponent(ticket.slug)}/admin`, label: 'Back to your gym admin panel' }
+      : { href: '/platform/my-gym', label: 'Your Yoyo account' };
+    if (!ticket) {
+      html(res, 400, problemPage({
+        title: 'That link has expired',
+        message: 'For your safety, Pay now works for five minutes. Go back to your gym admin panel and press it again.',
+      }));
+      return true;
+    }
+
+    const result = await startCheckout(deps, { gymId: ticket.gymId, source: 'gym admin panel' });
+    if (!result.ok) {
+      html(res, 400, problemPage({ title: 'Nothing was charged', message: result.reason, back }));
+      return true;
+    }
+    redirect(res, result.url);
+    return true;
+  }
+
   // ---- Paystack sends the owner back ----------------------------------------
   if (path === 'pay/callback' && method === 'GET') {
     // NO SESSION REQUIRED, and none is trusted if present. The reference in
     // this URL is a claim made by whoever opened it; completeCheckout settles
     // it by asking Paystack directly, server to server.
     const result = await completeCheckout(deps, { reference: url.searchParams.get('reference') });
+    // The way back to the gym's own admin panel, where an owner who paid from
+    // its dashboard came from (CLAUDE.md §48). Best-effort.
+    const gym = result.invoice?.gym_id ? await deps.getGym?.(result.invoice.gym_id).catch(() => null) : null;
 
     html(res, result.ok ? 200 : 400, paymentResultPage({
       ok: result.ok,
       reason: result.reason,
       alreadyPaid: result.alreadyPaid,
       recurring: result.recurring,
+      gymSlug: gym?.slug || '',
     }));
     return true;
   }
@@ -2152,8 +2189,10 @@ async function handleExtraRoutes(req, res, deps, { url, path, method }) {
       },
       {
         label: 'Card payments',
-        what: 'Paystack, for gym subscriptions.',
-        name: 'PAYSTACK_SECRET_KEY',
+        what: "Paystack, for gym subscriptions — Yoyo Gyms' own account, never a gym's (D-108).",
+        // The name platform/paystack.js reads. This line said PAYSTACK_SECRET_KEY,
+        // so a key set by following it was never found (found 2026-09-30, §48).
+        name: 'PLATFORM_PAYSTACK_SECRET_KEY',
         on: paystackConfigured(),
         onText: 'set',
         offText: 'not set',

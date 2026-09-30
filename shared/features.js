@@ -61,6 +61,8 @@ export const ROUTE_FEATURES = {
   plans: FEATURES.CATALOG,
   addons: FEATURES.CATALOG,
   settings: FEATURES.SETTINGS,
+  // What the gym pays Yoyo Gyms — every plan, always: a gym must be able to pay (§48).
+  'yoyo-plan': FEATURES.SETTINGS,
   staff: FEATURES.STAFF,
   profile: FEATURES.STAFF,
   'qr-stats': FEATURES.QR,

@@ -25,6 +25,7 @@ import { SERVICE_INFO, SERVICE_GROUPS, ALL_SERVICES, CORE_FEATURES, effectiveFea
 import { planByKey, EVERY_PLAN_INCLUDES, PLAN_PROMISES, promisesOf, trialDaysOf } from './plans.js';
 import { COUNTRIES, countryName } from '../shared/countries.js';
 import { closeBy } from './owner-closure.js';
+import { planStanding, planFee, planWords, cardText } from '../shared/yoyo-plan.js';
 
 /** Escape text for safe interpolation into markup or an attribute. */
 export function escapeHtml(value) {
@@ -2437,6 +2438,45 @@ function ownerRequiredLine(type, documents) {
   return `<li class="${accepted ? 'ok' : ''}"><b>${h(DOCUMENT_LABELS[type] || type)}</b> <span class="muted">· ${h(state)}</span></li>`;
 }
 
+/**
+ * The owner's Yoyo Gyms plan: the plan, its monthly fee, where they stand, and
+ * the one Pay button (CLAUDE.md §48). The gym's own admin panel shows the same,
+ * from the same rules (shared/yoyo-plan.js).
+ *
+ * Inside the store app: the plan and where they stand only — no price and no
+ * Pay button (§48.1 Q2, §46.1 Q4).
+ */
+function yoyoPlanBlock({ subscription, plan, standing, inApp, csrfToken, payUrgent }) {
+  const fee = planFee(plan?.price_cents, plan?.currency);
+  const words = planWords({ ...standing, paidFrom: subscription.current_period_start }, { inApp, priced: Boolean(fee) });
+  const statusLine = words.status;
+  const note = words.note;
+  const label = words.button;
+
+  return `<h2 style="margin-top:18px">Your Yoyo Gyms plan</h2>
+  <dl class="facts">
+    <dt>Plan</dt><dd>${h(plan?.label || 'Not set')}</dd>
+    ${inApp ? '' : `<dt>Monthly fee</dt><dd>${fee ? h(fee) : 'Not set yet — we will tell you before anything is charged'}</dd>`}
+    <dt>Status</dt><dd>${h(statusLine)}</dd>
+  </dl>
+  ${note ? `<p class="muted">${h(note)}</p>` : ''}
+  ${
+    !inApp && standing.canPay && fee
+      ? `<form method="post" action="/platform/my-gym/pay">
+      <input type="hidden" name="csrf" value="${h(csrfToken)}">
+      <button type="submit"${payUrgent ? '' : ' class="ghost"'}>${label}</button>
+      <p class="muted">You will be taken to Paystack. We never see or store your card, only a token that
+      lets us take the same amount next month.</p>
+    </form>`
+      : ''
+  }
+  ${
+    !inApp && subscription.card_last4
+      ? `<p class="muted">Saved card: ${h(cardText(subscription.card_brand, subscription.card_last4))}.</p>`
+      : ''
+  }`;
+}
+
 export function ownerDashboardPage({
   user = null,
   application = null,
@@ -2449,11 +2489,14 @@ export function ownerDashboardPage({
   inApp = false,
   support = null,
   planSupport = null,
+  plan = null,
+  now = new Date(),
 } = {}) {
   // THE OWNER'S NEXT STEP is the one lime button on the page; everything else
   // is secondary. "Pay now" was lime while opening the gym — the main task —
   // was a text link (design critique 2026-09-29).
-  const payUrgent = Boolean(subscription && ['past_due', 'suspended'].includes(subscription.status));
+  const standing = planStanding(subscription, now);
+  const payUrgent = ['due', 'suspended', 'trial_ended'].includes(standing.state);
   const openGym = gym?.status === 'active' && !payUrgent;
   const docsNeeded =
     Boolean(application && ['submitted', 'under_review', 'info_requested'].includes(application.status)) &&
@@ -2614,28 +2657,7 @@ ${documents
          email, or as <b>${h(OWNER_USERNAME)}</b>, and the password you chose when you activated.</p>`
       : `<p class="muted">Your gym is not open yet. We will email you the moment it is.</p>`
   }
-  ${
-    subscription?.trial_ends_at
-      ? `<p class="muted">Trial ends ${h(until(subscription.trial_ends_at))}.</p>`
-      : ''
-  }
-  ${
-    // Inside the store app: the status only — no Pay button, no card
-    // (CLAUDE.md §46.1 Q4). Owners pay on the website.
-    !inApp && subscription && ['trialing', 'past_due', 'suspended'].includes(subscription.status)
-      ? `<form method="post" action="/platform/my-gym/pay">
-      <input type="hidden" name="csrf" value="${h(csrfToken)}">
-      <button type="submit"${payUrgent ? '' : ' class="ghost"'}>${subscription.status === 'suspended' ? 'Pay and reopen my gym' : 'Pay now'}</button>
-      <p class="muted">You will be taken to Paystack. We never see or store your card, only a token that
-      lets us take the same amount next month.</p>
-    </form>`
-      : ''
-  }
-  ${
-    !inApp && subscription?.card_last4
-      ? `<p class="muted">Saved card: ${h(subscription.card_brand || 'card')} ending ${h(subscription.card_last4)}.</p>`
-      : ''
-  }
+  ${subscription ? yoyoPlanBlock({ subscription, plan, standing, inApp, csrfToken, payUrgent }) : ''}
 </div>`
     : application
       ? `<div class="card">
@@ -3419,7 +3441,12 @@ export function setupDonePage({ recoveryCodes = [], invited = false } = {}) {
  * subscription and a single payment, and the owner should not discover it next
  * month when their gym is suspended.
  */
-export function paymentResultPage({ ok = false, reason = '', alreadyPaid = false, recurring = false } = {}) {
+export function paymentResultPage({ ok = false, reason = '', alreadyPaid = false, recurring = false, gymSlug = '' } = {}) {
+  // Back to where the owner came from: their gym's admin panel (its dashboard
+  // has Pay now, §48) or their Yoyo account page.
+  const ways = `<p>${
+    gymSlug ? `<a class="btn" href="${h(gymAdminPath(gymSlug))}">Open your gym admin panel →</a> ` : ''
+  }<a href="/platform/my-gym"${gymSlug ? ' class="btn ghost"' : ''}>${gymSlug ? 'Your Yoyo account' : 'Back to your gym →'}</a></p>`;
   if (!ok) {
     return layout({
       title: 'Payment not completed',
@@ -3428,7 +3455,7 @@ export function paymentResultPage({ ok = false, reason = '', alreadyPaid = false
   <p>${h(reason) || 'Nothing has been charged.'}</p>
   <p class="muted"><b>Nothing has been charged.</b> Your gym is unaffected — you can try again
   whenever you are ready.</p>
-  <p><a href="/platform/my-gym">Back to your gym →</a></p>
+  ${ways}
 </div>`,
     });
   }
@@ -3446,7 +3473,7 @@ export function paymentResultPage({ ok = false, reason = '', alreadyPaid = false
       : `<p class="muted"><b>This payment was one-off.</b> Your card could not be saved for next
          month, so we will email you when the next one is due and you will pay the same way again.</p>`
   }
-  <p><a href="/platform/my-gym">Back to your gym →</a></p>
+  ${ways}
 </div>`,
   });
 }

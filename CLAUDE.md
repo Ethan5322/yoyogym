@@ -997,7 +997,7 @@ STAGE 10 (store compliance and release): NOT STARTED — checklist in the
   store-compliance skill; store rules are re-checked then, never from memory.
 
 WAITING ON THE USER:
-  Vercel (§45.1): PAYSTACK_SECRET_KEY (test key), PLATFORM_BILLING_LIVE=true,
+  Vercel (§45.1): PLATFORM_PAYSTACK_SECRET_KEY (test key), PLATFORM_BILLING_LIVE=true,
     PLATFORM_RETENTION_LIVE=true, PLATFORM_PRIVACY_CONTACT=hello@mulesoo.com;
     after reading them, PLATFORM_PRIVACY_APPROVED / PLATFORM_TERMS_APPROVED.
   The Gym Owner Agreement rewrite (§45): the supplier's legal details first.
@@ -1994,7 +1994,7 @@ Checked against the code and the live data on 2026-09-29 (read-only):
   calls it (it is not a Vercel cron, `platform/CRON.md`), so billing, the drift report and document
   retention would never happen even when switched on.
 - **What each amber line needs** (Vercel → Settings → Environment Variables, Production, then redeploy):
-  Billing gyms `PLATFORM_BILLING_LIVE=true` · Card payments `PAYSTACK_SECRET_KEY` (from the user's Paystack
+  Billing gyms `PLATFORM_BILLING_LIVE=true` · Card payments `PLATFORM_PAYSTACK_SECRET_KEY` (from the user's Paystack
   account) · Deleting old documents `PLATFORM_RETENTION_LIVE=true` · Privacy policy
   `PLATFORM_PRIVACY_APPROVED=true` · Privacy contact `PLATFORM_PRIVACY_CONTACT=<an email>` · Gym Owner
   Agreement `PLATFORM_TERMS_APPROVED=true`. These are the user's keys and decisions; Claude cannot set them.
@@ -2213,3 +2213,46 @@ pages and in the admin sidebar; every logo in one light tile; what a person at Y
 trial are switches on each plan (Plans page), read by the apply, welcome and owner pages and by the trial
 itself; the app's owner screen names only facts no switch can change. Not built: Q1 (chatbot steps).
 SQL for the user: `platform/migrations/2026-09-30-plan-promises.sql`.
+
+---
+
+## 48. The gym owner's monthly fee and Pay now, inside their account (user instruction, 2026-09-30)
+
+> The user's words, word for word. Clarified one question at a time in §48.1, which wins over the text
+> above it.
+
+> while you building i checked, their must be button in inside each gym owners account the monthly fee
+> based on their subscribtion mentioned if its on free 30 day plan it just desplay since the day he join
+> to nex 30 days as free and must say pay now, when it clicked it must open link to pay gym owner plan to
+> yoyo gyms, lets say if one gym subscribe button display pay monthly fee now get clicked open payment so
+> person pay
+
+### 48.1 Clarifications — answered by the user, one at a time
+
+Checked against the code on 2026-09-30:
+- **The gym admin panel shows nothing of the owner's Yoyo plan** — no fee, no trial dates, no Pay, not even
+  a link to the owner's account page. The account page (`/platform/my-gym`) has Pay now (in a browser; the
+  store app hides it, §46.1 Q4) and the trial's end date, but not the monthly fee.
+- **Paying during the free trial can charge twice:** a payment marks the subscription active but leaves the
+  period ending at the trial's end, so the nightly job charges again then.
+- **Q1 — where:** a "Your Yoyo Gyms plan" card at the top of the gym admin panel's dashboard, for the owner
+  only — plan, monthly fee, status ("Free trial: 30 Sep – 30 Oct 2026", "Active — next payment …",
+  "Payment due") and a Pay button that opens the secure Paystack payment page; the same on the owner's
+  Yoyo account page.
+- **Q2 — inside the store app: status only** (§46.1 Q4 stands). In a browser, the full card with the fee
+  and the Pay button; in the store app, the plan and its status (free-trial dates, active, payment due)
+  with no price and no Pay button.
+- **Q3 — paying during the free trial pays for the month AFTER it.** The owner keeps every free day; the
+  payment covers the month that starts when the trial ends, so nothing is charged again that day; the
+  next charge is a month after that.
+
+All three answered 2026-09-30.
+
+**Built 2026-09-30** — vault D-173: "Your Yoyo Gyms plan" at the top of the owner's gym dashboard and on the
+account page (plan, monthly fee, trial dates or paid-until, one Pay button to Paystack; status only in the
+store app, refused there by the server too); a trial payment buys the month after the trial; the next month
+opens for payment 31 days before the paid one ends. Pay now in the gym panel carries a 5-minute signed ticket
+to `/platform/pay/start`. Fixed on the way: the platform router lacked three functions the checkout needs
+(every Pay now would have failed), and the Paystack webhook moved no dates and saved no card. Also: the
+platform reads its Paystack key from `PLATFORM_PAYSTACK_SECRET_KEY` (D-108), but Settings and this file named
+`PAYSTACK_SECRET_KEY` — corrected; a missing key now says "nothing has been charged" instead of failing. No SQL.

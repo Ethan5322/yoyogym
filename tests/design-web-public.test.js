@@ -266,11 +266,13 @@ test('THE FRONT PAGE HAS ONE LIME BUTTON, and every other way in grouped', () =>
 
 test("THE OWNER'S NEXT STEP IS THE LIME BUTTON: open the gym, unless a payment is overdue", () => {
   const gym = { id: 'g1', slug: 'bos', status: 'active', plan_key: 'basic', search_name: 'BOS GYM' };
-  const trial = ownerDashboardPage({ user: { email: 'a@b.co' }, gym, subscription: { status: 'trialing' } });
+  // A priced plan: with no price there is nothing to pay, and no Pay button (CLAUDE.md §48).
+  const plan = { label: 'Basic', price_cents: 49900, currency: 'ZAR' };
+  const trial = ownerDashboardPage({ user: { email: 'a@b.co' }, gym, subscription: { status: 'trialing' }, plan });
   assert.match(trial, /<a class="btn" href="\/g\/bos\/admin[^"]*">Open your gym admin panel<\/a>/);
   assert.match(trial, /<button type="submit" class="ghost">Pay now<\/button>/);
 
-  const overdue = ownerDashboardPage({ user: { email: 'a@b.co' }, gym, subscription: { status: 'past_due' } });
+  const overdue = ownerDashboardPage({ user: { email: 'a@b.co' }, gym, subscription: { status: 'past_due' }, plan });
   assert.match(overdue, /<button type="submit">Pay now<\/button>/);
   assert.match(overdue, /<a class="btn ghost" href="\/g\/bos\/admin/);
   assert.match(overdue, /aria-current="page">My gym</);

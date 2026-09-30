@@ -24,6 +24,7 @@
 //    asking Paystack directly what happened to that reference, server to
 //    server, which is what completeCheckout does before anything is recorded.
 import { invoiceNumber } from './billing.js';
+import { planStanding, monthBought, planDate } from '../shared/yoyo-plan.js';
 
 /**
  * Start a payment.
@@ -36,9 +37,23 @@ import { invoiceNumber } from './billing.js';
  * @param {object} deps { getSubscription, getPlan, getGym, findOpenInvoice,
  *                        createInvoice, initializePayment, audit }
  */
-export async function startCheckout(deps, { gymId, userId = null, now = new Date() } = {}) {
+export async function startCheckout(deps, { gymId, userId = null, source = 'account page', now = new Date() } = {}) {
   const subscription = await deps.getSubscription(gymId);
   if (!subscription) return { ok: false, reason: 'This gym has no subscription to pay for.' };
+
+  // Nothing to pay yet: the month paid still has more than PAY_AHEAD_DAYS to
+  // run. A second click never buys a second month by accident (CLAUDE.md §48).
+  const standing = planStanding(subscription, now);
+  if (!standing.canPay) {
+    return {
+      ok: false,
+      reason: standing.paidUntil
+        ? `Your plan is paid until ${planDate(standing.paidUntil)}.${
+          standing.payableFrom ? ` The next month can be paid from ${planDate(standing.payableFrom)}.` : ''
+        } Nothing has been charged.`
+        : 'There is nothing to pay for this gym. Nothing has been charged.',
+    };
+  }
 
   const plan = subscription.plan_id ? await deps.getPlan(subscription.plan_id) : null;
 
@@ -76,12 +91,20 @@ export async function startCheckout(deps, { gymId, userId = null, now = new Date
     });
   }
 
-  const payment = await deps.initializePayment({
-    email: gym.owner_email,
-    amountCents: invoice.amount_cents,
-    reference: invoice.provider_ref,
-    metadata: { gym_id: gymId, invoice_id: invoice.id },
-  });
+  // Paystack unreachable, refusing, or its key not set: said plainly, never a
+  // crash. The invoice stays open and is reused on the next try.
+  let payment;
+  try {
+    payment = await deps.initializePayment({
+      email: gym.owner_email,
+      amountCents: invoice.amount_cents,
+      reference: invoice.provider_ref,
+      metadata: { gym_id: gymId, invoice_id: invoice.id },
+    });
+  } catch (err) {
+    console.error('[checkout] the payment page could not be opened:', String(err?.message || err).slice(0, 200));
+    return { ok: false, reason: 'Card payments are not available right now. Nothing has been charged — please try again later.' };
+  }
 
   if (!payment?.authorization_url) {
     return { ok: false, reason: 'We could not start the payment. Please try again.' };
@@ -92,7 +115,7 @@ export async function startCheckout(deps, { gymId, userId = null, now = new Date
     actor_user_id: userId,
     entity: 'invoice',
     entity_id: invoice.id,
-    detail: { gym_id: gymId, amount_cents: invoice.amount_cents },
+    detail: { gym_id: gymId, amount_cents: invoice.amount_cents, from: source },
   });
 
   return { ok: true, url: payment.authorization_url, invoice };
@@ -150,11 +173,16 @@ export async function completeCheckout(deps, { reference, now = new Date() } = {
   // asking. Not stored, there is a first payment and then silence — which is
   // exactly what this system did before today.
   const auth = verified.authorization || {};
+  // The month this invoice bought starts where the time it was raised against
+  // ends: paid during the free trial, the free days are kept and the trial's
+  // end charges nothing (CLAUDE.md §48.1 Q3). The webhook applies the same
+  // month from the same invoice, so whichever arrives first, they agree.
+  const month = monthBought(invoice.period_end, now);
   await deps.activateSubscription(invoice.gym_id, {
     status: 'active',
     grace_ends_at: null,
-    current_period_start: now.toISOString(),
-    current_period_end: new Date(now.getTime() + 30 * 86_400_000).toISOString(),
+    current_period_start: month.start,
+    current_period_end: month.end,
     paystack_auth_code: auth.authorization_code ?? null,
     paystack_customer: verified.customer?.customer_code ?? null,
     card_brand: auth.brand ?? null,

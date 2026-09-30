@@ -49,6 +49,7 @@ import pauses from '../../server/handlers/admin/pauses.js';
 import rewards from '../../server/handlers/admin/rewards.js';
 import challenges from '../../server/handlers/admin/challenges.js';
 import memberGroups from '../../server/handlers/admin/member-groups.js';
+import yoyoPlan from '../../server/handlers/admin/yoyo-plan.js';
 
 const routes = {
   dashboard,
@@ -94,6 +95,8 @@ const routes = {
   rewards,
   challenges,
   'member-groups': memberGroups,
+  // The owner's own Yoyo Gyms plan and Pay now (CLAUDE.md §48).
+  'yoyo-plan': yoyoPlan,
 };
 
 // Routes that carry face photos, a logo or a member import (server/lib/guard.js).

@@ -482,13 +482,14 @@ test('Q4 the invitation email says what the link does', () => {
 
 test('SETTINGS NAME EVERY SWITCH AND NEVER SHOW A VALUE', async () => {
   const before = { ...process.env };
-  process.env.PAYSTACK_SECRET_KEY = 'sk_live_TOPSECRET_123';
+  // The name platform/paystack.js reads (it is not the old gym PAYSTACK_SECRET_KEY).
+  process.env.PLATFORM_PAYSTACK_SECRET_KEY = 'sk_live_TOPSECRET_123';
   process.env.PLATFORM_CRON_SECRET = 'cron-TOPSECRET-456';
   try {
     const r = await call({ url: '/platform/settings' }, {});
     assert.equal(r.statusCode, 200);
     assert.ok(!r.body.includes('TOPSECRET'), 'no secret value reaches the page');
-    for (const name of ['PLATFORM_PROVISION_LIVE', 'PLATFORM_BILLING_LIVE', 'PAYSTACK_SECRET_KEY', 'BREVO_API_KEY', 'PLATFORM_CRON_SECRET']) {
+    for (const name of ['PLATFORM_PROVISION_LIVE', 'PLATFORM_BILLING_LIVE', 'PLATFORM_PAYSTACK_SECRET_KEY', 'BREVO_API_KEY', 'PLATFORM_CRON_SECRET']) {
       assert.ok(r.body.includes(name), `names ${name}`);
     }
   } finally {

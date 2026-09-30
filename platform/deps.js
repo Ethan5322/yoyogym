@@ -45,6 +45,7 @@ import {
   coordinate, haversineKm, nearestGyms, likeTerm, RESULT_LIMIT, BOX_FETCH,
 } from './gym-search.js';
 import { timedFetch } from '../shared/timed-fetch.js';
+import { monthBought } from '../shared/yoyo-plan.js';
 
 let _db = null;
 
@@ -850,9 +851,21 @@ export function platformOpsDeps(db = platformDb()) {
         if (invoice.status === 'paid') return { ok: true, duplicate: true };
 
         await db.from('platform_invoices').update({ status: 'paid', paid_at: now, updated_at: now }).eq('id', invoice.id);
+        // The month this invoice bought, and the card for the next one — the
+        // same month the browser's return would record, from the same invoice
+        // (CLAUDE.md §48.1 Q3). Before this, a webhook that arrived first
+        // left the period where it was: a trial payment was never renewed.
+        const month = monthBought(invoice.period_end, new Date(now));
         await db
           .from('platform_subscriptions')
-          .update({ status: 'active', grace_ends_at: null, updated_at: now })
+          .update({
+            status: 'active',
+            grace_ends_at: null,
+            current_period_start: month.start,
+            current_period_end: month.end,
+            ...(intent.card || {}),
+            updated_at: now,
+          })
           .eq('gym_id', invoice.gym_id);
         // A gym suspended for non-payment comes back the moment it pays.
         await db.from('gyms').update({ status: 'active', suspended_at: null, updated_at: now })
@@ -962,6 +975,13 @@ export function platformOpsDeps(db = platformDb()) {
     },
 
     // ---- the owner paying their subscription ------------------------------
+    // The plan, the owner's email and the invoice, read and raised exactly as
+    // the nightly run does — the same functions, not copies. Missing here,
+    // every Pay now failed before reaching Paystack (found 2026-09-30, §48).
+    getPlan: (planId) => billingDeps(db).getPlan(planId),
+    getGym: (gymId) => billingDeps(db).getGym(gymId),
+    createInvoice: (row) => billingDeps(db).createInvoice(row),
+
     getSubscription: async (gymId) => {
       const { data } = await db.from('platform_subscriptions').select('*').eq('gym_id', gymId).maybeSingle();
       return data ?? null;

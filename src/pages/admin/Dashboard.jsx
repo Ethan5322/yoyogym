@@ -6,6 +6,7 @@ import { useAuth } from '../../lib/auth.jsx';
 import { apiFetch } from '../../lib/api.js';
 import { StatCard, SkeletonStats, StatusPill } from '../../components/ui.jsx';
 import Icon from '../../components/Icon.jsx';
+import YoyoPlanCard from '../../components/YoyoPlanCard.jsx';
 
 // Whole rands on the dashboard: headline figures, not a statement. Payments
 // and receipts keep the cents.
@@ -107,6 +108,9 @@ export default function Dashboard() {
           </Link>
         </div>
       </div>
+
+      {/* What the gym pays Yoyo Gyms, and Pay now — the owner's alone (CLAUDE.md §48). */}
+      {user?.role === 'owner' && <YoyoPlanCard />}
 
       {error && <p className="mt-4 rounded-xl bg-error/10 px-4 py-3 text-error">{error}</p>}
       {!d && !error && (

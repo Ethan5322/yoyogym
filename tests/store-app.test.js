@@ -42,9 +42,11 @@ function deps(calls = []) {
     ownerDashboard: async () => ({
       application: { id: 'app-1', applicant_user_id: 'owner-1', proposed_gym_name: 'BOS GYM', status: 'approved' },
       gym: { id: 'g1', slug: 'bos-gym', search_name: 'BOS GYM', status: 'active', plan_key: 'basic' },
-      subscription: { status: 'trialing', trial_ends_at: '2026-10-30T00:00:00Z', card_last4: '4242', card_brand: 'visa' },
+      subscription: { status: 'trialing', plan_id: 'p-basic', trial_ends_at: '2026-10-30T00:00:00Z', card_last4: '4242', card_brand: 'visa' },
       documents: [],
     }),
+    // A priced plan: the fee and Pay now show in a browser, and never in the app (§48).
+    listPlans: async () => [{ id: 'p-basic', key: 'basic', label: 'Basic', price_cents: 49900, currency: 'ZAR' }],
     startPayment: async (...a) => { calls.push(a); return { url: 'https://checkout.paystack.com/x' }; },
   };
 }
@@ -63,6 +65,7 @@ test('in a browser the owner page still offers Pay now and shows the card', asyn
   assert.equal(res.statusCode, 200);
   assert.match(res.body, /Pay now/);
   assert.match(res.body, /ending 4242/);
+  assert.match(res.body, /ZAR 499\.00 a month/);
   assert.doesNotMatch(res.body, /<body data-store-app/);
 });
 
@@ -70,7 +73,7 @@ test('inside the app the owner page shows the status only — no Pay button, no 
   const { req, res } = call({ ua: APP_UA });
   await handlePlatform(req, res, deps());
   assert.equal(res.statusCode, 200);
-  assert.doesNotMatch(res.body, /Pay now|my-gym\/pay|Paystack|ending 4242/);
+  assert.doesNotMatch(res.body, /Pay now|my-gym\/pay|Paystack|ending 4242|499|Monthly fee/);
   assert.match(res.body, /<body data-store-app/);
   assert.match(res.body, /Open your gym admin panel/);
 });

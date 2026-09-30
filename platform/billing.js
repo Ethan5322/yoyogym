@@ -236,6 +236,10 @@ export function eventToIntent(payload) {
       // The AMOUNT IS NOT TRUSTED as the source of truth for what was owed;
       // it is recorded so a mismatch with the invoice can be spotted.
       amount_cents: Number.isFinite(payload?.data?.amount) ? payload.data.amount : null,
+      // The card, for next month's charge — carried here too, because the
+      // webhook usually arrives before the owner's browser does, and then the
+      // browser's return records nothing (CLAUDE.md §48).
+      card: cardOf(payload?.data),
     };
   }
 
@@ -248,6 +252,19 @@ export function eventToIntent(payload) {
   }
 
   return { kind: 'ignore', reason: `Unhandled event: ${event}` };
+}
+
+/** The saved-card fields a paid charge carries, or null when it carries none. */
+function cardOf(data) {
+  const auth = data?.authorization;
+  if (!auth || typeof auth.authorization_code !== 'string' || !auth.authorization_code) return null;
+  const text = (v) => (typeof v === 'string' && v ? v.slice(0, 64) : null);
+  return {
+    paystack_auth_code: auth.authorization_code.slice(0, 128),
+    paystack_customer: text(data?.customer?.customer_code),
+    card_brand: text(auth.brand),
+    card_last4: text(auth.last4),
+  };
 }
 
 /** Human-readable invoice number: YG-2026-000123. */

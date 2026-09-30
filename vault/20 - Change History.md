@@ -15,6 +15,21 @@ occurrence is answered from notes rather than rediscovered.
 
 ---
 
+## 2026-09-30 — §48: the monthly fee and Pay now; the Android test build
+
+**Android test APK** built from `stage-8-app`'s www (`npm run mobile:sync`, then Gradle `assembleDebug`,
+JDK 21, 37 minutes on this machine) and copied to the Desktop as `YoyoGyms-test.apk`. `mobile:sync` first
+failed with "Cannot find package 'esbuild'" — Vite 8 no longer brings esbuild along; added as a
+devDependency.
+
+**§48** (D-173). **Found by reading, not by a test:** the Pay now that already existed on the owner's
+account page could never have worked — `startCheckout` asks for `getPlan`, `getGym` and `createInvoice`,
+and those were only in the nightly billing's dependency set, not the router's. Its unit tests passed
+because they hand the function its own fakes. The deps test now lists them. **Also found:** Paystack's
+webhook usually arrives before the owner's browser returns; it marked the gym active and stopped there —
+no new dates, no saved card — and the browser's return then saw the invoice already paid and recorded
+nothing. A gym that paid during its trial would never have been charged again.
+
 ## 2026-09-30 — Polish, then §47: each gym's look, sign-out, the plans' promises
 
 **Polish** (`0562d08`, deployed): clicked through 35 screens with Playwright (from the npx cache, driving

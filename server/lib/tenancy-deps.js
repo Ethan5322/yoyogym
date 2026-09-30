@@ -142,6 +142,36 @@ export function tenancyDeps() {
       return (gyms || []).map((g) => String(g.slug).toLowerCase());
     },
 
+    /**
+     * The gym's own Yoyo Gyms plan and subscription, for the owner's plan card
+     * in the gym's admin panel (CLAUDE.md §48). Read, never written: paying
+     * happens on the platform. Not cached — a payment made a minute ago must
+     * show. The plan is the one the subscription is billed on, which is the
+     * price Pay now takes.
+     */
+    gymBilling: async (gymId) => {
+      const db = platformClient();
+      const { data: subscription, error } = await db
+        .from('platform_subscriptions')
+        .select('status, plan_id, trial_ends_at, current_period_start, current_period_end, grace_ends_at, card_brand, card_last4, created_at')
+        .eq('gym_id', gymId)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (error) throw new Error(`Could not read the gym's subscription: ${error.message}`);
+      let plan = null;
+      if (subscription?.plan_id) {
+        const { data, error: planError } = await db
+          .from('platform_plans')
+          .select('key, label, price_cents, currency')
+          .eq('id', subscription.plan_id)
+          .maybeSingle();
+        if (planError) throw new Error(`Could not read the gym's plan: ${planError.message}`);
+        plan = data ?? null;
+      }
+      return { subscription: subscription ?? null, plan };
+    },
+
     /** The registry row for a slug, with its connection. */
     lookupGym: async (slug) => {
       const key = String(slug).toLowerCase();
