@@ -149,7 +149,9 @@ test('Q1 the gym front page, the portal and the app all show the offer', () => {
   assert.match(readFileSync('src/pages/Splash.jsx', 'utf8'), /<GymOffer /);
   assert.match(readFileSync('src/pages/MemberPortal.jsx', 'utf8'), /<GymOffer /);
   const app = readFileSync('apps/mobile/www/member.js', 'utf8');
-  assert.match(app, /gymContact\(\) \+\s*gymOffer\(\)/);
+  // In the app, one tap from the home (design critique 2026-09-29) — still shown.
+  assert.match(app, /homeLink\('data-m="offer"'/);
+  assert.match(app, /function renderOffer\(main\)[\s\S]{0,200}gymOffer\(\)/);
   assert.match(app, /state\.off = Array\.isArray\(d\.services_off\)/, 'and the app hides what the owner switched off');
 });
 

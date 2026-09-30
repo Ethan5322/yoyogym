@@ -92,7 +92,7 @@ test('after signing in, the home screen says the membership status first', async
   const { doc, calls } = await signIn();
   const status = calls.find((c) => c.path === '/api/member/status');
   assert.equal(status.headers.Authorization, 'Bearer tok-bos');
-  assert.match(text(doc, '.m-status'), /Active/);
+  assert.match(text(doc, '.m-state'), /Active/);
   assert.match(text(doc, '.m-hello'), /Hi Thandi/);
   assert.match(text(doc, '.m-progress'), /9/);
 });
@@ -129,7 +129,7 @@ test('the gym\'s name arriving late does not wipe what the member typed', async 
   release();
   await tick();
   assert.equal(app.doc.getElementById('m-mn').value, 'GYM-2026-ABC123');
-  assert.equal(text(app.doc, '.m-hero h1'), 'BOS GYM');
+  assert.equal(text(app.doc, '.m-hero h1').replace(/\s+/g, ' '), 'Sign in to BOS GYM');
 });
 
 // ---------------------------------------------------------------------------
@@ -285,7 +285,7 @@ test('a colour that is not a colour is not applied', async () => {
 test('SIGNING IN MOVES FOCUS TO THE NEW SCREEN AND NAMES THE PAGE', async () => {
   const { doc } = await signIn();
   assert.equal(doc.activeElement.tagName, 'H1', 'a screen reader follows the member into their gym');
-  assert.equal(doc.activeElement.textContent, 'Monthly Gold');
+  assert.equal(doc.activeElement.textContent, 'Hi Thandi');
   assert.match(doc.title, /^Home · BOS GYM$/);
 });
 
@@ -306,8 +306,10 @@ test("PRICES ARE IN THE GYM'S OWN CURRENCY, not always Rand", async () => {
     'GET /api/content': { status: 200, body: { branding: { name: 'COCATE GYM', currency: 'ETB', dial: '251' }, offer: { services: [], facilities: [] } } },
     'GET /api/catalog': { status: 200, body: { plans: [{ id: 'p1', name: 'Monthly membership', visit_type: 'full', monthly_price: 1200 }], addons: [] } },
   };
-  const { doc } = await signIn(routes);
+  const { doc, window } = await signIn(routes);
   await tick();
+  // The plans are one tap from the home (design critique 2026-09-29).
+  doc.querySelector('[data-m="offer"]').dispatchEvent(new window.MouseEvent('click', { bubbles: true }));
   const offer = doc.querySelector('.m-offer')?.textContent || '';
   assert.match(offer, /ETB|Br/, 'Ethiopian birr, however this phone writes it');
   assert.doesNotMatch(offer, /R1[\s,.]?200/, 'not Rand');
