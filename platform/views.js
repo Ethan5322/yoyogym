@@ -22,7 +22,8 @@ import { BRAND, LOGO_ON_DARK } from '../shared/brand.js';
 import { REQUIRED_DOCUMENTS, DOCUMENT_LABELS, missingRequiredDocuments, MAX_DOCUMENT_BYTES } from './documents.js';
 import { INVITE_TTL_HOURS } from './team.js';
 import { SERVICE_INFO, SERVICE_GROUPS, ALL_SERVICES, CORE_FEATURES, effectiveFeatures } from '../shared/features.js';
-import { planByKey } from './plans.js';
+import { planByKey, EVERY_PLAN_INCLUDES } from './plans.js';
+import { COUNTRIES } from '../shared/countries.js';
 
 /** Escape text for safe interpolation into markup or an attribute. */
 export function escapeHtml(value) {
@@ -108,6 +109,33 @@ const STYLE = `
   button { font:inherit; font-size:15px; font-weight:700; min-height:44px; padding:10px 20px; border:0; border-radius:99px;
            background:var(--accent); color:var(--accent-ink); cursor:pointer; }
   .err { color:var(--bad); font-size:13px; }
+  /* The parts of the page nobody draws still wear the brand. */
+  ::selection { background:rgba(191,246,66,.32); color:#fff; }
+  input, textarea { caret-color:var(--accent); }
+
+  /* ONE TYPE SCALE for every page outside the main admin panel — the app's
+     own (.y-title 28/1.15, h2 20, body 16, small 13). The owner, terms and
+     "sent" pages read 15/17/20px, too close to tell apart (design critique
+     2026-09-29). :where() keeps it a default a page's own class can refine. */
+  body:not(.panel) { font-size:16px; line-height:1.55; }
+  :where(body:not(.panel)) main { max-width:720px; }
+  :where(body:not(.panel)) h1 { font-size:28px; line-height:1.15; letter-spacing:-.01em; margin:0 0 10px; text-wrap:balance; }
+  :where(body:not(.panel)) h2, :where(body:not(.panel)) .card h2 { font-size:20px; line-height:1.25; margin:0 0 10px; }
+  :where(body:not(.panel)) main > h2 { margin:36px 0 12px; }
+  :where(body:not(.panel)) label { font-weight:700; }
+  :where(body:not(.panel)) label :is(.muted, small) { display:block; font-weight:400; }
+  /* A field inherits its label's small type unless told otherwise, and a
+     phone zooms into any field under 16px. */
+  :where(body:not(.panel)) :is(input, textarea, select) { font-size:16px; font-weight:400; }
+  :where(body:not(.panel)) button, :where(body:not(.panel)) .btn { font-size:16px; }
+  :where(body:not(.panel)) :is(p, li) { max-width:70ch; }
+  /* A tick box and its sentence side by side, the whole row a target. */
+  label.agree { display:flex; gap:12px; align-items:flex-start; font-size:16px; font-weight:400; color:var(--ink);
+                cursor:pointer; border:1px solid var(--line); border-radius:14px; padding:14px 16px; }
+  label.agree input { width:22px; height:22px; margin-top:1px; flex:none; }
+  /* How to put a problem right: set apart by tone, never a card in a card. */
+  .fix { background:rgba(245,196,81,.08); border:1px solid rgba(245,196,81,.3); border-radius:12px; padding:14px 16px; margin:14px 0; }
+  .fix p { margin:4px 0 0; }
   .row { display:flex; gap:12px; flex-wrap:wrap; align-items:center; }
   ul.events { list-style:none; padding:0; margin:12px 0 0; }
   ul.events li { border-left:2px solid var(--line); padding:6px 0 6px 12px; margin-bottom:6px; }
@@ -485,6 +513,10 @@ export function layout({
   bare = false,
   bodyClass = 'auth',
   active = '',
+  // What the owner's one menu link is called. "My gym" before a gym exists
+  // promised something that was not there yet (design critique 2026-09-29),
+  // so it says "My application" until the owner's page knows there is a gym.
+  ownerNav = 'My application',
 }) {
   // noindex is right for the staff panel and WRONG for the two public pages.
   // A signup page nobody can find is a signup page nobody uses, so `indexable`
@@ -546,7 +578,7 @@ ${body}
   ${
     owner
       ? `<nav class="row">
-    <a href="/platform/my-gym"${active === 'my-gym' ? ' class="on"' : ''}>My gym</a>
+    <a href="/platform/my-gym"${active === 'my-gym' ? ' class="on" aria-current="page"' : ''}>${h(ownerNav)}</a>
     <a href="/platform/logout">Sign out</a>
   </nav>`
       : ''
@@ -561,32 +593,31 @@ ${body}
 }
 
 /**
- * Sign-in. Password and the second factor together.
+ * The Yoyo STAFF sign-in (CLAUDE.md §36.1 Q8). Password and the second factor
+ * together; login.js decides who may enter.
  *
- * ONE form, two audiences, because the server decides who is who (login.js).
- * The Yoyo staff panel is the default (CLAUDE.md §36.1 Q8). A gym owner
- * checking their application arrives from the app with `?as=owner` and is not
- * told they are at the "platform administrator" login.
+ * It used to wear a second heading for gym owners (`?as=owner`). Owners now
+ * have ONE door, /owner/login, which opens their gym or their application by
+ * what their account can reach (design critique 2026-09-29) — so this page is
+ * the staff door only, and sends an owner there.
  */
-export function loginPage({ error = '', audience = 'staff' } = {}) {
-  const owner = audience === 'owner';
+export function loginPage({ error = '' } = {}) {
   return layout({
-    title: owner ? 'Gym owner account' : 'Platform administrator login',
+    title: 'Platform administrator login',
     bare: true,
     body: `
 <img class="auth-logo" src="${LOGO_ON_DARK}" width="720" height="531" alt="Yoyo Gyms">
 <form class="card" method="post" action="/platform/login">
-  <h1>${owner ? 'Gym owner account' : 'Yoyo Gyms Platform'}</h1>
-  <p class="muted auth-sub">${owner ? 'Your application, documents and subscription.' : 'Platform administrator login'}</p>
-  ${owner ? '<input type="hidden" name="as" value="owner">' : ''}
-  ${error ? `<p class="err">${h(error)}</p>` : ''}
+  <h1>Yoyo Gyms Platform</h1>
+  <p class="muted auth-sub">Platform administrator login</p>
+  ${error ? `<p class="err" role="alert">${h(error)}</p>` : ''}
   <label>Email
     <input type="email" name="email" autocomplete="username" required>
   </label>
   <label>Password
     <input type="password" name="password" autocomplete="current-password" required>
   </label>
-  <label>${owner ? 'Authentication code <span class="muted">(if you have set one up)</span>' : 'Authentication code'}
+  <label>Authentication code
     <input type="text" name="totp" inputmode="numeric" autocomplete="one-time-code"
            placeholder="6 digits">
   </label>
@@ -594,17 +625,19 @@ export function loginPage({ error = '', audience = 'staff' } = {}) {
   <p class="auth-links"><a href="/platform/forgot">Forgot password?</a></p>
   <p class="muted auth-links">Lost your device? Use a recovery code in place of the authentication code.</p>
 </form>
-${owner ? '' : '<p class="muted auth-foot">Gym owner? <a href="/platform/login?as=owner">Sign in to your owner account</a></p>'}
-<p class="muted auth-foot">Gym member? You sign in at your own gym — <a href="/platform/find">find your gym</a>.</p>
+<p class="muted auth-foot">Gym owner? <a href="/owner/login">Use the gym owner sign-in</a></p>
+<p class="muted auth-foot">Gym member? You sign in at your own gym. <a href="/platform/find">Find your gym</a></p>
 <p class="muted auth-foot"><a href="/platform/privacy">Privacy policy</a> · <a href="/platform/delete-account">Delete your account</a></p>`,
   });
-  // The code field used to be `required`. Two-factor is REQUIRED for Yoyo
-  // staff but OPTIONAL for gym owners (D-119), so an owner without it could
-  // not submit the form until they typed something meaningless into a box
-  // they had never been given. Staff without a code are still refused — by
-  // the server, which is where that rule belongs. `pattern` went with it: a
-  // recovery code is not all digits.
+  // The code field is not `required`: a recovery code can stand in for it
+  // (so no `pattern` either — it is not all digits), and a staff account
+  // without two-factor is refused by the server, which is where that rule
+  // belongs. The same route still serves the owner door's hand-over, where
+  // the code is optional (D-119).
 }
+
+/** The two sign-in doors, for pages either kind of person reaches. */
+const SIGN_IN_DOORS = `<a href="/owner/login">Gym owner sign-in</a> · <a href="/platform/login">Yoyo staff sign-in</a>`;
 
 /** "I forgot my password." The same answer whether or not the account exists. */
 export function forgotPage({ message = '', error = '' } = {}) {
@@ -614,12 +647,12 @@ export function forgotPage({ message = '', error = '' } = {}) {
 <form class="card" method="post" action="/platform/forgot">
   <h1>Reset your password</h1>
   ${message ? `<p>${h(message)}</p>` : `<p class="muted">Enter the email you sign in with. We will send a link to choose a new password.</p>`}
-  ${error ? `<p class="err">${h(error)}</p>` : ''}
+  ${error ? `<p class="err" role="alert">${h(error)}</p>` : ''}
   <label>Email
     <input type="email" name="email" autocomplete="username" required>
   </label>
   <button type="submit">Send the link</button>
-  <p><a href="/platform/login">Back to sign in</a></p>
+  <p class="muted">Back to ${SIGN_IN_DOORS}</p>
 </form>`,
   });
 }
@@ -650,8 +683,13 @@ export function resetDonePage({ gymAccountsUpdated = 0 } = {}) {
 <div class="card">
   <h1>Password changed</h1>
   <p>You can sign in with your new password now.</p>
-  ${gymAccountsUpdated ? '<p class="muted">Your gym\'s admin panel uses the new password too — sign in there as <b>owner</b>.</p>' : ''}
-  <p><a href="/platform/login">Sign in</a></p>
+  ${
+    // An owner's gym took the new password too, so their one door opens it.
+    gymAccountsUpdated
+      ? `<p class="muted">Your gym's admin panel uses the new password too.</p>
+  <p><a class="btn" href="/owner/login">Sign in to your gym</a></p>`
+      : `<p class="muted">${SIGN_IN_DOORS}</p>`
+  }
 </div>`,
   });
 }
@@ -1047,87 +1085,110 @@ function planPrice(plan) {
 }
 
 /**
- * One plan, as a gym owner chooses it: the price the main admin set, what
- * their members get, what they get, and what Yoyo Gyms commits to (§41.1 Q6).
- * From the second plan on, only what it ADDS is listed — "everything in
- * Basic, plus" reads; the same forty lines three times does not.
+ * Everything one plan includes, as a gym owner reads it: what their members
+ * get, what they get, and what Yoyo Gyms commits to (§41.1 Q6). From the
+ * second plan on, only what it ADDS is listed — "everything in Basic, plus"
+ * reads; the same forty lines three times does not.
  */
-function planCard(plan, { selected = false, previous = null, recommended = false } = {}) {
+function planDetails(plan, previous = null) {
   const adds = (list, prev) => (prev ? list.filter((x) => !prev.includes(x)) : list);
-  const members = adds(plan.memberBenefits, previous?.memberBenefits);
-  const tools = adds(plan.included, previous?.included);
   const lead = previous ? `<li class="plan-lead">Everything in ${h(previous.label)}, plus:</li>` : '';
-
-  return `
-<label class="plan${recommended ? ' plan-rec' : ''}">
-  ${recommended ? '<span class="plan-badge">Recommended</span>' : ''}
-  <input type="radio" name="plan" value="${h(plan.key)}"${selected ? ' checked' : ''} required>
-  <b class="plan-name">${h(plan.label)}</b>
-  <span class="plan-price">${planPrice(plan)}</span>
-  <span class="plan-limit">${h(plan.memberLimit)}</span>
-  ${plan.summary ? `<p class="muted plan-sum">${h(plan.summary)}</p>` : ''}
-
-  <p class="plan-sub">Your members get</p>
-  <ul>${lead}${members.map((b) => `<li>${h(b)}</li>`).join('')}</ul>
-
+  const list = (items) => `<ul class="ticks">${items.map((x) => `<li>${h(x)}</li>`).join('')}</ul>`;
+  return `<p class="plan-sub">Your members get</p>
+  <ul class="ticks">${lead}${adds(plan.memberBenefits, previous?.memberBenefits).map((b) => `<li>${h(b)}</li>`).join('')}</ul>
   <p class="plan-sub">You get</p>
-  <ul>${lead}${tools.map((f) => `<li>${h(f)}</li>`).join('')}</ul>
-
+  <ul class="ticks">${lead}${adds(plan.included, previous?.included).map((f) => `<li>${h(f)}</li>`).join('')}</ul>
   <p class="plan-sub">Our support</p>
-  <ul class="plan-support">${(plan.support || []).map((s) => `<li>${h(s)}</li>`).join('')}</ul>
-  <span class="plan-pick">${selected ? 'Selected' : 'Choose'} ${h(plan.label)}</span>
-</label>`;
+  ${list(plan.support || [])}`;
 }
 
+/**
+ * One plan to choose on step 1: name, price, member limit and the first
+ * things it adds, with the rest behind "See everything included". Step 1 was
+ * a 7035px sales page on a phone (design critique 2026-09-29); the pitch now
+ * lives on the front page, and this is a form.
+ *
+ * The whole card picks the plan (the label is stretched over it), except the
+ * disclosure, which sits above that and opens on its own.
+ */
+function planChoice(plan, { selected = false, previous = null, recommended = false } = {}) {
+  const id = `plan-${plan.key}`;
+  const adds = previous ? plan.included.filter((x) => !previous.included.includes(x)) : plan.included;
+  return `<div class="plan${recommended ? ' plan-rec' : ''}">
+  <input type="radio" name="plan" id="${h(id)}" value="${h(plan.key)}" aria-describedby="${h(id)}-d"${selected ? ' checked' : ''} required>
+  <label for="${h(id)}" class="plan-head"><span class="plan-top"><span class="plan-name">${h(plan.label)}</span>${
+    recommended ? ' <span class="plan-badge">Recommended</span>' : ''
+  }</span> <span class="plan-price">${planPrice(plan)}</span></label>
+  <div id="${h(id)}-d">
+    <p class="plan-limit">${h(plan.memberLimit)}</p>
+    <ul class="ticks">${previous ? `<li class="plan-lead">Everything in ${h(previous.label)}, plus:</li>` : ''}${adds
+      .slice(0, 3)
+      .map((f) => `<li>${h(f)}</li>`)
+      .join('')}</ul>
+  </div>
+  <details class="plan-more"><summary>See everything included</summary>${planDetails(plan, previous)}</details>
+</div>`;
+}
+
+/**
+ * The country as a person names it — "South Africa", never "ZA" (design
+ * critique 2026-09-29). The value sent is still the ISO code the server
+ * stores. A saved code that is not on the list is kept as it is, so
+ * correcting a draft never quietly changes it.
+ */
+const COUNTRY_OPTIONS = [...COUNTRIES].sort((a, b) => a.name.localeCompare(b.name, 'en'));
+function countrySelect(value) {
+  const code = String(value || '').trim().toUpperCase();
+  const known = COUNTRY_OPTIONS.some((c) => c.code === code);
+  return `<select name="country" required autocomplete="country">
+          <option value=""${code ? '' : ' selected'}>Choose your country</option>
+          ${code && !known ? `<option value="${h(code)}" selected>${h(code)}</option>` : ''}
+          ${COUNTRY_OPTIONS.map((c) => `<option value="${h(c.code)}"${c.code === code ? ' selected' : ''}>${h(c.name)}</option>`).join('')}
+        </select>`;
+}
+
+const TICK = `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M5 12.5l4.5 4.5L19 7.5'/%3E%3C/svg%3E")`;
+
+// Step 1 of the application, and the owner pitch on the front page.
 const SIGNUP_STYLE = `
-  main { max-width:1120px; }
-  .apply-hero { text-align:center; padding:24px 0 8px; }
-  .apply-hero .eyebrow { color:var(--accent); font-weight:800; letter-spacing:.14em; text-transform:uppercase; font-size:12px; margin:0 0 10px; }
-  .apply-hero h1 { font-size:clamp(28px,5vw,44px); line-height:1.1; margin:0 0 12px; letter-spacing:-.02em; }
-  .apply-hero .lede { max-width:640px; margin:0 auto; font-size:17px; }
-  .trust { display:flex; flex-wrap:wrap; justify-content:center; gap:10px; margin:22px 0 8px; }
-  .trust span { border:1px solid var(--line); border-radius:99px; padding:8px 14px; font-weight:700; font-size:14px; }
-  .trust span::before { content:'✓ '; color:var(--accent); }
-  .apply-h2 { font-size:12px; text-transform:uppercase; letter-spacing:.14em; color:var(--muted); margin:40px 0 14px; }
-  .includes { display:grid; gap:12px; grid-template-columns:repeat(auto-fit,minmax(230px,1fr)); }
-  .includes div { background:var(--card); border:1px solid var(--line); border-radius:16px; padding:16px 18px; }
-  .includes b { display:block; margin-bottom:4px; }
-  .includes p { margin:0; color:var(--muted); font-size:14px; }
-  .plans { display:grid; gap:14px; grid-template-columns:repeat(auto-fit,minmax(260px,1fr)); margin:0 0 8px; align-items:start; }
-  .plan { position:relative; display:flex; flex-direction:column; gap:2px; background:var(--card); border:1px solid var(--line);
-          border-radius:20px; padding:22px; cursor:pointer; color:var(--ink); font-size:15px; }
-  .plan input[type=radio] { position:absolute; opacity:0; pointer-events:none; }
-  .plan:has(input:checked) { border-color:var(--accent); box-shadow:0 0 0 2px var(--accent); }
-  .plan:focus-within { outline:2px solid var(--accent); outline-offset:2px; }
+  .apply-sec { border:0; margin:36px 0 0; padding:0; min-width:0; }
+  .apply-sec > legend, .apply-sec > h2 { font-size:20px; font-weight:700; line-height:1.25; margin:0 0 12px; padding:0; }
+  .apply-card { background:var(--card); border:1px solid var(--line); border-radius:20px; padding:24px; display:grid; gap:16px; }
+  .apply-card > * { margin:0; }
+  /* A tick drawn in the accent, not a text glyph. */
+  .ticks { list-style:none; margin:0; padding:0; display:grid; gap:6px; }
+  .ticks li { position:relative; padding-left:24px; }
+  .ticks li::before { content:''; position:absolute; left:0; top:.3em; width:15px; height:15px; background:var(--accent);
+                      -webkit-mask:${TICK} center/contain no-repeat; mask:${TICK} center/contain no-repeat; }
+  .ticks li.plan-lead { padding-left:0; font-weight:700; }
+  .ticks li.plan-lead::before { display:none; }
+  .plans { display:grid; gap:12px; grid-template-columns:repeat(auto-fit,minmax(230px,1fr)); align-items:start; margin:0 0 12px; }
+  .plan { position:relative; display:grid; gap:10px; align-content:start; background:var(--card); border:1px solid var(--line);
+          border-radius:20px; padding:20px; }
   .plan-rec { border-color:rgba(191,246,66,.45); }
-  .plan-badge { position:absolute; top:-12px; left:22px; background:var(--accent); color:var(--accent-ink); font-size:12px;
-                font-weight:800; border-radius:99px; padding:4px 12px; }
-  .plan-name { font-size:20px; }
-  .plan-price { font-size:30px; font-weight:800; letter-spacing:-.02em; margin-top:6px; }
-  .plan-price .muted { font-size:14px; font-weight:500; }
-  .plan-limit { font-weight:700; font-size:14px; }
-  .plan-sum { margin:8px 0 0; }
-  .plan-sub { font-size:12px; text-transform:uppercase; letter-spacing:.1em; color:var(--muted); margin:16px 0 6px; font-weight:700; }
-  .plan ul { list-style:none; margin:0; padding:0; display:grid; gap:6px; font-size:14px; }
-  .plan li { padding-left:22px; position:relative; }
-  .plan li::before { content:'✓'; position:absolute; left:0; color:var(--accent); font-weight:800; }
-  .plan li.plan-lead { padding-left:0; font-weight:700; }
-  .plan li.plan-lead::before { content:''; }
-  .plan-pick { margin-top:18px; text-align:center; border:1px solid var(--line); border-radius:99px; padding:12px; font-weight:800; }
-  .plan:has(input:checked) .plan-pick { background:var(--accent); color:var(--accent-ink); border-color:var(--accent); }
-  form.wide { max-width:none; margin:0; display:grid; gap:14px; }
-  .apply-card { background:var(--card); border:1px solid var(--line); border-radius:20px; padding:24px; display:grid; gap:14px; }
-  .terms-list { list-style:none; margin:0; padding:0; display:grid; gap:10px; }
+  .plan:has(input:checked) { border-color:var(--accent); box-shadow:0 0 0 1px var(--accent); }
+  .plan:has(input:focus-visible) { outline:2px solid var(--accent); outline-offset:3px; }
+  .plan > input[type=radio] { position:absolute; top:22px; right:20px; width:22px; height:22px; margin:0; }
+  .plan-head { display:grid; gap:4px; padding-right:34px; color:var(--ink); cursor:pointer; }
+  .plan-head::after { content:''; position:absolute; inset:0; border-radius:inherit; }
+  .plan-top { display:flex; flex-wrap:wrap; align-items:center; gap:8px; }
+  .plan-name { font-size:20px; font-weight:800; line-height:1.25; }
+  .plan-badge { font-size:12px; font-weight:800; color:var(--accent); border:1px solid rgba(191,246,66,.5); border-radius:99px; padding:2px 10px; }
+  .plan-price { font-size:28px; font-weight:800; letter-spacing:-.02em; font-variant-numeric:tabular-nums; }
+  .plan-price .muted { font-size:13px; font-weight:500; letter-spacing:0; }
+  .plan-limit { margin:0; font-size:13px; font-weight:700; }
+  .plan .ticks { font-size:13px; }
+  .plan-more { position:relative; z-index:1; border-top:1px solid var(--line); }
+  .plan-more summary { cursor:pointer; min-height:44px; display:flex; align-items:center; font-size:13px; font-weight:700; }
+  .plan-more[open] summary { color:var(--accent); }
+  .plan-sub { font-size:12px; text-transform:uppercase; letter-spacing:.1em; color:var(--muted); margin:14px 0 6px; font-weight:700; }
+  .terms-list { list-style:none; margin:0; padding:0; display:grid; gap:12px 24px; grid-template-columns:repeat(auto-fit,minmax(260px,1fr)); }
   .terms-list li b { display:block; }
-  .terms-list li span { color:var(--muted); font-size:14px; }
-  .agree { display:flex; gap:12px; align-items:flex-start; font-size:15px; color:var(--ink); cursor:pointer;
-           border:1px solid var(--line); border-radius:14px; padding:14px 16px; }
-  .agree input { width:22px; height:22px; margin-top:1px; flex:none; }
-  .draft { display:inline-block; font-size:12px; font-weight:800; color:#f5c451; border:1px solid rgba(245,196,81,.4);
-           border-radius:99px; padding:2px 10px; margin-left:8px; }
-  .submit-row button { min-height:56px; font-size:17px; width:100%; }
-  .two { display:grid; gap:12px; grid-template-columns:1fr 1fr; }
-  @media (max-width:560px){ .two { grid-template-columns:1fr; } }
+  .terms-list li span { color:var(--muted); }
+  form.wide { max-width:none; margin:0; display:grid; }
+  .submit-row { margin-top:28px; display:grid; gap:12px; }
+  .submit-row p { margin:0; }
+  .submit-row button { min-height:56px; width:100%; font-weight:800; }
 `;
 
 /** The opening sentence of an agreement section, for the key-terms list. */
@@ -1138,10 +1199,10 @@ function firstSentence(text) {
 }
 
 /**
- * The gym-owner registration page (CLAUDE.md §41.1 Q2, Q5, Q6): what every
- * plan includes, the plans themselves as the main admin set them, and the key
- * terms with a required "I agree". Every line on it is something the product
- * or the team actually does.
+ * Step 1 of the gym-owner application (CLAUDE.md §41.1 Q2, Q5, §42): the
+ * plan, who they are, and the key terms with a required "I agree". A FORM,
+ * with the stepper as its only numbering; what Yoyo Gyms offers is on the
+ * front page (/platform/welcome#owners), linked from here.
  */
 export function signupPage({
   plans = [],
@@ -1150,7 +1211,6 @@ export function signupPage({
   selectedPlan = '',
   terms = [],
   termsApproved = false,
-  includes = [],
   // A signed-in owner correcting their own draft (CLAUDE.md §42): the account
   // exists and the agreement was accepted, so neither is asked again.
   editing = false,
@@ -1158,46 +1218,40 @@ export function signupPage({
   csrfToken = '',
 } = {}) {
   const chosen = selectedPlan || (plans.find((p) => p.key === 'medium') ? 'medium' : plans[0]?.key || '');
+  const title = editing ? 'Your details' : 'Apply to join Yoyo Gyms';
 
   return layout({
-    title: 'List your gym',
-    indexable: true, // the front door — it must be findable
-    body: `<style>${SIGNUP_STYLE}</style>
-<section class="apply-hero">
-  <p class="eyebrow">For gym owners</p>
-  <h1>Bring your gym to Yoyo Gyms</h1>
-  <p class="muted lede">Your own branded member app, check-in at the door, payments, classes and more —
-  and we set it up with you. Your first 30 days are free.</p>
-  <div class="trust"><span>Verified gyms only</span><span>30 days free</span><span>Setup help included</span><span>Your data kept separate</span></div>
-</section>
-<style>${APPLY_STEP_STYLE}</style>
+    title,
+    indexable: true, // the front door for owners — it must be findable
+    body: `<style>${SIGNUP_STYLE}${APPLY_STEP_STYLE}
+  main { max-width:880px; }
+</style>
 ${applySteps(1)}
-
-${
-  includes.length
-    ? `<h2 class="apply-h2">Every plan includes</h2>
-<div class="includes">
-${includes.map(([title, text]) => `  <div><b>${h(title)}</b><p>${h(text)}</p></div>`).join('\n')}
-</div>`
-    : ''
-}
-
-${error ? `<p class="err" role="alert" style="margin-top:24px">${h(error)}</p>` : ''}
+<h1>${title}</h1>
+<p class="lede">${
+      editing
+        ? 'Change anything below. You check it all again before you submit.'
+        : 'Your first 30 days are free, and a person checks every application before a gym goes live.'
+    } <a href="/platform/welcome#owners">What you get with Yoyo Gyms</a></p>
+${error ? `<p class="err" role="alert">${h(error)}</p>` : ''}
 
 <form class="wide" method="post" action="/platform/apply">
   ${editing ? `<input type="hidden" name="editing" value="1"><input type="hidden" name="csrf" value="${h(csrfToken)}">` : ''}
-  <h2 class="apply-h2">1. Choose your plan</h2>
-  <div class="plans">
-    ${plans
-      .map((p, i) =>
-        planCard(p, { selected: chosen === p.key, previous: i > 0 ? plans[i - 1] : null, recommended: p.key === 'medium' })
-      )
-      .join('')}
-  </div>
-  <p class="muted">You can move to another plan at any time. Moving down never deletes a member.</p>
+  <fieldset class="apply-sec">
+    <legend>Choose your plan</legend>
+    <div class="plans">
+      ${plans
+        .map((p, i) =>
+          planChoice(p, { selected: chosen === p.key, previous: i > 0 ? plans[i - 1] : null, recommended: p.key === 'medium' })
+        )
+        .join('')}
+    </div>
+    <p class="muted">You can move to another plan at any time. Moving down never deletes a member.</p>
+  </fieldset>
 
-  <h2 class="apply-h2">2. About you and your gym</h2>
-  <div class="apply-card">
+  <section class="apply-sec" aria-labelledby="about-h">
+    <h2 id="about-h">About you and your gym</h2>
+    <div class="apply-card">
     ${
       editing
         ? `<label>Your name
@@ -1220,7 +1274,7 @@ ${error ? `<p class="err" role="alert" style="margin-top:24px">${h(error)}</p>` 
           ? ''
           : `<label>Choose a password
         <input type="password" name="password" required minlength="10" autocomplete="new-password">
-        <span class="muted">At least 10 characters. You will use it to finish and follow your application, from any device.</span>
+        <span class="muted">At least 10 characters. You use it to finish and follow your application, from any device.</span>
       </label>`
       }
       <label>Your phone number
@@ -1232,7 +1286,7 @@ ${error ? `<p class="err" role="alert" style="margin-top:24px">${h(error)}</p>` 
     <div class="two">
       <label>Gym name
         <input name="gym_name" required value="${h(values.gym_name)}">
-        <span class="muted">This is the name your members will search for.</span>
+        <span class="muted">The name your members will search for.</span>
       </label>
       <label>Gym street address
         <input name="address" required autocomplete="street-address" value="${h(values.address)}">
@@ -1245,40 +1299,57 @@ ${error ? `<p class="err" role="alert" style="margin-top:24px">${h(error)}</p>` 
         <input name="city" required value="${h(values.city)}">
       </label>
       <label>Country
-        <input name="country" maxlength="2" placeholder="ZA" required value="${h(values.country)}">
+        ${countrySelect(values.country)}
+        <span class="muted">Not listed? Write to hello@mulesoo.com and we will add it.</span>
       </label>
     </div>
 
-    <label>Roughly how many members?
-      <input type="number" name="estimated_members" min="0" value="${h(values.estimated_members)}">
+    <label>Roughly how many members? <span class="muted">Optional.</span>
+      <input type="number" name="estimated_members" min="0" inputmode="numeric" value="${h(values.estimated_members)}">
     </label>
 
-    <label>Is there anything your gym needs that this does not do?
-      <textarea name="needs" rows="3" placeholder="Optional — but it genuinely shapes what we build next.">${h(values.needs)}</textarea>
+    <label>Is there anything your gym needs that this does not do? <span class="muted">Optional. It shapes what we build next.</span>
+      <textarea name="needs" rows="3">${h(values.needs)}</textarea>
     </label>
-  </div>
+    </div>
+  </section>
 
   ${
     editing
       ? ''
-      : `<h2 class="apply-h2">3. The agreement</h2>
-  <div class="apply-card">
-    <p><b>Gym Owner Agreement — the key terms</b>${termsApproved ? '' : '<span class="draft">DRAFT</span>'}</p>
-    <ul class="terms-list">
-      ${terms.map((t) => `<li><b>${h(t.heading || t.title)}</b><span>${h(firstSentence(t.body))}</span></li>`).join('\n      ')}
-    </ul>
-    <p><a href="/platform/terms" target="_blank" rel="noopener">Read the full Gym Owner Agreement →</a></p>
-    <label class="agree">
-      <input type="checkbox" name="accept_terms" value="yes" required${values.accept_terms === 'yes' ? ' checked' : ''}>
-      <span>I have read and agree to the Gym Owner Agreement.</span>
-    </label>
-    <p class="muted">Next you upload three documents — a PDF, or a photo from your phone: <b>your ID</b>,
-    <b>your business registration</b> and <b>proof of the gym's address</b>. Then you check everything and
-    submit. Nothing is sent until you do.</p>
-  </div>`
+      : `<section class="apply-sec" aria-labelledby="terms-h">
+    <h2 id="terms-h">The Gym Owner Agreement</h2>
+    <div class="apply-card">
+      <ul class="terms-list">
+        ${terms
+          .map((t) => `<li><b>${h(String(t.heading || t.title || '').replace(/^\d+\.\s*/, ''))}</b><span>${h(firstSentence(t.body))}</span></li>`)
+          .join('\n        ')}
+      </ul>
+      <p><a href="/platform/terms" target="_blank" rel="noopener">Read the full Gym Owner Agreement</a></p>
+      ${
+        // Still a draft until someone approves it (§41.1 Q5). Said calmly and
+        // truly: it is accepted AGAIN at activation, in its wording then.
+        termsApproved
+          ? ''
+          : '<p class="muted">The agreement is still being finalised. You accept it again when you activate your gym, so you always agree to its latest wording.</p>'
+      }
+      <label class="agree">
+        <input type="checkbox" name="accept_terms" value="yes" required${values.accept_terms === 'yes' ? ' checked' : ''}>
+        <span>I have read and agree to the Gym Owner Agreement.</span>
+      </label>
+    </div>
+  </section>`
   }
 
-  <div class="submit-row"><button type="submit">${editing ? 'Save and continue' : 'Continue — upload your documents'}</button></div>
+  <div class="submit-row">
+    ${
+      editing
+        ? ''
+        : `<p class="muted">Next you upload three documents, each a PDF or a photo from your phone: your ID, your business
+    registration and proof of the gym's address. Nothing is sent until you check it all and submit.</p>`
+    }
+    <button type="submit">${editing ? 'Save and continue' : 'Continue to your documents'}</button>
+  </div>
 </form>`,
   });
 }
@@ -1290,7 +1361,7 @@ export function signupSuccessPage({ gymName = '', emailed = true, user = null } 
     body: `<style>${SIGNUP_STYLE}${APPLY_STEP_STYLE}</style>
 ${applySteps(4)}
 <h1>Application sent</h1>
-<p>Thank you — your application for <b>${h(gymName)}</b> and its documents are with us.${
+<p class="lede">Thank you. Your application for <b>${h(gymName)}</b> and its documents are with us.${
       emailed ? ' We have emailed you a confirmation.' : ''
     }</p>
 
@@ -1303,7 +1374,7 @@ ${applySteps(4)}
     gives you your own gym admin panel.</li>
   </ol>
 </div>
-<p><a class="btn" href="/platform/my-gym">Follow your application →</a></p>
+<p><a class="btn" href="/platform/my-gym">Follow your application</a></p>
 <p class="muted">Your gym will not appear in member search until it is approved and live.</p>`,
   });
 }
@@ -1353,7 +1424,7 @@ function applySteps(at) {
 
 /** What each document is, in the owner's words. */
 const DOCUMENT_HINTS = {
-  id_document: 'Your passport or national ID card — the side with your photo, all four corners in the picture.',
+  id_document: 'Your passport or national ID card. Show the side with your photo, with all four corners in the picture.',
   business_registration: 'The certificate that registers the business that runs the gym.',
   proof_of_address: "A recent utility bill, lease or municipal account showing the gym's street address.",
   tax_clearance: 'A tax clearance certificate, if you have one.',
@@ -1388,10 +1459,10 @@ function docBox(type, documents, { required }) {
       ? `<p class="doc-file"><a href="/platform/apply/documents/${h(latest.id)}" target="_blank" rel="noopener">${h(latest.filename || 'Your file')}</a> <span class="muted">${h(fileSize(latest.size_bytes))}</span></p>`
       : ''
   }
-  ${rejected ? `<p class="err" style="margin:0">Not accepted${latest.reject_reason ? `: ${h(latest.reject_reason)}` : ''} — please upload a new one.</p>` : ''}
+  ${rejected ? `<p class="err" style="margin:0">Not accepted${latest.reject_reason ? `: ${h(latest.reject_reason)}` : ''}. Please upload a new one.</p>` : ''}
   <label class="upload-btn">
     <input type="file" accept="application/pdf,image/*" data-type="${h(type)}">
-    <span>${done ? 'Replace' : 'Upload'} — PDF or photo</span>
+    <span>${done ? 'Replace the file' : 'Upload a PDF or photo'}</span>
   </label>
   <p class="doc-note muted" aria-live="polite"></p>
 </div>`;
@@ -1420,18 +1491,20 @@ export function applyDocumentsPage({ application, documents = [], csrfToken = ''
   return layout({
     title: 'Upload your documents',
     user,
-    body: `<style>${SIGNUP_STYLE}${APPLY_STEP_STYLE}</style>
+    body: `<style>${SIGNUP_STYLE}${APPLY_STEP_STYLE}
+  main { max-width:880px; }
+</style>
 ${applySteps(2)}
 <h1>Upload your documents</h1>
-<p class="muted">For <b>${h(application.proposed_gym_name || 'your gym')}</b>. A PDF, or a clear photo — take one with
-your phone's camera or choose a file. Up to 10 MB each. We look at every document by hand.</p>
+<p class="lede">For <b>${h(application.proposed_gym_name || 'your gym')}</b>. Send a PDF or a clear photo: take one with
+your phone's camera, or choose a file. Up to 10 MB each. A person looks at every document.</p>
 
 <div class="docs">
 ${REQUIRED_DOCUMENTS.map((t) => docBox(t, documents, { required: true })).join('\n')}
 </div>
 
 <details class="optional"${optionalUploaded ? ' open' : ''}>
-  <summary>Optional documents — they can speed up the review</summary>
+  <summary>Optional documents, which can speed up the review</summary>
   <div class="docs">
 ${OPTIONAL_DOCUMENTS.map((t) => docBox(t, documents, { required: false })).join('\n')}
   </div>
@@ -1440,7 +1513,7 @@ ${OPTIONAL_DOCUMENTS.map((t) => docBox(t, documents, { required: false })).join(
 <p class="muted" style="margin-top:24px"><b>${have} of ${REQUIRED_DOCUMENTS.length}</b> required documents uploaded.</p>
 <div class="submit-row">${
       ready
-        ? '<a class="cta" href="/platform/apply/review">Continue — check and submit</a>'
+        ? '<a class="cta" href="/platform/apply/review">Continue to check and submit</a>'
         : '<button class="cta" type="button" disabled>Upload the three required documents to continue</button>'
     }</div>
 <p><a href="/platform/apply">← Back to your details</a></p>
@@ -1530,7 +1603,7 @@ ${OPTIONAL_DOCUMENTS.map((t) => docBox(t, documents, { required: false })).join(
       note.textContent = 'Uploaded ✓';
       location.reload();
     } catch (err) {
-      say('The upload stopped — please check your connection and try again.', true);
+      say('The upload stopped. Please check your connection and try again.', true);
     } finally {
       box.classList.remove('busy');
       input.value = '';
@@ -2065,9 +2138,11 @@ function money(cents, currency = 'ZAR') {
 const FINDER_NEXT = {
   join: { title: 'Join a gym', sub: 'Find the gym you want to join, then register with them.', path: '/register' },
   signin: { title: 'Member sign in', sub: 'Find your gym, then sign in with your membership number and phone.', path: '/member' },
+  // The STAFF door: a gym's own sign-in. Owners have their own door,
+  // /owner/login, which finds their gym for them (design critique 2026-09-29).
   admin: {
-    title: 'Gym owner login',
-    sub: 'Choose your gym, then sign in with your admin email or username and password. Your staff use the same sign-in.',
+    title: 'Gym staff sign in',
+    sub: 'Choose your gym, then sign in with your email or username and password. Gym owners can use the owner sign-in instead.',
     path: '/admin/login',
   },
 };
@@ -2079,7 +2154,7 @@ export function finderPage({ next = '' } = {}) {
     indexable: !FINDER_NEXT[next],
     body: `<p><a href="/platform/welcome">← Back</a></p>
 <h1>${h(go.title)}</h1>
-<p class="muted">${h(go.sub)}</p>
+<p class="lede">${h(go.sub)}${next === 'admin' ? ' <a href="/owner/login">Gym owner sign-in</a>' : ''}</p>
 
 <form class="card" id="finder" onsubmit="return false">
   <label>Gym name<input id="q" name="q" placeholder="e.g. BOS GYM" autocomplete="off"></label>
@@ -2214,7 +2289,7 @@ export function activatePage({ token = '', gymName = '', error = '', code = '', 
     return layout({
       title: 'Activate your account',
       body: `<h1>This link has expired</h1>
-<p class="muted">Activation links and codes work for 10 minutes. You can receive one link a day.</p>
+<p class="lede">Activation links and codes work for 10 minutes. You can receive one link a day.</p>
 <form class="card" method="post" action="/platform/activate/renew">
   <input type="hidden" name="token" value="${h(token)}">
   <p>We will email a new link and code to the address you applied with.</p>
@@ -2225,13 +2300,13 @@ export function activatePage({ token = '', gymName = '', error = '', code = '', 
   return layout({
     title: 'Activate your account',
     body: `<h1>Activate your account</h1>
-<p class="muted">${
+<p class="lede">${
       gymName
         ? `Your gym <b>${h(gymName)}</b> has been approved.`
         : 'Your gym has been approved.'
     } Enter the six-digit code from your email and choose a password. The link and code work for
     <b>10 minutes</b>.</p>
-${error ? `<p class="err">${h(error)}</p>` : ''}
+${error ? `<p class="err" role="alert">${h(error)}</p>` : ''}
 
 <form class="card" method="post" action="/platform/activate">
   <input type="hidden" name="token" value="${h(token)}">
@@ -2250,12 +2325,12 @@ ${error ? `<p class="err">${h(error)}</p>` : ''}
   <label>Choose a password
     <input type="password" name="password" required minlength="10" autocomplete="new-password">
   </label>
-  <p class="muted">At least 10 characters. <b>This becomes your one password</b> — for your Yoyo Gyms account and your
-  gym admin panel — and it <b>replaces the one you chose when you applied</b>. Type it yourself: if your browser
+  <p class="muted">At least 10 characters. <b>This becomes your one password</b>, for your Yoyo Gyms account and your
+  gym admin panel, and it <b>replaces the one you chose when you applied</b>. Type it yourself: if your browser
   offers a saved password here, that is the old one.</p>
-  <label class="check">
+  <label class="agree">
     <input type="checkbox" name="accept_terms" value="yes" required>
-    I have read and accept the <a href="/platform/terms" target="_blank" rel="noopener">Gym Owner Agreement</a>.
+    <span>I have read and accept the <a href="/platform/terms" target="_blank" rel="noopener">Gym Owner Agreement</a>.</span>
   </label>
   <button type="submit">Activate</button>
 </form>`,
@@ -2286,7 +2361,7 @@ export function activateSuccessPage({ gymActivated = false, gymSlug = '', gymUse
     title: 'Account activated',
     body: `<div class="card">
   <h1>Your account is active</h1>
-  ${ownerRef ? `<p>Your <b>Owner ID</b> is <b style="font-size:1.2em;letter-spacing:.05em">${h(ownerRef)}</b>. Keep it — quote it whenever you contact us.</p>` : ''}
+  ${ownerRef ? `<p>Your <b>Owner ID</b> is <b style="font-size:1.2em;letter-spacing:.05em">${h(ownerRef)}</b>. Keep it, and quote it whenever you contact us.</p>` : ''}
   <p>You can now sign in with your email and the password you just chose. Your signed
   <b>Gym Owner Agreement</b> is on your owner page as a PDF, to download any time.</p>
   ${
@@ -2295,7 +2370,7 @@ export function activateSuccessPage({ gymActivated = false, gymSlug = '', gymUse
          <p class="muted">Your free trial has started. We will email you before it ends.</p>`
       : `<p class="muted">Your gym is not open to members yet. We will email you when it is.</p>`
   }
-  <p><a href="/platform/login">Sign in →</a></p>
+  <p><a class="btn" href="/owner/login">Sign in</a></p>
 </div>
 ${gymLogin}`,
   });
@@ -2332,7 +2407,8 @@ function ownerApplicationText(application) {
       return `<p><b>Your application was not approved.</b>${
         application.decision_reason ? ` Reason: ${h(application.decision_reason)}` : ''
       }</p>
-  <p class="muted">You are welcome to apply again once that is resolved. <a href="/platform/apply">Apply again →</a></p>`;
+  <p class="muted">You are welcome to apply again once that is resolved.</p>
+  <p><a class="btn" href="/platform/apply">Apply again</a></p>`;
     default:
       return `<p class="muted">A person is reviewing your application. Upload the three documents below —
   your gym is approved once each has been checked. We email you as soon as there is a decision.</p>`;
@@ -2365,6 +2441,16 @@ export function ownerDashboardPage({
   support = null,
   planSupport = null,
 } = {}) {
+  // THE OWNER'S NEXT STEP is the one lime button on the page; everything else
+  // is secondary. "Pay now" was lime while opening the gym — the main task —
+  // was a text link (design critique 2026-09-29).
+  const payUrgent = Boolean(subscription && ['past_due', 'suspended'].includes(subscription.status));
+  const openGym = gym?.status === 'active' && !payUrgent;
+  const docsNeeded =
+    Boolean(application && ['submitted', 'under_review', 'info_requested'].includes(application.status)) &&
+    (application.status === 'info_requested' ||
+      REQUIRED_DOCUMENTS.some((t) => !documents.some((d) => d.doc_type === t && ['accepted', 'pending'].includes(d.status))));
+
   // What Yoyo Gyms promises this owner, and how to reach it (§41.1 Q6, Q7).
   const prime = gym?.plan_key === 'prime';
   const supportCard =
@@ -2394,7 +2480,7 @@ export function ownerDashboardPage({
         ? `<p>You asked for setup help ${h(when(support.setupRequestedAt))}. We will be in touch.</p>`
         : `<form method="post" action="/platform/my-gym/setup-help" style="margin-top:14px">
     <input type="hidden" name="csrf" value="${h(csrfToken)}">
-    <button type="submit">Ask for setup help</button>
+    <button type="submit" class="ghost">Ask for setup help</button>
     <p class="muted">We help you set your plans and prices, move your members across and print your QR posters.</p>
   </form>`
   }
@@ -2444,8 +2530,8 @@ ${documents
   </label>
   <label>File<input type="file" name="file" accept=".pdf,image/jpeg,image/png,image/webp,image/heic" required></label>
   <p class="muted">PDF or a photo, up to 10 MB. We look at every document by hand.</p>
-  <button type="submit">Upload</button>
-  <p class="muted" id="upload-note"></p>
+  <button type="submit"${docsNeeded ? '' : ' class="ghost"'}>Upload</button>
+  <p class="muted" id="upload-note" aria-live="polite"></p>
 </form>
 
 <script>
@@ -2510,13 +2596,13 @@ ${documents
 
   const status = gym
     ? `<div class="card">
-  <h2>${h(gym.search_name || gym.slug)}</h2>
+  <h2>${h(gym.search_name || application?.proposed_gym_name || 'Your gym')}</h2>
   <p>${statusTag(gym.status)}${subscription ? ` · ${statusTag(subscription.status)}` : ''}</p>
   ${
     gym.status === 'active'
-      ? `<p><a href="${h(gymAdminPath(gym.slug))}">Open your gym admin panel →</a></p>
-         <p class="muted">That is where you manage members, check-ins, payments and classes.
-         Sign in as <b>${h(OWNER_USERNAME)}</b> with the password you chose when you activated.</p>`
+      ? `<p><a class="btn${openGym ? '' : ' ghost'}" href="${h(gymAdminPath(gym.slug))}">Open your gym admin panel</a></p>
+         <p class="muted">That is where you manage members, check-ins, payments and classes. Sign in with your
+         email, or as <b>${h(OWNER_USERNAME)}</b>, and the password you chose when you activated.</p>`
       : `<p class="muted">Your gym is not open yet. We will email you the moment it is.</p>`
   }
   ${
@@ -2528,9 +2614,9 @@ ${documents
     subscription && ['trialing', 'past_due', 'suspended'].includes(subscription.status)
       ? `<form method="post" action="/platform/my-gym/pay">
       <input type="hidden" name="csrf" value="${h(csrfToken)}">
-      <button type="submit">${subscription.status === 'suspended' ? 'Pay and reopen my gym' : 'Pay now'}</button>
-      <p class="muted">You will be taken to Paystack. We never see or store your card —
-      only a token that lets us take the same amount next month.</p>
+      <button type="submit"${payUrgent ? '' : ' class="ghost"'}>${subscription.status === 'suspended' ? 'Pay and reopen my gym' : 'Pay now'}</button>
+      <p class="muted">You will be taken to Paystack. We never see or store your card, only a token that
+      lets us take the same amount next month.</p>
     </form>`
       : ''
   }
@@ -2573,15 +2659,16 @@ ${documents
   confirmed it with you. <b>Download anything you want to keep first.</b></p>
   <form method="post" action="/platform/my-gym/close">
     <input type="hidden" name="csrf" value="${h(csrfToken)}">
-    <button type="submit">Ask to close my account</button>
+    <button type="submit" class="ghost">Ask to close my account</button>
   </form>
 </details>`;
 
   return layout({
     active: 'my-gym',
-    title: 'Your gym',
+    title: gym ? 'Your gym' : 'Your application',
+    ownerNav: gym ? 'My gym' : 'My application',
     user: user && { ...user, kind: 'gym_owner' },
-    body: `<h1>Your gym</h1>
+    body: `<h1>${gym ? 'Your gym' : 'Your application'}</h1>
 ${status}
 ${supportCard}
 ${agreementCard}
@@ -2616,14 +2703,14 @@ export function deleteAccountPage() {
   <ol>
     <li><a href="/platform/find">Find your gym</a> and sign in with your membership number and phone number.</li>
     <li>On the <b>Status</b> screen, scroll to the bottom and choose <b>Request data deletion</b>.</li>
-    <li>Your gym is told straight away and deletes your records — your details, check-ins, bookings,
+    <li>Your gym is told straight away and deletes your records: your details, check-ins, bookings,
     health answers and any face data.</li>
   </ol>
   <p class="muted">Cannot sign in? Ask your gym directly. They hold your records and can delete them.</p>
 
   <h2>If you own a gym</h2>
   <ol>
-    <li><a href="/platform/login">Sign in</a> and open <b>Your gym</b>.</li>
+    <li><a href="/owner/login?next=account">Sign in to your Yoyo Gyms account</a>.</li>
     <li>Choose <b>Close my account</b>. We contact you to confirm, close the gym to members and switch
     off your sign-in. Your gym's data is kept for 90 days in case you change your mind, then deleted
     once we have confirmed it with you.</li>
@@ -3240,7 +3327,7 @@ export function setupDonePage({ recoveryCodes = [], invited = false } = {}) {
     body: `<h1>Your account is ready</h1>
 
 <div class="card">
-  <h2>⚠️ Save these recovery codes now</h2>
+  <h2>Save these recovery codes now</h2>
   <p class="muted">Each one signs you in once if you lose your phone. <b>This is the only time
   they are shown</b> — only their hashes are stored, so nobody, including us, can show them
   to you again.</p>
@@ -3252,7 +3339,7 @@ export function setupDonePage({ recoveryCodes = [], invited = false } = {}) {
 </div>
 
 <div class="card">
-  <p><a href="/platform/login">Sign in →</a></p>
+  <p><a class="btn" href="/platform/login">Sign in</a></p>
   ${
     invited
       ? ''
@@ -3327,7 +3414,7 @@ export function problemPage({ title = 'Something went wrong', message = '', fix 
     body: `<div class="card">
   <h1>${h(title)}</h1>
   <p>${h(message)}</p>
-  ${fix ? `<div class="card" style="border-left:4px solid #b7791f"><b>How to fix it</b><p>${h(fix)}</p></div>` : ''}
+  ${fix ? `<div class="fix"><b>How to fix it</b><p>${h(fix)}</p></div>` : ''}
   ${back ? `<p><a class="btn" href="${h(back.href)}">${h(back.label)} →</a></p>` : ''}
 </div>`,
   });
@@ -4069,39 +4156,86 @@ export function privacyPage({ approved = false, contact = '', operator = 'MuleSo
  * panel is still the website's main job (D-133); this page only makes sure a
  * gym member or a gym owner who arrives here has a way forward.
  */
-export function welcomePage() {
+export function welcomePage({ plans = [], includes = EVERY_PLAN_INCLUDES } = {}) {
   // The website's front door, made to match the app's first screen (CLAUDE.md
   // §36): the user's photograph — which already carries the Yoyo Gyms logo, so
   // no header logo is added above it (§36.1 Q11) — the headline, and every
   // choice a person arrives with. The main admin panel is still the website's
   // main job (D-133); this page makes sure a member or an owner has a way in.
+  //
+  // ONE lime button on the page — "Join a gym", the member choice being the
+  // primary one, as on the app's first screen (§36) — and every other way in
+  // grouped under it (design critique 2026-09-29: nine actions, two lime).
+  //
+  // Below the choices, WHAT AN OWNER GETS (#owners): what every plan includes,
+  // each plan's services and support, and Yoyo's commitments (§41.1 Q6). It
+  // was the top of the application form, which made step 1 a 7000px sales
+  // page; the form now links here. Every line is something the product or the
+  // team actually does (the same data as before: plans.js).
+  const planColumns = plans
+    .map(
+      (p, i) => `<section class="pitch-plan${p.key === 'medium' ? ' plan-rec' : ''}" aria-labelledby="pp-${h(p.key)}">
+      <div class="plan-top"><h3 id="pp-${h(p.key)}" class="plan-name">${h(p.label)}</h3>${
+        p.key === 'medium' ? '<span class="plan-badge">Recommended</span>' : ''
+      }</div>
+      <p class="plan-price">${planPrice(p)}</p>
+      <p class="plan-limit">${h(p.memberLimit)}</p>
+      ${p.summary ? `<p class="muted">${h(p.summary)}</p>` : ''}
+      ${planDetails(p, i > 0 ? plans[i - 1] : null)}
+    </section>`
+    )
+    .join('\n    ');
+
   return layout({
     title: 'Yoyo Gyms',
     indexable: true,
     bare: true,
     bodyClass: 'landing',
-    body: `<style>
+    body: `<style>${SIGNUP_STYLE}
   body.landing main { max-width: 960px; padding: 0 0 48px; }
   .land-hero { position: relative; height: min(56vh, 520px); min-height: 260px; overflow: hidden; }
   .land-hero img { display: block; width: 100%; height: 100%; object-fit: cover; object-position: 50% 0; }
   .land-hero::after { content: ''; position: absolute; left: 0; right: 0; bottom: 0; height: 50%;
                       background: linear-gradient(rgba(7,12,16,0), var(--bg) 92%); }
   .land-body { position: relative; margin-top: -64px; padding: 0 20px; text-align: center; }
-  .land-h { font-size: clamp(32px, 8vw, 48px); line-height: 1.04; font-weight: 800; text-transform: uppercase;
-            letter-spacing: -0.01em; margin: 0 0 12px; }
+  body.landing .land-h { font-size: clamp(32px, 8vw, 48px); line-height: 1.04; font-weight: 800; text-transform: uppercase;
+            letter-spacing: -0.01em; margin: 0 0 12px; max-width: none; }
   .land-h span { display: block; color: var(--accent); }
   .land-lede { font-size: 16px; max-width: 32ch; margin: 0 auto 32px; }
   .land-grid { display: grid; gap: 16px; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); text-align: left; }
-  .land-card { background: var(--card); border: 1px solid var(--line); border-radius: 20px; padding: 24px; display: grid; gap: 12px; }
-  .land-card h2 { margin: 0; font-size: 20px; }
+  .land-card { background: var(--card); border: 1px solid var(--line); border-radius: 20px; padding: 24px; display: grid; gap: 12px;
+               align-content: start; }
+  body.landing .land-card h2 { margin: 0; font-size: 20px; }
   .land-card p { margin: 0 0 4px; }
   .btn { display: flex; align-items: center; justify-content: center; min-height: 52px; border-radius: 26px;
          font-weight: 800; text-decoration: none; background: var(--accent); color: var(--accent-ink); }
   .btn.ghost { background: transparent; color: var(--ink); border: 1.5px solid rgba(255,255,255,.86); }
   .btn:hover { filter: brightness(1.08); }
-  .land-small { text-align: center; font-size: 14px; }
-  .land-small a, .land-foot a { color: var(--muted); }
-  .land-foot { margin-top: 32px; text-align: center; }
+  .land-small { font-size: 13px; }
+  .land-small a { color: var(--ink); }
+  .land-foot { margin-top: 32px; text-align: center; font-size: 13px; display: grid; gap: 6px; justify-items: center; }
+  .land-foot a { color: var(--muted); }
+  .land-foot b { color: var(--muted); font-weight: 700; }
+
+  /* The owner pitch. */
+  .pitch { padding: 56px 20px 0; border-top: 1px solid var(--line); margin-top: 48px; }
+  body.landing .pitch h2 { font-size: 28px; line-height: 1.15; margin: 0 0 10px; }
+  .pitch h3 { margin: 0; }
+  .pitch-lede { color: var(--muted); margin: 0 0 16px; }
+  .pitch-points { display: flex; flex-wrap: wrap; gap: 8px 20px; margin: 0 0 8px; font-weight: 700; }
+  .pitch .apply-sec > h2, .pitch .apply-sec > h3 { font-size: 20px; line-height: 1.25; margin: 0 0 14px; }
+  .includes { display: grid; gap: 0 32px; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); margin: 0; }
+  .includes div { border-top: 1px solid var(--line); padding: 14px 0; }
+  .includes dt { font-weight: 800; }
+  .includes dd { margin: 4px 0 0; color: var(--muted); }
+  .pitch-plans { display: grid; gap: 12px; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); align-items: start; }
+  .pitch-plan { background: var(--card); border: 1px solid var(--line); border-radius: 20px; padding: 22px; display: grid;
+                align-content: start; }
+  .pitch-plan > p { margin: 0; }
+  .pitch-plan .plan-price { margin-top: 6px; }
+  .pitch-plan .ticks { font-size: 14px; }
+  .pitch-go { display: grid; gap: 10px; justify-items: start; margin-top: 28px; }
+  .pitch-go .btn { padding: 0 28px; }
 
   /* A computer: the photograph in a phone-width panel beside the choices, never
      shown larger than it really is (941 px wide — §39.1 Q2), so it stays sharp. */
@@ -4114,7 +4248,8 @@ export function welcomePage() {
     .land-hero::after { height: 30%; }
     .land-body { margin-top: 0; padding: 0; text-align: left; }
     .land-lede { margin: 0 0 32px; }
-    .land-foot { text-align: left; }
+    .land-foot { justify-items: start; text-align: left; }
+    .pitch { padding: 64px 0 0; }
   }
 </style>
 <div class="land">
@@ -4133,16 +4268,52 @@ export function welcomePage() {
     </section>
     <section class="land-card">
       <h2>I’m a gym owner</h2>
-      <p class="muted">Open your gym’s admin panel with your email and password, or bring your gym to Yoyo.</p>
-      <a class="btn" href="/owner/login">Owner login</a>
+      <p class="muted">Sign in to your gym, or to your application if your gym is not open yet. New here? Bring your gym to Yoyo.</p>
+      <a class="btn ghost" href="/owner/login">Owner sign in</a>
       <a class="btn ghost" href="/platform/apply">Apply to join Yoyo Gyms</a>
-      <p class="land-small"><a href="/platform/find?next=admin">Gym staff sign in</a> · <a href="/platform/login?as=owner">Check application status</a></p>
+      <p class="land-small"><a href="#owners">What you get with Yoyo Gyms</a></p>
     </section>
   </div>
 
-  <p class="muted land-foot"><a href="/platform/privacy">Privacy policy</a> · <a href="/platform/delete-account">Delete your account</a> · <a href="/platform/login">Yoyo staff sign in</a></p>
+  <div class="muted land-foot">
+    <p><b>Staff</b> · <a href="/platform/find?next=admin">Gym staff sign in</a> · <a href="/platform/login">Yoyo staff sign in</a></p>
+    <p><a href="/platform/privacy">Privacy policy</a> · <a href="/platform/delete-account">Delete your account</a></p>
+  </div>
 </div>
-</div>`,
+</div>
+
+<section class="pitch" id="owners" aria-labelledby="owners-h">
+  <h2 id="owners-h">Bring your gym to Yoyo Gyms</h2>
+  <p class="pitch-lede">Your own branded member app, check-in at the door, payments, classes and more, and we set it up
+  with you. Your first 30 days are free.</p>
+  <p class="pitch-points"><span>Verified gyms only</span><span>30 days free</span><span>Setup help included</span><span>Your data kept separate</span></p>
+  ${
+    includes.length
+      ? `<div class="apply-sec">
+    <h3>Every plan includes</h3>
+    <dl class="includes">
+      ${includes.map(([title, text]) => `<div><dt>${h(title)}</dt><dd>${h(text)}</dd></div>`).join('\n      ')}
+    </dl>
+  </div>`
+      : ''
+  }
+  ${
+    planColumns
+      ? `<div class="apply-sec">
+    <h3>The plans</h3>
+    <div class="pitch-plans">
+    ${planColumns}
+    </div>
+    <p class="muted" style="margin-top:12px">You can move to another plan at any time. Moving down never deletes a member.</p>
+  </div>`
+      : ''
+  }
+  <div class="pitch-go">
+    <a class="btn ghost" href="/platform/apply">Apply to join Yoyo Gyms</a>
+    <p class="muted">A person checks every application. You upload three documents: your ID, your business registration
+    and proof of the gym's address.</p>
+  </div>
+</section>`,
   });
 }
 

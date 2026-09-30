@@ -15,7 +15,7 @@ import { ownerFacingPlan, livePlansForOwners, EVERY_PLAN_INCLUDES, SUPPORT_BY_PL
 import { readApplication } from '../platform/application-form.js';
 import { handlePlatform } from '../platform/router.js';
 import { sessionCookie, issueCsrfToken } from '../platform/http.js';
-import { signupPage, gymDetailPage, ownerDashboardPage, settingsPage, plansPage } from '../platform/views.js';
+import { signupPage, gymDetailPage, ownerDashboardPage, settingsPage, plansPage, welcomePage } from '../platform/views.js';
 import { cleanSupport, audit } from '../platform/deps.js';
 
 const STAFF = { id: 'staff-1', email: 'me@yoyogyms.com', kind: 'platform_staff' };
@@ -205,13 +205,17 @@ test('Q5 the registration page shows the key terms, marks the draft, and require
     termsApproved: false,
     includes: EVERY_PLAN_INCLUDES,
   });
-  assert.match(html, /1\. The parties/);
+  assert.match(html, /<b>The parties<\/b>/, 'the stepper is the only numbering on step 1');
   assert.match(html, /This agreement is between you and us\./);
   assert.ok(!html.includes('More words'), 'the opening sentence, not the whole section');
-  assert.match(html, /DRAFT/);
+  // Still a draft, said calmly beside "I agree": it is accepted again at activation.
+  assert.match(html, /still being finalised\. You accept it again when you activate your gym/);
   assert.match(html, /<input type="checkbox" name="accept_terms" value="yes" required/);
   assert.match(html, /href="\/platform\/terms"/);
-  for (const [title] of EVERY_PLAN_INCLUDES) assert.ok(html.includes(title.replace(/'/g, '&#39;')), title);
+  // What every plan includes moved to the front page (design critique 2026-09-29).
+  assert.match(html, /href="\/platform\/welcome#owners"/, 'step 1 links to it');
+  const welcome = welcomePage({ includes: EVERY_PLAN_INCLUDES });
+  for (const [title] of EVERY_PLAN_INCLUDES) assert.ok(welcome.includes(title.replace(/'/g, '&#39;')), title);
 });
 
 test('Q5 an application without "I agree" is refused, with a reason', () => {
