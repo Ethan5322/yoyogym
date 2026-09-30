@@ -15,7 +15,7 @@
 // components (D-081 forbids cross-imports), and duplicating a design system for
 // an internal panel would be work with no return.
 
-import { when, exact, until, money as fmtMoney, count } from './format.js';
+import { when, exact, until, money as fmtMoney } from './format.js';
 import { pageLink } from './paging.js';
 import { gymAdminPath, OWNER_USERNAME } from './gym-admin.js';
 import { BRAND, LOGO_ON_DARK } from '../shared/brand.js';
@@ -72,6 +72,9 @@ const STYLE = `
   table { width:100%; border-collapse:collapse; margin-top:16px; }
   th, td { text-align:left; padding:10px 8px; border-bottom:1px solid var(--line); }
   th { font-size:12px; text-transform:uppercase; letter-spacing:.05em; color:var(--muted); }
+  /* Figures line up in a column: right-aligned, equal-width digits (design
+     critique 2026-09-29). */
+  th.num, td.num { text-align:right; font-variant-numeric:tabular-nums; white-space:nowrap; }
   a { color:var(--accent); }
   .empty { border:1px dashed var(--line); border-radius:8px; padding:40px 20px;
            text-align:center; color:var(--muted); margin-top:16px; }
@@ -98,7 +101,7 @@ const STYLE = `
                               color:var(--bad); }
   details.confirm > summary::-webkit-details-marker { display:none; }
   details.confirm[open] > summary { background:rgba(255,107,94,.1); }
-  details.confirm form { margin:10px 0 0; max-width:340px; white-space:normal; }
+  details.confirm form { margin:10px 0 0; max-width:min(340px,100%); white-space:normal; }
   details.confirm p { margin:0 0 10px; font-size:14px; color:var(--ink); }
   /* Every control at least 44 px tall — a comfortable target for a finger, and
      big enough to read at a glance (CLAUDE.md §41). */
@@ -171,8 +174,12 @@ const STYLE = `
   body.panel { display:grid; grid-template-columns:252px minmax(0,1fr); min-height:100vh; }
   .side { position:sticky; top:0; height:100vh; overflow-y:auto; overflow-x:hidden; background:#0a1115;
           border-right:1px solid var(--line); padding:18px 12px; display:flex; flex-direction:column; }
-  .side .brand { display:block; padding:4px 10px 8px; }
-  .side .brand img { display:block; height:44px; width:auto; }
+  .side .brand { display:block; width:max-content; padding:4px 10px 8px; }
+  /* The logo without its tagline (design critique 2026-09-29): "LIFT · TRAIN ·
+     TRANSFORM" is 3 px tall at sidebar size, so the picture is cropped just
+     under the wordmark. At 87 x 60 the 720 x 531 file shows rows 0-496; the
+     wordmark ends at 488 and the tagline starts at 510. */
+  .side .brand img { display:block; width:87px; height:60px; object-fit:cover; object-position:50% 0; }
   /* The phone menu's switch. On a computer it is display:none, so it is not
      an invisible stop in the keyboard order. */
   .navt { display:none; }
@@ -201,21 +208,61 @@ const STYLE = `
   body.panel th { background:rgba(255,255,255,.03); }
   body.panel tbody tr:hover td { background:rgba(255,255,255,.025); }
   body.panel tbody tr:last-child td { border-bottom:0; }
-  .kpis { display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:12px; margin:20px 0; }
+  /* A wide list scrolls inside its own box on a tablet, never the page. */
+  .tscroll { overflow-x:auto; margin-top:16px; }
+  .tscroll > table { margin-top:0; }
+  .card .tscroll { margin-top:4px; }
+  .tscroll th { white-space:nowrap; }
+  body.panel .sr-only { position:absolute; width:1px; height:1px; overflow:hidden; clip-path:inset(50%); white-space:nowrap; }
+  /* One lime fill per page, for the one thing to do next; every other action
+     is outlined (design critique 2026-09-29: lime was on every button). */
+  body.panel .btn.ghost:hover, body.panel button.ghost:hover { border-color:rgba(255,255,255,.32); }
+  /* A card whose colour says what it is — never a thick stripe down one side. */
+  body.panel .card.tone-bad { border-color:rgba(255,107,94,.45); }
+  body.panel .card.tone-warn { border-color:rgba(245,196,81,.45); }
+  body.panel .card.tone-good { border-color:rgba(142,224,122,.4); }
+  /* The application states as one row of tabs: the current one tinted like the
+     menu's current page, not a lime button beside four grey ones. */
+  .tabs { display:flex; flex-wrap:wrap; gap:6px; margin:18px 0 4px; }
+  .tabs a { display:inline-flex; align-items:center; gap:8px; min-height:44px; padding:0 16px; border-radius:99px;
+            border:1px solid var(--line); color:var(--ink); text-decoration:none; font-weight:700; font-size:14px; }
+  .tabs a:hover { border-color:rgba(255,255,255,.32); }
+  .tabs a[aria-current] { background:rgba(191,246,66,.12); border-color:rgba(191,246,66,.45); color:var(--accent); }
+  .tabs .n { color:var(--muted); font-weight:600; font-variant-numeric:tabular-nums; }
+  .tabs a[aria-current] .n { color:inherit; }
+  /* The figures on Today and on a gym: a grid that never leaves one tile alone
+     on a row (design critique 2026-09-29: Today wrapped 5+1). It sizes by the
+     room it is given, not by the window, because the sidebar comes and goes. */
+  .kpi-wrap { container-type:inline-size; margin:12px 0 20px; }
+  .kpis { display:grid; grid-template-columns:minmax(0,1fr); gap:12px; margin:0; }
+  .kpis.n1 { max-width:320px; }
+  @container (min-width: 340px) { .kpis.n2, .kpis.n4 { grid-template-columns:repeat(2,minmax(0,1fr)); } }
+  @container (min-width: 600px) { .kpis.n3 { grid-template-columns:repeat(3,minmax(0,1fr)); } }
+  @container (min-width: 760px) { .kpis.n4 { grid-template-columns:repeat(4,minmax(0,1fr)); } }
   .kpi { display:block; background:var(--card); border:1px solid var(--line); border-radius:16px; padding:16px 18px;
          color:inherit; text-decoration:none; }
   a.kpi:hover { border-color:rgba(191,246,66,.45); }
   .kpi .lbl { font-size:12px; font-weight:600; color:var(--muted); }
-  .kpi .val { font-size:28px; font-weight:800; letter-spacing:-.02em; margin-top:6px; font-variant-numeric:tabular-nums;
+  .kpi .val { font-size:24px; font-weight:800; letter-spacing:-.02em; margin-top:6px; font-variant-numeric:tabular-nums;
               overflow-wrap:anywhere; }
   .kpi .sub { font-size:12px; color:var(--muted); margin-top:2px; }
-  .todo { display:flex; align-items:center; gap:12px; padding:14px 18px; border-top:1px solid var(--line);
-          color:inherit; text-decoration:none; }
-  .todo:first-of-type { border-top:0; }
-  .todo:hover { background:rgba(255,255,255,.03); }
-  .todo .dot { width:10px; height:10px; border-radius:50%; flex:none; background:#f5c451; }
+  /* What needs a person comes first on Today and weighs more than the totals
+     under it (design critique 2026-09-29): a real heading, larger rows, and a
+     border in the colour of the most urgent item. */
+  .decide { margin:20px 0 28px; }
+  .decide > h2 { font-size:19px; margin:0 0 10px; }
+  .decide > .card { padding:0; overflow:hidden; margin:0; }
+  .todo { display:flex; align-items:center; gap:14px; min-height:60px; padding:12px 20px; border-top:1px solid var(--line);
+          color:inherit; text-decoration:none; font-size:16px; font-weight:600; }
+  .todo:first-child { border-top:0; }
+  a.todo:hover { background:rgba(255,255,255,.03); }
+  .todo .what { flex:1 1 auto; min-width:0; }
+  .todo small { display:block; margin-top:2px; font-size:13px; font-weight:500; color:var(--muted); }
+  .todo .dot { width:12px; height:12px; border-radius:50%; flex:none; background:#f5c451; }
   .todo .dot.bad { background:var(--bad); }
-  .todo .go { margin-left:auto; color:var(--accent); font-weight:700; white-space:nowrap; }
+  .todo .go { margin-left:auto; flex:none; display:inline-flex; align-items:center; min-height:36px; padding:0 14px;
+              border:1px solid var(--line); border-radius:99px; color:var(--accent); font-size:14px; font-weight:700; white-space:nowrap; }
+  a.todo:hover .go { border-color:rgba(191,246,66,.45); }
   .checklist { list-style:none; padding:0; margin:8px 0 0; display:grid; gap:6px; }
   .checklist li::before { content:'○'; margin-right:8px; color:var(--muted); }
   .checklist li.ok::before { content:'●'; color:#8ee07a; }
@@ -239,7 +286,7 @@ const STYLE = `
     .side { position:sticky; top:0; z-index:5; height:auto; flex-direction:row; flex-wrap:wrap; align-items:center;
             padding:10px 16px; }
     .side .brand { padding:0; }
-    .side .brand img { height:34px; }
+    .side .brand img { width:49px; height:34px; }
     .navt { display:block; position:absolute; opacity:0; width:1px; height:1px; pointer-events:none; }
     .navt-label { display:inline-flex; margin-left:auto; border:1px solid var(--line); border-radius:99px;
                   padding:7px 14px; font-weight:700; cursor:pointer; }
@@ -247,8 +294,40 @@ const STYLE = `
     .navt:checked ~ nav, .navt:checked ~ .me { display:flex; }
     .navt:focus-visible + .navt-label { outline:2px solid var(--accent); }
     body.panel main { padding:20px 16px 64px; }
-    body.panel table { display:block; overflow-x:auto; white-space:nowrap; }
     header { flex-wrap:wrap; }
+  }
+
+  /* A PHONE READS A LIST AS CARDS (design critique 2026-09-29): a table that
+     scrolled sideways hid its last columns — and the switch-off button with
+     them. Each value carries its column's name from data-label; the header
+     row is hidden from sight only, and the roles written into the markup keep
+     it a table for a screen reader whatever the display. A computer keeps the
+     real table. */
+  @media (max-width: 640px) {
+    body.panel table.list, body.panel table.list tbody, body.panel table.list tr { display:block; }
+    body.panel table.list { background:none; border:0; border-radius:0; overflow:visible; }
+    body.panel table.list thead { position:absolute; width:1px; height:1px; overflow:hidden; clip-path:inset(50%); white-space:nowrap; }
+    body.panel table.list tr { background:var(--card); border:1px solid var(--line); border-radius:16px; padding:4px 16px; margin:0 0 12px; }
+    body.panel table.list td { display:block; position:relative; min-height:44px; padding:11px 0 11px 40%;
+                               text-align:left; white-space:normal; overflow-wrap:anywhere; }
+    body.panel table.list td::before { content:attr(data-label); position:absolute; left:0; top:11px; width:36%;
+                                       color:var(--muted); font-size:12px; font-weight:600; line-height:1.6; }
+    /* The first cell names the card; an action cell takes the whole width. */
+    body.panel table.list td:first-child, body.panel table.list td.act { padding-left:0; min-height:0; }
+    body.panel table.list td:first-child::before, body.panel table.list td.act::before { content:none; }
+    body.panel table.list td:first-child { font-size:16px; }
+    body.panel table.list tbody tr:last-child td { border-bottom:1px solid var(--line); }
+    body.panel table.list tbody tr td:last-child { border-bottom:0; }
+    body.panel table.list tbody tr:hover td { background:none; }
+    /* Inside a card, rows are divided by lines, never cards within a card. */
+    body.panel .card table.list tr { background:none; border:0; border-bottom:1px solid var(--line); border-radius:0;
+                                     padding:4px 0; margin:0; }
+    body.panel .card table.list tbody tr:last-child { border-bottom:0; }
+    /* The switch-off confirmation opens across the card, inside the screen. */
+    details.confirm, details.confirm[open] { display:block; }
+    details.confirm form { max-width:none; }
+    .todo { flex-wrap:wrap; padding:12px 16px; }
+    .todo .go { margin-left:26px; }
   }
 `;
 
@@ -303,6 +382,77 @@ const STAFF_NAV = [
 ];
 
 const ICON_FOR = { home: 'today', registry: 'gyms' };
+
+/**
+ * The panel's one script, and every page works without it.
+ *
+ * 1. Search as you type (design critique 2026-09-29). A form marked
+ *    `data-live="list-id [other-id…]"` still searches when submitted; with the
+ *    script, the named parts of the page are refreshed from the same address
+ *    300 ms after typing stops. The search box is never replaced, so it keeps
+ *    focus and caret, and `<id>-status` tells a screen reader how many were
+ *    found. Anything unexpected — signed out, refused, an error page — is
+ *    opened properly instead.
+ * 2. A switch-off confirmation scrolls into sight when it opens; on a phone it
+ *    could open below the screen's edge.
+ * 3. A shown-once link selects itself when tapped, ready to copy.
+ *
+ * No inline handlers (tests/platform-views.test.js).
+ */
+const PANEL_SCRIPT = `(function () {
+  'use strict';
+  if (window.fetch && window.DOMParser && window.URLSearchParams && window.FormData) {
+    document.querySelectorAll('form[data-live]').forEach(function (form) {
+      var ids = form.getAttribute('data-live').split(' ');
+      var status = document.getElementById(ids[0] + '-status');
+      var timer = 0, seq = 0, ctrl = null;
+      function run() {
+        var url = form.getAttribute('action') + '?' + new URLSearchParams(new FormData(form)).toString();
+        var mine = ++seq;
+        var list = document.getElementById(ids[0]);
+        if (!list) return;
+        if (ctrl) ctrl.abort();
+        ctrl = window.AbortController ? new AbortController() : null;
+        list.setAttribute('aria-busy', 'true');
+        fetch(url, { credentials: 'same-origin', headers: { Accept: 'text/html' }, signal: ctrl ? ctrl.signal : undefined })
+          .then(function (res) { return res.text().then(function (text) { return { ok: res.ok, text: text }; }); })
+          .then(function (got) {
+            if (mine !== seq) return;
+            var doc = new DOMParser().parseFromString(got.text, 'text/html');
+            var fresh = doc.getElementById(ids[0]);
+            if (!got.ok || !fresh) { location.assign(url); return; }
+            ids.forEach(function (id) {
+              var here = document.getElementById(id), there = doc.getElementById(id);
+              if (here && there) here.innerHTML = there.innerHTML;
+            });
+            list.removeAttribute('aria-busy');
+            if (status) status.textContent = fresh.getAttribute('data-summary') || '';
+            if (window.history && history.replaceState) history.replaceState(null, '', url);
+          })
+          .catch(function (err) {
+            if (err && err.name === 'AbortError') return;
+            if (mine === seq) list.removeAttribute('aria-busy');
+          });
+      }
+      function soon() { clearTimeout(timer); timer = setTimeout(run, 300); }
+      form.addEventListener('input', function (e) { if (e.target && e.target.type === 'search') soon(); });
+      form.addEventListener('change', function (e) {
+        if (e.target && e.target.tagName === 'SELECT') { clearTimeout(timer); run(); }
+      });
+    });
+  }
+  var calm = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  document.addEventListener('toggle', function (e) {
+    var d = e.target;
+    if (!d || !d.open || !d.matches || !d.matches('details.confirm')) return;
+    var f = d.querySelector('form');
+    if (f && f.scrollIntoView) f.scrollIntoView({ block: 'nearest', behavior: calm ? 'auto' : 'smooth' });
+  }, true);
+  document.querySelectorAll('input[data-select]').forEach(function (i) {
+    i.addEventListener('focus', function () { i.select(); });
+    i.addEventListener('click', function () { i.select(); });
+  });
+})();`;
 
 function staffNav(user, active) {
   // No permission list (a page rendered on its own, as the tests do): the
@@ -381,6 +531,7 @@ ${staffNav(user, active)}
 <main id="main" tabindex="-1">
 ${body}
 </main>
+<script>${PANEL_SCRIPT}</script>
 </body>
 </html>`;
   }
@@ -520,6 +671,114 @@ const STATUS_TONE = {
 const statusTag = (status) =>
   `<span class="tag${STATUS_TONE[status] ? ` tag--${STATUS_TONE[status]}` : ''}">${h(String(status ?? '').replace(/_/g, ' '))}</span>`;
 
+// ---------------------------------------------------------------------------
+// Figures and lists in the main admin panel (design critique 2026-09-29)
+// ---------------------------------------------------------------------------
+
+/** Digits in threes with a no-break space: "12 345". */
+const grouped = (digits) => String(digits).replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
+
+/**
+ * A figure as a person reads it: "12 345" — grouped with a space, as the money
+ * tiles on Today already were (en-ZA), because a comma or a point is read as
+ * a decimal somewhere in the world. A figure we do not have is a dash, never 0.
+ * Plain text: it needs no escaping.
+ */
+function num(n) {
+  if (n === null || n === undefined || n === '') return '—';
+  const v = Number(n);
+  if (!Number.isFinite(v)) return '—';
+  const [whole, part] = String(Math.abs(v)).split('.');
+  return `${v < 0 ? '-' : ''}${grouped(whole)}${part ? `.${part}` : ''}`;
+}
+
+/** format.js count(), with the figure grouped: "No gyms", "1 gym", "1 234 gyms". */
+function tally(n, singular, plural = `${singular}s`) {
+  if (n === null || n === undefined || !Number.isFinite(Number(n))) return '—';
+  const v = Number(n);
+  if (v === 0) return `No ${plural}`;
+  return `${num(v)} ${v === 1 ? singular : plural}`;
+}
+
+/**
+ * Cents as money, grouped: "ZAR 12 345.00". Never rounded to whole units, and
+ * an absent amount is a dash (format.js money). Escape it where it is drawn:
+ * the currency code is data.
+ */
+function amount(cents, currency = 'ZAR') {
+  if (cents === null || cents === undefined || cents === '') return '—';
+  const v = Number(cents);
+  if (!Number.isFinite(v)) return '—';
+  const [whole, part] = (Math.abs(v) / 100).toFixed(2).split('.');
+  return `${currency} ${v < 0 ? '-' : ''}${grouped(whole)}.${part}`;
+}
+
+/**
+ * A panel list: a real table on a computer, a stack of cards on a phone.
+ *
+ * `cols` are [label, options]: `num` right-aligns a column of figures, `act`
+ * marks the actions column (its heading is read aloud, not shown). `rows` are
+ * arrays of cell markup the caller has ALREADY ESCAPED, one per column; a cell
+ * may be { html, cls } to add a class. Every value carries its column's name
+ * in data-label for the phone layout, and the explicit roles keep the table a
+ * table for a screen reader when a phone lays its rows out as blocks.
+ */
+function listTable(cols, rows) {
+  const head = cols
+    .map(
+      ([label, o = {}]) =>
+        `<th scope="col" role="columnheader"${o.num ? ' class="num"' : ''}>${
+          o.act ? `<span class="sr-only">${h(label)}</span>` : h(label)
+        }</th>`
+    )
+    .join('');
+  const body = rows
+    .map(
+      (cells) =>
+        `    <tr role="row">${cells
+          .map((cell, i) => {
+            const [label, o = {}] = cols[i] || [''];
+            const c = cell && typeof cell === 'object' ? cell : { html: cell };
+            const cls = [o.num ? 'num' : '', o.act ? 'act' : '', c.cls || ''].filter(Boolean).join(' ');
+            return `<td role="cell"${o.act ? '' : ` data-label="${h(label)}"`}${cls ? ` class="${cls}"` : ''}>${c.html ?? ''}</td>`;
+          })
+          .join('')}</tr>`
+    )
+    .join('\n');
+  return `<div class="tscroll"><table class="list" role="table">
+  <thead role="rowgroup"><tr role="row">${head}</tr></thead>
+  <tbody role="rowgroup">
+${body}
+  </tbody>
+</table></div>`;
+}
+
+/**
+ * The figures row on Today and on a gym's page. Its class says how many tiles
+ * it holds, so the grid can balance them (2 x 2, never 3 + 1).
+ */
+function kpiRow(tiles) {
+  const shown = tiles.filter(Boolean);
+  if (!shown.length) return '';
+  return `<div class="kpi-wrap"><div class="kpis n${Math.min(shown.length, 4)}">
+  ${shown.join('\n  ')}
+</div></div>`;
+}
+
+/**
+ * A list search that filters as the person types (design critique
+ * 2026-09-29), and still works as a plain form without the script.
+ * `fields` is the search box and any filters, already built and escaped.
+ */
+function liveSearch({ action, regions, fields, hidden = '' }) {
+  const [list] = regions;
+  return `<form class="card row" method="get" action="${action}" role="search" data-live="${regions.join(' ')}">
+  ${hidden}${fields}
+  <button type="submit" class="ghost">Search</button>
+</form>
+<p id="${list}-status" class="sr-only" role="status" aria-live="polite"></p>`;
+}
+
 /**
  * The review queue, in tabs by what each application is waiting for, with a
  * search (CLAUDE.md §40.1 F-40.6).
@@ -537,31 +796,30 @@ export function applicationsPage({ applications = [], user = null, tab = 'review
   const tabCount = (states) =>
     counts ? (states.length ? states : Object.keys(counts)).reduce((n, s) => n + (counts[s] || 0), 0) : null;
 
-  const tabs = `<nav class="row" aria-label="Application states" style="margin:18px 0 4px">
+  // The current state tinted like the menu's current page — not one lime
+  // button beside four grey ones (design critique 2026-09-29). Refreshed with
+  // the list when a search is typed, so every tab keeps the search.
+  const tabs = `<nav class="tabs" id="applications-tabs" aria-label="Application states">
 ${APPLICATION_TABS.map(([key, label, states]) => {
   const n = tabCount(states);
   const href = `/platform/applications?tab=${key}${query ? `&q=${encodeURIComponent(query)}` : ''}`;
-  return `  <a class="btn${key === tab ? '' : ' ghost'}" href="${h(href)}">${h(label)}${n === null ? '' : ` <span>${h(n)}</span>`}</a>`;
+  return `  <a href="${h(href)}"${key === tab ? ' aria-current="page"' : ''}>${h(label)}${
+    n === null ? '' : ` <span class="n">${h(num(n))}</span>`
+  }</a>`;
 }).join('\n')}
 </nav>`;
 
-  const body = applications.length
-    ? `<table>
-  <thead><tr><th>Gym</th><th>City</th><th>Plan</th><th>Status</th><th>Submitted</th></tr></thead>
-  <tbody>
-${applications
-  .map(
-    (a) => `    <tr>
-      <td><a href="/platform/applications/${h(a.id)}"><b>${h(a.proposed_gym_name || 'Unnamed')}</b></a></td>
-      <td>${h(a.city)}${a.country ? ` <span class="muted">${h(a.country)}</span>` : ''}</td>
-      <td>${h(a.requested_plan_key || '—')}</td>
-      <td>${statusTag(a.status)}</td>
-      <td class="muted">${h(when(a.submitted_at))}</td>
-    </tr>`
-  )
-  .join('\n')}
-  </tbody>
-</table>`
+  const list = applications.length
+    ? listTable(
+        [['Gym'], ['City'], ['Plan'], ['Status'], ['Submitted']],
+        applications.map((a) => [
+          `<a href="/platform/applications/${h(a.id)}"><b>${h(a.proposed_gym_name || 'Unnamed')}</b></a>`,
+          `${h(a.city)}${a.country ? ` <span class="muted">${h(a.country)}</span>` : ''}`,
+          a.requested_plan_key ? h(planName(a.requested_plan_key)) : '—',
+          statusTag(a.status),
+          { html: h(when(a.submitted_at)), cls: 'muted' },
+        ])
+      )
     : `<div class="empty">${
         query
           ? 'No applications match that search.'
@@ -569,6 +827,10 @@ ${applications
             ? 'No applications waiting for review.'
             : 'No applications here.'
       }</div>`;
+
+  const summary = query
+    ? `${tally(applications.length, 'application')} match “${query}”.`
+    : `${tally(applications.length, 'application')}.`;
 
   return layout({
     active: 'applications',
@@ -578,12 +840,15 @@ ${applications
 <p class="lede">Every gym is reviewed by a person before it appears in app search. A gym is approved
 once its ID, business registration and proof of address have each been accepted.</p>
 ${tabs}
-<form class="card row" method="get" action="/platform/applications">
-  <input type="hidden" name="tab" value="${h(tab)}">
-  <label style="flex:1">Search<input name="q" value="${h(query)}" placeholder="gym name or city"></label>
-  <button type="submit">Search</button>
-</form>
-${body}`,
+${liveSearch({
+  action: '/platform/applications',
+  regions: ['applications-list', 'applications-tabs'],
+  hidden: `<input type="hidden" name="tab" value="${h(tab)}">\n  `,
+  fields: `<label style="flex:1">Search by gym name or city<input type="search" name="q" value="${h(query)}" autocomplete="off"></label>`,
+})}
+<div id="applications-list" data-summary="${h(summary)}">
+${list}
+</div>`,
   });
 }
 
@@ -613,33 +878,27 @@ export function applicationDetailPage({
 }) {
   const missing = missingRequiredDocuments(documents);
 
+  // Accept and Reject are outlined: the one lime button on this page is the
+  // decision below (design critique 2026-09-29).
   const docs = documents.length
-    ? `<table>
-  <thead><tr><th>Document</th><th>File</th><th>Status</th><th>Decide</th></tr></thead>
-  <tbody>
-${documents
-  .map(
-    (d) => `    <tr>
-      <td>${h(DOCUMENT_LABELS[d.doc_type] || d.doc_type)}${
-        REQUIRED_DOCUMENTS.includes(d.doc_type) ? ' <span class="muted">· required</span>' : ''
-      }</td>
-      <td><a href="/platform/documents/${h(d.id)}">${h(d.filename || 'open')}</a></td>
-      <td>${statusTag(d.status)}${d.reject_reason ? `<br><span class="muted">${h(d.reject_reason)}</span>` : ''}</td>
-      <td>${
-        d.status === 'pending'
-          ? `<form method="post" action="/platform/documents/${h(d.id)}/decide" class="row">
+    ? `${listTable(
+        [['Document'], ['File'], ['Status'], ['Decide', { act: true }]],
+        documents.map((d) => [
+          `${h(DOCUMENT_LABELS[d.doc_type] || d.doc_type)}${
+            REQUIRED_DOCUMENTS.includes(d.doc_type) ? ' <span class="muted">· required</span>' : ''
+          }`,
+          `<a href="/platform/documents/${h(d.id)}">${h(d.filename || 'open')}</a>`,
+          `${statusTag(d.status)}${d.reject_reason ? `<br><span class="muted">${h(d.reject_reason)}</span>` : ''}`,
+          d.status === 'pending'
+            ? `<form method="post" action="/platform/documents/${h(d.id)}/decide" class="row">
         <input type="hidden" name="csrf" value="${h(csrfToken)}">
-        <button type="submit" name="action" value="accept" formnovalidate>Accept</button>
+        <button type="submit" name="action" value="accept" formnovalidate class="ghost">Accept</button>
         <input name="reason" required aria-label="Reason for rejecting this document" placeholder="Reason, if rejecting">
         <button type="submit" name="action" value="reject" class="ghost">Reject</button>
       </form>`
-          : '<span class="muted">decided</span>'
-      }</td>
-    </tr>`
-  )
-  .join('\n')}
-  </tbody>
-</table>
+            : '<span class="muted">decided</span>',
+        ])
+      )}
 <p class="muted">Open a document to see it beside what the applicant told us. Opening one is recorded
 in the audit log: who opened it, and when.</p>`
     : `<div class="empty">No documents uploaded yet.</div>`;
@@ -665,8 +924,8 @@ ${events
     <dt>Owner</dt><dd>${h(applicant?.full_name || '—')}</dd>
     <dt>Email</dt><dd>${applicant?.email ? `<a href="mailto:${h(applicant.email)}">${h(applicant.email)}</a>` : '—'}</dd>
     <dt>Phone</dt><dd>${a.owner_phone ? `<a href="tel:${h(a.owner_phone)}">${h(a.owner_phone)}</a>` : '<span class="muted">not given</span>'}</dd>
-    <dt>Plan</dt><dd>${h(a.requested_plan_key || '—')}</dd>
-    <dt>Expected members</dt><dd>${h(a.estimated_members ?? '—')}</dd>
+    <dt>Plan</dt><dd>${a.requested_plan_key ? h(planName(a.requested_plan_key)) : '—'}</dd>
+    <dt>Expected members</dt><dd>${h(num(a.estimated_members))}</dd>
     <dt>Applied</dt><dd>${h(exact(a.submitted_at)) || '—'}</dd>
   </dl>
 </div>`;
@@ -677,7 +936,7 @@ ${events
     <dt>Name</dt><dd><b>${h(a.proposed_gym_name || '—')}</b></dd>
     <dt>Street address</dt><dd>${h(a.gym_address) || '<span class="muted">not given</span>'}</dd>
     <dt>City</dt><dd>${h(a.city) || '—'}${a.country ? `, ${h(a.country)}` : ''}</dd>
-    <dt>Search name</dt><dd class="muted">${h(a.slug || '—')}</dd>
+    <dt>Web address</dt><dd class="muted">${a.slug ? `/g/${h(a.slug)}/` : '—'}</dd>
     <dt>What they need</dt><dd>${h(a.owner_needs) || '<span class="muted">nothing added</span>'}</dd>
   </dl>
 </div>`;
@@ -700,7 +959,7 @@ ${events
     .sort((x, y) => String(y.created_at).localeCompare(String(x.created_at)))[0];
   const buildFailed = a.status === 'approved' && lastBuild?.event === 'provision_failed';
   const retry = buildFailed
-    ? `<form class="card" method="post" action="/platform/applications/${h(a.id)}/decide" style="border-left:4px solid var(--bad)">
+    ? `<form class="card tone-bad" method="post" action="/platform/applications/${h(a.id)}/decide">
   <input type="hidden" name="csrf" value="${h(csrfToken)}">
   <h2>The gym was not fully created</h2>
   <p>Approved, but building the gym stopped${lastBuild.detail?.failed_at ? ` at <b>${h(lastBuild.detail.failed_at)}</b>` : ''}${
@@ -730,7 +989,7 @@ may submit a new application.${
     <textarea name="reason" rows="3" required placeholder="Required to reject or to ask for more. The owner is emailed this."></textarea>
   </label>
   <div class="row">
-    <button type="submit" name="action" value="approve" formnovalidate${missing.length ? ' disabled' : ''}>Approve and provision</button>
+    <button type="submit" name="action" value="approve" formnovalidate${missing.length ? ' disabled' : ''}>Approve and set up the gym</button>
     <button type="submit" name="action" value="request_info" class="ghost">Request information</button>
     <button type="submit" name="action" value="reject" class="danger">Reject</button>
   </div>
@@ -1406,17 +1665,24 @@ function pager(page, basePath, params = {}) {
   // One page and nothing to turn to: the count alone, with no dead controls.
   // A link that goes nowhere is the "dead text" this panel is meant not to
   // have.
+  // The label again, with its figures grouped ("Showing 1–25 of 1 234").
+  const label =
+    page.total === 0
+      ? 'None'
+      : `Showing ${num(page.first)}–${num(page.last)}${Number.isInteger(page.total) ? ` of ${num(page.total)}` : ''}`;
+  const said = Number.isInteger(page.first) && Number.isInteger(page.last) ? label : page.label;
+
   if (!page.hasPrev && !page.hasNext) {
-    return `<p class="muted">${h(page.label)}</p>`;
+    return `<p class="muted">${h(said)}</p>`;
   }
 
   return `<p class="muted" style="display:flex;gap:1rem;align-items:center">
-  ${prev}<span>${h(page.label)}</span>${next}
+  ${prev}<span>${h(said)}</span>${next}
 </p>`;
 }
 
 /** A gym's counts, as a person reads them. */
-const statCell = (value) => (value === null || value === undefined ? '<span class="muted">—</span>' : h(value));
+const statCell = (value) => (value === null || value === undefined ? '<span class="muted">—</span>' : h(num(value)));
 
 /**
  * Every gym, with what it is doing (CLAUDE.md §40.1 F-40.7): members,
@@ -1426,58 +1692,66 @@ export function registryPage({ gyms = [], user = null, canSuspend = false, filte
   const of = (g) => (stats && typeof stats.get === 'function' ? stats.get(g.id) : null) || null;
 
   const body = gyms.length
-    ? `<table>
-  <thead><tr><th>Gym</th><th>Plan</th><th>Status</th><th>Billing</th><th>Active members</th><th>Check-ins this month</th><th>Last check-in</th></tr></thead>
-  <tbody>
-${gyms
-  .map((g) => {
-    const s = of(g);
-    const unreachable = s && s.reachable === false;
-    return `    <tr>
-      <td><a href="/platform/registry/${h(g.id)}"><b>${h(g.search_name || g.slug)}</b></a><br><span class="muted">${h(g.city)}${
-        g.country ? `, ${h(g.country)}` : ''
-      }</span></td>
-      <td>${h(g.plan_key || '—')}</td>
-      <td>${statusTag(g.status)}</td>
-      <td>${statusTag(g.subscription_status || 'none')}</td>
-      <td>${unreachable ? '<span class="tag tag--bad">unreachable</span>' : statCell(s?.activeMembers)}</td>
-      <td>${unreachable ? '' : statCell(s?.checkinsThisMonth)}</td>
-      <td class="muted">${s?.lastActivityAt ? h(when(s.lastActivityAt)) : unreachable ? '' : 'none yet'}</td>
-    </tr>`;
-  })
-  .join('\n')}
-  </tbody>
-</table>`
-    : `<div class="empty">${filter.query || filter.status ? 'No gyms match that search.' : 'No gyms have been provisioned yet.'}</div>`;
+    ? listTable(
+        [
+          ['Gym'], ['Plan'], ['Status'], ['Billing'],
+          ['Active members', { num: true }], ['Check-ins this month', { num: true }], ['Last check-in'],
+        ],
+        gyms.map((g) => {
+          const s = of(g);
+          const unreachable = s && s.reachable === false;
+          return [
+            `<a href="/platform/registry/${h(g.id)}"><b>${h(g.search_name || g.slug)}</b></a><br><span class="muted">${h(g.city)}${
+              g.country ? `, ${h(g.country)}` : ''
+            }</span>`,
+            g.plan_key ? h(planName(g.plan_key)) : '—',
+            statusTag(g.status),
+            statusTag(g.subscription_status || 'none'),
+            unreachable ? '<span class="tag tag--bad">unreachable</span>' : statCell(s?.activeMembers),
+            unreachable ? '' : statCell(s?.checkinsThisMonth),
+            { html: s?.lastActivityAt ? h(when(s.lastActivityAt)) : unreachable ? '' : 'none yet', cls: 'muted' },
+          ];
+        })
+      )
+    : `<div class="empty">${filter.query || filter.status ? 'No gyms match that search.' : 'No gyms have been set up yet.'}</div>`;
+
+  // With a search or a filter the total is what MATCHED, not the platform.
+  const filtered = Boolean(filter.query || filter.status || filter.setup);
+  const summary =
+    page && page.total !== null
+      ? `${tally(page.total, 'gym')} ${filtered ? (page.total === 1 ? 'matches' : 'match') : 'on the platform'}.`
+      : `${tally(gyms.length, 'gym')} shown.`;
 
   return layout({
     active: 'registry',
     title: 'Gyms',
     user,
     body: `<h1>Gyms</h1>
-<p class="lede">${
-      page && page.total !== null
-        ? `${h(count(page.total, 'gym'))} on the platform.`
-        : `${h(count(gyms.length, 'gym'))} shown.`
-    }${canSuspend ? '' : ' You have read-only access.'} Figures are counts only — the platform never
+<p class="lede">${canSuspend ? '' : 'You have read-only access. '}Figures are counts only — the platform never
 reads a member's name, phone or health answers.</p>
 ${filter.setup ? '<p class="card">Showing gyms <b>waiting for setup help</b>. <a href="/platform/registry">Show all gyms</a></p>' : ''}
 
-<form class="card row" method="get" action="/platform/registry">
-  <label style="flex:1">Search<input name="q" value="${h(filter.query)}" placeholder="gym name, city or search name"></label>
+${liveSearch({
+  action: '/platform/registry',
+  regions: ['registry-list'],
+  // A search inside "waiting for setup help" stays inside it.
+  hidden: filter.setup ? '<input type="hidden" name="setup" value="1">\n  ' : '',
+  fields: `<label style="flex:1">Search by gym name, city or web address<input type="search" name="q" value="${h(filter.query)}" autocomplete="off"></label>
   <label>Status
     <select name="status">
       <option value="">Any</option>
       ${['pending', 'active', 'suspended', 'cancelled']
-        .map((v) => `<option value="${v}"${filter.status === v ? ' selected' : ''}>${v}</option>`)
+        .map((v) => `<option value="${v}"${filter.status === v ? ' selected' : ''}>${v === 'pending' ? 'Not activated yet' : v[0].toUpperCase() + v.slice(1)}</option>`)
         .join('')}
     </select>
-  </label>
-  <button type="submit">Search</button>
-  <a class="btn ghost" href="/platform/reconcile">Check for drift</a>
-</form>
+  </label>`,
+})}
+<p><a class="btn ghost" href="/platform/reconcile">Check gyms are in sync</a></p>
+<div id="registry-list" data-summary="${h(summary)}">
+<p class="muted">${h(summary)}</p>
 ${body}
-${pager(page, '/platform/registry', { q: filter.query, status: filter.status, setup: filter.setup ? '1' : '' })}`,
+${pager(page, '/platform/registry', { q: filter.query, status: filter.status, setup: filter.setup ? '1' : '' })}
+</div>`,
   });
 }
 
@@ -1493,33 +1767,25 @@ function gymServicesCard({ gym, plan, canBill, csrfToken }) {
   const result = new Set(effectiveFeatures(planFeatures, added, removed));
   const switchable = ALL_SERVICES.filter((f) => SERVICE_INFO[f].group !== 'core');
 
-  const rows = switchable
-    .map((f) => {
+  const table = listTable(
+    [['Service'], ['Plan'], ['For this gym'], ['Result']],
+    switchable.map((f) => {
       const choice = added.includes(f) ? 'add' : removed.includes(f) ? 'remove' : 'plan';
       const fromPlan = planFeatures.includes(f);
-      return `    <tr>
-      <td><b>${h(SERVICE_INFO[f].label)}</b>${SERVICE_INFO[f].forMembers ? `<br><span class="muted">${h(SERVICE_INFO[f].forMembers)}</span>` : ''}</td>
-      <td>${fromPlan ? statusTag('included') : '<span class="muted">not in plan</span>'}</td>
-      <td>${
+      return [
+        `<b>${h(SERVICE_INFO[f].label)}</b>${SERVICE_INFO[f].forMembers ? `<br><span class="muted">${h(SERVICE_INFO[f].forMembers)}</span>` : ''}`,
+        fromPlan ? statusTag('included') : '<span class="muted">not in plan</span>',
         canBill
           ? `<select name="svc_${h(f)}" aria-label="${h(SERVICE_INFO[f].label)} for this gym">
           <option value="plan"${choice === 'plan' ? ' selected' : ''}>As the plan says</option>
           <option value="add"${choice === 'add' ? ' selected' : ''}>Add for this gym</option>
           <option value="remove"${choice === 'remove' ? ' selected' : ''}>Remove for this gym</option>
         </select>`
-          : h({ plan: 'As the plan says', add: 'Added for this gym', remove: 'Removed for this gym' }[choice])
-      }</td>
-      <td>${result.has(f) ? statusTag('on') : statusTag('off')}</td>
-    </tr>`;
+          : h({ plan: 'As the plan says', add: 'Added for this gym', remove: 'Removed for this gym' }[choice]),
+        result.has(f) ? statusTag('on') : statusTag('off'),
+      ];
     })
-    .join('\n');
-
-  const table = `<table>
-  <thead><tr><th>Service</th><th>Plan</th><th>For this gym</th><th>Result</th></tr></thead>
-  <tbody>
-${rows}
-  </tbody>
-</table>`;
+  );
 
   return canBill
     ? `<form class="card" method="post" action="/platform/registry/${h(gym.id)}/services">
@@ -1529,7 +1795,7 @@ ${rows}
   recognition, say. Always included: ${h(CORE_FEATURES.map((f) => SERVICE_INFO[f].label).join(', '))}. The owner can
   still switch member services off for their own members.</p>
   ${table}
-  <button type="submit">Save services</button>
+  <button type="submit" class="ghost">Save services</button>
 </form>`
     : `<div class="card"><h2>Services for this gym</h2>${table}</div>`;
 }
@@ -1555,17 +1821,17 @@ function accountManagerCard({ gym, staff, canManage, csrfToken, manager }) {
     </select>
   </label>
   ${manager ? `<p class="muted">Now: <b>${h(manager.full_name || manager.email)}</b></p>` : ''}
-  <button type="submit">Save account manager</button>
+  <button type="submit" class="ghost">Save account manager</button>
 </form>`;
 }
 
 /** Setup help the owner asked for, and whether it was given (§41.1 Q6). */
-function setupHelpCard({ gym, canOnboard, csrfToken }) {
+function setupHelpCard({ gym, canOnboard, csrfToken, lead = false }) {
   if (!gym.setup_help_requested_at && !gym.setup_help_done_at) return '';
   if (gym.setup_help_done_at) {
     return `<div class="card"><h2>Setup help</h2><p>${statusTag('done')} Given ${h(when(gym.setup_help_done_at))}.</p></div>`;
   }
-  return `<div class="card" style="border-color:rgba(245,196,81,.45)">
+  return `<div class="card tone-warn">
   <h2>The owner asked for setup help</h2>
   <p class="muted">Asked ${h(when(gym.setup_help_requested_at))}. Help them set their plans and prices, import their members
   and print their QR posters, then record it here.</p>
@@ -1573,7 +1839,7 @@ function setupHelpCard({ gym, canOnboard, csrfToken }) {
     canOnboard
       ? `<form method="post" action="/platform/registry/${h(gym.id)}/setup-done">
     <input type="hidden" name="csrf" value="${h(csrfToken)}">
-    <button type="submit">Mark setup help as given</button>
+    <button type="submit"${lead ? '' : ' class="ghost"'}>Mark setup help as given</button>
   </form>`
       : ''
   }
@@ -1601,14 +1867,28 @@ export function gymDetailPage({
 }) {
   const suspended = gym.status === 'suspended';
   const limit = plan?.max_active_members ?? null;
+  // The plan as a person names it (design critique 2026-09-29).
+  const planLabel = gym.plan_key ? plan?.label || planName(gym.plan_key, plans) : '';
+  const showResend = Boolean(canOnboard && gym.status === 'pending' && gym.owner_user_id);
+
+  // ONE lime button on the page: whatever this gym most needs next. Every
+  // other save is outlined (design critique 2026-09-29).
+  const lead =
+    suspended && canSuspend
+      ? 'reactivate'
+      : showResend
+        ? 'resend'
+        : gym.setup_help_requested_at && !gym.setup_help_done_at && canOnboard
+          ? 'setup'
+          : null;
 
   // The control is rendered only for someone who may use it. Hiding a button
   // is not the security boundary — the router checks the permission again —
   // but offering a control that will be refused is its own kind of lie.
   const controls = canSuspend
-    ? `<form class="card" method="post" action="/platform/registry/${h(gym.id)}/${
+    ? `<form class="card${suspended ? '' : ' tone-bad'}" method="post" action="/platform/registry/${h(gym.id)}/${
         suspended ? 'reactivate' : 'suspend'
-      }" style="border-color:${suspended ? 'var(--line)' : 'rgba(255,107,94,.35)'}">
+      }">
   <input type="hidden" name="csrf" value="${h(csrfToken)}">
   <h2>${suspended ? 'Reactivate this gym' : 'Suspend this gym'}</h2>
   <p class="muted">${
@@ -1621,48 +1901,48 @@ export function gymDetailPage({
 </form>`
     : '';
 
-  const resend =
-    canOnboard && gym.status === 'pending' && gym.owner_user_id
-      ? `<form class="card" method="post" action="/platform/registry/${h(gym.id)}/resend-activation">
+  // Links last 10 minutes and one goes out a day, whoever asks (CLAUDE.md
+  // §43.1 Q1) — this said 48 hours.
+  const resend = showResend
+    ? `<form class="card" method="post" action="/platform/registry/${h(gym.id)}/resend-activation">
   <input type="hidden" name="csrf" value="${h(csrfToken)}">
   <h2>The owner has not activated yet</h2>
-  <p class="muted">The gym opens when the owner uses the link and code from their activation email.
-  If it was lost or the 48 hours ran out, send a new one — the old link stops working.</p>
-  <button type="submit">Send a new activation link</button>
+  <p class="muted">The gym opens when the owner uses the link and code from their activation email. A link lasts
+  10 minutes, and one can be sent a day. If it was lost or ran out, send a new one; if a link already went out
+  today, you are told when the next can be sent.</p>
+  <button type="submit"${lead === 'resend' ? '' : ' class="ghost"'}>Send a new activation link</button>
 </form>`
-      : '';
+    : '';
 
   const bills = invoices.length
-    ? `<table>
-  <thead><tr><th>Invoice</th><th>Amount</th><th>Status</th><th>Issued</th></tr></thead>
-  <tbody>
-${invoices
-  .map(
-    (i) => `    <tr><td>${h(i.number)}</td><td>${fmtMoney(i.amount_cents, i.currency)}</td>
-      <td>${statusTag(i.status)}</td><td class="muted">${h(when(i.issued_at))}</td></tr>`
-  )
-  .join('\n')}
-  </tbody>
-</table>`
+    ? listTable(
+        [['Invoice'], ['Amount', { num: true }], ['Status'], ['Issued']],
+        invoices.map((i) => [
+          h(i.number),
+          h(amount(i.amount_cents, i.currency || 'ZAR')),
+          statusTag(i.status),
+          { html: h(when(i.issued_at)), cls: 'muted' },
+        ])
+      )
     : `<div class="empty">No invoices yet.</div>`;
 
   const activity = stats
     ? stats.reachable
-      ? `<div class="kpis">
-  <div class="kpi"><div class="lbl">Active members</div><div class="val">${h(stats.activeMembers ?? '—')}</div>
-    <div class="sub">${limit ? `of ${h(limit)} on ${h(plan?.label || gym.plan_key)}` : 'no plan limit'}</div></div>
-  <div class="kpi"><div class="lbl">Check-ins this month</div><div class="val">${h(stats.checkinsThisMonth ?? '—')}</div></div>
-  <div class="kpi"><div class="lbl">Last check-in</div><div class="val" style="font-size:18px">${
-    stats.lastActivityAt ? h(when(stats.lastActivityAt)) : 'none yet'
-  }</div></div>
-  <div class="kpi"><div class="lbl">Subscription</div><div class="val" style="font-size:18px">${
-    subscription ? statusTag(subscription.status) : statusTag('none')
-  }</div></div>
-</div>
+      ? `${kpiRow([
+          `<div class="kpi"><div class="lbl">Active members</div><div class="val">${h(num(stats.activeMembers))}</div>
+    <div class="sub">${limit ? `of ${h(num(limit))} on ${h(planLabel)}` : 'no plan limit'}</div></div>`,
+          `<div class="kpi"><div class="lbl">Check-ins this month</div><div class="val">${h(num(stats.checkinsThisMonth))}</div></div>`,
+          `<div class="kpi"><div class="lbl">Last check-in</div><div class="val" style="font-size:18px">${
+            stats.lastActivityAt ? h(when(stats.lastActivityAt)) : 'none yet'
+          }</div></div>`,
+          `<div class="kpi"><div class="lbl">Subscription</div><div class="val" style="font-size:18px">${
+            subscription ? statusTag(subscription.status) : statusTag('none')
+          }</div></div>`,
+        ])}
 <p class="muted"><b>Counts only.</b> The platform never reads a member's name, phone,
 ID or health answers — only how many there are. Every one of these reads is
 written to the audit log with your name on it.</p>`
-      : `<div class="card" style="border-color:rgba(255,107,94,.35)"><p>⚠️ This gym's data could not be reached, so there are no counts.
+      : `<div class="card tone-bad"><p>⚠️ This gym's data could not be reached, so there are no counts.
          That is worth looking into — it usually means the gym is not serving traffic either.</p></div>`
     : '';
 
@@ -1672,9 +1952,9 @@ written to the audit log with your name on it.</p>`
     user,
     body: `<p><a href="/platform/registry">← All gyms</a></p>
 <h1>${h(gym.search_name || gym.slug)}</h1>
-<p class="row">${statusTag(gym.status)} <span class="tag">${h(gym.plan_key || 'no plan')}</span>
+<p class="row">${statusTag(gym.status)} <span class="tag">${h(planLabel || 'no plan')}</span>
 <span class="muted">${h(gym.city)}${gym.country ? `, ${h(gym.country)}` : ''}</span></p>
-${notice ? `<div class="card" style="border-color:rgba(142,224,122,.4)">${h(notice)}</div>` : ''}
+${notice ? `<div class="card tone-good">${h(notice)}</div>` : ''}
 
 ${activity}
 
@@ -1699,10 +1979,10 @@ ${activity}
 <div class="card">
   <h2>Gym</h2>
   <dl class="facts">
-    <dt>Search name</dt><dd>${h(gym.slug)}</dd>
+    <dt>Web address</dt><dd>/g/${h(gym.slug)}/</dd>
     <dt>Admin sign-in</dt><dd><a href="${h(gymAdminPath(gym.slug))}" target="_blank" rel="noopener">${h(gymAdminPath(gym.slug))}</a></dd>
-    <dt>Plan</dt><dd>${h(plan?.label || gym.plan_key || '—')}${
-      plan && Number.isInteger(plan.price_cents) ? ` <span class="muted">· ${h(fmtMoney(plan.price_cents, plan.currency || 'ZAR'))} a month</span>` : ''
+    <dt>Plan</dt><dd>${h(planLabel || '—')}${
+      plan && Number.isInteger(plan.price_cents) ? ` <span class="muted">· ${h(amount(plan.price_cents, plan.currency || 'ZAR'))} a month</span>` : ''
     }</dd>
     <dt>On the platform since</dt><dd class="muted">${h(when(gym.created_at)) || '—'}</dd>
     ${application?.id ? `<dt>Application</dt><dd><a href="/platform/applications/${h(application.id)}">Open →</a></dd>` : ''}
@@ -1714,17 +1994,15 @@ ${activity}
   <h2>Subscription</h2>
   ${
     subscription
-      ? `<p>${statusTag(subscription.status)} on <b>${h(gym.plan_key || '—')}</b></p>
-  <p class="muted">Trial ends ${h(subscription.trial_ends_at) || '—'} · Period ends ${
-          h(subscription.current_period_end) || '—'
-        }</p>`
+      ? `<p>${statusTag(subscription.status)} on <b>${h(planLabel || '—')}</b></p>
+  <p class="muted">Trial ends ${h(when(subscription.trial_ends_at))} · Period ends ${h(when(subscription.current_period_end))}</p>`
       : `<p class="muted">No subscription record.</p>`
   }
 </div>
 
 ${resend}
 
-${setupHelpCard({ gym, canOnboard, csrfToken })}
+${setupHelpCard({ gym, canOnboard, csrfToken, lead: lead === 'setup' })}
 
 ${gymServicesCard({ gym, plan, canBill, csrfToken })}
 
@@ -1747,7 +2025,7 @@ ${
   <p class="muted"><b>A downgrade never deletes members.</b> Existing members stay; only new
   registrations stop once the gym is over the new plan's limit. The change applies from the next
   billing date — nobody is re-billed for this month.</p>
-  <button type="submit">Change plan</button>
+  <button type="submit" class="ghost">Change plan</button>
 </form>`
     : ''
 }
@@ -1892,27 +2170,30 @@ export function driftPage({ report, user = null, csrfToken = '' }) {
 
   return layout({
     active: 'registry',
-    title: 'Drift report',
+    // "Drift" and "schema" are the builder's words; the page says what they
+    // mean, keeping each schema's name for whoever goes to fix it (design
+    // critique 2026-09-29).
+    title: 'Gym sync check',
     user,
     body: `<p><a href="/platform/registry">← All gyms</a></p>
-<h1>Drift report</h1>
-<p class="muted">Compares the schemas that exist against the gyms the registry knows about.
-This report <b>never changes anything</b>.</p>
+<h1>Are the gyms in sync?</h1>
+<p class="muted">Checks that every gym on the list has its own store of data (its database schema), and
+that no store is left behind without a gym. This check <b>never changes anything</b>.</p>
 
-${report ? `<p>${report.ok ? '✅ Nothing is out of step.' : '⚠️ Findings below.'}
-  Checked ${h(report.checkedSchemas)} gym schemas.</p>
+${report ? `<p>${report.ok ? '✅ Every gym is in sync.' : '⚠️ Something is out of step — see below.'}
+  Checked the data of ${h(tally(report.checkedSchemas, 'gym'))}.</p>
 
-<h2>Schemas no gym owns</h2>
+<h2>Data that no gym owns</h2>
 ${list(report.orphans || [], (o) => `<li><b>${h(o.schema_name)}</b> — ${h(o.risk)}<br>
   <span class="muted">${h(o.likely_cause)}. ${h(o.next_step)}</span></li>`)}
 
-<h2>Gyms whose schema is missing</h2>
+<h2>Gyms whose data is missing</h2>
 ${list(report.dangling || [], (d) => `<li><b>${h(d.gym_id)}</b> → ${h(d.schema_name)}<br>
   <span class="muted">${h(d.impact)}</span></li>`)}` : ''}
 
 <form class="card" method="post" action="/platform/reconcile">
   <input type="hidden" name="csrf" value="${h(csrfToken)}">
-  <button type="submit">Run the check again</button>
+  <button type="submit">Check again</button>
 </form>`,
   });
 }
@@ -2384,7 +2665,7 @@ export function plansPage({ plans = [], user = null, csrfToken = '', error = '' 
 ${error ? `<p class="err">${h(error)}</p>` : ''}
 ${
   unpriced.length
-    ? `<div class="card"><b>⚠️ ${unpriced.length} plan${unpriced.length === 1 ? ' has' : 's have'} no price.</b>
+    ? `<div class="card tone-warn"><b>⚠️ ${unpriced.length} plan${unpriced.length === 1 ? ' has' : 's have'} no price.</b>
   <p class="muted">Billing skips a plan with no price — those gyms are <b>not being billed at all</b>.
   Nothing is charged until a price is set here.</p></div>`
     : ''
@@ -2394,10 +2675,10 @@ ${plans
   .map(
     (p) => `<form class="card" method="post" action="/platform/plans/${h(p.key)}">
   <input type="hidden" name="csrf" value="${h(csrfToken)}">
-  <h2>${h(p.label)} <span class="muted">${h(p.key)}</span></h2>
+  <h2>${h(p.label || planName(p.key))}</h2>
   <p>${
     Number.isInteger(p.price_cents) && p.price_cents > 0
-      ? `Currently <b>${h(p.currency || 'ZAR')} ${rands(p.price_cents)}</b> per month`
+      ? `Currently <b>${h(amount(p.price_cents, p.currency || 'ZAR'))}</b> per month`
       : '<b>No price set</b> — this plan bills nobody.'
   }</p>
   <div class="two">
@@ -2412,7 +2693,7 @@ ${plans
     p.is_enabled === false ? '' : 'checked'
   }> Offered to new gyms</label>
   ${serviceSwitches(p.features)}
-  <button type="submit">Save ${h(p.label)}</button>
+  <button type="submit" class="ghost">Save ${h(p.label || planName(p.key))}</button>
 </form>`
   )
   .join('\n')}
@@ -2466,23 +2747,21 @@ function serviceSwitches(features) {
  * the platform, and "show me everything" stops being a useful question.
  */
 export function auditPage({ entries = [], user = null, filter = {}, page = null } = {}) {
+  // What happened in words first, with the recorded name under it — the name
+  // is what "Action contains" searches (design critique 2026-09-29).
   const rows = entries.length
-    ? `<table>
-  <thead><tr><th>When</th><th>Action</th><th>Who</th><th>What</th><th>Detail</th></tr></thead>
-  <tbody>
-${entries
-  .map(
-    (e) => `    <tr>
-      <td class="muted">${h(exact(e.created_at))}</td>
-      <td><b>${h(e.action)}</b></td>
-      <td>${h(e.actor_kind || '')}${e.actor_user_id ? `<br><span class="muted">${h(e.actor_user_id)}</span>` : ''}</td>
-      <td>${h(e.entity || '')}${e.entity_id || e.detail?.entity_key ? `<br><span class="muted">${h(e.entity_id || e.detail.entity_key)}</span>` : ''}</td>
-      <td class="muted">${h(detailText(e.detail))}</td>
-    </tr>`
-  )
-  .join('\n')}
-  </tbody>
-</table>`
+    ? listTable(
+        [['When'], ['Action'], ['Who'], ['What'], ['Detail']],
+        entries.map((e) => [
+          { html: h(exact(e.created_at)), cls: 'muted' },
+          `<b>${h(actionText(e.action))}</b><br><span class="muted">${h(e.action)}</span>`,
+          `${h(ACTOR_TEXT[e.actor_kind] || String(e.actor_kind || '').replace(/_/g, ' '))}${
+            e.actor_user_id ? `<br><span class="muted">${h(e.actor_user_id)}</span>` : ''
+          }`,
+          `${h(e.entity || '')}${e.entity_id || e.detail?.entity_key ? `<br><span class="muted">${h(e.entity_id || e.detail.entity_key)}</span>` : ''}`,
+          { html: h(detailText(e.detail)), cls: 'muted' },
+        ])
+      )
     : `<div class="empty">Nothing matches that filter.</div>`;
 
   return layout({
@@ -2495,7 +2774,7 @@ ${entries
 <form class="card row" method="get" action="/platform/audit">
   <label>Action contains<input name="action" value="${h(filter.action)}" placeholder="e.g. suspend"></label>
   <label>Entity id<input name="entity_id" value="${h(filter.entityId)}" placeholder="a gym or document id"></label>
-  <button type="submit">Filter</button>
+  <button type="submit" class="ghost">Filter</button>
 </form>
 
 ${rows}
@@ -2526,38 +2805,36 @@ function detailText(detail) {
 /** Gym owners, and the switch that stops one. */
 export function ownersPage({ owners = [], user = null, csrfToken = '', filter = {}, page = null } = {}) {
   const rows = owners.length
-    ? `<table>
-  <thead><tr><th>Owner</th><th>Email</th><th>Gyms</th><th>Status</th><th></th></tr></thead>
-  <tbody>
-${owners
-  .map(
-    (o) => `    <tr>
-      <td>${h(o.full_name || '—')}</td>
-      <td>${h(o.email)}</td>
-      <td>${h(o.gym_count ?? 0)}</td>
-      <td>${statusTag(o.is_active === false ? 'switched off' : 'active')}${
-        o.closure_requested_at && o.is_active !== false ? ` ${statusTag('asked to close')}` : ''
-      }</td>
-      <td>${
-        o.is_active === false
-          ? `<form method="post" action="/platform/owners/${h(o.id)}/reactivate">
+    ? listTable(
+        [['Owner'], ['Email'], ['Gyms', { num: true }], ['Status'], ['Actions', { act: true }]],
+        owners.map((o) => [
+          h(o.full_name || '—'),
+          h(o.email),
+          h(num(o.gym_count ?? 0)),
+          `${statusTag(o.is_active === false ? 'switched off' : 'active')}${
+            o.closure_requested_at && o.is_active !== false ? ` ${statusTag('asked to close')}` : ''
+          }`,
+          o.is_active === false
+            ? `<form method="post" action="/platform/owners/${h(o.id)}/reactivate">
         <input type="hidden" name="csrf" value="${h(csrfToken)}">
-        <button type="submit">Switch on</button>
+        <button type="submit" class="ghost">Switch on</button>
       </form>`
-          : `<details class="confirm"><summary>Switch off</summary>
+            : `<details class="confirm"><summary>Switch off</summary>
         <form method="post" action="/platform/owners/${h(o.id)}/deactivate">
           <input type="hidden" name="csrf" value="${h(csrfToken)}">
-          <p><b>${h(o.email || 'This owner')}</b> can no longer sign in to their Yoyo Gyms account or with Owner login.
+          <p><b>${h(o.email || 'This owner')}</b> can no longer sign in to their Yoyo Gyms account or through Owner sign-in.
           Their gym stays open, and its staff and members are not affected. You can switch them on again.</p>
           <button type="submit" class="danger">Yes, switch off</button>
-        </form></details>`
-      }</td>
-    </tr>`
-  )
-  .join('\n')}
-  </tbody>
-</table>`
+        </form></details>`,
+        ])
+      )
     : `<div class="empty">No owners match that search.</div>`;
+
+  const total = Number.isInteger(owners.total) ? owners.total : Number.isInteger(page?.total) ? page.total : null;
+  const summary =
+    total === null
+      ? `${tally(owners.length, 'owner')} shown.`
+      : `${tally(total, 'owner')}${filter.query ? (total === 1 ? ' matches' : ' match') : ''}.`;
 
   return layout({
     active: 'owners',
@@ -2567,13 +2844,15 @@ ${owners
 <p class="muted">Switching an owner off stops them signing in. <b>It does not close their gym</b>
 and it deletes nothing — suspend the gym itself if that is what you mean.</p>
 
-<form class="card row" method="get" action="/platform/owners">
-  <label>Search<input name="q" value="${h(filter.query)}" placeholder="name or email"></label>
-  <button type="submit">Search</button>
-</form>
-
+${liveSearch({
+  action: '/platform/owners',
+  regions: ['owners-list'],
+  fields: `<label style="flex:1">Search by name or email<input type="search" name="q" value="${h(filter.query)}" autocomplete="off"></label>`,
+})}
+<div id="owners-list" data-summary="${h(summary)}">
 ${rows}
-${pager(page, '/platform/owners', { q: filter.query })}`,
+${pager(page, '/platform/owners', { q: filter.query })}
+</div>`,
   });
 }
 
@@ -2594,32 +2873,23 @@ export function financePage({ summary = {}, user = null } = {}) {
 
 ${
   unpriced.length
-    ? `<div class="card"><b>⚠️ Gyms on ${unpriced.map((k) => h(k)).join(', ')} are not being billed.</b>
+    ? `<div class="card tone-warn"><b>⚠️ Gyms on ${unpriced.map((k) => h(planName(k))).join(', ')} are not being billed.</b>
   <p class="muted">Those plans have <b>no price</b>, so billing skips them entirely.
   <a href="/platform/plans">Set a price →</a></p></div>`
     : ''
 }
 
-<div class="card">
-  <h2>Paid</h2>
-  <p><b>${h(summary.currency || 'ZAR')} ${((Number(summary.paid_cents) || 0) / 100).toFixed(2)}</b></p>
-</div>
-
-<div class="card">
-  <h2>Outstanding</h2>
-  <p><b>${h(summary.currency || 'ZAR')} ${((Number(summary.outstanding_cents) || 0) / 100).toFixed(2)}</b></p>
-  <p class="muted">Invoices issued and not yet paid.</p>
-</div>
+${kpiRow([
+  `<div class="kpi"><div class="lbl">Paid</div><div class="val">${h(amount(Number(summary.paid_cents) || 0, summary.currency || 'ZAR'))}</div></div>`,
+  `<div class="kpi"><div class="lbl">Outstanding</div><div class="val">${h(amount(Number(summary.outstanding_cents) || 0, summary.currency || 'ZAR'))}</div>
+    <div class="sub">Invoices issued and not yet paid.</div></div>`,
+])}
 
 <h2>Gyms by subscription state</h2>
-<table>
-  <thead><tr><th>State</th><th>Gyms</th></tr></thead>
-  <tbody>
-${Object.entries(byStatus)
-  .map(([state, count]) => `    <tr><td>${statusTag(state)}</td><td>${h(count)}</td></tr>`)
-  .join('\n')}
-  </tbody>
-</table>
+${listTable(
+  [['State'], ['Gyms', { num: true }]],
+  Object.entries(byStatus).map(([state, n]) => [statusTag(state), h(num(n))])
+)}
 
 <p class="muted">Figures come from <code>platform_invoices</code>. Money the platform is owed by
 gyms — <b>never a member's payment to their gym</b>, which the platform does not see (D-013).</p>`,
@@ -2653,14 +2923,14 @@ export function activationHandoverPage({ activation = {}, gymName = '', applicat
   <p><b>⚠️ The activation email could not be sent${
     activation.emailReason ? ` (${h(activation.emailReason)})` : ''
   }.</b></p>
-  <p class="muted">The gym <b>${h(gymName)}</b> is provisioned and waiting. The owner cannot open
+  <p class="muted">The gym <b>${h(gymName)}</b> is set up and waiting. The owner cannot open
   it until they use the link and the code below, so please send these to them yourself.</p>
 </div>
 
 <div class="card">
   <h2>Send to ${h(activation.to || 'the owner')}</h2>
   <p><b>Link</b></p>
-  <p><input readonly value="${h(activation.link)}" style="width:100%" onclick="this.select()"></p>
+  <p><input readonly value="${h(activation.link)}" style="width:100%" aria-label="Activation link" data-select></p>
   <p><b>Code</b></p>
   <p style="font-size:28px;letter-spacing:6px"><b>${h(activation.code)}</b></p>
   <p class="muted">Both are needed. The link alone is not enough, and it expires
@@ -2718,7 +2988,7 @@ export function documentReviewPage({
   // show an embedded PDF as a blank box, and the fallback inside <object>
   // only appears where it is not needed.
   const tools = `<p class="row">
-  <a class="btn" href="${src}" target="_blank" rel="noopener">Open in a new tab</a>
+  <a class="btn ghost" href="${src}" target="_blank" rel="noopener">Open in a new tab</a>
   <a class="btn ghost" href="${src}?download=1">Download</a>
 </p>`;
   const viewer = isImage
@@ -2732,7 +3002,7 @@ export function documentReviewPage({
 
   // Flags are facts, phrased as facts. None of them is a verdict.
   const flagList = (facts?.flags || []).length
-    ? `<div class="card" style="border-left:4px solid var(--bad)">
+    ? `<div class="card tone-bad">
   <h2>⚠️ Worth a closer look</h2>
   <ul>${facts.flags
     .map((f) => `<li><b>${h(f.severity)}</b> — ${h(f.detail)}</li>`)
@@ -2745,7 +3015,7 @@ export function documentReviewPage({
   // The strongest signal available, and the one a human would never spot
   // unaided: this exact file on somebody else's application.
   const dupeList = duplicates.length
-    ? `<div class="card" style="border-left:4px solid var(--bad)">
+    ? `<div class="card tone-bad">
   <h2>⚠️ This exact file appears on ${duplicates.length} other application${
         duplicates.length === 1 ? '' : 's'
       }</h2>
@@ -2862,9 +3132,7 @@ export function securityPage({ alerts = [], windowHours = 24, user = null }) {
   const body = alerts.length
     ? alerts
         .map(
-          (a) => `<div class="card" style="border-left:4px solid ${
-            a.severity === 'high' ? 'var(--bad)' : '#b7791f'
-          }">
+          (a) => `<div class="card ${a.severity === 'high' ? 'tone-bad' : 'tone-warn'}">
   <h2>${h(a.detail)}</h2>
   <p class="muted">${h(a.innocent)}</p>
   <p class="muted"><a href="/platform/audit?action=${h(auditFilterFor(a.code))}">
@@ -3161,17 +3429,70 @@ const ACTIVITY_TEXT = {
   'platform.staff.deactivated': 'Staff member switched off',
   'platform.staff.joined': 'Staff member finished setting up',
   'platform.application.decision_email_failed': 'Decision email could not be sent',
+  // Said in plain words, never "provisioned" (design critique 2026-09-29).
+  'gym.provisioned': 'Gym set up',
+  'gym.provision.failed': 'Setting up a gym stopped before it finished',
+  'platform.gym.services_changed': "Gym's services changed",
+  'platform.gym.setup_help_given': 'Setup help given',
+  'platform.gym.account_manager_set': 'Account manager named',
+  'platform.gym.owner_account_created': "Owner's gym sign-in created",
+  'platform.owner.setup_help_requested': 'Owner asked for setup help',
+  'platform.owner.activated': 'Owner activated their account',
+  'platform.owner.activation_email_failed': 'Activation email could not be sent',
+  'platform.owner.activation_renewed': 'Owner asked for a new activation link',
+  'platform.staff.reactivated': 'Staff member switched back on',
+  'platform.staff.invite_resent': 'Staff invitation sent again',
+  'platform.document.opened': 'Document opened',
+  'platform.document.downloaded': 'Document downloaded',
+  'platform.document.purged': 'Old document deleted',
+  'platform.password.reset_requested': 'Password reset asked for',
+  'platform.password.reset': 'Password reset',
+  'platform.invoice.paid': 'Invoice paid',
+  'platform.settings.support_changed': 'Support contacts changed',
 };
+
+/** Who did it, for the audit log — the kind of account, in words. */
+const ACTOR_TEXT = { platform_staff: 'Yoyo staff', gym_owner: 'Gym owner', system: 'The system' };
+
+/** An audit action as a person reads it; the recorded name when we have no words for it. */
+function actionText(action) {
+  return (
+    ACTIVITY_TEXT[action] ||
+    String(action || '')
+      .replace(/^platform\./, '')
+      .replace(/[._]/g, ' ')
+  );
+}
 
 /** Entries worth reading on Today — reads of figures are not news. */
 const QUIET = new Set(['platform.gym.stats_read', 'platform.logout']);
 
+/**
+ * Gyms approved but not fully built, and not built since (CLAUDE.md §40.1,
+ * D-167): the owner is waiting and Try again is on the application's page.
+ * Read from the audit entries Today already has — a later "gym.provisioned"
+ * for the same web address means the retry worked.
+ */
+function openFailedBuilds(entries) {
+  const list = Array.isArray(entries) ? entries : [];
+  const at = (e) => String(e?.created_at || '');
+  const built = new Map();
+  for (const e of list) {
+    const slug = e?.action === 'gym.provisioned' ? e.detail?.slug : null;
+    if (slug && at(e) > (built.get(slug) || '')) built.set(slug, at(e));
+  }
+  const open = new Map();
+  for (const e of list) {
+    if (e?.action !== 'gym.provision.failed' || !e.entity_id) continue;
+    const slug = e.detail?.slug;
+    if (slug && built.has(slug) && built.get(slug) > at(e)) continue;
+    open.set(e.entity_id, e);
+  }
+  return [...open.values()];
+}
+
 function activityLine(e) {
-  const text =
-    ACTIVITY_TEXT[e.action] ||
-    String(e.action || '')
-      .replace(/^platform\./, '')
-      .replace(/[._]/g, ' ');
+  const text = actionText(e.action);
   const name = e.detail && typeof e.detail === 'object' ? e.detail.gym_name || e.detail.email || '' : '';
   return `<li><b>${h(text)}</b>${name ? ` <span class="muted">· ${h(name)}</span>` : ''} <span class="muted" style="float:right">${h(
     when(e.created_at)
@@ -3208,13 +3529,18 @@ export function dashboardPage({
   provisioning = null,
   recent = [],
   setupRequests = 0,
+  // Documents uploaded and not yet checked. Shown when the router passes it;
+  // null is "not known", never 0 (design critique 2026-09-29).
+  documentsWaiting = null,
 } = {}) {
   // What this person may open. A tile or a link they would be refused is a
   // dead button (CLAUDE.md §40.1 F-40.2); rendered on its own, with no
   // permission list, the page shows everything, as before.
   const can = (perm) => !Array.isArray(user?.perms) || user.perms.includes(perm);
 
-  // Ordered by what it costs to ignore, not by what is interesting.
+  // Everything that needs a person, before any total (design critique
+  // 2026-09-29). Red items — what costs most to ignore — go first; within a
+  // colour, the order below.
   const needsYou = [];
 
   // Can this server create a gym? Said on the home page — by setting NAME,
@@ -3237,68 +3563,38 @@ export function dashboardPage({
     });
   }
 
-  // Someone asked to leave. The stores require it to be honoured, and an
-  // owner still being billed after asking to close is a complaint waiting.
-  if (closureRequests) {
+  // An approved owner waiting on a gym that did not finish building.
+  const failed = openFailedBuilds(recent);
+  if (failed.length) {
     needsYou.push({
       urgency: 'high',
-      text: `${count(closureRequests, 'owner')} asked to close their account.`,
-      href: '/platform/owners',
-      action: 'Contact them',
-      perm: 'platform.manage',
-    });
-  }
-
-  if (unpricedPlans.length) {
-    needsYou.push({
-      urgency: 'high',
-      text: `${unpricedPlans.map((k) => h(k)).join(', ')} ${
-        unpricedPlans.length === 1 ? 'has' : 'have'
-      } no price, so ${unpricedPlans.length === 1 ? 'that plan bills' : 'those plans bill'} nobody.`,
-      href: '/platform/plans',
-      action: 'Set a price',
-      perm: 'subscription.manage',
+      text: `${h(tally(failed.length, 'approved gym'))} not fully set up — the owner is waiting.`,
+      sub: 'Trying again finishes the gym from where it stopped.',
+      href:
+        failed.length === 1 ? `/platform/applications/${h(failed[0].entity_id)}` : '/platform/applications?tab=approved',
+      action: 'Try again',
+      perm: 'application.view',
     });
   }
 
   if (waiting) {
     needsYou.push({
       urgency: 'normal',
-      text: `${count(waiting, 'gym')} waiting for a decision.`,
+      text: `${h(tally(waiting, 'application'))} waiting for a decision.`,
+      sub: waitingOnOwner ? `${h(num(waitingOnOwner))} more waiting on the owner.` : '',
       href: '/platform/applications',
       action: 'Review',
       perm: 'application.view',
     });
   }
 
-  if (alerts) {
-    needsYou.push({
-      urgency: 'high',
-      text: `${count(alerts, 'security item')} worth a look in the last day.`,
-      href: '/platform/security',
-      action: 'Look',
-      perm: 'audit.view',
-    });
-  }
-
-  if (driftFindings) {
-    needsYou.push({
-      urgency: 'high',
-      text: `${count(driftFindings, 'gym')} out of step between the registry and the database.`,
-      href: '/platform/reconcile',
-      action: 'See the report',
-      perm: 'gym.view',
-    });
-  }
-
-  // A promise made on the registration page (§41.1 Q6): somebody is waiting.
-  if (setupRequests) {
+  if (documentsWaiting) {
     needsYou.push({
       urgency: 'normal',
-      text: `${count(setupRequests, 'gym')} asked for setup help.`,
-      href: '/platform/registry?setup=1',
-      action: 'Help them',
-      perm: 'gym.view',
+      text: `${h(tally(documentsWaiting, 'document'))} waiting to be checked.`,
+      href: '/platform/applications',
+      action: 'Check them',
+      perm: 'application.view',
     });
   }
 
@@ -3312,22 +3608,80 @@ export function dashboardPage({
     });
   }
 
-  const todo = needsYou.length
-    ? `<div class="card" style="padding:0;overflow:hidden">
-${needsYou
-  .map((item) =>
+  // Someone asked to leave. The stores require it to be honoured, and an
+  // owner still being billed after asking to close is a complaint waiting.
+  if (closureRequests) {
+    needsYou.push({
+      urgency: 'high',
+      text: `${h(tally(closureRequests, 'owner'))} asked to close their account.`,
+      href: '/platform/owners',
+      action: 'Contact them',
+      perm: 'platform.manage',
+    });
+  }
+
+  if (unpricedPlans.length) {
+    needsYou.push({
+      urgency: 'high',
+      text: `${unpricedPlans.map((k) => h(planName(k))).join(', ')} ${
+        unpricedPlans.length === 1 ? 'has' : 'have'
+      } no price, so ${unpricedPlans.length === 1 ? 'that plan bills' : 'those plans bill'} nobody.`,
+      href: '/platform/plans',
+      action: 'Set a price',
+      perm: 'subscription.manage',
+    });
+  }
+
+  if (alerts) {
+    needsYou.push({
+      urgency: 'high',
+      text: `${h(tally(alerts, 'security item'))} worth a look in the last day.`,
+      href: '/platform/security',
+      action: 'Look',
+      perm: 'audit.view',
+    });
+  }
+
+  if (driftFindings) {
+    needsYou.push({
+      urgency: 'high',
+      text: `${h(tally(driftFindings, 'gym'))} out of sync between the list of gyms and their data.`,
+      href: '/platform/reconcile',
+      action: 'See the check',
+      perm: 'gym.view',
+    });
+  }
+
+  // A promise made on the registration page (§41.1 Q6): somebody is waiting.
+  if (setupRequests) {
+    needsYou.push({
+      urgency: 'normal',
+      text: `${h(tally(setupRequests, 'gym'))} asked for setup help.`,
+      href: '/platform/registry?setup=1',
+      action: 'Help them',
+      perm: 'gym.view',
+    });
+  }
+
+  // Stable: red first, then the order above.
+  const ordered = [...needsYou.filter((i) => i.urgency === 'high'), ...needsYou.filter((i) => i.urgency !== 'high')];
+  const row = (item) => {
+    const dot = `<span class="dot${item.urgency === 'high' ? ' bad' : ''}" aria-hidden="true"></span>`;
+    const what = `<span class="what">${item.text}${item.sub ? `<small>${item.sub}</small>` : ''}</span>`;
     // Told, but not offered a door they would be refused at.
-    can(item.perm)
-      ? `  <a class="todo" href="${item.href}"><span class="dot${item.urgency === 'high' ? ' bad' : ''}"></span>
-    <span>${item.text}</span><span class="go">${h(item.action)} →</span></a>`
-      : `  <div class="todo"><span class="dot${item.urgency === 'high' ? ' bad' : ''}"></span><span>${item.text}</span></div>`
-  )
-  .join('\n')}
+    return can(item.perm)
+      ? `  <a class="todo" href="${item.href}">${dot}${what}<span class="go">${h(item.action)} →</span></a>`
+      : `  <div class="todo">${dot}${what}</div>`;
+  };
+
+  const todo = ordered.length
+    ? `<div class="card ${ordered[0].urgency === 'high' ? 'tone-bad' : 'tone-warn'}">
+${ordered.map(row).join('\n')}
 </div>`
-    : `<div class="card">
+    : `<div class="card tone-good" style="padding:20px 22px">
   <h2>✅ Nothing needs you</h2>
   <p class="muted">No applications waiting, no security items, no plan billing nobody,
-  and nothing out of step. Come back tomorrow.</p>
+  and nothing out of sync. Come back tomorrow.</p>
 </div>`;
 
   const byStatus = gymCounts || {};
@@ -3335,8 +3689,8 @@ ${needsYou
     !can(perm)
       ? ''
       : `<a class="kpi" href="${href}"><div class="lbl">${h(label)}</div><div class="val">${value}</div>${
-      sub ? `<div class="sub">${sub}</div>` : ''
-    }</a>`;
+          sub ? `<div class="sub">${sub}</div>` : ''
+        }</a>`;
 
   // Whole units in a tile: a headline figure, not a statement. Finances keep
   // the cents.
@@ -3350,20 +3704,25 @@ ${needsYou
     }
   };
 
-  const kpis = `<div class="kpis">
-  ${tile('/platform/applications', 'To review', h(waiting), waitingOnOwner ? `${h(waitingOnOwner)} waiting on the owner` : 'applications', 'application.view')}
-  ${tile(
-    '/platform/registry?status=active',
-    'Active gyms',
-    h(activeGyms),
-    `of ${h(gyms)}${byStatus.suspended ? ` · ${h(byStatus.suspended)} suspended` : ''}${byStatus.pending ? ` · ${h(byStatus.pending)} not activated` : ''}`,
-    'gym.view'
-  )}
-  ${owners === null ? '' : tile('/platform/owners', 'Gym owners', h(owners), '', 'platform.manage')}
-  ${mrrCents === null ? '' : tile('/platform/finance', 'Monthly revenue', h(kpiMoney(mrrCents)), 'from paying gyms', 'subscription.manage')}
-  ${outstandingCents === null ? '' : tile('/platform/finance', 'Outstanding', h(kpiMoney(outstandingCents)), 'invoiced, not yet paid', 'subscription.manage')}
-  ${tile('/platform/security', 'Security items', h(alerts), 'last 24 hours', 'audit.view')}
-</div>`;
+  // The totals: how the platform is doing, quieter than the decisions above.
+  // What was the "To review" tile is the first decision now, and security
+  // items are a decision too — neither is a total.
+  const kpis = kpiRow([
+    tile(
+      '/platform/registry?status=active',
+      'Active gyms',
+      h(num(activeGyms)),
+      `of ${h(num(gyms))}${byStatus.suspended ? ` · ${h(num(byStatus.suspended))} suspended` : ''}${
+        byStatus.pending ? ` · ${h(num(byStatus.pending))} not activated` : ''
+      }`,
+      'gym.view'
+    ),
+    owners === null ? '' : tile('/platform/owners', 'Gym owners', h(num(owners)), '', 'platform.manage'),
+    mrrCents === null ? '' : tile('/platform/finance', 'Monthly revenue', h(kpiMoney(mrrCents)), 'from paying gyms', 'subscription.manage'),
+    outstandingCents === null
+      ? ''
+      : tile('/platform/finance', 'Outstanding', h(kpiMoney(outstandingCents)), 'invoiced, not yet paid', 'subscription.manage'),
+  ]);
 
   const shown = (recent || []).filter((e) => !QUIET.has(e.action)).slice(0, 8);
   // The audit log's own entries: only for someone who may read it.
@@ -3382,15 +3741,17 @@ ${needsYou
     body: `<h1>Today</h1>
 <p class="lede">What needs a decision, and how the platform is doing.</p>
 
-${kpis}
-
-<h2>Needs you</h2>
+<section class="decide" aria-labelledby="needs-you">
+<h2 id="needs-you">Needs you</h2>
 ${todo}
+</section>
+
+${kpis ? `<h2>The platform</h2>\n${kpis}` : ''}
 
 <div class="grid2" style="margin-top:16px">
 ${activity}
 <div class="card">
-  <h2>The platform</h2>
+  <h2>Status</h2>
   <dl class="facts">
     ${
       provisioning
@@ -3401,7 +3762,7 @@ ${activity}
           }</dd>`
         : ''
     }
-    <dt>Gyms</dt><dd>${can('gym.view') ? `<a href="/platform/registry">${h(gyms)}</a>` : h(gyms)} <span class="muted">· ${h(activeGyms)} active</span></dd>
+    <dt>Gyms</dt><dd>${can('gym.view') ? `<a href="/platform/registry">${h(num(gyms))}</a>` : h(num(gyms))} <span class="muted">· ${h(num(activeGyms))} active</span></dd>
     ${can('platform.manage') ? '<dt>Settings</dt><dd><a href="/platform/settings">Every switch, and whether it is set →</a></dd>' : ''}
   </dl>
 </div>
@@ -3432,55 +3793,47 @@ export function teamPage({ staff = [], roles = [], user = null, me = '', csrfTok
     s.is_active === false ? statusTag('switched off') : !s.set_up ? statusTag('invited') : statusTag('active');
 
   const rows = staff.length
-    ? `<table>
-  <thead><tr><th>Person</th><th>Role</th><th>Status</th><th>Last sign-in</th><th></th></tr></thead>
-  <tbody>
-${staff
-  .map((s) => {
-    const self = s.id === me;
-    const role = (s.roles || [])[0] || '';
-    return `    <tr>
-      <td><b>${h(s.full_name || '—')}</b>${self ? ' <span class="muted">(you)</span>' : ''}<br><span class="muted">${h(s.email)}</span></td>
-      <td>${
-        self
-          ? h(roles.find(([k]) => k === role)?.[1] || role || '—')
-          : `<form method="post" action="/platform/team/${h(s.id)}/role" class="row">
+    ? listTable(
+        [['Person'], ['Role'], ['Status'], ['Last sign-in'], ['Actions', { act: true }]],
+        staff.map((s) => {
+          const self = s.id === me;
+          const role = (s.roles || [])[0] || '';
+          return [
+            `<b>${h(s.full_name || '—')}</b>${self ? ' <span class="muted">(you)</span>' : ''}<br><span class="muted">${h(s.email)}</span>`,
+            self
+              ? h(roles.find(([k]) => k === role)?.[1] || role || '—')
+              : `<form method="post" action="/platform/team/${h(s.id)}/role" class="row">
         <input type="hidden" name="csrf" value="${h(csrfToken)}">
         <select name="role" aria-label="Role for ${h(s.email)}">${roleOptions(role)}</select>
         <button type="submit" class="ghost">Save</button>
-      </form>`
-      }</td>
-      <td>${state(s)}${s.set_up && !s.totp_enabled ? ' <span class="tag tag--warn">no authenticator</span>' : ''}</td>
-      <td class="muted">${s.last_login_at ? h(when(s.last_login_at)) : 'never'}</td>
-      <td>${
-        self
-          ? ''
-          : `<div class="row">${
-              !s.set_up && s.is_active !== false
-                ? `<form method="post" action="/platform/team/${h(s.id)}/resend">
+      </form>`,
+            `${state(s)}${s.set_up && !s.totp_enabled ? ' <span class="tag tag--warn">no authenticator</span>' : ''}`,
+            { html: s.last_login_at ? h(when(s.last_login_at)) : 'never', cls: 'muted' },
+            self
+              ? ''
+              : `<div class="row">${
+                  !s.set_up && s.is_active !== false
+                    ? `<form method="post" action="/platform/team/${h(s.id)}/resend">
           <input type="hidden" name="csrf" value="${h(csrfToken)}">
           <button type="submit" class="ghost">New invite link</button>
         </form>`
-                : ''
-            }${
-              s.is_active === false
-                ? `<form method="post" action="/platform/team/${h(s.id)}/reactivate">
+                    : ''
+                }${
+                  s.is_active === false
+                    ? `<form method="post" action="/platform/team/${h(s.id)}/reactivate">
           <input type="hidden" name="csrf" value="${h(csrfToken)}">
-          <button type="submit">Switch on</button>
+          <button type="submit" class="ghost">Switch on</button>
         </form>`
-                : `<details class="confirm"><summary>Switch off</summary>
+                    : `<details class="confirm"><summary>Switch off</summary>
           <form method="post" action="/platform/team/${h(s.id)}/deactivate">
             <input type="hidden" name="csrf" value="${h(csrfToken)}">
             <p><b>${h(s.email || 'This person')}</b> loses the main admin panel from their next click. You can switch them on again.</p>
             <button type="submit" class="danger">Yes, switch off</button>
           </form></details>`
-            }</div>`
-      }</td>
-    </tr>`;
-  })
-  .join('\n')}
-  </tbody>
-</table>`
+                }</div>`,
+          ];
+        })
+      )
     : '<div class="empty">No staff yet.</div>';
 
   return layout({
@@ -3530,7 +3883,7 @@ export function inviteHandoverPage({ invite = {}, user = null } = {}) {
   <p><b>⚠️ The invitation email could not be sent${invite.emailReason ? ` (${h(invite.emailReason)})` : ''}.</b></p>
   <p class="muted">Send this link to <b>${h(invite.to || 'them')}</b> yourself. It works once and expires in
   ${h(INVITE_TTL_HOURS)} hours. <b>It is shown only now</b> — only a hash of it is stored.</p>
-  <p><input readonly value="${h(invite.link)}" style="width:100%"></p>
+  <p><input readonly value="${h(invite.link)}" style="width:100%" aria-label="Invitation link" data-select></p>
 </div>
 <p><a class="btn" href="/platform/team">Back to the team →</a></p>`,
   });
@@ -3565,15 +3918,16 @@ export function settingsPage({ switches = [], baseUrl = '', user = null, support
   <button type="submit">Save support contacts</button>
 </form>`
     : '';
-  const rows = switches
-    .map(
-      (s) => `    <tr>
-      <td><b>${h(s.label)}</b><br><span class="muted">${h(s.what)}</span></td>
-      <td>${s.on ? `<span class="tag tag--good">${h(s.onText || 'on')}</span>` : `<span class="tag tag--${s.warn ? 'bad' : 'warn'}">${h(s.offText || 'off')}</span>`}</td>
-      <td class="muted">${h(s.name)}${s.note ? `<br>${h(s.note)}` : ''}</td>
-    </tr>`
-    )
-    .join('\n');
+  const rows = listTable(
+    [['Switch'], ['State'], ['Variable']],
+    switches.map((s) => [
+      `<b>${h(s.label)}</b><br><span class="muted">${h(s.what)}</span>`,
+      s.on
+        ? `<span class="tag tag--good">${h(s.onText || 'on')}</span>`
+        : `<span class="tag tag--${s.warn ? 'bad' : 'warn'}">${h(s.offText || 'off')}</span>`,
+      { html: `${h(s.name)}${s.note ? `<br>${h(s.note)}` : ''}`, cls: 'muted' },
+    ])
+  );
 
   return layout({
     active: 'settings',
@@ -3584,12 +3938,7 @@ export function settingsPage({ switches = [], baseUrl = '', user = null, support
 shown here — several are secrets. They are changed in Vercel → Settings → Environment Variables, and take
 effect after a redeploy.</p>
 
-<table>
-  <thead><tr><th>Switch</th><th>State</th><th>Variable</th></tr></thead>
-  <tbody>
 ${rows}
-  </tbody>
-</table>
 
 ${supportForm}
 

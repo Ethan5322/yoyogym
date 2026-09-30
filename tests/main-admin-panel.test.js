@@ -155,7 +155,7 @@ test('F-40.3 THE REVIEWER SEES WHO APPLIED: name, email, phone, address, plan, m
     documents: [],
     events: [],
   });
-  for (const fact of ['Ann Bos', 'mailto:ann@bos.co', 'tel:+27821234567', '12 Main Rd', 'medium', '120', 'SMS reminders']) {
+  for (const fact of ['Ann Bos', 'mailto:ann@bos.co', 'tel:+27821234567', '12 Main Rd', 'Medium', '120', 'SMS reminders']) {
     assert.ok(html.includes(fact), `shows ${fact}`);
   }
 });
@@ -522,8 +522,9 @@ test('F-40.7 THE GYM LIST SHOWS WHAT EACH GYM IS DOING — counts only', () => {
     ],
     stats,
   });
-  assert.match(html, /<td>3<\/td>/);
-  assert.match(html, /<td>41<\/td>/);
+  // Figures sit in right-aligned number cells (design critique 2026-09-29).
+  assert.match(html, /data-label="Active members" class="num">3<\/td>/);
+  assert.match(html, /data-label="Check-ins this month" class="num">41<\/td>/);
   assert.match(html, /unreachable/, 'a gym that cannot be reached says so');
 });
 

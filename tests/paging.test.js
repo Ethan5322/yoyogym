@@ -168,7 +168,8 @@ routeTest('the registry states the REAL total, not the page size', async () => {
   // and somebody would plan capacity around it.
   const r = await get('/platform/registry', pagedDeps({}));
 
-  assert.match(r.body, /4321 gyms on the platform/);
+  // Thousands grouped with a space (design critique 2026-09-29).
+  assert.match(r.body, /4 321 gyms on the platform/);
   assert.ok(!/50 gyms on the platform/.test(r.body));
 });
 
