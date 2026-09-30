@@ -268,8 +268,8 @@ test('the finance screen warns that an unpriced plan is billing nobody', async (
   await handlePlatform(req({ url: '/platform/finance', cookie: session() }), r, deps({ permissions: ['subscription.manage'] }));
 
   assert.equal(r.statusCode, 200);
-  assert.match(r.body, /1998\.00/, 'paid is shown in rands');
-  assert.match(r.body, /basic/, 'and the unpriced plan is named');
+  assert.match(r.body, /1 998\.00/, 'paid is shown in rands, thousands grouped');
+  assert.match(r.body, /Basic/, 'and the unpriced plan is named, by its label');
   assert.match(r.body, /not being billed|no price/i);
 });
 
