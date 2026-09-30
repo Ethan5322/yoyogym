@@ -13,24 +13,28 @@
 
         First screen: YOUR GYM. YOUR JOURNEY.
         ├── I'M A MEMBER
+        │     ├── Continue to [Gym] (the one saved on this phone, first)
         │     ├── Find my gym  ─┐
-        │     ├── Scan gym QR code ─┼─> Welcome to [Gym]
-        │     └── I already know my gym (the one saved on this phone)
+        │     └── Scan gym QR code ─┴─> Welcome to [Gym]   (the GYM's look from here)
         │                           ├── New member registration -> Join [Gym]
         │                           │                              -> the gym's own signup
-        │                           └── Existing member login  -> Sign in to [Gym]
+        │                           └── Existing member sign-in -> Sign in to [Gym]
         └── I'M A GYM OWNER
               ├── Apply to join Yoyo Gyms  -> Bring your gym to Yoyo
-              ├── Owner login              -> pick the gym -> its own admin login
-              └── Check application status -> the owner's Yoyo account
+              ├── Owner sign in            -> email + password, on the website (§43.1 Q2)
+              ├── Check application status -> the owner's Yoyo account
+              └── Gym staff sign in (quieter) -> pick the gym -> its own admin sign-in
         Privacy · Help (support, questions, delete your account, staff)
 
       A MEMBER PICKS THEIR GYM FIRST (D-041). Many gyms live inside this one
       app, so "which gym" is the first question on the member side, and the
-      gym's own screens handle everything after it.
+      gym's own screens handle everything after it — in the gym's own logo,
+      colour, cover and poster from the moment it is chosen (design critique
+      2026-09-29). The Yoyo look is only for the screens before that.
 
-      THE MAIN YOYO ADMIN PANEL IS NOT IN THIS APP (§36.1 Q2). Owner login is
-      the gym's own admin login; Yoyo staff use the website, in a browser.
+      THE MAIN YOYO ADMIN PANEL IS NOT IN THIS APP (§36.1 Q2). Owners and staff
+      sign in to their gym's own admin panel; Yoyo staff use the website, in a
+      browser.
 
       THE PHOTOGRAPH ALREADY CARRIES THE YOYO GYMS LOGO (§36.1 Q11). Never put
       a second logo or wordmark over it.
@@ -110,9 +114,11 @@
         transition: transform 0.15s ease, box-shadow 0.15s ease;
       }
       .y-btn:active { transform: scale(0.98); }
+      /* No lime glow under it (design critique 2026-09-29: a coloured halo on
+         a dark ground is decoration). The colour alone carries the button. */
       .y-btn--primary {
         background: var(--y-lime); color: var(--y-lime-ink);
-        box-shadow: 0 12px 32px rgba(191, 246, 66, 0.16), inset 0 1px 0 rgba(255, 255, 255, 0.4);
+        box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.4);
       }
       .y-btn--ghost { background: transparent; color: var(--y-text); border: 1.5px solid rgba(255, 255, 255, 0.86); }
       .y-btn--caps { text-transform: uppercase; letter-spacing: 0.08em; }
@@ -134,6 +140,9 @@
            fall below the fold (§36: "approximately the upper half"). */
         height: max(240px, min(56vh, calc(100vh - 380px)));
         height: max(240px, min(56dvh, calc(100dvh - 380px)));
+        /* The photograph's own tones, top to bottom, while it decodes — so the
+           first screen is never a blank black box (critique 2026-09-29). */
+        background: #1d2023 linear-gradient(#14181f, #2a2b2a 50%, #3a3e3d 78%, #1b2024);
       }
       .y-hero img {
         display: block; width: 100%; height: 100%;
@@ -180,16 +189,20 @@
         padding: calc(8px + var(--y-top)) 24px calc(24px + var(--y-bottom));
       }
       .y-bar { display: flex; align-items: center; min-height: 56px; margin-bottom: 8px; }
+      /* THE back button, on every screen of the app — the member area uses
+         this same class and markup. A full 44 px target, the chevron optically
+         in line with the content below it. */
       .y-back {
-        width: auto; min-height: 44px; margin: 0 0 0 -8px; padding: 0 8px;
-        display: inline-flex; align-items: center; gap: 4px;
+        width: auto; min-width: 44px; min-height: 44px; margin: 0 0 0 -8px; padding: 0 12px 0 8px;
+        display: inline-flex; align-items: center; gap: 4px; border-radius: 22px;
         background: none; color: var(--y-muted); font-weight: 500;
+        transition: color 0.15s ease;
       }
-      .y-back svg { width: 24px; height: 24px; }
+      .y-back:active { color: var(--y-text); }
+      .y-back svg { width: 24px; height: 24px; flex: none; }
       .y-logo { display: block; width: 128px; height: auto; margin: 0 auto 24px; }
       .y-head { margin-bottom: 32px; }
       .y-head--center { text-align: center; }
-      .y-eyebrow { color: var(--y-muted); margin: 0 0 8px; }
       .y-title { font-size: 28px; line-height: 1.15; font-weight: 800; margin: 0 0 8px; letter-spacing: -0.01em; overflow-wrap: anywhere; }
       .y-sub { color: var(--y-muted); margin: 0; }
       .y-bottom { margin-top: auto; padding-top: 32px; display: grid; gap: 16px; }
@@ -215,16 +228,46 @@
       .y-option__text b { display: block; font-weight: 800; overflow-wrap: anywhere; }
       .y-option__text small { display: block; color: var(--y-muted); font-size: 13px; }
       .y-option__chev { flex: none; width: 20px; height: 20px; color: var(--y-muted); }
-      .y-option--saved { border-color: rgba(191, 246, 66, 0.36); }
+      /* The gym saved on this phone, edged in ITS colour (app.js renderMine). */
+      .y-option--saved { border-color: rgba(191, 246, 66, 0.36); border-color: color-mix(in srgb, var(--g-accent, #bff642) 48%, transparent); }
+      #mine { margin-bottom: 24px; }
+      #mine .y-center { margin: 0; }
       svg.y-i { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
 
-      /* The gym, as a person meets it: its initial, then its name. */
-      .y-badge {
-        width: 64px; height: 64px; border-radius: 20px; margin: 0 auto 24px;
-        display: grid; place-items: center;
-        background: rgba(191, 246, 66, 0.12); color: var(--y-lime);
-        font-size: 28px; font-weight: 800;
+      /* Gym staff: their own door, quieter than the owner's three and set
+         apart from them (design critique 2026-09-29). */
+      .y-quiet {
+        display: flex; align-items: center; gap: 16px;
+        min-height: 64px; margin: 0; padding: 12px 0; border-radius: 0;
+        background: none; color: var(--y-body); text-align: left; font-weight: 500;
+        border-top: 1px solid var(--y-line);
       }
+      .y-quiet > svg:first-child { flex: none; width: 22px; height: 22px; margin: 0 11px; color: var(--y-muted); }
+      .y-quiet__text { flex: 1; min-width: 0; }
+      .y-quiet__text b { display: block; font-weight: 800; }
+      .y-quiet__text small { display: block; color: var(--y-muted); font-size: 13px; }
+
+      /* ==== The GYM's mark: its logo, or its letter in its colour ==========
+         Wherever a gym appears — a search result, the saved gym, its welcome
+         (CLAUDE.md §37.1 Q7). app.js paintMark() fills it from the gym's public
+         branding; --g-accent / --g-accent-ink come from YOYO_BRAND.accentPair,
+         so the letter always reads on the colour. Three states:
+           not yet known   a plain white letter, no colour promised;
+           known           the gym's colour — the Yoyo lime when it chose none,
+                           exactly as its member area shows it;
+           has a logo      the logo alone.                                   */
+      .g-mark {
+        display: grid; place-items: center; flex: none; overflow: hidden;
+        background: var(--g-accent, var(--y-lime)); color: var(--g-accent-ink, var(--y-lime-ink));
+        font-weight: 800; line-height: 1;
+        transition: background-color 0.2s ease, color 0.2s ease;
+      }
+      .g-mark:not(.is-known) { background: rgba(255, 255, 255, 0.08); color: var(--y-text); box-shadow: inset 0 0 0 1px var(--y-line); }
+      .g-mark.has-logo { background: transparent; box-shadow: none; }
+      .g-mark img { display: block; width: 100%; height: 100%; object-fit: contain; }
+      .g-mark--hero { width: 72px; height: 72px; border-radius: 22px; font-size: 32px; margin: 0 auto 24px; box-shadow: 0 12px 28px rgba(0, 0, 0, 0.36); }
+      .g-mark--hero.has-logo { width: fit-content; min-width: 72px; }
+      .g-mark--hero.has-logo img { width: auto; max-width: 200px; }
 
       /* What a gym owner gets. */
       .y-feats { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin: 0 0 16px; padding: 0; list-style: none; }
@@ -233,6 +276,10 @@
         background: var(--y-surface); border: 1px solid var(--y-line); border-radius: 16px; font-size: 13px;
       }
       .y-feats svg { flex: none; color: var(--y-lime); }
+      /* What is true for every new gym today (CLAUDE.md §41.1 Q6). */
+      .y-promises { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+      .y-promises li { display: flex; align-items: center; gap: 12px; color: var(--y-body); }
+      .y-promises svg { flex: none; color: var(--y-lime); }
 
       /* Search results and the recovery form. */
       .y-field { margin-bottom: 16px; }
@@ -244,10 +291,8 @@
         border-radius: 16px; padding: 12px 16px; margin: 12px 0 0;
         color: var(--y-text); font: inherit; min-height: 64px;
       }
-      .gym__initial {
-        flex: none; width: 40px; height: 40px; border-radius: 12px; display: grid; place-items: center;
-        background: rgba(191, 246, 66, 0.12); color: var(--y-lime); font-weight: 800;
-      }
+      /* Each result wears its gym's mark (.g-mark above), not a Yoyo badge. */
+      .gym__initial { width: 40px; height: 40px; border-radius: 12px; font-size: 16px; }
       .gym b { display: block; overflow-wrap: anywhere; }
       .gym span span { display: block; color: var(--y-muted); font-size: 13px; }
       .empty { color: var(--y-muted); padding: 16px 0; }
@@ -284,10 +329,69 @@
       .y-staff { margin-top: 32px; text-align: center; font-size: 13px; color: var(--y-muted); }
       .y-staff a { color: var(--y-muted); }
 
+      /* ==== A gym's own screens: "Welcome to [Gym]" and "Join [Gym]" ======
+         From the moment a gym is chosen it wears ITS look, not Yoyo's (design
+         critique 2026-09-29; CLAUDE.md §37.1 Q7, §38.1 Q4, §39.1 Q3): its mark,
+         its cover as a hero, its poster darkened behind, its colour on the main
+         button. app.js sets the custom properties on these two sections only,
+         so nothing leaks into a Yoyo screen; with none set, the Yoyo lime. */
+      .g-screen {
+        --g-accent: var(--y-lime); --g-accent-ink: var(--y-lime-ink);
+        --g-accent-text: var(--y-lime); /* the gym's colour as words on the dark ground */
+        --g-cover-h: clamp(200px, 38vh, 340px);
+        position: relative; isolation: isolate;
+      }
+      .g-screen--step { --g-cover-h: clamp(160px, 28vh, 260px); }
+      .g-screen .y-btn--primary { background: var(--g-accent); color: var(--g-accent-ink); transition: transform 0.15s ease, background-color 0.2s ease, color 0.2s ease; }
+      /* A focus ring that reads whatever the gym's colour is. */
+      .g-screen button:focus-visible { outline-color: var(--y-text); }
+
+      /* The poster behind the whole screen — the member area's technique
+         (#member.has-poster), blurred and darkened further so the words and
+         buttons always win over a busy picture. Only a plain https URL. */
+      .g-screen.has-poster::before {
+        content: ''; position: fixed; inset: -24px; z-index: -1; pointer-events: none;
+        background:
+          linear-gradient(180deg, rgba(7, 12, 16, 0.74) 0%, rgba(7, 12, 16, 0.86) 55%, rgba(7, 12, 16, 0.96) 100%),
+          var(--g-poster) center / cover no-repeat;
+        filter: blur(8px);
+      }
+
+      /* The cover: a full-bleed hero at the top that melts into whatever is
+         behind it (the poster, or the ground), with a shade under Back. */
+      .g-cover { display: none; position: absolute; top: 0; left: 0; right: 0; height: var(--g-cover-h); z-index: -1; overflow: hidden; }
+      .g-screen.has-cover .g-cover { display: block; }
+      .g-cover img {
+        display: block; width: 100%; height: 100%; object-fit: cover;
+        -webkit-mask-image: linear-gradient(#000 45%, rgba(0, 0, 0, 0.55) 72%, transparent);
+        mask-image: linear-gradient(#000 45%, rgba(0, 0, 0, 0.55) 72%, transparent);
+      }
+      .g-cover::after {
+        content: ''; position: absolute; left: 0; right: 0; top: 0; height: calc(96px + var(--y-top));
+        background: linear-gradient(rgba(7, 12, 16, 0.6), rgba(7, 12, 16, 0));
+      }
+      .g-screen.has-cover .y-back { color: var(--y-text); }
+
+      /* The gym's mark and name: centred on its welcome, at the start of Join.
+         Under a cover, the mark sits on the cover's lower edge. */
+      .g-id { margin-top: auto; }
+      .g-id--start { margin-top: 24px; }
+      .g-id--start .g-mark--hero { margin: 0 0 24px; }
+      .g-screen.has-cover .g-id { margin-top: max(16px, calc(var(--g-cover-h) - 136px - var(--y-top))); }
+
+      /* "Welcome to [Gym]" in the landing's own display voice, the gym's name
+         in the gym's colour — the moment the app becomes that gym's app. */
+      .g-headline {
+        margin: 0; font-size: 36px; font-size: clamp(30px, 9vw, 40px);
+        line-height: 1.04; font-weight: 800; letter-spacing: -0.01em; text-transform: uppercase;
+        overflow-wrap: anywhere; text-wrap: balance;
+      }
+      .g-headline span { display: block; color: var(--g-accent-text); }
+
       @media (min-height: 800px) { .y-head { margin-bottom: 40px; } }
       @media (prefers-reduced-motion: reduce) {
         .y-rise { animation: none; }
-        .y-btn, .y-option { transition: none; }
+        .y-btn, .y-option, .y-back, .g-mark, .g-screen .y-btn--primary { transition: none; }
       }
 
       /* ==== The member area (member.js) ===================================
@@ -602,6 +706,18 @@
         <p class="y-sub">Choose your gym first, then join or sign in.</p>
       </div>
 
+      <!-- The gym saved on this phone, FIRST and by name, in its own mark
+           (§36.1 Q5; critique 2026-09-29). Hidden until a gym has been picked
+           here: a member opens their gym many times a week and picks it once. -->
+      <div id="mine" class="hidden">
+        <button type="button" class="y-option y-option--saved" id="mine-open">
+          <span class="y-option__icon g-mark" id="mine-mark" aria-hidden="true"></span>
+          <span class="y-option__text"><b>Continue to <span id="mine-name"></span></b><small>Saved on this phone</small></span>
+          <svg class="y-i y-option__chev" aria-hidden="true"><use href="#i-chev"/></svg>
+        </button>
+        <p class="y-center"><button type="button" class="y-link" id="mine-forget">Not your gym? Forget it on this phone</button></p>
+      </div>
+
       <button type="button" class="y-option" data-go="find">
         <span class="y-option__icon"><svg class="y-i"><use href="#i-search"/></svg></span>
         <span class="y-option__text"><b>Find my gym</b><small>Search by name or by where you are</small></span>
@@ -612,16 +728,6 @@
         <span class="y-option__text"><b>Scan gym QR code</b><small>The code on your gym’s wall or desk</small></span>
         <svg class="y-i y-option__chev"><use href="#i-chev"/></svg>
       </button>
-      <!-- Only once a gym has been picked on this phone (§36.1 Q5). A member
-           opens their gym many times a week and picks it once. -->
-      <div id="mine" class="hidden">
-        <button type="button" class="y-option y-option--saved" id="mine-open">
-          <span class="y-option__icon"><svg class="y-i"><use href="#i-pin"/></svg></span>
-          <span class="y-option__text"><b>I already know my gym</b><small>Continue to <span id="mine-name"></span></small></span>
-          <svg class="y-i y-option__chev"><use href="#i-chev"/></svg>
-        </button>
-        <p class="y-center"><button type="button" class="y-link" id="mine-forget">Not your gym? Forget it on this phone</button></p>
-      </div>
       <p class="note" data-note role="status"></p>
     </section>
 
@@ -681,26 +787,30 @@
       <div id="find-results"></div>
     </section>
 
-    <!-- ============ 5. Welcome to [Gym] ============ -->
-    <section id="gym" class="y-screen hidden">
+    <!-- ============ 5. Welcome to [Gym] — the gym's own look from here ============
+         Its mark, cover, poster and colour are put on by app.js (dressGym) from
+         the gym's public branding; the Yoyo lime only when it chose none. -->
+    <section id="gym" class="y-screen g-screen hidden">
+      <div class="g-cover" aria-hidden="true"></div>
       <div class="y-bar"><button type="button" class="y-back" data-go="back"><svg class="y-i"><use href="#i-back"/></svg>Back</button></div>
-      <div class="y-head y-head--center" style="margin-top:auto">
-        <div class="y-badge" data-gym-initial aria-hidden="true"></div>
-        <p class="y-eyebrow">Welcome to</p>
-        <h1 class="y-title" data-gym-name></h1>
+      <div class="y-head y-head--center g-id">
+        <div class="g-mark g-mark--hero" data-gym-mark aria-hidden="true"></div>
+        <!-- One heading, as §36 words it: "Welcome to [Gym Name]". -->
+        <h1 class="g-headline">Welcome to <span data-gym-name></span></h1>
       </div>
       <div class="y-bottom">
         <button type="button" class="y-btn y-btn--primary" data-go="join">New member registration</button>
-        <button type="button" class="y-btn y-btn--ghost" data-go="signin">Existing member login</button>
+        <button type="button" class="y-btn y-btn--ghost" data-go="signin">Existing member sign-in</button>
       </div>
       <p class="note" data-note role="status"></p>
     </section>
 
     <!-- ============ 6. Join [Gym] ============ -->
-    <section id="join" class="y-screen hidden">
+    <section id="join" class="y-screen g-screen g-screen--step hidden">
+      <div class="g-cover" aria-hidden="true"></div>
       <div class="y-bar"><button type="button" class="y-back" data-go="back"><svg class="y-i"><use href="#i-back"/></svg>Back</button></div>
-      <div class="y-head" style="margin-top:24px">
-        <div class="y-badge" style="margin:0 0 24px" data-gym-initial aria-hidden="true"></div>
+      <div class="y-head g-id g-id--start">
+        <div class="g-mark g-mark--hero" data-gym-mark aria-hidden="true"></div>
         <h1 class="y-title">Join <span data-gym-name></span></h1>
         <p class="y-sub">Create your membership and get started.</p>
       </div>
@@ -729,12 +839,7 @@
       </button>
       <button type="button" class="y-option" data-go="owner-signin">
         <span class="y-option__icon"><svg class="y-i"><use href="#i-key"/></svg></span>
-        <span class="y-option__text"><b>Owner login</b><small>The email you applied with and your password</small></span>
-        <svg class="y-i y-option__chev"><use href="#i-chev"/></svg>
-      </button>
-      <button type="button" class="y-option" data-go="staff-signin">
-        <span class="y-option__icon"><svg class="y-i"><use href="#i-key"/></svg></span>
-        <span class="y-option__text"><b>Gym staff sign in</b><small>Managers, reception and trainers — choose your gym</small></span>
+        <span class="y-option__text"><b>Owner sign in</b><small>The email you applied with and your password</small></span>
         <svg class="y-i y-option__chev"><use href="#i-chev"/></svg>
       </button>
       <button type="button" class="y-option" data-go="owner-status">
@@ -742,6 +847,16 @@
         <span class="y-option__text"><b>Check application status</b><small>Sign in with the email you applied with</small></span>
         <svg class="y-i y-option__chev"><use href="#i-chev"/></svg>
       </button>
+
+      <!-- Staff are not owners: their own door, with its own icon, set apart
+           and quieter (design critique 2026-09-29). Also reachable from Help. -->
+      <div class="y-bottom">
+        <button type="button" class="y-quiet" data-go="staff-signin">
+          <svg class="y-i" aria-hidden="true"><use href="#i-users"/></svg>
+          <span class="y-quiet__text"><b>Gym staff sign in</b><small>Managers, reception and trainers — choose your gym</small></span>
+          <svg class="y-i y-option__chev" aria-hidden="true"><use href="#i-chev"/></svg>
+        </button>
+      </div>
       <p class="note" data-note role="status"></p>
     </section>
 
@@ -761,6 +876,12 @@
         <li><svg class="y-i"><use href="#i-bars"/></svg>Daily operations</li>
       </ul>
       <div class="y-bottom">
+        <!-- Only what is true for every new gym today (CLAUDE.md §17, §41.1 Q6). -->
+        <ul class="y-promises">
+          <li><svg class="y-i" aria-hidden="true"><use href="#i-check"/></svg>A 30-day free trial</li>
+          <li><svg class="y-i" aria-hidden="true"><use href="#i-check"/></svg>A verified listing in the Yoyo Gyms app</li>
+          <li><svg class="y-i" aria-hidden="true"><use href="#i-check"/></svg>Setup help for every new gym</li>
+        </ul>
         <p class="y-small">You’ll tell us about yourself and your gym, and later upload
           verification documents. A person at Yoyo Gyms reviews every application.</p>
         <button type="button" class="y-btn y-btn--primary" data-go="owner-register">Apply as a gym owner</button>
@@ -796,6 +917,12 @@
           <p>Tap <b>I’m a member</b>, then <b>Find my gym</b>, then
             <b>I don’t remember which gym I joined</b>. Your membership number and
             phone number will tell us.</p>
+        </details>
+        <details>
+          <summary>I work at a gym. Where do I sign in?</summary>
+          <p>Gym staff sign in to their gym’s own admin panel with the details their
+            gym owner set up for them.</p>
+          <p><button type="button" class="y-link y-link--inline" data-go="staff-signin">Gym staff sign in</button></p>
         </details>
         <details>
           <summary>My gym isn’t on Yoyo Gyms</summary>

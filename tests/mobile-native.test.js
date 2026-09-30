@@ -326,7 +326,9 @@ test('OWNER LOGIN IS EMAIL + PASSWORD ALONE â€” no choosing the gym (CLAUDE.md Â
   click(doc, window, '[data-go="owner"]');
   assert.match(text(doc, '#owner-welcome .y-title'), /Welcome, Gym Owner/);
   const options = [...doc.querySelectorAll('#owner-welcome .y-option b')].map((b) => b.textContent);
-  assert.deepEqual(options, ['Apply to join Yoyo Gyms', 'Owner login', 'Gym staff sign in', 'Check application status']);
+  assert.deepEqual(options, ['Apply to join Yoyo Gyms', 'Owner sign in', 'Check application status']);
+  // Staff are not owners: their own, quieter door below (design critique 2026-09-29).
+  assert.equal(text(doc, '#owner-welcome .y-quiet[data-go="staff-signin"] b'), 'Gym staff sign in');
   assert.match(text(doc, '#owner-welcome [data-go="owner-signin"] small'), /email you applied with/);
 
   click(doc, window, '[data-go="owner-signin"]');
@@ -344,8 +346,8 @@ test('GYM STAFF STILL CHOOSE THEIR GYM, THEN ITS OWN ADMIN SIGN-IN', async () =>
   const { doc, window } = boot({ routes });
   click(doc, window, '[data-go="owner"]');
   click(doc, window, '[data-go="staff-signin"]');
-  assert.equal(text(doc, '#pick-title'), 'Gym owner login');
-  assert.match(text(doc, '#pick-sub'), /staff/);
+  assert.equal(text(doc, '#pick-title'), 'Gym staff sign in');
+  assert.match(text(doc, '#pick-sub'), /your gym set up for you/);
   assert.ok(!visible(doc, 'forgot'), 'the member recovery route is not offered to owners');
   assert.ok(visible(doc, 'owner-extras'), 'Forgot password? and Apply');
 
