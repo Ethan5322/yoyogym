@@ -79,7 +79,7 @@ test('THE GYM\'S HOME CARRIES ITS COVER, ICON, NOTICE, HOURS AND CONTACT (Q4)', 
   await tick();
   assert.equal(doc.querySelector('.m-gymhero__img').getAttribute('src'), BRAND.cover_url);
   assert.equal(text(doc, '.m-gymhero__id b'), 'KOM');
-  assert.match(text(doc, '.m-notice'), /Closed on Friday/);
+  assert.match(text(doc, '.m-banner'), /Closed on Friday/);
   assert.match(text(doc, '.m-contact'), /Mon–Fri 05:00–21:00/);
   assert.equal(doc.querySelector('.m-action[href^="tel:"]').getAttribute('href'), 'tel:+27821234567');
   assert.match(doc.querySelector('.m-action[href*="maps"]').getAttribute('href'), /query=12%20Main%20Rd%2C%20Durban/);
@@ -91,7 +91,7 @@ test('a gym with no cover, notice or contact shows just its icon and name', asyn
   const { doc } = boot({ storage: SIGNED_IN_AT_KOM, brand: { name: 'KOM' } });
   await tick();
   assert.equal(doc.querySelector('.m-gymhero__img'), null);
-  assert.equal(doc.querySelector('.m-notice'), null);
+  assert.equal(doc.querySelector('.m-banner'), null);
   assert.equal(doc.querySelector('.m-contact'), null);
   assert.equal(text(doc, '.m-gymhero__id .m-gymicon'), 'K', 'the gym\'s letter badge');
 });
@@ -102,7 +102,7 @@ test('WHAT AN OWNER TYPES IS TEXT, AND A COVER IS ONLY EVER AN HTTPS PICTURE', a
     brand: { name: 'KOM', notice: '<img src=x onerror=alert(1)>', cover_url: 'javascript:alert(1)', phone: '082"><b>', email: 'bad' },
   });
   await tick();
-  assert.equal(doc.querySelector('.m-notice img'), null);
+  assert.equal(doc.querySelector('.m-banner img'), null);
   assert.equal(doc.querySelector('.m-gymhero__img'), null, 'not a https URL: no cover at all');
   assert.equal(doc.querySelector('.m-action[href^="tel:"]').getAttribute('href'), 'tel:082');
   assert.equal(doc.querySelector('.m-action[href^="mailto:"]'), null);
@@ -213,5 +213,5 @@ test("THE APP'S PROFILE OFFERS A PAUSE AND SHOWS THE FAMILY, where the gym has t
 });
 
 test('a paused member reads "Paused", not "Frozen"', () => {
-  assert.match(read('member.js'), /frozen: \{ tone: 'warn', text: 'Paused' \}/);
+  assert.match(read('member.js'), /frozen: \{ tone: 'warn', icon: 'pause', text: 'Paused' \}/);
 });

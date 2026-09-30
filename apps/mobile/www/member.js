@@ -102,6 +102,32 @@
   // The row chevron, drawn from the app's own icon set.
   var CHEV = '<svg class="y-i m-row__chev" aria-hidden="true"><use href="#i-chev"/></svg>';
 
+  // The ONE back button in the app: the Yoyo screens' .y-back (design
+  // critique 2026-09-29: there were two, "← Back" here and a drawn arrow there).
+  function backButton(action, label) {
+    return '<button type="button" class="y-back" data-m="' + action + '">' +
+      '<svg class="y-i" aria-hidden="true"><use href="#i-back"/></svg>' + esc(label || 'Back') + '</button>';
+  }
+
+  // Status and row icons, drawn in the tab bar's line style — never a "✓" or
+  // "★" character standing in for one (design critique 2026-09-29).
+  var ICONS = {
+    check: '<circle cx="12" cy="12" r="9"/><path d="M8 12.5l2.5 2.5L16 9.5"/>',
+    clock: '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',
+    pause: '<circle cx="12" cy="12" r="9"/><path d="M10 9v6M14 9v6"/>',
+    alert: '<circle cx="12" cy="12" r="9"/><path d="M12 7.5v5.5M12 16.5h.01"/>',
+    due: '<path d="M10.3 4.3L2.9 17.2A2 2 0 0 0 4.6 20.2h14.8a2 2 0 0 0 1.7-3L13.7 4.3a2 2 0 0 0-3.4 0z"/><path d="M12 9.5v4M12 17h.01"/>',
+    info: '<circle cx="12" cy="12" r="9"/><path d="M12 11v5.5M12 7.5h.01"/>',
+    card: '<rect x="3" y="5" width="18" height="14" rx="3"/><path d="M7 15h4M7 11h10"/>',
+    cal: '<rect x="3" y="5" width="18" height="16" rx="3"/><path d="M8 3v4M16 3v4M3 11h18"/>',
+    offer: '<path d="M6.5 6.5v11M3.5 9v6M17.5 6.5v11M20.5 9v6M6.5 12h11"/>',
+    qr: '<path d="M4 4h6v6H4zM14 4h6v6h-6zM4 14h6v6H4z"/><path d="M14 14h2v2h-2zM18 14h2M14 18v2M18 18h2v2"/>',
+  };
+
+  function icon(name, cls) {
+    return '<svg class="m-i' + (cls ? ' ' + cls : '') + '" viewBox="0 0 24 24" aria-hidden="true">' + ICONS[name] + '</svg>';
+  }
+
   function dateText(ymd) {
     if (!ymd) return '';
     var d = new Date(String(ymd).slice(0, 10) + 'T00:00:00');
@@ -192,16 +218,42 @@
 
   window.YOYO_BRAND = Object.freeze({ inkOn: inkOn, accentPair: accentPair, contrast: contrast });
 
+  // The lightest surface in the member area: a row or track, 8% white over
+  // the card (#172024). Words in the gym's colour must read on it.
+  var LIGHTEST_SURFACE = '#2A3236';
+
+  /**
+   * The gym's colour as WORDS, an icon or a thin line on the member area's
+   * dark ground (design critique 2026-09-29) — never as a fill, which
+   * accentPair() handles. A dark gym colour on near-black cannot be read, so
+   * it is lifted toward white until it reads at 4.5:1 on every member
+   * surface. The Yoyo lime, and any colour that already reads, come back as
+   * they are.
+   */
+  function textOnDark(hex) {
+    var n = parseInt(hex.slice(1), 16);
+    var rgb = [(n >> 16) & 255, (n >> 8) & 255, n & 255];
+    var toHex = function (c) {
+      return ('#' + c.map(function (v) { return ('0' + Math.round(v).toString(16)).slice(-2); }).join('')).toUpperCase();
+    };
+    for (var i = 0; i < 60 && contrast(toHex(rgb), LIGHTEST_SURFACE) < 4.5; i++) {
+      rgb = rgb.map(function (v) { return v + (255 - v) * 0.1; });
+    }
+    return toHex(rgb);
+  }
+
   function applyBrand(branding) {
     var colour = branding && /^#[0-9a-fA-F]{6}$/.test(branding.accent_color || '') ? branding.accent_color : null;
     if (colour) {
       var pair = accentPair(colour);
       root.style.setProperty('--m-accent', pair.accent);
       root.style.setProperty('--m-accent-ink', pair.ink);
+      root.style.setProperty('--m-accent-text', textOnDark(colour));
     } else {
       // No colour chosen: the Yoyo lime from the stylesheet (CLAUDE.md §37).
       root.style.removeProperty('--m-accent');
       root.style.removeProperty('--m-accent-ink');
+      root.style.removeProperty('--m-accent-text');
     }
     if (branding && branding.name) state.gymName = branding.name;
     // The gym's own logo, if it uploaded one — the same rule the server applies.
@@ -289,6 +341,7 @@
     state.features = state.status ? state.status.features || null : null;
     state.off = state.status && Array.isArray(state.status.services_off) ? state.status.services_off : [];
     state.tab = 'home';
+    state.view = null;
 
     document.body.classList.add('in-member');
     root.classList.remove('hidden');
@@ -349,14 +402,19 @@
   function renderSignIn(notice) {
     root.innerHTML =
       '<div class="m-signin">' +
-      '  <button type="button" class="m-back" data-m="leave" aria-label="Back">← Back</button>' +
+      '  <div class="y-bar">' + backButton('leave') + '</div>' +
       '  <div class="m-hero">' +
       '    <div class="m-hero__icon" data-gym-icon="72">' + gymIcon(72) + '</div>' +
-      '    <p class="m-eyebrow">Sign in to</p>' +
-      '    <h1 data-gym-name>' + esc(state.gymName || 'your gym') + '</h1>' +
+      // One heading, as §36 words it: "Sign in to [Gym Name]".
+      '    <h1>Sign in to <span data-gym-name>' + esc(state.gymName || 'your gym') + '</span></h1>' +
       '  </div>' +
       '  <form class="m-card" id="m-login" novalidate>' +
       (notice ? '<p class="m-note">' + esc(notice) + '</p>' : '') +
+      // FIRST, above the fields it fills (design critique 2026-09-29): the
+      // card's code fills in the membership number and signs nobody in — the
+      // phone is still asked for (§14, §36.1 Q6).
+      '    <button type="button" class="m-secondary m-scan" data-m="scan-card">' + icon('qr') + 'Scan my membership card</button>' +
+      '    <p class="m-err" id="m-scan-err" role="alert"></p>' +
       '    <label for="m-mn">Membership number</label>' +
       '    <input id="m-mn" autocapitalize="characters" autocomplete="off" placeholder="GYM-2026-000123" value="' + esc(state.prefill) + '" required>' +
       '    <label for="m-ph">Phone number</label>' +
@@ -365,10 +423,6 @@
       '    <button type="submit" class="m-primary" id="m-login-btn">Sign in</button>' +
       '  </form>' +
       '  <div class="m-join">' +
-      // Fills in the membership number from the member's own card, and
-      // signs nobody in: the phone is still asked for (§14, §36.1 Q6).
-      '    <button type="button" class="m-secondary" data-m="scan-card">Scan my membership card</button>' +
-      '    <p class="m-err" id="m-scan-err" role="alert"></p>' +
       '    <button type="button" class="y-link" data-m="help">Need help?</button>' +
       '  </div>' +
       '</div>';
@@ -455,7 +509,7 @@
     if (!visibleTabs().some(function (t) { return t.id === state.tab; })) state.tab = 'home';
     // On the home the gym's own hero carries its name and icon, so the small
     // header does not repeat them.
-    root.classList.toggle('m-on-home', state.tab === 'home');
+    root.classList.toggle('m-on-home', state.tab === 'home' && !state.view);
 
     root.innerHTML =
       '<header class="m-top">' +
@@ -472,10 +526,11 @@
       '</nav>';
 
     var main = document.getElementById('m-main');
-    ({ home: renderHome, card: renderCard, classes: renderClasses, rewards: renderRewards, profile: renderProfile })[state.tab](main);
+    if (state.tab === 'home' && state.view === 'offer') renderOffer(main);
+    else ({ home: renderHome, card: renderCard, classes: renderClasses, rewards: renderRewards, profile: renderProfile })[state.tab](main);
 
     var tab = TABS.filter(function (t) { return t.id === state.tab; })[0];
-    title(tab ? tab.label : 'Home');
+    title(state.view === 'offer' ? 'Plans and facilities' : tab ? tab.label : 'Home');
     if (opts.moveFocus || state.pendingFocus) focusHeading();
     else if (keep) {
       var again = root.querySelector('[data-tab="' + keep + '"]');
@@ -502,16 +557,19 @@
   function statusLine(s) {
     var member = (s && s.member) || {};
     var ms = (s && s.membership) || {};
+    // Status is said in words and an icon, and coloured by MEANING — green,
+    // amber, red — never in the gym's colour, so a red gym's brand can never
+    // read as a problem (design critique 2026-09-29).
     var map = {
-      active: { tone: 'good', text: 'Active' },
-      new: { tone: 'warn', text: 'Waiting for activation' },
-      lapsed: { tone: 'bad', text: 'Expired' },
-      suspended: { tone: 'bad', text: 'Suspended' },
-      frozen: { tone: 'warn', text: 'Paused' },
+      active: { tone: 'good', icon: 'check', text: 'Active' },
+      new: { tone: 'warn', icon: 'clock', text: 'Waiting for activation' },
+      lapsed: { tone: 'bad', icon: 'alert', text: 'Expired' },
+      suspended: { tone: 'bad', icon: 'alert', text: 'Suspended' },
+      frozen: { tone: 'warn', icon: 'pause', text: 'Paused' },
     };
-    var st = map[member.status] || { tone: 'warn', text: member.status || 'Unknown' };
+    var st = map[member.status] || { tone: 'warn', icon: 'clock', text: member.status || 'Unknown' };
     var until = ms.end_date ? 'until ' + dateText(ms.end_date) : '';
-    return { tone: st.tone, text: st.text, plan: ms.plan_name || 'Membership', until: until };
+    return { tone: st.tone, icon: st.icon, text: st.text, plan: ms.plan_name || 'Membership', until: until };
   }
 
   /**
@@ -557,6 +615,12 @@
    * the services members can use, and its facilities — the same as its page
    * on the web. A section with nothing in it is left out.
    */
+  function offerCount() {
+    var o = state.offer || {};
+    var c = state.catalog || {};
+    return (c.plans || []).length + (c.addons || []).length + (o.services || []).length + (o.facilities || []).length;
+  }
+
   function gymOffer() {
     var o = state.offer || {};
     var c = state.catalog || {};
@@ -564,9 +628,9 @@
     var addons = c.addons || [];
     var services = o.services || [];
     var facilities = o.facilities || [];
-    if (!plans.length && !addons.length && !services.length && !facilities.length) return '';
+    if (!offerCount()) return '';
     return '<section class="m-offer" aria-label="What we offer">' +
-      '<h2 class="m-offer__title">What ' + esc(state.gymName || 'your gym') + ' offers</h2>' +
+      '<h1 class="m-offer__title">What ' + esc(state.gymName || 'your gym') + ' offers</h1>' +
       (plans.length
         ? '<h3 class="m-offer__h">Membership plans</h3>' + plans.map(function (p) {
             return '<div class="m-card m-plan">' + (p.is_featured ? '<span class="m-plan__tag">Most popular</span>' : '') +
@@ -584,7 +648,7 @@
         : '') +
       (services.length
         ? '<h3 class="m-offer__h">In your app</h3><ul class="m-checks">' + services.map(function (x) {
-            return '<li>' + esc(x.text) + '</li>';
+            return '<li>' + icon('check') + '<span>' + esc(x.text) + '</span></li>';
           }).join('') + '</ul>'
         : '') +
       (facilities.length
@@ -595,6 +659,36 @@
       '</section>';
   }
 
+  /**
+   * At most ONE banner above the check-in (design critique 2026-09-29: they
+   * were stacked). Money owed comes first; otherwise the gym's own notice.
+   * A notice that waits behind a payment is still shown, with the gym's hours.
+   */
+  function homeBanner(s) {
+    if (s.has_outstanding) {
+      return '<section class="m-banner is-warn" role="status">' + icon('due') +
+        '<div><b>Payment due</b><span>Please see reception to settle your balance.</span></div></section>';
+    }
+    if (state.brand.notice) {
+      return '<section class="m-banner" role="note">' + icon('info') +
+        '<div><b>From ' + esc(state.gymName || 'your gym') + '</b><span>' + esc(state.brand.notice) + '</span></div></section>';
+    }
+    return '';
+  }
+
+  /** A row on the home that goes somewhere: an icon, the words, a chevron. */
+  function homeLink(attr, iconName, label) {
+    return '<button type="button" class="m-row" ' + attr + '><span class="m-row__lead">' + icon(iconName) +
+      '<span>' + esc(label) + '</span></span>' + CHEV + '</button>';
+  }
+
+  /**
+   * The gym's home, in the order §38.1 Q1 gives it: the gym, the member's
+   * status with one-tap check-in, then card and classes. It was a 2,164px
+   * stack headed by the plan's name and ending in a price list (design
+   * critique 2026-09-29). The plans, add-ons and facilities are one tap away
+   * — members still see them after joining (§41.1 Q1), they just do not lead.
+   */
   function renderHome(main) {
     var s = state.status;
     if (!s) { main.innerHTML = skeleton(); return; }
@@ -607,34 +701,31 @@
 
     main.innerHTML =
       gymHero() +
-      '<section class="m-hello"><p class="m-eyebrow">Hi ' + esc(firstName(s.member && s.member.full_name)) + '</p>' +
-      '<h1>' + esc(line.plan) + '</h1></section>' +
-      (state.brand.notice
-        ? '<section class="m-card m-notice" role="note"><b>From ' + esc(state.gymName || 'your gym') + '</b><p>' + esc(state.brand.notice) + '</p></section>'
-        : '') +
+      '<section class="m-hello"><h1>Hi ' + esc(firstName(s.member && s.member.full_name)) + '</h1>' +
+      '<p class="m-sub">' + esc(line.plan) + (line.until ? ' · ' + esc(line.until) : '') + '</p></section>' +
+      homeBanner(s) +
 
-      '<section class="m-card m-status is-' + line.tone + '">' +
-      '  <span class="m-dot" aria-hidden="true"></span>' +
-      '  <div><b>' + esc(line.text) + '</b><span>' + esc(line.until) + '</span></div>' +
+      '<section class="m-card m-checkcard" aria-label="Check in">' +
+      '  <p class="m-state is-' + line.tone + '">' + icon(line.icon) + '<b>' + esc(line.text) + '</b></p>' +
+      '  <button type="button" class="m-checkin" id="m-checkin"' + (s.member && s.member.status !== 'active' ? ' disabled' : '') + '>' +
+      '    <span class="m-checkin__ring" aria-hidden="true"></span>' +
+      '    <span class="m-checkin__label">Check in</span>' +
+      '  </button>' +
+      '  <p class="m-hint">' + esc(checkinHint(s)) + '</p>' +
       '</section>' +
-
-      (s.has_outstanding
-        ? '<section class="m-card m-owe"><b>Payment due</b><span>Please see reception to settle your balance.</span></section>'
-        : '') +
-
-      '<button type="button" class="m-checkin" id="m-checkin"' + (s.member && s.member.status !== 'active' ? ' disabled' : '') + '>' +
-      '  <span class="m-checkin__ring" aria-hidden="true"></span>' +
-      '  <span class="m-checkin__label">Check in</span>' +
-      '</button>' +
-      '<p class="m-hint">' + esc(checkinHint(s)) + '</p>' +
 
       '<section class="m-card m-progress">' +
       '  <div class="m-progress__top"><span>Last 30 days</span><b class="m-num">' + visits + (expected ? '<small> / ' + expected + '</small>' : '') + '</b></div>' +
       '  <div class="m-bar"><i style="width:' + pct + '%"></i></div>' +
       '  <span class="m-sub">' + esc(visits === 1 ? '1 visit' : visits + ' visits') + (a.label ? ' · ' + esc(a.label) : '') + '</span>' +
       '</section>' +
-      gymContact() +
-      gymOffer();
+
+      '<nav class="m-card m-list" aria-label="More">' +
+      homeLink('data-tab="card"', 'card', 'My membership card') +
+      (has('classes') ? homeLink('data-tab="classes"', 'cal', 'Classes this week') : '') +
+      (offerCount() ? homeLink('data-m="offer"', 'offer', 'Plans, add-ons and facilities') : '') +
+      '</nav>' +
+      gymContact(Boolean(s.has_outstanding && state.brand.notice));
 
     var btn = document.getElementById('m-checkin');
 
@@ -665,6 +756,15 @@
     });
   }
 
+  /** The gym's plans, add-ons, services and facilities: one tap from the home. */
+  function renderOffer(main) {
+    main.innerHTML =
+      '<div class="y-bar">' + backButton('offer-back', 'Home') + '</div>' +
+      (gymOffer() ||
+        '<section class="m-hello"><h1>Plans and facilities</h1></section>' +
+        '<div class="m-empty"><b>Nothing listed yet</b><span>Ask at reception about plans and add-ons.</span></div>');
+  }
+
   function skeleton() {
     return '<div class="m-skel"><i></i><i></i><i class="is-tall"></i><i></i></div>';
   }
@@ -685,7 +785,7 @@
 
     main.innerHTML =
       '<section class="m-pass">' +
-      '  <div class="m-pass__head"><span>' + esc(state.gymName || 'Member') + '</span><span class="m-pill is-' + line.tone + '">' + esc(line.text) + '</span></div>' +
+      '  <div class="m-pass__head"><span>' + esc(state.gymName || 'Member') + '</span><span class="m-pill is-' + line.tone + '">' + icon(line.icon) + esc(line.text) + '</span></div>' +
       '  <canvas id="m-qr" width="240" height="240" aria-label="Your membership QR code"></canvas>' +
       '  <b class="m-pass__name">' + esc(m.full_name) + '</b>' +
       '  <span class="m-num m-pass__no">' + esc(m.membership_number) + '</span>' +
@@ -725,7 +825,7 @@
           html += '<h2 class="m-day">' + esc(dayText(day)) + '</h2>';
         }
         var action = c.already_booked
-          ? '<button type="button" class="m-chip is-on" data-cancel="' + esc(c.class_id) + '|' + esc(c.session_date) + '">Booked ✓</button>'
+          ? '<button type="button" class="m-chip is-on" data-cancel="' + esc(c.class_id) + '|' + esc(c.session_date) + '">' + icon('check') + 'Booked</button>'
           : !c.allowed
             ? '<span class="m-chip is-off">Not on your plan</span>'
             : c.is_full
@@ -775,9 +875,9 @@
    * Opening hours and one-tap contact, as the owner set them (§38.1 Q4). The
    * links leave the app for the phone's dialler, maps and mail.
    */
-  function gymContact() {
+  function gymContact(withNotice) {
     var b = state.brand;
-    if (!b.hours && !b.phone && !b.email && !b.address) return '';
+    if (!withNotice && !b.hours && !b.phone && !b.email && !b.address) return '';
     var tel = b.phone.replace(/[^\d+]/g, '');
     var actions =
       (tel ? '<a class="m-action" href="tel:' + esc(tel) + '">Call</a>' : '') +
@@ -785,6 +885,7 @@
       (/^[^\s@<>"]+@[^\s@<>"]+$/.test(b.email) ? '<a class="m-action" href="mailto:' + esc(b.email) + '">Email</a>' : '');
     return '<section class="m-card m-contact">' +
       '<h2>' + esc(state.gymName || 'Your gym') + '</h2>' +
+      (withNotice ? '<p class="m-contact__row"><span class="m-sub">Notice</span><b class="m-pre">' + esc(b.notice) + '</b></p>' : '') +
       (b.hours ? '<p class="m-contact__row"><span class="m-sub">Opening hours</span><b>' + esc(b.hours) + '</b></p>' : '') +
       (b.address ? '<p class="m-contact__row"><span class="m-sub">Address</span><b>' + esc(b.address) + '</b></p>' : '') +
       (actions ? '<div class="m-actions">' + actions + '</div>' : '') +
@@ -832,7 +933,7 @@
           '<p class="m-hint">' + esc(d.points_per_visit + ' points a visit · a week counts at ' + d.streak_target + ' visits' +
             (d.next_badge ? ' · ' + d.next_badge.visits_to_go + ' to go for “' + d.next_badge.label + '”' : '')) + '</p>' +
           '<h3 class="m-offer__h">Badges</h3><div class="m-chips">' + d.badges.map(function (b) {
-            return '<span class="' + (b.earned ? 'is-on' : 'is-off') + '">' + (b.earned ? '★ ' : '') + esc(b.label) + '</span>';
+            return '<span class="' + (b.earned ? 'is-on' : 'is-off') + '">' + (b.earned ? icon('check') : '') + esc(b.label) + '</span>';
           }).join('') + '</div>' +
           '<h3 class="m-offer__h">Claim a reward</h3>' +
           (d.rewards.length
@@ -924,7 +1025,7 @@
 
   root.addEventListener('click', function (e) {
     var tab = e.target.closest('[data-tab]');
-    if (tab) { state.tab = tab.dataset.tab; render({ moveFocus: true }); return; }
+    if (tab) { state.tab = tab.dataset.tab; state.view = null; render({ moveFocus: true }); window.scrollTo(0, 0); return; }
 
     var book = e.target.closest('[data-book]');
     if (book) { book.disabled = true; bookOrCancel(book.dataset.book, '/member/book-class', 'Booked.'); return; }
@@ -957,6 +1058,8 @@
     var go = window.YOYO_APP.go;
     switch (act.dataset.m) {
       case 'leave': return close();
+      case 'offer': state.view = 'offer'; render({ moveFocus: true }); return window.scrollTo(0, 0);
+      case 'offer-back': state.view = null; render({ moveFocus: true }); return window.scrollTo(0, 0);
       case 'join': return go('/g/' + encodeURIComponent(state.slug) + '/register');
       case 'web': return go('/g/' + encodeURIComponent(state.slug) + '/member');
       case 'privacy': return go('/platform/privacy');
@@ -1012,6 +1115,11 @@
    */
   function back() {
     if (root.classList.contains('hidden')) return false;
+    if (state.token && state.view && root.querySelector('.m-main')) {
+      state.view = null;
+      render();
+      return true;
+    }
     if (state.token && state.tab !== 'home' && root.querySelector('.m-main')) {
       state.tab = 'home';
       render();

@@ -311,8 +311,7 @@ test('WELCOME TO [GYM]: JOIN LEADS TO "JOIN [GYM]", SIGN IN TO "SIGN IN TO [GYM]
 
   click(doc, window, '#join [data-go="signin"]');
   assert.ok(doc.getElementById('m-login'), 'Sign in instead');
-  assert.equal(text(doc, '.m-hero .m-eyebrow'), 'Sign in to');
-  assert.equal(text(doc, '.m-hero h1'), 'BOS GYM');
+  assert.equal(text(doc, '.m-hero h1').replace(/\s+/g, ' '), 'Sign in to BOS GYM');
   assert.ok(doc.querySelector('[data-m="scan-card"]'), 'Scan my membership card');
   assert.ok(doc.querySelector('[data-m="help"]'), 'Need help?');
 

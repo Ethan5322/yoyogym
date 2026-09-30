@@ -299,6 +299,7 @@
       #member {
         --m-accent: #bff642; /* the Yoyo lime until the gym's own colour loads */
         --m-accent-ink: #0b1400; /* text on the accent */
+        --m-accent-text: #bff642; /* the accent as words, icons and lines on the dark ground */
         --m-ground: #0e1416;
         --m-surface: #172024;
         --m-line: rgba(255, 255, 255, 0.08);
@@ -313,13 +314,15 @@
         display: flex;
         flex-direction: column;
       }
-      #member h1 { font-size: 32px; line-height: 1.15; margin: 0; font-weight: 700; letter-spacing: -0.01em; }
+      #member h1 { font-size: 28px; line-height: 1.15; margin: 0; font-weight: 700; letter-spacing: -0.01em; }
       #member h2 { font-size: 20px; margin: 0 0 16px; font-weight: 700; }
       #member label { color: var(--m-muted); font-weight: 600; font-size: 13px; margin: 16px 0 8px; }
       #member input { background: #0e1416; color: #fff; border-color: var(--m-line); }
-      #member input:focus { outline: 2px solid var(--m-accent); outline-offset: 1px; }
+      #member input:focus { outline: 2px solid var(--m-accent-text); outline-offset: 1px; }
+      /* Status and row icons (member.js icon()). */
+      .m-i { width: 20px; height: 20px; flex: none; fill: none; stroke: currentColor; stroke-width: 1.8;
+             stroke-linecap: round; stroke-linejoin: round; }
       .m-num { font-variant-numeric: tabular-nums; }
-      .m-eyebrow { color: var(--m-muted); margin: 0 0 8px; font-size: 16px; }
       .m-sub { color: var(--m-muted); font-size: 13px; }
       .m-hint { color: var(--m-muted); font-size: 13px; text-align: center; margin: 8px 0 24px; }
       .m-note { color: var(--m-warn); font-size: 13px; }
@@ -347,11 +350,13 @@
          between #member's own ground and its content (isolation + z-index -1). */
       #member { isolation: isolate; }
       #member.has-poster::before {
-        content: ''; position: fixed; inset: -8px; z-index: -1; pointer-events: none;
+        content: ''; position: fixed; inset: -32px; z-index: -1; pointer-events: none;
         background:
-          linear-gradient(180deg, rgba(14, 20, 22, 0.70) 0%, rgba(14, 20, 22, 0.86) 55%, rgba(14, 20, 22, 0.96) 100%),
+          linear-gradient(180deg, rgba(14, 20, 22, 0.80) 0%, rgba(14, 20, 22, 0.88) 55%, rgba(14, 20, 22, 0.96) 100%),
           var(--m-poster) center / cover no-repeat;
-        filter: blur(2px);
+        /* Atmosphere, not a busy photo (design critique 2026-09-29: 2px under
+           a 70% veil read as clutter). One fixed layer, cheap on old Android. */
+        filter: blur(14px);
       }
       #member.has-poster .m-card { background: rgba(23, 32, 36, 0.86); backdrop-filter: blur(6px); }
       #member.has-poster .m-top { background: linear-gradient(rgba(14, 20, 22, 0.9) 70%, transparent); }
@@ -362,50 +367,56 @@
                                     background: linear-gradient(rgba(14, 20, 22, 0.1), var(--m-ground) 96%); }
       .m-gymhero__id { position: relative; z-index: 1; display: flex; align-items: center; gap: 12px; }
       .m-gymhero__id b { font-size: 20px; }
-      .m-notice { border-color: color-mix(in srgb, var(--m-accent) 45%, transparent); }
-      .m-notice b { display: block; font-size: 13px; color: var(--m-muted); margin-bottom: 4px; }
-      .m-notice p { margin: 0; white-space: pre-line; }
+      /* ONE banner above the check-in: money owed, else the gym's notice. */
+      .m-banner { display: flex; gap: 12px; align-items: flex-start; padding: 16px; margin-bottom: 16px;
+                  border-radius: 16px; background: rgba(255, 255, 255, 0.06); border: 1px solid var(--m-line); }
+      .m-banner .m-i { color: var(--m-muted); margin-top: 1px; }
+      .m-banner b { display: block; }
+      .m-banner span { display: block; color: var(--m-muted); font-size: 13px; white-space: pre-line; margin-top: 2px; }
+      .m-banner.is-warn { background: rgba(242, 179, 61, 0.10); border-color: rgba(242, 179, 61, 0.4); }
+      .m-banner.is-warn .m-i, .m-banner.is-warn b { color: var(--m-warn); }
+      .m-pre { white-space: pre-line; }
       .m-contact h2 { margin-bottom: 8px; }
       .m-contact__row { display: flex; flex-direction: column; margin: 0 0 12px; }
       .m-actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 4px; }
       .m-action { flex: 1; min-width: 88px; min-height: 44px; display: inline-flex; align-items: center; justify-content: center;
                   border-radius: 22px; background: rgba(255, 255, 255, 0.08); color: #fff; text-decoration: none; font-weight: 700; }
       /* What the gym offers (CLAUDE.md §41.1 Q1). */
-      .m-offer { margin-top: 32px; }
-      .m-offer__title { font-size: 20px; margin: 0 0 4px; }
-      .m-offer__h { font-size: 12px; font-weight: 800; letter-spacing: 0.14em; text-transform: uppercase;
+      .m-offer { margin-top: 8px; }
+      .m-offer__title { margin: 0 0 8px; }
+      .m-offer__h { font-size: 13px; font-weight: 800; letter-spacing: 0.1em; text-transform: uppercase;
                     color: var(--m-muted); margin: 20px 0 10px; }
       .m-plan { position: relative; display: flex; flex-direction: column; gap: 2px; margin-bottom: 12px; }
       .m-plan b { font-size: 16px; padding-right: 96px; }
-      .m-plan__price { font-size: 24px; font-weight: 800; margin-top: 4px; }
+      .m-plan__price { font-size: 20px; font-weight: 800; margin-top: 4px; }
       .m-plan__price small { font-size: 13px; font-weight: 500; color: var(--m-muted); }
-      .m-plan__tag { position: absolute; top: 18px; right: 18px; font-size: 11px; font-weight: 800; padding: 3px 10px;
+      .m-plan__tag { position: absolute; top: 18px; right: 18px; font-size: 13px; font-weight: 800; padding: 3px 10px;
                      border-radius: 99px; background: var(--m-accent); color: var(--m-accent-ink); }
       .m-plan p { margin: 6px 0 0; }
-      .m-list { padding: 4px 20px; }
-      .m-list__row { display: flex; justify-content: space-between; gap: 16px; padding: 14px 0; border-top: 1px solid var(--m-line); }
+      .m-list__row { display: flex; justify-content: space-between; gap: 16px; padding: 14px 24px; border-top: 1px solid var(--m-line); }
       .m-list__row:first-child { border-top: 0; }
       .m-list__row small { display: block; color: var(--m-muted); font-size: 13px; font-weight: 400; margin-top: 2px; }
       .m-checks { list-style: none; padding: 0; margin: 0; display: grid; gap: 10px; }
-      .m-checks li { display: flex; gap: 10px; align-items: flex-start; }
-      .m-checks li::before { content: '✓'; color: var(--m-accent); font-weight: 800; }
+      .m-checks li { display: flex; gap: 12px; align-items: flex-start; }
+      .m-checks .m-i { color: var(--m-accent-text); }
       .m-chips { display: flex; flex-wrap: wrap; gap: 8px; }
-      .m-chips span { border: 1px solid var(--m-line); border-radius: 99px; padding: 6px 12px; font-size: 14px;
+      .m-chips span { display: inline-flex; align-items: center; gap: 6px; border: 1px solid var(--m-line); border-radius: 99px; padding: 6px 12px; font-size: 13px;
                       background: rgba(255, 255, 255, 0.03); }
       /* The member services (CLAUDE.md §41.1 Q3). */
       .m-stats { display: grid; grid-template-columns: repeat(3, 1fr); text-align: center; gap: 8px; }
-      .m-stats b { display: block; font-size: 26px; font-weight: 800; }
-      .m-stats div:first-child b { color: var(--m-accent); }
-      .m-stats span { color: var(--m-muted); font-size: 12px; }
-      .m-chips span.is-on { border-color: color-mix(in srgb, var(--m-accent) 55%, transparent); }
+      .m-stats b { display: block; font-size: 28px; font-weight: 800; }
+      .m-stats div:first-child b { color: var(--m-accent-text); }
+      .m-stats span { color: var(--m-muted); font-size: 13px; }
+      .m-chips span.is-on { border-color: color-mix(in srgb, var(--m-accent-text) 55%, transparent); }
+      .m-chips span.is-on .m-i { width: 16px; height: 16px; color: var(--m-accent-text); }
       .m-chips span.is-off { opacity: 0.5; }
       .m-mini { min-height: 40px; padding: 0 16px; border: 0; border-radius: 20px; background: var(--m-accent);
-                color: var(--m-accent-ink); font-weight: 800; font-size: 14px; flex: none; }
+                color: var(--m-accent-ink); font-weight: 800; font-size: 13px; flex: none; }
       .m-mini.is-ghost { background: rgba(255, 255, 255, 0.08); color: #fff; }
       .m-mini:disabled { opacity: 0.5; }
       .m-board { list-style: none; padding: 0; margin: 12px 0 4px; display: grid; gap: 6px; }
       .m-board li { display: flex; justify-content: space-between; }
-      .m-board li.is-you { color: var(--m-accent); font-weight: 700; }
+      .m-board li.is-you { color: var(--m-accent-text); font-weight: 700; }
       .m-main { flex: 1; padding: 0 24px calc(96px + env(safe-area-inset-bottom)); }
       .m-hello { margin: 8px 0 24px; }
 
@@ -418,16 +429,15 @@
         box-shadow: 0 16px 32px rgba(0, 0, 0, 0.28);
       }
 
-      /* Status: the first thing a member wants to know. */
-      .m-status { display: flex; gap: 16px; align-items: center; }
-      .m-status b { display: block; font-size: 20px; }
-      .m-status span { color: var(--m-muted); font-size: 13px; }
-      .m-dot { width: 12px; height: 12px; border-radius: 50%; flex: none; background: var(--m-warn); box-shadow: 0 0 0 6px rgba(242, 179, 61, 0.16); }
-      .m-status.is-good .m-dot { background: var(--m-good); box-shadow: 0 0 0 6px rgba(47, 191, 113, 0.16); }
-      .m-status.is-bad .m-dot { background: var(--m-bad); box-shadow: 0 0 0 6px rgba(255, 107, 94, 0.16); }
-      .m-owe { border-color: rgba(255, 107, 94, 0.4); }
-      .m-owe b { display: block; color: var(--m-bad); }
-      .m-owe span { color: var(--m-muted); font-size: 13px; }
+      /* Status and check-in, one card: the first thing a member wants to know
+         and the one thing they came to do. Status is said in words and an
+         icon, in green / amber / red by MEANING — never the gym's colour. */
+      .m-checkcard { text-align: center; }
+      .m-state { display: inline-flex; align-items: center; gap: 8px; margin: 0; padding: 6px 14px;
+                 border-radius: 99px; font-size: 16px; color: var(--m-warn); background: rgba(242, 179, 61, 0.12); }
+      .m-state.is-good { color: var(--m-good); background: rgba(47, 191, 113, 0.12); }
+      .m-state.is-bad { color: var(--m-bad); background: rgba(255, 107, 94, 0.12); }
+      .m-checkcard .m-hint { margin: 16px 0 0; }
 
       /* Check-in: the peak moment. Big, round, in the thumb zone. */
       .m-checkin {
@@ -439,23 +449,23 @@
         background: var(--m-accent);
         background: radial-gradient(circle at 50% 35%, color-mix(in srgb, var(--m-accent) 88%, #fff), var(--m-accent));
         color: var(--m-accent-ink); font-size: 20px;
-        box-shadow: 0 16px 48px color-mix(in srgb, var(--m-accent) 45%, transparent), inset 0 2px 0 rgba(255, 255, 255, 0.28);
+        box-shadow: 0 16px 32px rgba(0, 0, 0, 0.45), inset 0 2px 0 rgba(255, 255, 255, 0.28);
         transition: transform 0.15s ease;
       }
       .m-checkin:active { transform: scale(0.96); }
       .m-checkin:disabled { background: #2a3337; box-shadow: none; color: var(--m-muted); }
       .m-checkin__ring { position: absolute; inset: -8px; border-radius: 50%; border: 2px solid color-mix(in srgb, var(--m-accent) 40%, transparent); }
       .m-checkin.is-busy .m-checkin__ring { animation: m-spin 1s linear infinite; border-top-color: #fff; }
-      .m-checkin.is-done { background: var(--m-good); box-shadow: 0 16px 48px rgba(47, 191, 113, 0.4); animation: m-pop 0.4s ease; }
+      .m-checkin.is-done { background: var(--m-good); color: #0b1400; animation: m-pop 0.4s ease; }
       @keyframes m-spin { to { transform: rotate(360deg); } }
       @keyframes m-pop { 50% { transform: scale(1.06); } }
 
       .m-progress__top { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 16px; }
       .m-progress__top span { color: var(--m-muted); font-size: 13px; }
-      .m-progress__top b { font-size: 32px; }
+      .m-progress__top b { font-size: 28px; }
       .m-progress__top small { font-size: 16px; color: var(--m-muted); }
       .m-bar { height: 8px; border-radius: 8px; background: rgba(255, 255, 255, 0.08); overflow: hidden; margin-bottom: 8px; }
-      .m-bar i { display: block; height: 100%; background: var(--m-accent); border-radius: 8px; transition: width 0.6s ease; }
+      .m-bar i { display: block; height: 100%; background: var(--m-accent-text); border-radius: 8px; transition: width 0.6s ease; }
 
       /* The card: made to be shown across a desk. */
       .m-pass {
@@ -468,7 +478,8 @@
       .m-pass__name { font-size: 20px; margin-top: 8px; }
       .m-pass__no { font-size: 16px; letter-spacing: 0.06em; }
       .m-pass .m-sub { color: #5b6a6d; }
-      .m-pill { font-size: 13px; padding: 4px 12px; border-radius: 16px; background: #fdf1d8; color: #7a5200; }
+      .m-pill { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; padding: 4px 12px; border-radius: 16px; background: #fdf1d8; color: #7a5200; }
+      .m-pill .m-i { width: 16px; height: 16px; }
       .m-pill.is-good { background: #dcf5e7; color: #16693c; }
       .m-pill.is-bad { background: #fde3e0; color: #8c2f22; }
 
@@ -484,11 +495,15 @@
         border-radius: 24px; background: rgba(255, 255, 255, 0.12);
         background: color-mix(in srgb, var(--m-accent) 16%, transparent); color: #fff;
       }
-      .m-chip.is-on { background: var(--m-good); }
+      .m-chip { display: inline-flex; align-items: center; gap: 6px; }
+      .m-chip .m-i { width: 16px; height: 16px; }
+      .m-chip.is-on { background: var(--m-good); color: #0b1400; }
       .m-chip.is-off { display: inline-flex; align-items: center; color: var(--m-muted); background: transparent; }
 
-      /* Profile */
+      /* Rows in a card: the home's links, the profile, a gym's add-ons. */
       .m-list { padding: 8px 0; }
+      .m-row__lead { display: inline-flex; align-items: center; gap: 12px; min-width: 0; color: #fff; }
+      .m-row__lead .m-i { color: var(--m-muted); }
       .m-row {
         display: flex; justify-content: space-between; align-items: center; gap: 16px;
         width: 100%; min-height: 56px; margin: 0; padding: 0 24px; border-radius: 0;
@@ -498,6 +513,7 @@
       .m-row.is-static { flex-direction: column; align-items: flex-start; justify-content: center; gap: 0; padding: 8px 24px; }
       .m-row span:last-child { color: var(--m-muted); }
       .m-row .m-row__chev { width: 18px; height: 18px; flex: none; color: var(--m-muted); }
+      .m-row .m-row__lead span { color: #fff; } /* a link's words, not a muted value */
 
       .m-primary { background: var(--m-accent); }
       .m-secondary { background: rgba(255, 255, 255, 0.08); color: #fff; }
@@ -505,6 +521,7 @@
 
       .m-empty { text-align: center; padding: 48px 24px; color: var(--m-muted); }
       .m-empty b { display: block; color: #fff; font-size: 20px; margin-bottom: 8px; }
+      .m-empty span { display: block; }
 
       .m-skel i { display: block; height: 88px; border-radius: 24px; margin-bottom: 16px; background: linear-gradient(90deg, #172024, #1f2a2e, #172024); background-size: 200% 100%; animation: m-shimmer 1.2s infinite; }
       .m-skel i.is-tall { height: 184px; width: 184px; border-radius: 50%; margin: 24px auto; }
@@ -525,12 +542,13 @@
       }
       .m-tab svg { width: 24px; height: 24px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
       .m-tab.is-on { color: #fff; }
-      .m-tab.is-on svg { stroke: var(--m-accent); }
+      .m-tab.is-on svg { stroke: var(--m-accent-text); }
 
       /* Sign in */
       .m-signin { padding: max(16px, env(safe-area-inset-top)) 24px max(24px, env(safe-area-inset-bottom)); }
-      .m-back { width: auto; min-height: 44px; margin: 0; padding: 0; background: none; color: var(--m-muted); font-weight: 500; }
-      .m-hero { margin: 24px 0 32px; }
+      .m-hero { margin: 8px 0 32px; }
+      .m-scan { display: inline-flex; align-items: center; justify-content: center; gap: 8px; margin: 0; }
+      .m-scan + .m-err { margin-bottom: 8px; }
       .m-join { text-align: center; margin-top: 24px; color: var(--m-muted); }
       .m-join p { margin: 0 0 8px; }
 
