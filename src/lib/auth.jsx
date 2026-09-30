@@ -1,7 +1,7 @@
 // Admin auth context: holds the current admin user, restores the session
 // on load via /api/auth/me, and exposes login/logout + role helpers (RBAC).
 import { createContext, useContext, useEffect, useState, useCallback } from 'react';
-import { apiFetch, setToken, clearToken, getToken } from './api.js';
+import { apiFetch } from './api.js';
 import { clearGym } from './gym.js';
 
 // Permission map mirrors spec Part 4.1 server-side roles. The server is the
@@ -29,14 +29,12 @@ export function AuthProvider({ children }) {
     apiFetch('/auth/me').then((d) => setPlan(d.plan ?? null)).catch(() => {});
   }, []);
 
-  // Restore session on first load if a token exists.
+  // Restore the session on first load. It is an HttpOnly cookie this page
+  // cannot see (CLAUDE.md §46.1 Q1), so the server is asked; a 401 simply
+  // means nobody is signed in here.
   useEffect(() => {
     let active = true;
     (async () => {
-      if (!getToken()) {
-        setLoading(false);
-        return;
-      }
       try {
         const { user, plan } = await apiFetch('/auth/me');
         if (active) {
@@ -44,7 +42,7 @@ export function AuthProvider({ children }) {
           setPlan(plan ?? null);
         }
       } catch {
-        clearToken();
+        /* not signed in */
       } finally {
         if (active) setLoading(false);
       }
@@ -56,27 +54,28 @@ export function AuthProvider({ children }) {
 
   // `remember`: in the phone app, stay signed in until signing out (§38.1 Q3).
   const login = useCallback(async (username, password, { remember = false } = {}) => {
-    const { token, user } = await apiFetch('/auth/login', {
+    // The server keeps the session in its cookie; the token in the answer is
+    // for the store app and is not kept here.
+    const { user } = await apiFetch('/auth/login', {
       method: 'POST',
       body: { username, password, remember },
-      auth: false,
     });
-    setToken(token);
     setUser(user);
     loadPlan();
     return user;
   }, [loadPlan]);
 
-  // Apply an externally-obtained session (e.g. face login).
-  const applySession = useCallback((token, user) => {
-    setToken(token);
+  // Apply a session another sign-in opened (face sign-in): its cookie is
+  // already set by the server.
+  const applySession = useCallback((_token, user) => {
     setUser(user);
     loadPlan();
     return user;
   }, [loadPlan]);
 
   const logout = useCallback(() => {
-    clearToken();
+    // Only the server can remove an HttpOnly cookie.
+    apiFetch('/auth/logout', { method: 'POST' }).catch(() => {});
     // Forget the gym too. A reception computer is shared, and leaving one
     // gym selected would have the next person working against it.
     //

@@ -32,8 +32,10 @@ globalThis.fetch = async (url, init = {}) => {
 };
 
 const gym = await import('../src/lib/gym.js');
-const { tokenKey, setToken, getToken } = await import('../src/lib/api.js');
-const { memberFetch, setMemberToken, getMemberToken } = await import('../src/lib/memberApi.js');
+const { tokenKey } = await import('../src/lib/api.js');
+const { memberFetch } = await import('../src/lib/memberApi.js');
+// The session itself is now a per-gym HttpOnly cookie (CLAUDE.md §46.1 Q1).
+const { cookieName, adoptSessionCookie } = await import('../server/lib/session-cookie.js');
 
 function at(pathname) {
   gym.clearGym();
@@ -94,25 +96,24 @@ test('no request in the gym app bypasses the gym header', () => {
 // One session per gym
 // ---------------------------------------------------------------------------
 
+// The session is a cookie per gym, named after the gym the page asks for
+// (CLAUDE.md §46.1 Q1): the cookie for one gym is never adopted at another.
+function adopted(kind, cookies, slug) {
+  const req = { method: 'GET', headers: { cookie: cookies, ...(slug ? { 'x-gym-slug': slug } : {}) } };
+  adoptSessionCookie(req, {}, kind, () => {});
+  return req.headers.authorization || null;
+}
+
 test('EACH GYM KEEPS ITS OWN SESSION', () => {
-  at('/g/bos-gym/member');
-  setMemberToken('token-for-bos');
-
-  at('/g/iron-works/member');
-  setMemberToken('token-for-iron');
-
-  at('/g/bos-gym/member');
-  assert.equal(getMemberToken(), 'token-for-bos', 'signing in at iron-works did not sign out of bos-gym');
-
-  at('/g/iron-works/member');
-  assert.equal(getMemberToken(), 'token-for-iron');
+  const jar = `${cookieName('member', 'bos-gym')}=token-for-bos; ${cookieName('member', 'iron-works')}=token-for-iron`;
+  assert.equal(adopted('member', jar, 'bos-gym'), 'Bearer token-for-bos', 'signing in at iron-works did not sign out of bos-gym');
+  assert.equal(adopted('member', jar, 'iron-works'), 'Bearer token-for-iron');
 });
 
 test('staff sessions are per gym too', () => {
-  at('/g/bos-gym/admin');
-  setToken('staff-bos');
-  at('/g/iron-works/admin');
-  assert.equal(getToken(), null, 'another gym has no session here');
+  const jar = `${cookieName('admin', 'bos-gym')}=staff-bos`;
+  assert.equal(adopted('admin', jar, 'iron-works'), null, 'another gym has no session here');
+  assert.equal(adopted('member', jar, 'bos-gym'), null, 'a staff session is not a member session');
 });
 
 test('single-gym mode keeps the ORIGINAL keys, so nobody there is signed out', () => {

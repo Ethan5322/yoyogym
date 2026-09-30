@@ -18,6 +18,7 @@ import { allowMethods, readJsonBody, ok, badRequest, unauthorized, serverError }
 import { rateLimit } from '../../lib/ratelimit.js';
 import { resolveGym, runWithGym } from '../../lib/tenancy.js';
 import { attemptLogin } from './login.js';
+import { issueSessionCookie } from '../../lib/session-cookie.js';
 
 const INVALID = 'Invalid email or password';
 
@@ -46,6 +47,9 @@ export default async function ownerLogin(req, res, { tenancy } = {}) {
         attemptLogin(getSupabase(), address, password, { remember: remember === true })
       );
       if (result.ok) {
+        // Named after the owner's gym: the page opens /g/<slug>/admin next
+        // (CLAUDE.md §46.1 Q1).
+        issueSessionCookie(req, res, 'admin', result.token, { slug });
         return ok(res, {
           token: result.token,
           user: result.user,

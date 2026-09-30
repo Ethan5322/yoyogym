@@ -136,7 +136,10 @@ test('email and password are both required', async () => {
 test('the website page stores the session where the gym\'s own sign-in does, and opens the gym', () => {
   const page = readFileSync(new URL('../src/pages/OwnerLogin.jsx', import.meta.url), 'utf8');
   assert.match(page, /fetch\('\/api\/auth\/owner-login'/);
-  assert.match(page, /tokenKey\(ADMIN_TOKEN, data\.gym\.slug\)/, 'the per-gym key the admin panel reads');
+  // The session is the gym's own HttpOnly cookie, named after the owner's gym
+  // (CLAUDE.md §46.1 Q1) — the one the admin panel's requests carry.
+  assert.match(readFileSync(new URL('../server/handlers/auth/owner-login.js', import.meta.url), 'utf8'),
+    /issueSessionCookie\(req, res, 'admin', result\.token, \{ slug \}\)/);
   assert.match(page, /\/g\/\$\{encodeURIComponent\(slug\)\}\/admin\/login/);
   assert.match(page, /\/platform\/forgot/, 'a way back in');
   const app = readFileSync(new URL('../src/App.jsx', import.meta.url), 'utf8');

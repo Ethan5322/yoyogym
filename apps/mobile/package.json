@@ -2,7 +2,7 @@
   "name": "@yoyo/mobile",
   "version": "0.0.0",
   "private": true,
-  "description": "Yoyo Gyms app shell. A Capacitor wrapper around the Yoyo Gyms server's own screens \u2014 it packages them for Google Play and the App Store and changes nothing about how they work.",
+  "description": "Yoyo Gyms app shell. A Capacitor wrapper around the Yoyo Gyms server's own screens — it packages them for Google Play and the App Store and changes nothing about how they work.",
   "scripts": {
     "cap:sync": "cap sync",
     "cap:open:android": "cap open android",
@@ -12,6 +12,7 @@
     "aab:release": "cd android && gradlew.bat bundleRelease"
   },
   "dependencies": {
+    "@aparajita/capacitor-secure-storage": "^8.0.1",
     "@capacitor/android": "^8.5.0",
     "@capacitor/app": "^8.1.1",
     "@capacitor/barcode-scanner": "^3.1.2",

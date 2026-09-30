@@ -24,11 +24,10 @@
 import { useEffect, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import BrandLogo from '../components/BrandLogo.jsx';
-import { tokenKey } from '../lib/api.js';
+import { PAGE_HEADERS } from '../lib/api.js';
 import { captureInApp, inApp } from '../lib/inApp.js';
 import { BRAND, hexToRgb, deepen } from '../../shared/brand.js';
 
-const ADMIN_TOKEN = 'gym_admin_token';
 // The gym this browser last signed an owner in to, so reopening the app goes
 // straight back to it while the session lasts.
 const LAST_GYM = 'yoyo.owner.lastgym';
@@ -84,7 +83,9 @@ function openGym(slug, app) {
 function readLast() {
   try {
     const slug = localStorage.getItem(LAST_GYM);
-    return slug && SAFE_SLUG.test(slug) && localStorage.getItem(tokenKey(ADMIN_TOKEN, slug)) ? slug : null;
+    // Only WHICH gym: the session itself is the gym's HttpOnly cookie, and the
+    // gym's own sign-in page moves straight on while it lasts (CLAUDE.md §46.1 Q1).
+    return slug && SAFE_SLUG.test(slug) ? slug : null;
   } catch {
     return null;
   }
@@ -150,8 +151,9 @@ export default function OwnerLogin() {
       // the gym header a previous page in this tab may have left behind.
       const res = await fetch('/api/auth/owner-login', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...PAGE_HEADERS },
         body: JSON.stringify({ email: email.trim(), password, remember: Boolean(app) }),
+        credentials: 'same-origin',
       });
       const data = await res.json().catch(() => ({}));
       if (res.status === 401 && data.error === NO_GYM_TOOK_IT) {
@@ -159,16 +161,14 @@ export default function OwnerLogin() {
         handOn(form);
         return;
       }
-      if (!res.ok || !data.token || !SAFE_SLUG.test(String(data.gym?.slug || ''))) {
+      if (!res.ok || !SAFE_SLUG.test(String(data.gym?.slug || ''))) {
         setError(data.error || 'Sign-in failed. Please try again.');
         return;
       }
       try {
-        localStorage.setItem(tokenKey(ADMIN_TOKEN, data.gym.slug), data.token);
         localStorage.setItem(LAST_GYM, data.gym.slug);
       } catch {
-        setError('This browser will not keep you signed in (storage is blocked).');
-        return;
+        /* not remembered: the next visit asks for the email again */
       }
       leaving = true;
       openGym(data.gym.slug, app);

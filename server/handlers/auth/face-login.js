@@ -16,6 +16,7 @@ import { ARCFACE, FACEAPI, arcfaceSimilarity, faceApiSimilarity, templatesOf, id
 import { selectFaceRows } from '../../lib/facedb.js';
 import { currentGym } from '../../lib/tenancy.js';
 import { withSessionVersion } from '../../lib/sessions.js';
+import { issueSessionCookie } from '../../lib/session-cookie.js';
 
 // The gym this login happened in, stamped into the token so every later
 // request carries it in a signature the client cannot edit. null in
@@ -70,6 +71,8 @@ export default async function handler(req, res) {
 
     await supabase.from('admin_users').update({ last_login_at: new Date().toISOString() }).eq('id', best.id);
     const token = signToken(await withSessionVersion(supabase, 'admin_users', best, remember), { gym: gymSlug(), remember: remember === true });
+    // The website keeps it in an HttpOnly cookie (CLAUDE.md §46.1 Q1).
+    issueSessionCookie(req, res, 'admin', token);
     return ok(res, {
       token,
       user: { id: best.id, username: best.username, full_name: best.full_name, email: best.email, role: best.role, trainer_id: best.trainer_id },

@@ -6,6 +6,7 @@ import { allowMethods, readJsonBody, ok, badRequest, unauthorized, serverError, 
 import { signMemberToken, phoneMatches } from '../../lib/memberauth.js';
 import { rateLimit } from '../../lib/ratelimit.js';
 import { currentGym } from '../../lib/tenancy.js';
+import { issueSessionCookie } from '../../lib/session-cookie.js';
 
 // The gym this login happened in, stamped into the token so every later
 // request carries it in a signature the client cannot edit. null in
@@ -35,9 +36,12 @@ export default async function handler(req, res) {
       return unauthorized(res, 'We could not find a matching membership. Please check your details.');
     }
 
+    // `remember`: the app keeps its members signed in until they sign out (§38.1 Q2).
+    const token = signMemberToken(member, { gym: gymSlug(), remember: remember === true });
+    // The website keeps it in an HttpOnly cookie (CLAUDE.md §46.1 Q1).
+    issueSessionCookie(req, res, 'member', token);
     return ok(res, {
-      // `remember`: the app keeps its members signed in until they sign out (§38.1 Q2).
-      token: signMemberToken(member, { gym: gymSlug(), remember: remember === true }),
+      token,
       member: {
         id: member.id,
         full_name: member.full_name,

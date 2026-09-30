@@ -28,6 +28,7 @@ import {
 import { selectFaceRows, updateFaceRow } from '../../lib/facedb.js';
 import { currentGym } from '../../lib/tenancy.js';
 import { withSessionVersion } from '../../lib/sessions.js';
+import { issueSessionCookie } from '../../lib/session-cookie.js';
 
 // The gym this login happened in, stamped into the token so every later
 // request carries it in a signature the client cannot edit. null in
@@ -114,8 +115,11 @@ export default async function handler(req, res) {
       if (learnErr) console.error('face template learn failed:', learnErr.message);
     }
 
+    const token = signMemberToken(await withSessionVersion(supabase, 'members', member, remember), { gym: gymSlug(), remember: remember === true });
+    // The website keeps it in an HttpOnly cookie (CLAUDE.md §46.1 Q1).
+    issueSessionCookie(req, res, 'member', token);
     return ok(res, {
-      token: signMemberToken(await withSessionVersion(supabase, 'members', member, remember), { gym: gymSlug(), remember: remember === true }),
+      token,
       member: {
         id: member.id,
         full_name: member.full_name,

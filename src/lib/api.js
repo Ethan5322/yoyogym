@@ -1,7 +1,11 @@
 // Frontend API client. The browser ONLY talks to our /api serverless
 // functions — never directly to Supabase (POPIA architecture, spec 6.3).
 //
-// Attaches the admin JWT (when present) and normalises error handling.
+// THE SESSION IS AN HttpOnly COOKIE (CLAUDE.md §46.1 Q1), set by the server at
+// sign-in and sent by the browser by itself. This page never sees it, so no
+// script that ever runs here can copy it. Every request says it comes from a
+// Yoyo Gyms page (X-Yoyo-Request); the server refuses a cookie-borne change
+// without it — the defence against another site acting with this session.
 
 import { currentGymSlug } from './gym.js';
 
@@ -18,28 +22,31 @@ export function tokenKey(base, gym = currentGymSlug()) {
   return gym ? `${base}:${gym}` : base;
 }
 
-const ADMIN_TOKEN = 'gym_admin_token';
+/** Sent with every request: "this comes from a Yoyo Gyms page". */
+export const PAGE_HEADERS = { 'X-Yoyo-Request': '1' };
 
-export function getToken() {
-  return localStorage.getItem(tokenKey(ADMIN_TOKEN));
+/**
+ * Sessions from before the cookie (CLAUDE.md §46.1 Q1) are removed from this
+ * browser's storage: no longer used, and exactly what the change is for — a
+ * token that any script on the page could read.
+ */
+export function forgetStoredSessions() {
+  try {
+    for (const k of Object.keys(localStorage)) {
+      if (/^gym_(admin|member)_token(:|$)/.test(k)) localStorage.removeItem(k);
+    }
+  } catch {
+    /* storage refused: nothing was kept there either */
+  }
 }
-export function setToken(token) {
-  if (token) localStorage.setItem(tokenKey(ADMIN_TOKEN), token);
-}
-export function clearToken() {
-  localStorage.removeItem(tokenKey(ADMIN_TOKEN));
-}
+forgetStoredSessions();
 
 /**
  * Make a JSON request to an /api endpoint.
  * Throws an Error with a friendly `.message` on non-2xx responses.
  */
-export async function apiFetch(path, { method = 'GET', body, auth = true } = {}) {
-  const headers = { 'Content-Type': 'application/json' };
-  if (auth) {
-    const token = getToken();
-    if (token) headers.Authorization = `Bearer ${token}`;
-  }
+export async function apiFetch(path, { method = 'GET', body } = {}) {
+  const headers = { 'Content-Type': 'application/json', ...PAGE_HEADERS };
 
   // WHICH GYM. Sent on every request so the server can resolve the tenant;
   // omitted entirely in single-gym mode, which is what an existing deployment
@@ -56,6 +63,7 @@ export async function apiFetch(path, { method = 'GET', body, auth = true } = {})
     method,
     headers,
     body: body ? JSON.stringify(body) : undefined,
+    credentials: 'same-origin',
   });
 
   let data = null;

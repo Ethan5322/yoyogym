@@ -14,10 +14,11 @@
  *     wrongly). "Join this gym" opens that flow.
  *   · Anything a member is not already allowed to do on the website.
  *
- * STORAGE, stated plainly: the session token and a cached copy of the card
- * live in this app's own storage on the phone (the app's private origin, not
- * shared with any website). A hardware-backed secure store is a later step,
- * recorded in the vault; clearing the app's data signs the member out.
+ * STORAGE, stated plainly: the SIGN-IN lives in the phone's secure storage —
+ * the iPhone Keychain, the Android Keystore (CLAUDE.md §46.1 Q1). A cached copy
+ * of the card and the gym's look live in the app's own storage on the phone,
+ * with a "signed in here" mark that is not a credential. Clearing the app's
+ * data, or deleting the app, signs the member out.
  *
  * No dependencies beyond vendor-qrcode.js, which is generated from the same
  * `qrcode` package the website uses.
@@ -59,11 +60,59 @@
   }
 
   // -------------------------------------------------------------------------
+  // The sign-in itself — in the phone's secure storage (CLAUDE.md §46.1 Q1)
+  // -------------------------------------------------------------------------
+  //
+  // Web storage can be read by any script that ever runs in the page; the
+  // Keychain and the Keystore cannot. So the token goes there, through the
+  // SecureStorage plugin (@aparajita/capacitor-secure-storage), and web
+  // storage keeps only a "signed in here" mark, so the entry screens can tell
+  // at once whether to skip "Welcome to [Gym]". A sign-in from before this
+  // change is moved across the first time it is read. Without the plugin —
+  // an older build, the tests — the token stays in web storage, as it was.
+
+  function vault() {
+    var plugins = window.Capacitor && window.Capacitor.Plugins;
+    return plugins && plugins.SecureStorage ? plugins.SecureStorage : null;
+  }
+
+  function vaultKey() { return 'yoyo_member_token_' + state.slug; }
+
+  function writeToken(token) {
+    var v = vault();
+    save('signedin', token ? true : null);
+    if (!v) { save('token', token || null); return Promise.resolve(); }
+    save('token', null); // never in web storage
+    var done = token
+      ? v.internalSetItem({ prefixedKey: vaultKey(), data: token, sync: false, access: 0 })
+      : v.internalRemoveItem({ prefixedKey: vaultKey(), sync: false });
+    return Promise.resolve(done).catch(function () { /* the Keychain refused: signed in until the app closes */ });
+  }
+
+  function readToken() {
+    var v = vault();
+    if (!v) return Promise.resolve(load('token'));
+    var old = load('token');
+    return Promise.resolve(v.internalGetItem({ prefixedKey: vaultKey(), sync: false })).then(function (r) {
+      if (r && r.data) { if (old) save('token', null); return r.data; }
+      // Moving a sign-in from before this change into the secure store.
+      if (old) return writeToken(old).then(function () { return old; });
+      return null;
+    }, function () { return old || null; });
+  }
+
+  // -------------------------------------------------------------------------
   // The API — the same endpoints the gym's website calls
   // -------------------------------------------------------------------------
 
   function api(path, opts) {
     opts = opts || {};
+    // A signed-in request waits for the token to come out of secure storage.
+    var ready = opts.auth === false ? Promise.resolve() : state.tokenReady || Promise.resolve();
+    return ready.then(function () { return send(path, opts); });
+  }
+
+  function send(path, opts) {
     var headers = { 'Content-Type': 'application/json', 'X-Gym-Slug': state.slug };
     if (opts.auth !== false && state.token) headers.Authorization = 'Bearer ' + state.token;
 
@@ -336,7 +385,12 @@
     state.slug = slug;
     state.gymName = opts.name || '';
     state.prefill = opts.number || '';
-    state.token = load('token');
+    // The mark decides at once; the token follows from secure storage.
+    var signedIn = Boolean(load('signedin') || load('token'));
+    state.token = null;
+    state.tokenReady = signedIn
+      ? readToken().then(function (t) { if (state.slug === slug) state.token = t; })
+      : Promise.resolve();
     state.status = load('status');
     state.features = state.status ? state.status.features || null : null;
     state.off = state.status && Array.isArray(state.status.services_off) ? state.status.services_off : [];
@@ -358,10 +412,14 @@
       if (state.token && root.querySelector('.m-main')) render();
     });
 
-    if (state.token) {
+    if (signedIn) {
       setLastRole('member');
       render({ moveFocus: true });
-      refresh();
+      state.tokenReady.then(function () {
+        if (state.slug !== slug) return;
+        if (state.token) refresh();
+        else signOut(true);
+      });
     } else {
       renderSignIn();
     }
@@ -373,7 +431,10 @@
    */
   function hasSession(slug) {
     if (!SAFE_SLUG.test(String(slug || ''))) return false;
-    try { return Boolean(JSON.parse(localStorage.getItem('yoyo.member.token:' + slug) || 'null')); } catch (e) { return false; }
+    try {
+      return Boolean(JSON.parse(localStorage.getItem('yoyo.member.signedin:' + slug) || 'null')) ||
+        Boolean(JSON.parse(localStorage.getItem('yoyo.member.token:' + slug) || 'null'));
+    } catch (e) { return false; }
   }
 
   /** Leave the gym, back to the Yoyo screen the member came from. */
@@ -385,7 +446,7 @@
   }
 
   function signOut(expired, notice) {
-    save('token', null);
+    writeToken(null);
     save('status', null);
     save('checkedIn', null);
     state.token = null;
@@ -446,7 +507,7 @@
       api('/member/login', { method: 'POST', auth: false, body: { membership_number: mn, phone: ph, remember: true } })
         .then(function (d) {
           state.token = d.token;
-          save('token', d.token);
+          state.tokenReady = writeToken(d.token);
           setLastRole('member');
           state.tab = 'home';
           render({ moveFocus: true });

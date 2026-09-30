@@ -2,6 +2,7 @@
 // /server/handlers/admin (outside /api, so not counted as functions).
 import { json } from '../../server/lib/http.js';
 import { guardRequest, MAX_PHOTO_BODY_BYTES } from '../../server/lib/guard.js';
+import { adoptSessionCookie } from '../../server/lib/session-cookie.js';
 import { withGym } from '../../server/lib/gymcontext.js';
 import { enforceEntitlement } from '../../server/lib/entitlements.js';
 import { captureError } from '../../server/lib/observability.js';
@@ -105,6 +106,9 @@ export default async function handler(req, res) {
   if (!fn) return json(res, 404, { error: `Not found: /api/admin/${seg || ''}` });
   // Size and rate first, before any work is done (CLAUDE.md §46).
   if (!guardRequest(req, res, PHOTO_ROUTES.has(seg) ? { maxBytes: MAX_PHOTO_BODY_BYTES } : undefined)) return;
+  // The website's session cookie, taken as the Bearer; a change it carries
+  // must come from a Yoyo Gyms page (server/lib/session-cookie.js).
+  if (!adoptSessionCookie(req, res, 'admin', json)) return;
 
   // Plan gating. Inert for a single-gym deployment (no resolved gym); for a
   // platform gym it refuses a route the plan does not include, with 402.

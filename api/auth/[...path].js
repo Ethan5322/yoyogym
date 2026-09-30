@@ -1,6 +1,8 @@
 // Auth router — /api/auth/* (login, me).
 import { json } from '../../server/lib/http.js';
 import { guardRequest, MAX_PHOTO_BODY_BYTES } from '../../server/lib/guard.js';
+import { adoptSessionCookie } from '../../server/lib/session-cookie.js';
+import logout from '../../server/handlers/auth/logout.js';
 import { withGym } from '../../server/lib/gymcontext.js';
 import { enforceEntitlement } from '../../server/lib/entitlements.js';
 import { AUTH_ROUTE_FEATURES } from '../../shared/features.js';
@@ -16,10 +18,21 @@ const routes = { login, me, 'face-login': faceLogin, 'change-password': changePa
 
 // Routes that carry face photos, a logo or a member import (server/lib/guard.js).
 const PHOTO_ROUTES = new Set(['face-login']);
+// The ways in: they open a session, so they never use the one in a cookie.
+const SIGN_INS = new Set(['login', 'face-login', 'owner-login']);
 
 export default async function handler(req, res) {
   const parts = new URL(req.url, 'http://localhost').pathname.split('/').filter(Boolean);
   const seg = parts[2];
+  // Size and rate first, before any work is done — owner sign-in included
+  // (CLAUDE.md §46).
+  if (!guardRequest(req, res, PHOTO_ROUTES.has(seg) ? { maxBytes: MAX_PHOTO_BODY_BYTES } : undefined)) return;
+  // The website's session cookie, taken as the Bearer; a change it carries
+  // must come from a Yoyo Gyms page (server/lib/session-cookie.js). Never on
+  // a sign-in, which needs no session: an old cookie the server no longer
+  // accepts must not stop someone signing in again.
+  if (!SIGN_INS.has(seg) && !adoptSessionCookie(req, res, 'admin', json)) return;
+  if (seg === 'logout') return logout(req, res);
   // An owner signing in by email names no gym: it finds their gym itself, and
   // then runs that gym's own sign-in inside its scope (CLAUDE.md §43.1 Q2).
   if (seg === 'owner-login') {
@@ -33,8 +46,6 @@ export default async function handler(req, res) {
   }
   const fn = routes[seg];
   if (!fn) return json(res, 404, { error: `Not found: /api/auth/${seg || ''}` });
-  // Size and rate first, before any work is done (CLAUDE.md §46).
-  if (!guardRequest(req, res, PHOTO_ROUTES.has(seg) ? { maxBytes: MAX_PHOTO_BODY_BYTES } : undefined)) return;
   // Plan gating inside the gym's scope: staff face sign-in is PRIME.
   try {
     return await withGym(

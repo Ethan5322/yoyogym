@@ -2,7 +2,7 @@
 // then check in, view status, browse & book classes, and see history.
 import { useState, useEffect, useCallback } from 'react';
 import { Link } from 'react-router-dom';
-import { memberFetch, getMemberToken, setMemberToken, clearMemberToken } from '../lib/memberApi.js';
+import { memberFetch, memberSignOut } from '../lib/memberApi.js';
 import { logQrScan } from '../lib/scan.js';
 import { currentGymSlug } from '../lib/gym.js';
 import PersonalQr from '../components/PersonalQr.jsx';
@@ -57,7 +57,9 @@ export function visibleTabs(features, off = []) {
 }
 
 export default function MemberPortal() {
-  const [token, setTok] = useState(getMemberToken());
+  // Signed in? The session is an HttpOnly cookie (CLAUDE.md §46.1 Q1), so the
+  // server says: null while asking, then true or false.
+  const [signedIn, setSignedIn] = useState(null);
   const [member, setMember] = useState(null);
   const [tab, setTab] = useState('status');
   // What this gym's plan includes — null means "not gated", show everything.
@@ -70,27 +72,31 @@ export default function MemberPortal() {
   useEffect(() => logQrScan('existing_member'), []);
 
   useEffect(() => {
-    if (!token) return;
+    if (signedIn === false) return;
     memberFetch('/member/status')
       .then((d) => {
+        setSignedIn(true);
         setFeatures(d.features ?? null);
         setOff(Array.isArray(d.services_off) ? d.services_off : []);
       })
-      .catch(() => {});
-  }, [token]);
+      .catch((e) => {
+        if (e.status === 401 || e.status === 403) setSignedIn(false);
+        else setSignedIn((v) => (v === null ? false : v));
+      });
+  }, [signedIn]);
 
-  function onLoggedIn(t, m) {
-    setMemberToken(t);
-    setTok(t);
+  function onLoggedIn(_token, m) {
     setMember(m);
+    setSignedIn(true);
   }
   function logout() {
-    clearMemberToken();
-    setTok(null);
+    memberSignOut();
+    setSignedIn(false);
     setMember(null);
   }
 
-  if (!token) return <MemberLogin onLoggedIn={onLoggedIn} />;
+  if (signedIn === null) return <div className="min-h-[100dvh]" aria-busy="true" />;
+  if (!signedIn) return <MemberLogin onLoggedIn={onLoggedIn} />;
 
   return (
     <div className="mx-auto flex min-h-[100dvh] max-w-md flex-col bg-bg/80 backdrop-blur-sm">

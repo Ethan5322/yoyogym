@@ -1,27 +1,21 @@
-// Member-portal API client (separate token from admin). The browser only ever
-// talks to /api functions, never Supabase directly.
+// Member-portal API client. The browser only ever talks to /api functions,
+// never Supabase directly.
+//
+// THE SESSION IS AN HttpOnly COOKIE (CLAUDE.md §46.1 Q1), one per gym, set by
+// the server at sign-in — never kept where a script on the page could read
+// it. See src/lib/api.js.
 import { gymHeaders } from './gym.js';
-import { tokenKey } from './api.js';
+import { PAGE_HEADERS } from './api.js';
 
-// One session per gym — see tokenKey() in api.js.
-const MEMBER_TOKEN = 'gym_member_token';
-
-export const getMemberToken = () => localStorage.getItem(tokenKey(MEMBER_TOKEN));
-export const setMemberToken = (t) => t && localStorage.setItem(tokenKey(MEMBER_TOKEN), t);
-export const clearMemberToken = () => localStorage.removeItem(tokenKey(MEMBER_TOKEN));
-
-export async function memberFetch(path, { method = 'GET', body, auth = true } = {}) {
+export async function memberFetch(path, { method = 'GET', body } = {}) {
   // WHICH GYM — see gymHeaders(). Missing here, a member at /g/<slug>/member
   // signed in against the default schema: another gym's members.
-  const headers = { 'Content-Type': 'application/json', ...gymHeaders() };
-  if (auth) {
-    const t = getMemberToken();
-    if (t) headers.Authorization = `Bearer ${t}`;
-  }
+  const headers = { 'Content-Type': 'application/json', ...PAGE_HEADERS, ...gymHeaders() };
   const res = await fetch(`/api${path}`, {
     method,
     headers,
     body: body ? JSON.stringify(body) : undefined,
+    credentials: 'same-origin',
   });
   let data = null;
   try {
@@ -35,4 +29,9 @@ export async function memberFetch(path, { method = 'GET', body, auth = true } = 
     throw err;
   }
   return data;
+}
+
+/** Sign out of this gym's member area on this browser: only the server can. */
+export function memberSignOut() {
+  return memberFetch('/member/logout', { method: 'POST' }).catch(() => {});
 }

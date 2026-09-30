@@ -177,7 +177,9 @@ test('THE OWNER DOOR TRIES THE GYM FIRST, then hands the same form on — and sa
   const page = readFileSync(new URL('../src/pages/OwnerLogin.jsx', import.meta.url), 'utf8');
   // 1. the gym: a gym owner lands in their gym's admin panel, as before
   assert.match(page, /fetch\('\/api\/auth\/owner-login'/);
-  assert.match(page, /localStorage\.setItem\(tokenKey\(ADMIN_TOKEN, data\.gym\.slug\), data\.token\)/);
+  // The session is the gym's HttpOnly cookie, set by the server (CLAUDE.md §46.1 Q1)
+  assert.doesNotMatch(page, /localStorage\.setItem\(tokenKey/);
+  assert.match(page, /\.\.\.PAGE_HEADERS/);
   assert.match(page, /openGym\(data\.gym\.slug, app\)/);
   // 2. only when NO gym took it, the real form goes to the owner account
   assert.match(page, /method="post"\s+action="\/platform\/login"/);

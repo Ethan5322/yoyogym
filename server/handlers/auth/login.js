@@ -10,6 +10,7 @@ import { verifyPassword, signToken } from '../../lib/auth.js';
 import { allowMethods, readJsonBody, ok, badRequest, unauthorized, serverError } from '../../lib/http.js';
 import { rateLimit } from '../../lib/ratelimit.js';
 import { currentGym } from '../../lib/tenancy.js';
+import { issueSessionCookie } from '../../lib/session-cookie.js';
 
 // The gym this login happened in, stamped into the token so every later
 // request carries it in a signature the client cannot edit. null in
@@ -142,6 +143,8 @@ export default async function handler(req, res) {
     const result = await attemptLogin(getSupabase(), username, password, { remember });
     if (result.error) return serverError(res, result.message);
     if (!result.ok) return unauthorized(res, result.message);
+    // The website keeps it in an HttpOnly cookie (CLAUDE.md §46.1 Q1).
+    issueSessionCookie(req, res, 'admin', result.token);
     return ok(res, { token: result.token, user: result.user });
   } catch (err) {
     console.error('login error:', err.message);
