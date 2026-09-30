@@ -321,7 +321,8 @@ test('BACKGROUND REQUESTS ON EVERY-PLAN SCREENS DO NOT RAISE THE NOTICE', () => 
 test('only an OWNER is offered the upgrade button; staff are told who can', () => {
   const notice = readFileSync('src/components/UpgradeNotice.jsx', 'utf8');
   assert.match(notice, /isOwner = user\?\.role === 'owner'/);
-  assert.match(notice, /\{isOwner && \(/);
+  // …and never inside the store app, where no plan can be bought (CLAUDE.md §46.1 Q4).
+  assert.match(notice, /\{isOwner && !inStoreApp && \(/);
 });
 
 test('the member portal shows only the tabs the gym\'s plan includes', () => {

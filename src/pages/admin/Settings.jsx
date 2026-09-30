@@ -11,6 +11,7 @@ import { DEFAULT_ACCENT } from '../../../shared/brand.js';
 import { OWNER_SWITCHABLE, SERVICE_INFO } from '../../../shared/features.js';
 import { FACILITIES, MAX_CUSTOM_FACILITIES, MAX_CUSTOM_LENGTH } from '../../../shared/facilities.js';
 import { useAuth } from '../../lib/auth.jsx';
+import { isStoreApp } from '../../../shared/store-app.js';
 
 export default function Settings() {
   const { hasFeature } = useAuth();
@@ -218,7 +219,11 @@ function MemberServicesSection({ initial, onSave, saved }) {
               <span className="min-w-0 flex-1">
                 <span className="block font-semibold text-body">{SERVICE_INFO[f].label}</span>
                 <span id={`svc-${f}`} className="block text-sm text-muted">
-                  {inPlan ? SERVICE_INFO[f].forMembers : 'Not in your Yoyo Gyms plan — upgrade to offer it.'}
+                  {inPlan
+                    ? SERVICE_INFO[f].forMembers
+                    : isStoreApp(navigator.userAgent)
+                      ? 'Not in your Yoyo Gyms plan.'
+                      : 'Not in your Yoyo Gyms plan — upgrade to offer it.'}
                 </span>
               </span>
               <span className={`flex-none text-sm font-semibold ${on ? 'text-success' : 'text-muted'}`}>{on ? 'Offered' : 'Off'}</span>

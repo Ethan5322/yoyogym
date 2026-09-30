@@ -86,6 +86,9 @@ const STYLE = `
   input, textarea, select { font:inherit; min-height:44px; padding:10px 12px; border:1px solid var(--line);
                     border-radius:6px; background:var(--bg); color:inherit; width:100%; }
   input:focus, textarea:focus, select:focus { outline:2px solid var(--accent); outline-offset:1px; }
+  /* Inside the store app, no price of the Yoyo subscription is shown
+     (router.js marks the page; CLAUDE.md §46.1 Q4). */
+  [data-store-app] .store-hide { display:none !important; }
   /* Keyboard focus on every control, in the brand's lime — the browser's own
      ring was the only one links, buttons and disclosures had. */
   a:focus-visible, button:focus-visible, summary:focus-visible, label:focus-visible, .btn:focus-visible {
@@ -1118,7 +1121,7 @@ function planChoice(plan, { selected = false, previous = null, recommended = fal
   <input type="radio" name="plan" id="${h(id)}" value="${h(plan.key)}" aria-describedby="${h(id)}-d"${selected ? ' checked' : ''} required>
   <label for="${h(id)}" class="plan-head"><span class="plan-top"><span class="plan-name">${h(plan.label)}</span>${
     recommended ? ' <span class="plan-badge">Recommended</span>' : ''
-  }</span> <span class="plan-price">${planPrice(plan)}</span></label>
+  }</span> <span class="plan-price store-hide">${planPrice(plan)}</span></label>
   <div id="${h(id)}-d">
     <p class="plan-limit">${h(plan.memberLimit)}</p>
     <ul class="ticks">${previous ? `<li class="plan-lead">Everything in ${h(previous.label)}, plus:</li>` : ''}${adds
@@ -2438,6 +2441,7 @@ export function ownerDashboardPage({
   csrfToken = '',
   closureRequestedAt = null,
   ownerRef = '',
+  inApp = false,
   support = null,
   planSupport = null,
 } = {}) {
@@ -2611,7 +2615,9 @@ ${documents
       : ''
   }
   ${
-    subscription && ['trialing', 'past_due', 'suspended'].includes(subscription.status)
+    // Inside the store app: the status only — no Pay button, no card
+    // (CLAUDE.md §46.1 Q4). Owners pay on the website.
+    !inApp && subscription && ['trialing', 'past_due', 'suspended'].includes(subscription.status)
       ? `<form method="post" action="/platform/my-gym/pay">
       <input type="hidden" name="csrf" value="${h(csrfToken)}">
       <button type="submit"${payUrgent ? '' : ' class="ghost"'}>${subscription.status === 'suspended' ? 'Pay and reopen my gym' : 'Pay now'}</button>
@@ -2621,7 +2627,7 @@ ${documents
       : ''
   }
   ${
-    subscription?.card_last4
+    !inApp && subscription?.card_last4
       ? `<p class="muted">Saved card: ${h(subscription.card_brand || 'card')} ending ${h(subscription.card_last4)}.</p>`
       : ''
   }
@@ -4178,7 +4184,7 @@ export function welcomePage({ plans = [], includes = EVERY_PLAN_INCLUDES } = {})
       <div class="plan-top"><h3 id="pp-${h(p.key)}" class="plan-name">${h(p.label)}</h3>${
         p.key === 'medium' ? '<span class="plan-badge">Recommended</span>' : ''
       }</div>
-      <p class="plan-price">${planPrice(p)}</p>
+      <p class="plan-price store-hide">${planPrice(p)}</p>
       <p class="plan-limit">${h(p.memberLimit)}</p>
       ${p.summary ? `<p class="muted">${h(p.summary)}</p>` : ''}
       ${planDetails(p, i > 0 ? plans[i - 1] : null)}

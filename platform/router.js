@@ -106,10 +106,14 @@ import {
   readFormBody,
   readRawBody,
 } from './http.js';
+import { isStoreApp } from '../shared/store-app.js';
 
 const html = (res, status, body) => {
   res.writeHead(status, { 'Content-Type': 'text/html; charset=utf-8' });
-  res.end(body);
+  // Inside the store app, the page is marked so prices of the Yoyo
+  // subscription are not shown (CLAUDE.md §46.1 Q4; views.js .store-hide).
+  const inApp = isStoreApp(res.req?.headers?.['user-agent']);
+  res.end(inApp && typeof body === 'string' ? body.replace('<body', '<body data-store-app') : body);
 };
 
 const redirect = (res, location, headers = {}) => {
@@ -883,6 +887,7 @@ async function handleExtraRoutes(req, res, deps, { url, path, method }) {
     const support = view.gym ? await deps.ownerSupport?.(view.gym).catch(() => null) : null;
     html(res, 200, ownerDashboardPage({
       ...view,
+      inApp: isStoreApp(req.headers['user-agent']),
       support,
       planSupport: view.gym ? SUPPORT_BY_PLAN[view.gym.plan_key] || SUPPORT_BY_PLAN.basic : null,
       user: await viewer(deps, session),
@@ -990,6 +995,8 @@ async function handleExtraRoutes(req, res, deps, { url, path, method }) {
   // app has no purchase route at all, which is also what the stores'
   // anti-steering rules require.
   if (path === 'my-gym/pay' && method === 'POST') {
+    // Never from inside the store app: owners pay on the website (§46.1 Q4).
+    if (isStoreApp(req.headers['user-agent'])) return redirect(res, '/platform/my-gym'), true;
     const form = await readFormBody(req);
 
     const session = requireSession(req, res, { csrfToken: form.csrf });

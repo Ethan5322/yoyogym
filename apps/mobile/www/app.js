@@ -564,6 +564,22 @@
     window.location.href = url;
   }
 
+  /**
+   * Open a Yoyo Gyms page in the phone's own browser (Capacitor's Browser
+   * plugin: Chrome Custom Tabs, Safari View Controller). Where the plugin is
+   * missing — an older build — the page opens here, as before.
+   */
+  function goOutside(path) {
+    var url = shell.defaultServer.replace(/\/+$/, '') + path;
+    var browser = window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.Browser;
+    if (!browser || !allowed(url)) return go(path);
+    if (navigator.onLine === false) {
+      say('You are offline. Connect to the internet and try again.', 'err');
+      return;
+    }
+    browser.open({ url: url }).catch(function () { go(path); });
+  }
+
   /** A gym name is text somebody typed. Escaped before it goes in the page. */
   function esc(value) {
     return String(value == null ? '' : value).replace(/[&<>"']/g, function (c) {
@@ -625,7 +641,10 @@
 
     if (where === 'privacy') return go('/platform/privacy');
     if (where === 'delete-account') return go('/platform/delete-account');
-    if (where === 'owner-register') return go('/platform/apply');
+    // Applying opens the phone's BROWSER, not the app (CLAUDE.md §46.1 Q4):
+    // it leads to a paid subscription, which the stores do not allow an app
+    // to sell outside their own billing.
+    if (where === 'owner-register') return goOutside('/platform/apply');
     // The owner's Yoyo account: where an applicant sees their application.
     if (where === 'owner-status') return go('/platform/login?as=owner');
     // Resets the owner's platform password AND their gym sign-in together.

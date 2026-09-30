@@ -72,6 +72,11 @@ const config: CapacitorConfig = {
   appId: 'com.mulesoo.yoyogyms',
   appName: 'Yoyo Gyms',
   webDir: 'www',
+  // Every request from the app's web view says it comes from the store app
+  // (shared/store-app.js), so the website can leave out what the stores
+  // forbid inside an app — the Yoyo subscription's prices and Pay buttons
+  // (CLAUDE.md §46.1 Q4).
+  appendUserAgent: 'YoyoGymsApp',
   android: {
     // The shell holds no data of its own — everything lives on the server and
     // in the session. Letting a device backup copy the WebView's storage would

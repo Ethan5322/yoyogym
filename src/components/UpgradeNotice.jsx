@@ -7,6 +7,7 @@
 // cannot buy a plan and should not be shown a button that pretends they can.
 import { useEffect, useState } from 'react';
 import { useAuth } from '../lib/auth.jsx';
+import { isStoreApp } from '../../shared/store-app.js';
 
 /** Plain names, for the sentence a person reads. */
 export const FEATURE_NAMES = {
@@ -38,6 +39,9 @@ export default function UpgradeNotice() {
 
   const name = FEATURE_NAMES[feature] || 'This feature';
   const isOwner = user?.role === 'owner';
+  // Inside the store app there is no way to buy a plan, and no pointing to
+  // one (CLAUDE.md §46.1 Q4): the notice says what is true, and closes.
+  const inStoreApp = typeof navigator !== 'undefined' && isStoreApp(navigator.userAgent);
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-4" role="dialog" aria-modal="true" aria-labelledby="upgrade-title">
@@ -45,12 +49,14 @@ export default function UpgradeNotice() {
         <div className="text-3xl" aria-hidden="true">🔒</div>
         <h2 id="upgrade-title" className="mt-2 text-lg font-bold text-body">{name} is not in your plan</h2>
         <p className="mt-2 text-sm text-muted">
-          {isOwner
-            ? 'Upgrade your plan to switch it on. Nothing you already have changes, and no data is lost.'
-            : 'Your gym owner can switch it on by upgrading the gym\'s plan.'}
+          {inStoreApp
+            ? 'It is not part of your gym\'s current Yoyo Gyms plan.'
+            : isOwner
+              ? 'Upgrade your plan to switch it on. Nothing you already have changes, and no data is lost.'
+              : 'Your gym owner can switch it on by upgrading the gym\'s plan.'}
         </p>
 
-        {isOwner && (
+        {isOwner && !inStoreApp && (
           <a href="/platform/my-gym" className="mt-5 block w-full rounded-xl bg-accent px-4 py-3 font-semibold text-accent-ink">
             See plans
           </a>
