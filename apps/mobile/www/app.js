@@ -145,11 +145,33 @@
     }
   }
 
-  /** "I already know my gym" — shown only when there is one (§36.1 Q5). */
+  /**
+   * "Continue to [Gym]" — the gym saved on this phone, FIRST on "Welcome,
+   * Member" and in its own mark (§36.1 Q5; design critique 2026-09-29: it was
+   * listed last, under a generic title). Hidden when nothing is saved.
+   */
   function renderMine() {
     var mine = myGym();
     document.getElementById('mine').classList.toggle('hidden', !mine);
-    if (mine) document.getElementById('mine-name').textContent = mine.name;
+    if (!mine) return;
+    document.getElementById('mine-name').textContent = mine.name;
+
+    var option = document.getElementById('mine-open');
+    var mark = document.getElementById('mine-mark');
+    function dress(branding) {
+      var look = lookOf(branding);
+      paintMark(mark, look, mine.name);
+      // The option's edge in the gym's colour (index.html .y-option--saved).
+      if (look.accent) option.style.setProperty('--g-accent', look.accent);
+      else option.style.removeProperty('--g-accent');
+    }
+    // What this phone already knows first — offline too — then the gym's
+    // current look, unless another gym has been saved in the meantime.
+    dress(cachedBrand(mine.slug));
+    fetchBrand(mine.slug).then(function (branding) {
+      var now = myGym();
+      if (now && now.slug === mine.slug) dress(branding);
+    }, function () { /* the kept look, or the plain letter, stays */ });
   }
 
   function renderAdminMine() {
@@ -243,6 +265,230 @@
   }
 
   // -------------------------------------------------------------------------
+  // A gym's own look — from the moment it is chosen (critique 2026-09-29)
+  // -------------------------------------------------------------------------
+  //
+  // "Gym identity arrives too late": search results and "Welcome to [Gym]"
+  // wore a Yoyo lime badge, and the gym's own logo and colour appeared only
+  // after sign-in. Now a gym looks like itself wherever it appears — its logo,
+  // or its first letter in its colour (CLAUDE.md §37.1 Q7) — and its welcome
+  // and join screens wear its cover, poster and colour too (§38.1 Q4, §39.1).
+  // The Yoyo look stays on the screens before a gym is chosen.
+  //
+  // WHERE IT COMES FROM: the gym's public branding, from the same public call
+  // the member area makes (member.js loadBrand: GET /api/content, addressed to
+  // the gym by X-Gym-Slug). The registry's search answer carries no branding,
+  // and needs none: this asks each gym, lazily, for the first few results.
+  //
+  // KEPT WHERE THE MEMBER AREA KEEPS IT: localStorage 'yoyo.member.brand:' +
+  // slug, the gym's `branding` object as JSON — member.js key('brand') /
+  // save('brand'). So a member who signs in next already has their gym's look,
+  // offline too, and the two never disagree about what a gym looks like.
+
+  var BRAND_KEY = 'yoyo.member.brand:';
+  var BRAND_LOOKUPS = 8; // results asked for their look — enough for a screenful
+
+  // What of a gym's branding may be drawn: member.js applyBrand()'s rules,
+  // exactly. A colour is six hex digits; a logo is the gym's https picture or
+  // an inline PNG / JPEG / WebP; a cover is plain https; a poster goes into a
+  // CSS url(), so it may not hold quotes, brackets or spaces either.
+  var HEX = /^#[0-9a-fA-F]{6}$/;
+  var LOGO = /^(data:image\/(png|jpeg|webp);base64,|https:\/\/)/;
+  var COVER = /^https:\/\/[^\s"'<>]+$/;
+  var POSTER = /^https:\/\/[^\s"'<>()\\]+$/;
+  var GROUND = '#070C10'; // --y-ground
+
+  function cachedBrand(slug) {
+    try {
+      return JSON.parse(localStorage.getItem(BRAND_KEY + slug) || 'null');
+    } catch (e) {
+      return null;
+    }
+  }
+
+  function keepBrand(slug, branding) {
+    try {
+      if (branding === null) localStorage.removeItem(BRAND_KEY + slug);
+      else localStorage.setItem(BRAND_KEY + slug, JSON.stringify(branding));
+    } catch (e) {
+      /* not kept: the gym is asked again next time */
+    }
+  }
+
+  /**
+   * A gym's branding, reduced to what may be drawn. `known` is false when
+   * there is nothing yet — the plain letter, promising no colour.
+   */
+  function lookOf(branding) {
+    var b = branding && typeof branding === 'object' ? branding : null;
+    var look = { known: Boolean(b), accent: '', ink: '', text: '', logo: '', cover: '', poster: '' };
+    if (!b) return look;
+    if (HEX.test(b.accent_color || '')) {
+      // Words ON the colour: the pair that reaches 4.5:1 (member.js).
+      var pair = window.YOYO_BRAND.accentPair(b.accent_color);
+      look.accent = pair.accent;
+      look.ink = pair.ink;
+      // The colour AS words on the dark ground: the gym's own, where it reads.
+      look.text = window.YOYO_BRAND.contrast(b.accent_color, GROUND) >= 4.5 ? b.accent_color : '#FFFFFF';
+    }
+    if (typeof b.logo_url === 'string' && LOGO.test(b.logo_url)) look.logo = b.logo_url;
+    if (typeof b.cover_url === 'string' && COVER.test(b.cover_url)) look.cover = b.cover_url;
+    if (typeof b.poster_url === 'string' && POSTER.test(b.poster_url)) look.poster = b.poster_url;
+    return look;
+  }
+
+  // Asked once per gym while the app is open: typing "bo", "bos", "bos g"
+  // shows the same gyms again, and must not ask them again. A failure is
+  // forgotten, so the next showing may try once more.
+  var brandAsked = {};
+
+  function fetchBrand(slug) {
+    if (brandAsked[slug]) return brandAsked[slug];
+    var url = shell.defaultServer.replace(/\/+$/, '') + '/api/content';
+    if (!allowed(url)) return Promise.reject(new Error('not an allowed address'));
+
+    var asked = fetch(url, {
+      method: 'GET',
+      // Addressed to ONE gym exactly as member.js api() addresses it.
+      headers: { 'Content-Type': 'application/json', 'X-Gym-Slug': slug },
+    })
+      .then(function (r) {
+        if (!r.ok) throw new Error('content ' + r.status);
+        return r.json();
+      })
+      .then(function (d) {
+        var branding = (d && d.branding) || null;
+        keepBrand(slug, branding);
+        return branding;
+      });
+    brandAsked[slug] = asked;
+    asked.catch(function () {
+      if (brandAsked[slug] === asked) delete brandAsked[slug];
+    });
+    return asked;
+  }
+
+  /**
+   * Draw a gym's mark into `el` (index.html .g-mark): its logo, or its first
+   * letter on its colour. A logo that will not load leaves the letter.
+   */
+  function paintMark(el, look, name) {
+    if (!el) return;
+    el.textContent = '';
+    el.classList.toggle('is-known', look.known);
+    el.classList.toggle('has-logo', Boolean(look.logo));
+    if (look.accent) {
+      el.style.setProperty('--g-accent', look.accent);
+      el.style.setProperty('--g-accent-ink', look.ink);
+    } else {
+      el.style.removeProperty('--g-accent');
+      el.style.removeProperty('--g-accent-ink');
+    }
+
+    if (look.logo) {
+      var img = document.createElement('img');
+      img.alt = '';
+      img.addEventListener('error', function () {
+        if (img.parentNode !== el) return; // already replaced
+        paintMark(el, {
+          known: look.known, accent: look.accent, ink: look.ink, text: look.text,
+          logo: '', cover: look.cover, poster: look.poster,
+        }, name);
+      });
+      img.src = look.logo;
+      el.appendChild(img);
+      return;
+    }
+    // Text somebody typed goes in as text, never as markup.
+    el.textContent = String(name || '').trim().charAt(0).toUpperCase() || '·';
+  }
+
+  // Which list of results is the latest, per list. The same idea as the
+  // search's searchSeq: an answer for a list that has since been redrawn is
+  // not painted — the newer list asks (and is answered) for itself.
+  var paintSeq = {};
+
+  /** Give each result its gym's mark: at once from this phone, then from the gym. */
+  function paintResults(list) {
+    var mine = (paintSeq[list.id] || 0) + 1;
+    paintSeq[list.id] = mine;
+    var buttons = Array.prototype.slice.call(list.querySelectorAll('.gym'), 0, BRAND_LOOKUPS);
+    buttons.forEach(function (button) {
+      var slug = button.dataset.slug;
+      if (!SAFE_SLUG.test(slug || '')) return;
+      var mark = button.querySelector('.g-mark');
+      var name = button.dataset.name || slug;
+      paintMark(mark, lookOf(cachedBrand(slug)), name);
+      // Never blocks the list: the letter is already there.
+      fetchBrand(slug).then(function (branding) {
+        if (paintSeq[list.id] !== mine) return;
+        paintMark(mark, lookOf(branding), name);
+      }, function () { /* the letter stays */ });
+    });
+  }
+
+  /** The cover as the hero at the top of a gym screen — or none at all. */
+  function showCover(view, url) {
+    var box = view.querySelector('.g-cover');
+    var img = box.querySelector('img');
+    if (!url) {
+      box.textContent = '';
+      view.classList.remove('has-cover');
+      return;
+    }
+    view.classList.add('has-cover');
+    if (img && img.getAttribute('src') === url) return;
+    box.textContent = '';
+    img = document.createElement('img');
+    img.alt = '';
+    img.addEventListener('error', function () {
+      // A cover that will not load is no cover: the screen stays whole.
+      if (img.parentNode !== box) return;
+      box.textContent = '';
+      view.classList.remove('has-cover');
+    });
+    img.src = url;
+    box.appendChild(img);
+  }
+
+  /**
+   * Put a gym's look on "Welcome to [Gym]" and "Join [Gym]" — and only there,
+   * as custom properties on those two sections, so no colour, poster or cover
+   * can leak into a Yoyo screen. An empty look is the Yoyo default.
+   */
+  function applyLook(look) {
+    ['gym', 'join'].forEach(function (id) {
+      var view = views[id];
+      [['--g-accent', look.accent], ['--g-accent-ink', look.ink], ['--g-accent-text', look.text]].forEach(function (v) {
+        if (v[1]) view.style.setProperty(v[0], v[1]);
+        else view.style.removeProperty(v[0]);
+      });
+      // The poster behind the screen (§39.1 Q3) — only the checked URL, so it
+      // cannot close the url() it sits in.
+      if (look.poster) view.style.setProperty('--g-poster', 'url("' + look.poster + '")');
+      else view.style.removeProperty('--g-poster');
+      view.classList.toggle('has-poster', Boolean(look.poster));
+      showCover(view, look.cover);
+      paintMark(view.querySelector('[data-gym-mark]'), look, chosen ? chosen.name : '');
+    });
+  }
+
+  // Which gym's look is wanted on the gym screens now. Choosing another gym
+  // makes any answer still on its way for the previous one stale.
+  var dressSeq = 0;
+
+  /** The chosen gym's look: this phone's copy at once, then the gym's own. */
+  function dressGym(slug) {
+    var mine = ++dressSeq;
+    // Starts from the Yoyo default: nothing of the previous gym survives.
+    applyLook(lookOf(cachedBrand(slug)));
+    fetchBrand(slug).then(function (branding) {
+      if (mine !== dressSeq || !chosen || chosen.slug !== slug) return;
+      applyLook(lookOf(branding));
+    }, function () { /* the kept look, or the Yoyo default, stays */ });
+  }
+
+  // -------------------------------------------------------------------------
   // A gym has been chosen
   // -------------------------------------------------------------------------
 
@@ -264,9 +510,8 @@
     document.querySelectorAll('[data-gym-name]').forEach(function (el) {
       if (!el.closest('#member')) el.textContent = chosen.name;
     });
-    document.querySelectorAll('[data-gym-initial]').forEach(function (el) {
-      el.textContent = chosen.name.trim().charAt(0).toUpperCase();
-    });
+    // From here the screens are the GYM's, not Yoyo's (critique 2026-09-29).
+    dressGym(slug);
     show('gym');
   }
 
@@ -326,13 +571,17 @@
     });
   }
 
+  /**
+   * One gym in a list. Its mark starts as a plain letter; paintResults() then
+   * gives it the gym's own logo or colour — never a Yoyo badge.
+   */
   function gymButton(g) {
     var where = [g.city, g.country].filter(Boolean).map(esc).join(', ');
     var far = g.distance_km == null ? '' : ' · ' + esc(g.distance_km) + ' km away';
     var initial = esc(String(g.name || g.slug || '?').trim().charAt(0).toUpperCase());
     return (
       '<button class="gym" type="button" data-slug="' + esc(g.slug) + '" data-name="' + esc(g.name) + '">' +
-      '<span class="gym__initial" aria-hidden="true">' + initial + '</span>' +
+      '<span class="gym__initial g-mark" aria-hidden="true">' + initial + '</span>' +
       '<span><b>' + esc(g.name) + '</b><span>' + where + far + '</span></span></button>'
     );
   }
@@ -344,9 +593,10 @@
   function openPick(mode) {
     pickMode = mode;
     var owner = mode === 'owner';
-    pickTitle.textContent = owner ? 'Gym owner login' : 'Find my gym';
+    // This search is the STAFF door now: owners sign in by email alone (§43.1 Q2).
+    pickTitle.textContent = owner ? 'Gym staff sign in' : 'Find my gym';
     pickSub.textContent = owner
-      ? 'Choose your gym, then sign in with your admin email or username and password. Your staff use the same sign-in.'
+      ? 'Choose your gym, then sign in with the email or username and password your gym set up for you.'
       : 'Search by name, or use your location to see the closest gyms first.';
     // The recovery route is for members; the password help is for owners.
     forgotBtn.classList.toggle('hidden', owner);
@@ -402,6 +652,7 @@
       return;
     }
     out.innerHTML = gyms.map(gymButton).join('');
+    paintResults(out);
   }
 
   // Which search is the latest. Answers can come back out of order — "bo"
@@ -636,6 +887,7 @@
           ? 'Those details match more than one gym. Which one did you mean?'
           : 'Found it. Tap to sign in.');
         findOut.innerHTML = gyms.map(gymButton).join('');
+        paintResults(findOut);
       })
       .catch(function () {
         say('Could not reach Yoyo Gyms. Check your connection and try again.', 'err');
