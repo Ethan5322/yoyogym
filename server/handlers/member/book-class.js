@@ -3,7 +3,7 @@
 // when the class is full (spec 3.3). Idempotent via the unique
 // (class_id, member_id, session_date) constraint.
 import { getSupabase } from '../../lib/supabase.js';
-import { allowMethods, readJsonBody, ok, badRequest, serverError } from '../../lib/http.js';
+import { allowMethods, readJsonBody, ok, badRequest, serverError, failed } from '../../lib/http.js';
 import { authenticateMember } from '../../lib/memberauth.js';
 import { loadCompliance, rulesFor } from '../../lib/compliance.js';
 import { notifyMemberEmail } from '../../lib/notify/index.js';
@@ -123,7 +123,7 @@ export default async function handler(req, res) {
       },
       { onConflict: 'class_id,member_id,session_date' }
     );
-    if (error) return serverError(res, error.message);
+    if (error) return failed(res, error);
 
     // Notify management (admin inbox).
     await notifyAdmin(supabase, {

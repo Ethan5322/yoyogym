@@ -8,7 +8,7 @@
 // adaptive learning: an authorisation gate must not quietly rewrite its own
 // templates. Admins re-enrol from Settings if their appearance changes a lot.
 import { getSupabase } from '../../lib/supabase.js';
-import { allowMethods, readJsonBody, ok, badRequest, unauthorized, serverError } from '../../lib/http.js';
+import { allowMethods, readJsonBody, ok, badRequest, unauthorized, serverError, failed } from '../../lib/http.js';
 import { signToken } from '../../lib/auth.js';
 import { rateLimit } from '../../lib/ratelimit.js';
 import { faceServiceConfigured, embedFace } from '../../lib/faceservice.js';
@@ -49,7 +49,7 @@ export default async function handler(req, res) {
       legacyColumns: `${BASE}, ${legacyColumn}`,
       apply: (q) => q.not(legacyColumn, 'is', null).eq('is_active', true),
     });
-    if (error) return serverError(res, error.message);
+    if (error) return failed(res, error);
 
     const people = (rows || []).map((row) => ({
       row,

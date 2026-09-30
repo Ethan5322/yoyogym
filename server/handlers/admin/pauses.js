@@ -6,7 +6,7 @@
 //                                      limits do not bind staff, 1 to 365 days
 //   POST { action: 'end', pause_id }   end a pause today; unused days come off
 import { getSupabase } from '../../lib/supabase.js';
-import { allowMethods, readJsonBody, ok, badRequest, serverError } from '../../lib/http.js';
+import { allowMethods, readJsonBody, ok, badRequest, serverError, failed } from '../../lib/http.js';
 import { requireRole } from '../../lib/auth.js';
 import { recordAudit } from '../../lib/audit.js';
 import { ymd, pausePeriod, openPause } from '../../lib/pauses.js';
@@ -28,7 +28,7 @@ export default async function handler(req, res) {
       let q = supabase.from('membership_pauses').select('*').order('starts_on', { ascending: false });
       q = memberId ? q.eq('member_id', memberId) : q.is('resumed_at', null).gte('ends_on', today).lte('starts_on', today);
       const { data, error } = await q.limit(200);
-      if (error) return serverError(res, error.message);
+      if (error) return failed(res, error);
       return ok(res, { pauses: data || [], today });
     }
 
@@ -63,7 +63,7 @@ export default async function handler(req, res) {
       reason: String(body.reason || '').trim().slice(0, 300) || null,
       created_by: 'staff',
     });
-    if (error) return serverError(res, error.message);
+    if (error) return failed(res, error);
     await supabase.from('members').update({ status: 'frozen' }).eq('id', member.id);
     await recordAudit(supabase, admin, { action: 'member.paused', entity: 'member', entity_id: member.id, detail: { days } });
     return ok(res, { paused: true, ...period });

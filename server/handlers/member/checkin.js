@@ -2,7 +2,7 @@
 // (spec 2.4 A). Blocks if the membership is not active and prevents a duplicate
 // open check-in (already inside the gym).
 import { getSupabase } from '../../lib/supabase.js';
-import { allowMethods, ok, badRequest, serverError } from '../../lib/http.js';
+import { allowMethods, ok, badRequest, serverError, failed } from '../../lib/http.js';
 import { authenticateMember } from '../../lib/memberauth.js';
 import { consumeSession } from '../../lib/session-packs.js';
 import { notifyMemberEmail } from '../../lib/notify/index.js';
@@ -40,7 +40,7 @@ export default async function handler(req, res) {
     const { error } = await supabase
       .from('checkins')
       .insert({ member_id: auth.sub, method: 'self' });
-    if (error) return serverError(res, error.message);
+    if (error) return failed(res, error);
 
     // Session-pack consumption + low-balance reminder (spec 3.1 / 2.6 #7).
     const pack = await consumeSession(supabase, auth.sub);

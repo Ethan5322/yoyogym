@@ -4,7 +4,7 @@
 // On check-in the compliance engine flags extra visits / violations, stores the
 // flag on the check-in, and notifies the owner for approval. Owner/Manager/Reception.
 import { getSupabase } from '../../lib/supabase.js';
-import { allowMethods, readJsonBody, ok, badRequest, serverError } from '../../lib/http.js';
+import { allowMethods, readJsonBody, ok, badRequest, serverError, failed } from '../../lib/http.js';
 import { requireRole } from '../../lib/auth.js';
 import { loadCompliance, evaluateAccess } from '../../lib/compliance.js';
 import { notifyOwner, notifyMemberEmail } from '../../lib/notify/index.js';
@@ -55,7 +55,7 @@ export default async function handler(req, res) {
         // columns (station_id/compliance/approved) may not be migrated yet
         ({ error } = await supabase.from('checkins').insert(base));
       }
-      if (error) return serverError(res, error.message);
+      if (error) return failed(res, error);
 
       // notify owner for extra / violation
       if (compliance !== 'ok') {
@@ -97,7 +97,7 @@ export default async function handler(req, res) {
       if (!open) return ok(res, { message: 'No open session to check out.' });
       const mins = Math.floor((Date.now() - new Date(open.checked_in_at)) / 60000);
       const { error } = await supabase.from('checkins').update({ checked_out_at: new Date().toISOString() }).eq('id', open.id);
-      if (error) return serverError(res, error.message);
+      if (error) return failed(res, error);
       return ok(res, { message: `Checked out — ${Math.floor(mins / 60)}h ${mins % 60}m logged.` });
     }
 
@@ -112,7 +112,7 @@ export default async function handler(req, res) {
         .maybeSingle();
       if (!last) return badRequest(res, 'No check-in to review.');
       const { error } = await supabase.from('checkins').update({ approved }).eq('id', last.id);
-      if (error) return serverError(res, error.message);
+      if (error) return failed(res, error);
       return ok(res, { message: approved ? 'Extra visit approved.' : 'Extra visit denied.' });
     }
 
@@ -121,7 +121,7 @@ export default async function handler(req, res) {
       const stamp = new Date().toLocaleString('en-ZA');
       const appended = `${m?.staff_notes ? m.staff_notes + '\n' : ''}[FLAG ${stamp}] ${note || 'Issue flagged at scan.'}`;
       const { error } = await supabase.from('members').update({ staff_notes: appended, updated_at: new Date().toISOString() }).eq('id', id);
-      if (error) return serverError(res, error.message);
+      if (error) return failed(res, error);
       return ok(res, { message: 'Issue flagged on the member record.' });
     }
 

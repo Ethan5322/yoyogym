@@ -4,7 +4,7 @@
 // (Member WhatsApp blasts aren't supported by CallMeBot — owner alerts only —
 // so member broadcasts are email.)
 import { getSupabase } from '../../lib/supabase.js';
-import { allowMethods, readJsonBody, ok, badRequest, serverError } from '../../lib/http.js';
+import { allowMethods, readJsonBody, ok, badRequest, serverError, failed } from '../../lib/http.js';
 import { requireRole } from '../../lib/auth.js';
 import { sendEmail, emailConfigured } from '../../lib/notify/channels.js';
 
@@ -32,7 +32,7 @@ export default async function handler(req, res) {
       q = q.in('id', ids);
     }
     const { data: members, error } = await q;
-    if (error) return serverError(res, error.message);
+    if (error) return failed(res, error);
 
     const html = `<div style="font-family:Arial,sans-serif">${message.replace(/\n/g, '<br>')}</div>`;
     let sent = 0;

@@ -29,6 +29,7 @@
 // is a registration that looks broken after it succeeded.
 import { createClient } from '@supabase/supabase-js';
 import { directoryRow, lookupHash } from '../../shared/member-directory.js';
+import { timedFetch } from '../../shared/timed-fetch.js';
 
 let _client = null;
 
@@ -40,7 +41,7 @@ function platformClient() {
   if (!url || !key) return null;
 
   _client = createClient(url, key, {
-    auth: { persistSession: false, autoRefreshToken: false },
+    auth: { persistSession: false, autoRefreshToken: false }, global: { fetch: timedFetch },
     db: { schema: 'platform' },
   });
   return _client;

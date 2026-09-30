@@ -3,7 +3,7 @@
 // contract-duration discounts from settings. Prices ALWAYS come from the
 // database (spec STEP 8/9 — never hardcoded in the frontend).
 import { getSupabase } from '../../lib/supabase.js';
-import { allowMethods, ok, serverError } from '../../lib/http.js';
+import { allowMethods, ok, serverError, failed } from '../../lib/http.js';
 import { DEFAULT_CONTRACT_DISCOUNTS, planPriceMissing } from '../../../shared/pricing.js';
 
 export default async function handler(req, res) {
@@ -26,8 +26,8 @@ export default async function handler(req, res) {
         supabase.from('settings').select('value').eq('key', 'contract_discounts').maybeSingle(),
       ]);
 
-    if (planErr) return serverError(res, planErr.message);
-    if (addonErr) return serverError(res, addonErr.message);
+    if (planErr) return failed(res, planErr);
+    if (addonErr) return failed(res, addonErr);
 
     const contract_discounts =
       setting && setting.value && Object.keys(setting.value).length

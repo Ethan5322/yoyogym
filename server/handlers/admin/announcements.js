@@ -4,7 +4,7 @@
 //   PATCH  /api/admin/announcements?id=...    { is_published }
 //   DELETE /api/admin/announcements?id=...
 import { getSupabase } from '../../lib/supabase.js';
-import { allowMethods, readJsonBody, ok, badRequest, serverError } from '../../lib/http.js';
+import { allowMethods, readJsonBody, ok, badRequest, serverError, failed } from '../../lib/http.js';
 import { requireRole } from '../../lib/auth.js';
 import { recordAudit } from '../../lib/audit.js';
 
@@ -31,7 +31,7 @@ export default async function handler(req, res) {
         })
         .select('id')
         .single();
-      if (error) return serverError(res, error.message);
+      if (error) return failed(res, error);
       await recordAudit(supabase, admin, { action: 'announcement.create', entity: 'announcement', entity_id: data.id, detail: title.trim() });
       return ok(res, { id: data.id });
     }
@@ -40,14 +40,14 @@ export default async function handler(req, res) {
       if (!id) return badRequest(res, 'id is required.');
       const b = await readJsonBody(req);
       const { error } = await supabase.from('announcements').update({ is_published: b.is_published !== false }).eq('id', id);
-      if (error) return serverError(res, error.message);
+      if (error) return failed(res, error);
       return ok(res, { updated: true });
     }
 
     if (req.method === 'DELETE') {
       if (!id) return badRequest(res, 'id is required.');
       const { error } = await supabase.from('announcements').delete().eq('id', id);
-      if (error) return serverError(res, error.message);
+      if (error) return failed(res, error);
       await recordAudit(supabase, admin, { action: 'announcement.delete', entity: 'announcement', entity_id: id });
       return ok(res, { deleted: true });
     }
@@ -57,7 +57,7 @@ export default async function handler(req, res) {
       .select('*')
       .order('created_at', { ascending: false })
       .limit(100);
-    if (error) return serverError(res, error.message);
+    if (error) return failed(res, error);
     return ok(res, { announcements: data || [] });
   } catch (err) {
     console.error('announcements error:', err.message);

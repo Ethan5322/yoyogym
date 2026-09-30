@@ -11,6 +11,7 @@
 // way any other consumer would.
 import { createClient } from '@supabase/supabase-js';
 import { effectiveFeatures } from '../../shared/features.js';
+import { timedFetch } from '../../shared/timed-fetch.js';
 
 /**
  * A short-lived cache of resolved gyms.
@@ -46,7 +47,7 @@ function platformClient() {
   }
 
   _platform = createClient(url, key, {
-    auth: { persistSession: false, autoRefreshToken: false },
+    auth: { persistSession: false, autoRefreshToken: false }, global: { fetch: timedFetch },
     db: { schema: 'platform' },
   });
   return _platform;

@@ -23,8 +23,44 @@ export function forbidden(res, message = 'Forbidden') {
   json(res, 403, { error: message });
 }
 
-export function serverError(res, message = 'Internal server error') {
+export function serverError(res, message = 'Something went wrong on our side. Please try again.') {
   json(res, 500, { error: message });
+}
+
+/**
+ * A failure on OUR side — the database, a service. The person is told so in
+ * plain words; the cause goes to the server log only. 125 handlers used to
+ * send the database's own message to the browser: table and column names,
+ * and sometimes the value that clashed (CLAUDE.md §46). A database repeats
+ * values back ("Key (phone)=(0821234567) already exists") — personal data —
+ * so those are masked in the log line too.
+ */
+export function failed(res, error, message) {
+  const text = String(error?.message ?? error ?? '')
+    .replace(/=\([^)]*\)/g, '=(…)')
+    .slice(0, 300);
+  console.error('[failed]', error?.code ? `${error.code}:` : '', text);
+  serverError(res, message);
+}
+
+/**
+ * Text typed into a search box, made safe to put INSIDE a PostgREST filter
+ * string (`.or('full_name.ilike.%…%,…')`). A comma, a bracket, a wildcard or a
+ * quote there is filter SYNTAX — it could add a condition — so only letters,
+ * digits, spaces and the few marks names, emails and numbers use are kept
+ * (CLAUDE.md §46; the platform's searches already did this: platform/deps.js).
+ */
+export function filterText(raw) {
+  return String(raw ?? '')
+    .replace(/[^\p{L}\p{N}\s@.'+-]/gu, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .slice(0, 80);
+}
+
+/** A membership number, trainer number or verification code: letters, digits and dashes only. */
+export function codeText(raw) {
+  return String(raw ?? '').trim().toUpperCase().replace(/[^A-Z0-9-]/g, '').slice(0, 40);
 }
 
 /**

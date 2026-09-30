@@ -3,7 +3,7 @@
 // includes one-off classes in range, enforces tier eligibility, and reports
 // booked/available counts plus whether this member is already booked.
 import { getSupabase } from '../../lib/supabase.js';
-import { allowMethods, ok, serverError } from '../../lib/http.js';
+import { allowMethods, ok, serverError, failed } from '../../lib/http.js';
 import { authenticateMember } from '../../lib/memberauth.js';
 
 const DAYS = 7;
@@ -33,7 +33,7 @@ export default async function handler(req, res) {
       .from('classes')
       .select('*, trainers(full_name)')
       .eq('is_active', true);
-    if (error) return serverError(res, error.message);
+    if (error) return failed(res, error);
 
     // Build the date window.
     const today = new Date();

@@ -3,7 +3,7 @@
 //   POST /api/admin/visitor            -> issue a day pass { name, phone, host_name }
 //   PATCH /api/admin/visitor?id=...    -> mark checked in
 import { getSupabase } from '../../lib/supabase.js';
-import { allowMethods, readJsonBody, ok, badRequest, serverError } from '../../lib/http.js';
+import { allowMethods, readJsonBody, ok, badRequest, serverError, failed } from '../../lib/http.js';
 import { requireRole } from '../../lib/auth.js';
 import { randomInt } from 'node:crypto';
 
@@ -25,7 +25,7 @@ export default async function handler(req, res) {
         .select('*')
         .eq('valid_date', today)
         .order('created_at', { ascending: false });
-      if (error) return serverError(res, error.message);
+      if (error) return failed(res, error);
       return ok(res, { visitors: data || [] });
     }
 
@@ -38,7 +38,7 @@ export default async function handler(req, res) {
         .insert({ name, phone: phone || null, host_name: host_name || null, pass_code: code, valid_date: today, created_by: admin.sub })
         .select('id, name, pass_code, valid_date')
         .single();
-      if (error) return serverError(res, error.message);
+      if (error) return failed(res, error);
       return ok(res, { visitor: data });
     }
 
@@ -46,7 +46,7 @@ export default async function handler(req, res) {
       const id = new URL(req.url, 'http://localhost').searchParams.get('id');
       if (!id) return badRequest(res, 'id is required.');
       const { error } = await supabase.from('visitors').update({ checked_in_at: new Date().toISOString() }).eq('id', id);
-      if (error) return serverError(res, error.message);
+      if (error) return failed(res, error);
       return ok(res, { checked_in: true });
     }
   } catch (err) {

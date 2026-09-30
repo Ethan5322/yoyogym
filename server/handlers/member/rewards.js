@@ -2,7 +2,7 @@
 //   GET                     points, streak, badges, what can be claimed, my claims
 //   POST { reward_id }      claim a reward — collected at the gym's desk
 import { getSupabase } from '../../lib/supabase.js';
-import { allowMethods, readJsonBody, ok, badRequest, serverError } from '../../lib/http.js';
+import { allowMethods, readJsonBody, ok, badRequest, serverError, failed } from '../../lib/http.js';
 import { authenticateMember } from '../../lib/memberauth.js';
 import { REWARD_RULES_KEY, cleanRewardRules, rewardsSummary } from '../../lib/loyalty.js';
 
@@ -48,7 +48,7 @@ export default async function handler(req, res) {
       .insert({ reward_id: reward.id, member_id: auth.sub, reward_name: reward.name, points: reward.points })
       .select('id')
       .single();
-    if (error) return serverError(res, error.message);
+    if (error) return failed(res, error);
 
     // Two quick taps could both pass the check above with points for one.
     // Counted again now the claim exists: if it overspent, it is taken back.

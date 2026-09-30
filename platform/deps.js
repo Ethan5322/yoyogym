@@ -43,6 +43,7 @@ import { ALL_SERVICES, CORE_FEATURES } from '../shared/features.js';
 import {
   coordinate, haversineKm, nearestGyms, likeTerm, RESULT_LIMIT, BOX_FETCH,
 } from './gym-search.js';
+import { timedFetch } from '../shared/timed-fetch.js';
 
 let _db = null;
 
@@ -88,7 +89,7 @@ export function platformDb() {
   }
 
   _db = createClient(url, key, {
-    auth: { persistSession: false, autoRefreshToken: false },
+    auth: { persistSession: false, autoRefreshToken: false }, global: { fetch: timedFetch },
     db: { schema: 'platform' },
   });
   return _db;
@@ -1256,7 +1257,7 @@ export function activationDeps(db = platformDb()) {
         connection.supabase_url || process.env.SUPABASE_URL,
         process.env.SUPABASE_SERVICE_ROLE_KEY,
         {
-          auth: { persistSession: false, autoRefreshToken: false },
+          auth: { persistSession: false, autoRefreshToken: false }, global: { fetch: timedFetch },
           db: { schema: connection.schema_name },
         }
       );
@@ -1942,7 +1943,7 @@ export function platformControlDeps(db = platformDb()) {
         connection.supabase_url || process.env.SUPABASE_URL,
         process.env.SUPABASE_SERVICE_ROLE_KEY,
         {
-          auth: { persistSession: false, autoRefreshToken: false },
+          auth: { persistSession: false, autoRefreshToken: false }, global: { fetch: timedFetch },
           db: { schema: connection.schema_name },
         }
       );
@@ -2234,7 +2235,7 @@ function teamAndActivityDeps(db) {
           const c = byGym.get(g.id);
           if (!c?.schema_name) return out.set(g.id, { reachable: false });
           const client = createClient(c.supabase_url || process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY, {
-            auth: { persistSession: false, autoRefreshToken: false },
+            auth: { persistSession: false, autoRefreshToken: false }, global: { fetch: timedFetch },
             db: { schema: c.schema_name },
           });
           return out.set(g.id, await gymStats(client));

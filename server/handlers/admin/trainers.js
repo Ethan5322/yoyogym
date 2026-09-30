@@ -1,7 +1,7 @@
 // Trainer management CRUD (spec 4.8). Owner/Manager.
 //   GET / POST / PATCH?id / DELETE?id
 import { getSupabase } from '../../lib/supabase.js';
-import { allowMethods, readJsonBody, ok, badRequest, serverError } from '../../lib/http.js';
+import { allowMethods, readJsonBody, ok, badRequest, serverError, failed } from '../../lib/http.js';
 import { requireRole } from '../../lib/auth.js';
 import { generateTrainerNumber, generateTrainerCode } from '../../lib/identifiers.js';
 import { enrolmentGallery } from '../../lib/facematch.js';
@@ -33,7 +33,7 @@ export default async function handler(req, res) {
   try {
     if (req.method === 'GET') {
       const { data, error } = await supabase.from('trainers').select('*').order('full_name');
-      if (error) return serverError(res, error.message);
+      if (error) return failed(res, error);
       return ok(res, { trainers: data || [] });
     }
     if (req.method === 'POST') {
@@ -59,7 +59,7 @@ export default async function handler(req, res) {
         verification_code = null;
         ({ data, error } = await insertFaceRow(supabase, 'trainers', body, 'id'));
       }
-      if (error) return serverError(res, error.message);
+      if (error) return failed(res, error);
       return ok(res, { id: data.id, trainer_number, verification_code });
     }
     if (req.method === 'PATCH') {
@@ -68,13 +68,13 @@ export default async function handler(req, res) {
       const body = withFaceGallery(raw, pick(raw));
       body.updated_at = new Date().toISOString();
       const { error } = await updateFaceRow(supabase, 'trainers', id, body);
-      if (error) return serverError(res, error.message);
+      if (error) return failed(res, error);
       return ok(res, { updated: true });
     }
     if (req.method === 'DELETE') {
       if (!id) return badRequest(res, 'id is required.');
       const { error } = await supabase.from('trainers').delete().eq('id', id);
-      if (error) return serverError(res, error.message);
+      if (error) return failed(res, error);
       return ok(res, { deleted: true });
     }
   } catch (err) {

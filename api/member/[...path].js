@@ -1,5 +1,6 @@
 // Member-portal router — /api/member/* .
 import { json } from '../../server/lib/http.js';
+import { guardRequest, MAX_PHOTO_BODY_BYTES } from '../../server/lib/guard.js';
 import { withGym } from '../../server/lib/gymcontext.js';
 import { enforceEntitlement } from '../../server/lib/entitlements.js';
 import { MEMBER_ROUTE_FEATURES } from '../../shared/features.js';
@@ -54,6 +55,9 @@ const routes = {
   family,
 };
 
+// Routes that carry face photos, a logo or a member import (server/lib/guard.js).
+const PHOTO_ROUTES = new Set(['enroll-face', 'face-login']);
+
 export default async function handler(req, res) {
   // The app's own member screens call these from its origin (shared/cors.js).
   if (applyAppCors(req, res)) return;
@@ -61,6 +65,8 @@ export default async function handler(req, res) {
   const seg = parts[2];
   const fn = routes[seg];
   if (!fn) return json(res, 404, { error: `Not found: /api/member/${seg || ''}` });
+  // Size and rate first, before any work is done (CLAUDE.md §46).
+  if (!guardRequest(req, res, PHOTO_ROUTES.has(seg) ? { maxBytes: MAX_PHOTO_BODY_BYTES } : undefined)) return;
   // Plan gating, inside the gym's scope — see api/admin/[...path].js. The
   // member router had none, so a BASIC gym's members could use every
   // MEDIUM and PRIME feature the portal offers.

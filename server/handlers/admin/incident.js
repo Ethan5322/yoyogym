@@ -2,7 +2,7 @@
 //   GET  /api/admin/incident   -> recent incidents
 //   POST /api/admin/incident   -> log { member_id?, person_label?, note }  (+ owner alert)
 import { getSupabase } from '../../lib/supabase.js';
-import { allowMethods, readJsonBody, ok, badRequest, serverError } from '../../lib/http.js';
+import { allowMethods, readJsonBody, ok, badRequest, serverError, failed } from '../../lib/http.js';
 import { requireRole } from '../../lib/auth.js';
 import { notifyOwner } from '../../lib/notify/index.js';
 import { ownerTemplates } from '../../lib/notify/templates.js';
@@ -21,7 +21,7 @@ export default async function handler(req, res) {
         .select('*, members(full_name, membership_number), admin_users(full_name)')
         .order('created_at', { ascending: false })
         .limit(100);
-      if (error) return serverError(res, error.message);
+      if (error) return failed(res, error);
       return ok(res, {
         incidents: (data || []).map((i) => ({
           id: i.id,
@@ -43,7 +43,7 @@ export default async function handler(req, res) {
       note,
       admin_id: admin.sub,
     });
-    if (error) return serverError(res, error.message);
+    if (error) return failed(res, error);
 
     await notifyOwner(supabase, 'incident', ownerTemplates.incident({ person: person_label || 'a person', note }));
     return ok(res, { logged: true });

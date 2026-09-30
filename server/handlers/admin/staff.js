@@ -4,7 +4,7 @@
 //   PATCH  /api/admin/staff?id=...     update role/profile/is_active, optional password reset
 //   DELETE /api/admin/staff?id=...     remove an account
 import { getSupabase } from '../../lib/supabase.js';
-import { allowMethods, readJsonBody, ok, badRequest, serverError } from '../../lib/http.js';
+import { allowMethods, readJsonBody, ok, badRequest, serverError, failed } from '../../lib/http.js';
 import { requireRole, hashPassword, ROLES } from '../../lib/auth.js';
 import { recordAudit } from '../../lib/audit.js';
 import { generateStaffNumber, generateStaffCode } from '../../lib/identifiers.js';
@@ -27,7 +27,7 @@ export default async function handler(req, res) {
         .from('admin_users')
         .select('*')
         .order('created_at', { ascending: true });
-      if (error) return serverError(res, error.message);
+      if (error) return failed(res, error);
       const staff = (data || []).map((s) => ({
         id: s.id,
         username: s.username,
@@ -129,14 +129,14 @@ export default async function handler(req, res) {
         patch.locked_until = null;
       }
       const { error } = await supabase.from('admin_users').update(patch).eq('id', id);
-      if (error) return serverError(res, error.message);
+      if (error) return failed(res, error);
 
       // A new password, a disabled account, or the owner's own "sign out
       // everywhere" ends every long app session this person has (§38.1 Q3).
       const signOut = Boolean(b.password) || b.is_active === false || b.sign_out_everywhere === true;
       if (signOut) {
         const result = await signOutEverywhere(supabase, 'admin', id);
-        if (!result.ok) return serverError(res, result.error.message);
+        if (!result.ok) return failed(res, result.error);
       }
       const detail = b.password ? 'password reset' : b.sign_out_everywhere === true ? 'signed out everywhere' : 'profile/role updated';
       await recordAudit(supabase, admin, { action: 'staff.update', entity: 'admin_user', entity_id: id, detail });
@@ -147,7 +147,7 @@ export default async function handler(req, res) {
       if (!id) return badRequest(res, 'id is required.');
       if (id === admin.sub) return badRequest(res, 'You cannot delete your own account.');
       const { error } = await supabase.from('admin_users').delete().eq('id', id);
-      if (error) return serverError(res, error.message);
+      if (error) return failed(res, error);
       await recordAudit(supabase, admin, { action: 'staff.delete', entity: 'admin_user', entity_id: id });
       return ok(res, { deleted: true });
     }

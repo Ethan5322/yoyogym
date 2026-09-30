@@ -5,7 +5,7 @@
 // Returns { found, id, type } so the scan can open the right access card.
 // Owner/Manager/Reception.
 import { getSupabase } from '../../lib/supabase.js';
-import { allowMethods, ok, badRequest, serverError } from '../../lib/http.js';
+import { allowMethods, ok, badRequest, serverError, failed, codeText } from '../../lib/http.js';
 import { requireRole } from '../../lib/auth.js';
 
 export default async function handler(req, res) {
@@ -15,7 +15,9 @@ export default async function handler(req, res) {
   const url = new URL(req.url, 'http://localhost');
   const raw = url.searchParams.get('q') || url.searchParams.get('membership_number');
   if (!raw) return badRequest(res, 'A code or membership number is required.');
-  const v = raw.trim().toUpperCase();
+  // Letters, digits and dashes only: it goes inside a filter string (CLAUDE.md §46).
+  const v = codeText(raw);
+  if (!v) return badRequest(res, 'A code or membership number is required.');
 
   try {
     const supabase = getSupabase();
@@ -26,7 +28,7 @@ export default async function handler(req, res) {
       .select('id')
       .or(`membership_number.eq.${v},verification_code.eq.${v}`)
       .maybeSingle();
-    if (error) return serverError(res, error.message);
+    if (error) return failed(res, error);
     if (member) return ok(res, { found: true, id: member.id, type: 'member' });
 
     // 2) Trainer by trainer number or verification code (best-effort — columns

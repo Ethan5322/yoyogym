@@ -4,7 +4,7 @@
 //   PATCH  /api/admin/classes?id=...     update
 //   DELETE /api/admin/classes?id=...     delete
 import { getSupabase } from '../../lib/supabase.js';
-import { allowMethods, readJsonBody, ok, badRequest, serverError } from '../../lib/http.js';
+import { allowMethods, readJsonBody, ok, badRequest, serverError, failed } from '../../lib/http.js';
 import { requireRole } from '../../lib/auth.js';
 
 const FIELDS = [
@@ -32,7 +32,7 @@ export default async function handler(req, res) {
         .from('classes')
         .select('*, trainers(full_name)')
         .order('day_of_week', { ascending: true });
-      if (error) return serverError(res, error.message);
+      if (error) return failed(res, error);
       return ok(res, { classes: data || [] });
     }
 
@@ -40,7 +40,7 @@ export default async function handler(req, res) {
       const body = pick(await readJsonBody(req));
       if (!body.name) return badRequest(res, 'Class name is required.');
       const { data, error } = await supabase.from('classes').insert(body).select('id').single();
-      if (error) return serverError(res, error.message);
+      if (error) return failed(res, error);
       return ok(res, { id: data.id });
     }
 
@@ -49,14 +49,14 @@ export default async function handler(req, res) {
       const body = pick(await readJsonBody(req));
       body.updated_at = new Date().toISOString();
       const { error } = await supabase.from('classes').update(body).eq('id', id);
-      if (error) return serverError(res, error.message);
+      if (error) return failed(res, error);
       return ok(res, { updated: true });
     }
 
     if (req.method === 'DELETE') {
       if (!id) return badRequest(res, 'id is required.');
       const { error } = await supabase.from('classes').delete().eq('id', id);
-      if (error) return serverError(res, error.message);
+      if (error) return failed(res, error);
       return ok(res, { deleted: true });
     }
   } catch (err) {

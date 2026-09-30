@@ -2,7 +2,7 @@
 // Returns the full corporate access card for a scanned person.
 // Owner/Manager/Reception.
 import { getSupabase } from '../../lib/supabase.js';
-import { allowMethods, ok, badRequest, serverError } from '../../lib/http.js';
+import { allowMethods, ok, badRequest, serverError, failed } from '../../lib/http.js';
 import { requireRole } from '../../lib/auth.js';
 import { loadCompliance, evaluateAccess, expectedVisits, adherence } from '../../lib/compliance.js';
 
@@ -40,7 +40,7 @@ export default async function handler(req, res) {
 
 async function memberCard(supabase, id, res) {
   const { data: m, error } = await supabase.from('members').select('*').eq('id', id).maybeSingle();
-  if (error) return serverError(res, error.message);
+  if (error) return failed(res, error);
   if (!m) return badRequest(res, 'Member not found.');
 
   const config = await loadCompliance(supabase);
@@ -156,7 +156,7 @@ async function memberCard(supabase, id, res) {
 
 async function trainerCard(supabase, id, res) {
   const { data: t, error } = await supabase.from('trainers').select('*').eq('id', id).maybeSingle();
-  if (error) return serverError(res, error.message);
+  if (error) return failed(res, error);
   if (!t) return badRequest(res, 'Trainer not found.');
 
   const todayYmd = new Date().toISOString().slice(0, 10);

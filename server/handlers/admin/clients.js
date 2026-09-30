@@ -1,7 +1,7 @@
 // GET /api/admin/clients -> personal-training sessions / client list (spec 4.8).
 // Trainers see only their own sessions; owner/manager see all.
 import { getSupabase } from '../../lib/supabase.js';
-import { allowMethods, ok, serverError } from '../../lib/http.js';
+import { allowMethods, ok, serverError, failed } from '../../lib/http.js';
 import { requireRole } from '../../lib/auth.js';
 
 export default async function handler(req, res) {
@@ -23,7 +23,7 @@ export default async function handler(req, res) {
     }
 
     const { data, error } = await q;
-    if (error) return serverError(res, error.message);
+    if (error) return failed(res, error);
 
     return ok(res, {
       sessions: (data || []).map((s) => ({

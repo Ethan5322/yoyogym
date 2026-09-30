@@ -7,7 +7,7 @@
 // Any authenticated admin may manage their own profile photo (self-service) —
 // no owner role required, and there is no limit on how often it can change.
 import { getSupabase } from '../../lib/supabase.js';
-import { allowMethods, readJsonBody, ok, badRequest, serverError } from '../../lib/http.js';
+import { allowMethods, readJsonBody, ok, badRequest, serverError, failed } from '../../lib/http.js';
 import { authenticate } from '../../lib/auth.js';
 import { generateStaffNumber, generateStaffCode } from '../../lib/identifiers.js';
 
@@ -31,7 +31,7 @@ export default async function handler(req, res) {
         .from('admin_users')
         .update({ photo_url: body.photo_url, updated_at: new Date().toISOString() })
         .eq('id', admin.sub);
-      if (error) return serverError(res, error.message);
+      if (error) return failed(res, error);
       return ok(res, { updated: true });
     }
 
@@ -41,7 +41,7 @@ export default async function handler(req, res) {
       .select(SELECT)
       .eq('id', admin.sub)
       .maybeSingle();
-    if (error) return serverError(res, error.message);
+    if (error) return failed(res, error);
     if (!me) return badRequest(res, 'Account not found.');
 
     const patch = {};

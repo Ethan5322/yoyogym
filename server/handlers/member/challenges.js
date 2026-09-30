@@ -5,7 +5,7 @@
 // Joining is the member's choice, and so is being on the board. The board
 // shows a first name and an initial, never a whole name.
 import { getSupabase } from '../../lib/supabase.js';
-import { allowMethods, readJsonBody, ok, badRequest, serverError } from '../../lib/http.js';
+import { allowMethods, readJsonBody, ok, badRequest, serverError, failed } from '../../lib/http.js';
 import { authenticateMember } from '../../lib/memberauth.js';
 import { challengeProgress, challengeState, leaderboard } from '../../lib/loyalty.js';
 import { ymd } from '../../lib/pauses.js';
@@ -30,7 +30,7 @@ export default async function handler(req, res) {
       const { error } = await supabase
         .from('challenge_entries')
         .upsert({ challenge_id: challenge.id, member_id: auth.sub, show_on_board: body.show_on_board !== false }, { onConflict: 'challenge_id,member_id' });
-      if (error) return serverError(res, error.message);
+      if (error) return failed(res, error);
       return ok(res, { joined: true, message: `You're in: ${challenge.title}.` });
     }
 
@@ -40,7 +40,7 @@ export default async function handler(req, res) {
       .eq('is_active', true)
       .gte('ends_on', today)
       .order('starts_on');
-    if (error) return serverError(res, error.message);
+    if (error) return failed(res, error);
 
     const out = [];
     for (const c of challenges || []) {

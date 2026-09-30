@@ -2,7 +2,7 @@
 // POST /api/member/refer -> refer a friend { friend_name, friend_phone, friend_email }
 // Lands a referral in the program + notifies management (admin inbox).
 import { getSupabase } from '../../lib/supabase.js';
-import { allowMethods, readJsonBody, ok, badRequest, serverError } from '../../lib/http.js';
+import { allowMethods, readJsonBody, ok, badRequest, serverError, failed } from '../../lib/http.js';
 import { authenticateMember } from '../../lib/memberauth.js';
 import { notifyAdmin } from '../../lib/inbox.js';
 import { rateLimit } from '../../lib/ratelimit.js';
@@ -34,7 +34,7 @@ export default async function handler(req, res) {
         friend_phone: (friend_phone || '').trim() || null,
         friend_email: (friend_email || '').trim() || null,
       });
-      if (error) return serverError(res, error.message);
+      if (error) return failed(res, error);
 
       await notifyAdmin(supabase, {
         kind: 'event',
@@ -55,7 +55,7 @@ export default async function handler(req, res) {
       .eq('referrer_member_id', auth.sub)
       .order('created_at', { ascending: false })
       .limit(50);
-    if (error) return serverError(res, error.message);
+    if (error) return failed(res, error);
     return ok(res, { referrals: data || [] });
   } catch (err) {
     console.error('member refer error:', err.message);

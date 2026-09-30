@@ -7,7 +7,7 @@
 // template: a frozen single template stops matching once the admin changes
 // their hair or grows a beard.
 import { getSupabase } from '../../lib/supabase.js';
-import { allowMethods, readJsonBody, ok, badRequest, serverError } from '../../lib/http.js';
+import { allowMethods, readJsonBody, ok, badRequest, serverError, failed } from '../../lib/http.js';
 import { authenticate } from '../../lib/auth.js';
 import { faceServiceConfigured, embedEnrolmentImages } from '../../lib/faceservice.js';
 import { enrolmentGallery } from '../../lib/facematch.js';
@@ -48,7 +48,7 @@ export default async function handler(req, res) {
 
     const supabase = getSupabase();
     const { error } = await updateFaceRow(supabase, 'admin_users', admin.sub, patch);
-    if (error) return serverError(res, error.message);
+    if (error) return failed(res, error);
     return ok(res, { enrolled: true, templates: patch.face_templates.length, arcface: !!patch.arcface_templates });
   } catch (err) {
     console.error('enroll-face error:', err.message);

@@ -6,7 +6,7 @@
 //   POST { action: 'remove', group_id, member_id }         the last one out closes it
 //   POST { action: 'payer', group_id, member_id }
 import { getSupabase } from '../../lib/supabase.js';
-import { allowMethods, readJsonBody, ok, badRequest, serverError } from '../../lib/http.js';
+import { allowMethods, readJsonBody, ok, badRequest, serverError, failed } from '../../lib/http.js';
 import { requireRole } from '../../lib/auth.js';
 import { recordAudit } from '../../lib/audit.js';
 import { GROUP_PRICING_KEY, GROUP_KINDS, cleanGroupPricing, addProblem } from '../../lib/groups.js';
@@ -46,7 +46,7 @@ export default async function handler(req, res) {
         return ok(res, { group: link ? await groupWithMembers(supabase, link.group_id) : null, pricing });
       }
       const { data: groups, error } = await supabase.from('member_groups').select('id').order('created_at', { ascending: false }).limit(200);
-      if (error) return serverError(res, error.message);
+      if (error) return failed(res, error);
       const all = [];
       for (const g of groups || []) all.push(await groupWithMembers(supabase, g.id));
       return ok(res, { groups: all.filter(Boolean), pricing });
@@ -67,7 +67,7 @@ export default async function handler(req, res) {
         .insert({ name, kind: body.kind, payer_member_id: member.id })
         .select('id')
         .single();
-      if (error) return serverError(res, error.message);
+      if (error) return failed(res, error);
       await supabase.from('member_group_links').insert({ group_id: group.id, member_id: member.id });
       await recordAudit(supabase, admin, { action: 'group.created', entity: 'member_group', entity_id: group.id });
       return ok(res, { group: await groupWithMembers(supabase, group.id) });
@@ -87,7 +87,7 @@ export default async function handler(req, res) {
       const problem = addProblem({ group, links: group.members, member, pricing, memberLinkedElsewhere: elsewhere });
       if (problem) return badRequest(res, problem);
       const { error } = await supabase.from('member_group_links').insert({ group_id: group.id, member_id: member.id });
-      if (error) return serverError(res, error.message);
+      if (error) return failed(res, error);
       await recordAudit(supabase, admin, { action: 'group.member_added', entity: 'member_group', entity_id: group.id, detail: { member_id: member.id } });
       return ok(res, { group: await groupWithMembers(supabase, group.id) });
     }

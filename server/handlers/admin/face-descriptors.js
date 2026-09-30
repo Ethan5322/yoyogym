@@ -4,7 +4,7 @@
 // 128-D face-api descriptors — NO photos or other sensitive data.
 // Owner/Manager/Reception.
 import { getSupabase } from '../../lib/supabase.js';
-import { allowMethods, ok, serverError } from '../../lib/http.js';
+import { allowMethods, ok, serverError, failed } from '../../lib/http.js';
 import { requireRole } from '../../lib/auth.js';
 import { selectFaceRows } from '../../lib/facedb.js';
 import { templatesOf } from '../../lib/facematch.js';
@@ -29,8 +29,8 @@ export default async function handler(req, res) {
         apply: (q) => q.not('face_descriptor', 'is', null),
       }),
     ]);
-    if (mRes.error) return serverError(res, mRes.error.message);
-    if (tRes.error) return serverError(res, tRes.error.message);
+    if (mRes.error) return failed(res, mRes.error);
+    if (tRes.error) return failed(res, tRes.error);
 
     const people = [
       ...(mRes.data || []).map((m) => ({

@@ -1,7 +1,7 @@
 // Add-on services management (spec 4.13 — Add-On Services). Owner/Manager.
 //   GET / POST / PATCH?id / DELETE?id
 import { getSupabase } from '../../lib/supabase.js';
-import { allowMethods, readJsonBody, ok, badRequest, serverError } from '../../lib/http.js';
+import { allowMethods, readJsonBody, ok, badRequest, serverError, failed } from '../../lib/http.js';
 import { requireRole } from '../../lib/auth.js';
 
 const FIELDS = ['name', 'category', 'description', 'price', 'billing_type', 'is_enabled'];
@@ -17,14 +17,14 @@ export default async function handler(req, res) {
   try {
     if (req.method === 'GET') {
       const { data, error } = await supabase.from('addon_services').select('*').order('category');
-      if (error) return serverError(res, error.message);
+      if (error) return failed(res, error);
       return ok(res, { addons: data || [] });
     }
     if (req.method === 'POST') {
       const body = pick(await readJsonBody(req));
       if (!body.name) return badRequest(res, 'Add-on name is required.');
       const { data, error } = await supabase.from('addon_services').insert(body).select('id').single();
-      if (error) return serverError(res, error.message);
+      if (error) return failed(res, error);
       return ok(res, { id: data.id });
     }
     if (req.method === 'PATCH') {
@@ -32,13 +32,13 @@ export default async function handler(req, res) {
       const body = pick(await readJsonBody(req));
       body.updated_at = new Date().toISOString();
       const { error } = await supabase.from('addon_services').update(body).eq('id', id);
-      if (error) return serverError(res, error.message);
+      if (error) return failed(res, error);
       return ok(res, { updated: true });
     }
     if (req.method === 'DELETE') {
       if (!id) return badRequest(res, 'id is required.');
       const { error } = await supabase.from('addon_services').delete().eq('id', id);
-      if (error) return serverError(res, error.message);
+      if (error) return failed(res, error);
       return ok(res, { deleted: true });
     }
   } catch (err) {

@@ -1,7 +1,7 @@
 // GET /api/member/messages -> the member's conversation with management
 // (their own messages + management replies). Marks management replies as read.
 import { getSupabase } from '../../lib/supabase.js';
-import { allowMethods, ok, serverError } from '../../lib/http.js';
+import { allowMethods, ok, serverError, failed } from '../../lib/http.js';
 import { authenticateMember } from '../../lib/memberauth.js';
 
 export default async function handler(req, res) {
@@ -18,7 +18,7 @@ export default async function handler(req, res) {
       .eq('kind', 'message')
       .order('created_at', { ascending: true })
       .limit(200);
-    if (error) return serverError(res, error.message);
+    if (error) return failed(res, error);
 
     const unread = (data || []).filter((m) => m.direction === 'out' && !m.is_read_member).length;
 

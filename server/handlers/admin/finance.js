@@ -3,7 +3,7 @@
 //   GET  /api/admin/finance            -> aging buckets + per-member outstanding
 //   POST /api/admin/finance { member_id }  -> email a balance reminder, log it
 import { getSupabase } from '../../lib/supabase.js';
-import { allowMethods, readJsonBody, ok, badRequest, serverError } from '../../lib/http.js';
+import { allowMethods, readJsonBody, ok, badRequest, serverError, failed } from '../../lib/http.js';
 import { requireRole } from '../../lib/auth.js';
 import { recordAudit } from '../../lib/audit.js';
 import { sendEmail, emailConfigured } from '../../lib/notify/channels.js';
@@ -73,7 +73,7 @@ export default async function handler(req, res) {
       .select('amount, created_at, member_id, members(full_name, membership_number, email)')
       .in('status', ['pending', 'failed'])
       .order('created_at', { ascending: true });
-    if (error) return serverError(res, error.message);
+    if (error) return failed(res, error);
 
     const buckets = { current: 0, d30: 0, d60: 0, d90: 0 }; // 0-30, 31-60, 61-90, 90+
     const byMember = new Map();

@@ -2,7 +2,7 @@
 // Pulls editable text from gym.settings (managed in the admin panel, Phase 7)
 // and falls back to compliant defaults so the flow works before configuration.
 import { getSupabase } from '../../lib/supabase.js';
-import { allowMethods, ok, serverError } from '../../lib/http.js';
+import { allowMethods, ok, serverError, failed } from '../../lib/http.js';
 import { currentGym } from '../../lib/tenancy.js';
 import { readOff, MEMBER_SERVICES_KEY } from '../../lib/member-services.js';
 import { FACILITIES_KEY, facilityLabels } from '../../../shared/facilities.js';
@@ -55,7 +55,7 @@ export default async function handler(req, res) {
       .select('key, value')
       .in('key', ['gym_profile', 'indemnity_text', 'contract_text', 'popia_text', 'contract_terms_version', FACILITIES_KEY, MEMBER_SERVICES_KEY]);
 
-    if (error) return serverError(res, error.message);
+    if (error) return failed(res, error);
 
     const map = Object.fromEntries((data || []).map((r) => [r.key, r.value]));
     const profile = map.gym_profile || {};

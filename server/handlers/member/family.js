@@ -4,7 +4,7 @@
 // Staff set groups up; a member only reads theirs. Other members appear by
 // first name only — enough to recognise your own family, nothing more.
 import { getSupabase } from '../../lib/supabase.js';
-import { allowMethods, ok, serverError } from '../../lib/http.js';
+import { allowMethods, ok, serverError, failed } from '../../lib/http.js';
 import { authenticateMember } from '../../lib/memberauth.js';
 import { GROUP_PRICING_KEY, cleanGroupPricing, discountFor } from '../../lib/groups.js';
 
@@ -18,7 +18,7 @@ export default async function handler(req, res) {
 
   try {
     const { data: link, error } = await supabase.from('member_group_links').select('group_id').eq('member_id', auth.sub).maybeSingle();
-    if (error) return serverError(res, error.message);
+    if (error) return failed(res, error);
     const { data: pricingRow } = await supabase.from('settings').select('value').eq('key', GROUP_PRICING_KEY).maybeSingle();
     const pricing = cleanGroupPricing(pricingRow?.value);
     if (!link) return ok(res, { group: null, pricing });

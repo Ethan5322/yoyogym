@@ -2,7 +2,7 @@
 // Existing-member sign in (spec 2.4). Verifies the membership number and phone
 // match, then issues a member session token.
 import { getSupabase } from '../../lib/supabase.js';
-import { allowMethods, readJsonBody, ok, badRequest, unauthorized, serverError } from '../../lib/http.js';
+import { allowMethods, readJsonBody, ok, badRequest, unauthorized, serverError, failed } from '../../lib/http.js';
 import { signMemberToken, phoneMatches } from '../../lib/memberauth.js';
 import { rateLimit } from '../../lib/ratelimit.js';
 import { currentGym } from '../../lib/tenancy.js';
@@ -27,7 +27,7 @@ export default async function handler(req, res) {
       .select('id, full_name, membership_number, phone, status, session_version')
       .eq('membership_number', membership_number.trim().toUpperCase())
       .maybeSingle();
-    if (error) return serverError(res, error.message);
+    if (error) return failed(res, error);
 
     // phoneMatches, not a plain comparison: phones are stored +27…, and people
     // type 082… (see memberauth.js).

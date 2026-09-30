@@ -1,6 +1,7 @@
 // Admin router — /api/admin/* . Resolves the route from req.url; logic lives in
 // /server/handlers/admin (outside /api, so not counted as functions).
 import { json } from '../../server/lib/http.js';
+import { guardRequest, MAX_PHOTO_BODY_BYTES } from '../../server/lib/guard.js';
 import { withGym } from '../../server/lib/gymcontext.js';
 import { enforceEntitlement } from '../../server/lib/entitlements.js';
 import { captureError } from '../../server/lib/observability.js';
@@ -94,11 +95,16 @@ const routes = {
   'member-groups': memberGroups,
 };
 
+// Routes that carry face photos, a logo or a member import (server/lib/guard.js).
+const PHOTO_ROUTES = new Set(['enroll-face', 'face-learn', 'members-import', 'settings', 'staff', 'trainers', 'profile']);
+
 export default async function handler(req, res) {
   const parts = new URL(req.url, 'http://localhost').pathname.split('/').filter(Boolean);
   const seg = parts[2];
   const fn = routes[seg];
   if (!fn) return json(res, 404, { error: `Not found: /api/admin/${seg || ''}` });
+  // Size and rate first, before any work is done (CLAUDE.md §46).
+  if (!guardRequest(req, res, PHOTO_ROUTES.has(seg) ? { maxBytes: MAX_PHOTO_BODY_BYTES } : undefined)) return;
 
   // Plan gating. Inert for a single-gym deployment (no resolved gym); for a
   // platform gym it refuses a route the plan does not include, with 402.

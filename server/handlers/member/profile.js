@@ -2,7 +2,7 @@
 // PATCH /api/member/profile  -> update own contact details (self-service)
 // Only safe contact fields are editable — never name, ID, status or billing.
 import { getSupabase } from '../../lib/supabase.js';
-import { allowMethods, readJsonBody, ok, serverError } from '../../lib/http.js';
+import { allowMethods, readJsonBody, ok, serverError, failed } from '../../lib/http.js';
 import { authenticateMember } from '../../lib/memberauth.js';
 
 const EDITABLE = [
@@ -27,7 +27,7 @@ export default async function handler(req, res) {
         if (body[k] !== undefined) patch[k] = (typeof body[k] === 'string' ? body[k].trim() : body[k]) || null;
       }
       const { error } = await supabase.from('members').update(patch).eq('id', auth.sub);
-      if (error) return serverError(res, error.message);
+      if (error) return failed(res, error);
       return ok(res, { updated: true, message: 'Your details have been updated.' });
     }
 
@@ -36,7 +36,7 @@ export default async function handler(req, res) {
       .select(EDITABLE.join(', '))
       .eq('id', auth.sub)
       .maybeSingle();
-    if (error) return serverError(res, error.message);
+    if (error) return failed(res, error);
     return ok(res, { profile: data || {} });
   } catch (err) {
     console.error('member profile error:', err.message);

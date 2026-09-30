@@ -13,7 +13,7 @@
 // exactly what the PDF reads — verified against generateMembershipPdf.js and
 // idcard.js — and nothing else. ADD A COLUMN HERE ONLY IF THE PDF NEEDS IT.
 import { getSupabase } from '../../lib/supabase.js';
-import { allowMethods, readJsonBody, ok, badRequest, serverError } from '../../lib/http.js';
+import { allowMethods, readJsonBody, ok, badRequest, serverError, failed } from '../../lib/http.js';
 import { rateLimit } from '../../lib/ratelimit.js';
 import { accentOrDefault } from '../../../shared/brand.js';
 
@@ -75,7 +75,7 @@ export default async function handler(req, res) {
       .eq('membership_number', membership_number)
       .eq('verification_code', verification_code)
       .maybeSingle();
-    if (error) return serverError(res, error.message);
+    if (error) return failed(res, error);
     if (!member) return badRequest(res, 'Membership not found or code does not match.');
 
     const [{ data: membership }, { data: parq }, { data: addons }, { data: settingRows }] =

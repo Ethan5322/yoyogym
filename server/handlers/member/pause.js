@@ -3,7 +3,7 @@
 //   POST { days, reason }      pause from today, within the owner's rules
 //   POST { action: 'resume' }  come back early; unused days come off the end date
 import { getSupabase } from '../../lib/supabase.js';
-import { allowMethods, readJsonBody, ok, badRequest, serverError } from '../../lib/http.js';
+import { allowMethods, readJsonBody, ok, badRequest, serverError, failed } from '../../lib/http.js';
 import { authenticateMember } from '../../lib/memberauth.js';
 import {
   PAUSE_RULES_KEY,
@@ -30,7 +30,7 @@ export default async function handler(req, res) {
       supabase.from('members').select('id, status').eq('id', auth.sub).maybeSingle(),
       supabase.from('membership_pauses').select('*').eq('member_id', auth.sub).order('starts_on', { ascending: false }),
     ]);
-    if (error) return serverError(res, error.message);
+    if (error) return failed(res, error);
     if (!member) return badRequest(res, 'Member not found.');
     const rules = cleanPauseRules(rulesRow?.value);
     const current = openPause(pauses || [], today);
@@ -67,7 +67,7 @@ export default async function handler(req, res) {
       reason: String(body.reason || '').trim().slice(0, 300) || null,
       created_by: 'member',
     });
-    if (insErr) return serverError(res, insErr.message);
+    if (insErr) return failed(res, insErr);
     await supabase.from('members').update({ status: 'frozen' }).eq('id', member.id);
 
     return ok(res, {

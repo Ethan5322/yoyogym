@@ -4,7 +4,7 @@
 //   PATCH /api/admin/inbox?all=1                    -> mark all read
 // Owner/Manager.
 import { getSupabase } from '../../lib/supabase.js';
-import { allowMethods, readJsonBody, ok, badRequest, serverError } from '../../lib/http.js';
+import { allowMethods, readJsonBody, ok, badRequest, serverError, failed } from '../../lib/http.js';
 import { requireRole } from '../../lib/auth.js';
 import { notifyAdmin } from '../../lib/inbox.js';
 import { notifyMemberEmail } from '../../lib/notify/index.js';
@@ -56,7 +56,7 @@ export default async function handler(req, res) {
     if (req.method === 'PATCH') {
       if (url.searchParams.get('all') === '1') {
         const { error } = await supabase.from('admin_inbox').update({ is_read: true }).eq('is_read', false);
-        if (error) return serverError(res, error.message);
+        if (error) return failed(res, error);
         return ok(res, { updated: true });
       }
       const id = url.searchParams.get('id');
@@ -66,7 +66,7 @@ export default async function handler(req, res) {
         .from('admin_inbox')
         .update({ is_read: b.is_read !== false })
         .eq('id', id);
-      if (error) return serverError(res, error.message);
+      if (error) return failed(res, error);
       return ok(res, { updated: true });
     }
 
@@ -87,7 +87,7 @@ export default async function handler(req, res) {
       q,
       supabase.from('admin_inbox').select('id', { count: 'exact', head: true }).eq('is_read', false),
     ]);
-    if (error) return serverError(res, error.message);
+    if (error) return failed(res, error);
 
     return ok(res, { items: data || [], unread_count: count || 0 });
   } catch (err) {

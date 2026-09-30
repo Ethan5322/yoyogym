@@ -6,7 +6,7 @@
 //                                  ("lost phone", CLAUDE.md §38.1 Q2)
 // Owner/Manager (reception may also do manual check-in).
 import { getSupabase } from '../../lib/supabase.js';
-import { allowMethods, readJsonBody, ok, badRequest, serverError } from '../../lib/http.js';
+import { allowMethods, readJsonBody, ok, badRequest, serverError, failed } from '../../lib/http.js';
 import { requireRole } from '../../lib/auth.js';
 import { generateVerificationCode } from '../../lib/identifiers.js';
 import { DURATION_MONTHS, computeMembership } from '../../../shared/pricing.js';
@@ -38,7 +38,7 @@ export default async function handler(req, res) {
       const { error } = await supabase
         .from('checkins')
         .insert({ member_id: id, method: 'manual', verified_by: admin.sub });
-      if (error) return serverError(res, error.message);
+      if (error) return failed(res, error);
       return ok(res, { message: 'Manual check-in logged.' });
     }
 
@@ -48,7 +48,7 @@ export default async function handler(req, res) {
         .from('members')
         .update({ verification_code: code, updated_at: new Date().toISOString() })
         .eq('id', id);
-      if (error) return serverError(res, error.message);
+      if (error) return failed(res, error);
       await recordAudit(supabase, admin, { action: 'member.regenerate_code', entity: 'member', entity_id: id });
       return ok(res, { message: 'New verification code generated.', verification_code: code });
     }
@@ -121,7 +121,7 @@ export default async function handler(req, res) {
 
     if (action === 'sign_out_everywhere') {
       const result = await signOutEverywhere(supabase, 'member', id);
-      if (!result.ok) return serverError(res, result.error.message);
+      if (!result.ok) return failed(res, result.error);
       await recordAudit(supabase, admin, { action: 'member.sign_out_everywhere', entity: 'member', entity_id: id });
       return ok(res, { message: 'Signed out of the app on every phone. They sign in again with their number and phone.' });
     }

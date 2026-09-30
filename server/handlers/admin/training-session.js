@@ -2,7 +2,7 @@
 //   { membership_number, workout_notes, completed }
 // Trainers log against their own trainer profile; owner/manager may pass trainer_id.
 import { getSupabase } from '../../lib/supabase.js';
-import { allowMethods, readJsonBody, ok, badRequest, serverError } from '../../lib/http.js';
+import { allowMethods, readJsonBody, ok, badRequest, serverError, failed } from '../../lib/http.js';
 import { requireRole } from '../../lib/auth.js';
 
 export default async function handler(req, res) {
@@ -32,7 +32,7 @@ export default async function handler(req, res) {
       completed_at: completed ? new Date().toISOString() : null,
       scheduled_at: new Date().toISOString(),
     });
-    if (error) return serverError(res, error.message);
+    if (error) return failed(res, error);
 
     return ok(res, { logged: true });
   } catch (err) {

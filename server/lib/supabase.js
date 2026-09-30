@@ -21,6 +21,7 @@
 // reaches the database through this function, so none of them changed.
 import { createClient } from '@supabase/supabase-js';
 import { currentGym } from './tenancy.js';
+import { timedFetch } from '../../shared/timed-fetch.js';
 
 let _client = null;
 
@@ -54,7 +55,7 @@ export function getSupabase() {
     }
 
     _client = createClient(url, serviceKey, {
-      auth: { persistSession: false, autoRefreshToken: false },
+      auth: { persistSession: false, autoRefreshToken: false }, global: { fetch: timedFetch },
       db: { schema },
     });
   }

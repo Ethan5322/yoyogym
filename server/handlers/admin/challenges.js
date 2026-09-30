@@ -4,7 +4,7 @@
 //   POST  { title, description, target_visits, starts_on, ends_on }
 //   PATCH { id, …same fields…, is_active }
 import { getSupabase } from '../../lib/supabase.js';
-import { allowMethods, readJsonBody, ok, badRequest, serverError } from '../../lib/http.js';
+import { allowMethods, readJsonBody, ok, badRequest, serverError, failed } from '../../lib/http.js';
 import { requireRole } from '../../lib/auth.js';
 import { recordAudit } from '../../lib/audit.js';
 import { challengeProgress, challengeState } from '../../lib/loyalty.js';
@@ -76,7 +76,7 @@ export default async function handler(req, res) {
       }
 
       const { data: challenges, error } = await supabase.from('challenges').select('*').order('starts_on', { ascending: false }).limit(100);
-      if (error) return serverError(res, error.message);
+      if (error) return failed(res, error);
       const { data: entries } = await supabase
         .from('challenge_entries')
         .select('challenge_id, member_id')
@@ -98,13 +98,13 @@ export default async function handler(req, res) {
 
     if (req.method === 'POST') {
       const { data, error } = await supabase.from('challenges').insert(c).select('id').single();
-      if (error) return serverError(res, error.message);
+      if (error) return failed(res, error);
       await recordAudit(supabase, admin, { action: 'challenge.created', entity: 'challenge', entity_id: data.id });
       return ok(res, { id: data.id });
     }
 
     const { error } = await supabase.from('challenges').update({ ...c, updated_at: new Date().toISOString() }).eq('id', body.id);
-    if (error) return serverError(res, error.message);
+    if (error) return failed(res, error);
     await recordAudit(supabase, admin, { action: 'challenge.updated', entity: 'challenge', entity_id: body.id });
     return ok(res, { saved: true });
   } catch (err) {

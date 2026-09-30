@@ -3,7 +3,7 @@
 // it succeeded (corporate audit/trust). Owner/Manager.
 //   Query: template_key, status, limit
 import { getSupabase } from '../../lib/supabase.js';
-import { allowMethods, ok, serverError } from '../../lib/http.js';
+import { allowMethods, ok, serverError, failed } from '../../lib/http.js';
 import { requireRole } from '../../lib/auth.js';
 
 export default async function handler(req, res) {
@@ -26,7 +26,7 @@ export default async function handler(req, res) {
     if (status) q = q.eq('status', status);
 
     const { data, error } = await q;
-    if (error) return serverError(res, error.message);
+    if (error) return failed(res, error);
 
     return ok(res, {
       notifications: (data || []).map((n) => ({

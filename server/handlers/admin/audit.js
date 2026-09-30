@@ -2,7 +2,7 @@
 //   Query: q (actor/action/detail search), action (prefix, e.g. "payment"),
 //          from, to (ISO dates), limit
 import { getSupabase } from '../../lib/supabase.js';
-import { allowMethods, ok, serverError } from '../../lib/http.js';
+import { allowMethods, ok, serverError, failed, filterText } from '../../lib/http.js';
 import { requireRole } from '../../lib/auth.js';
 
 export default async function handler(req, res) {
@@ -10,7 +10,7 @@ export default async function handler(req, res) {
   if (!requireRole(req, res, ['owner', 'manager'])) return;
   try {
     const url = new URL(req.url, 'http://localhost');
-    const q = (url.searchParams.get('q') || '').replace(/[%,]/g, '').trim();
+    const q = filterText(url.searchParams.get('q'));
     const action = (url.searchParams.get('action') || '').trim(); // prefix
     const from = url.searchParams.get('from');
     const to = url.searchParams.get('to');
@@ -28,7 +28,7 @@ export default async function handler(req, res) {
     if (to) query = query.lte('created_at', to);
 
     const { data, error } = await query;
-    if (error) return serverError(res, error.message);
+    if (error) return failed(res, error);
     return ok(res, { entries: data || [] });
   } catch (err) {
     console.error('audit view error:', err.message);

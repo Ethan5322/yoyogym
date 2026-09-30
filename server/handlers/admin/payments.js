@@ -2,7 +2,7 @@
 //   GET   /api/admin/payments?status=&category=&from=&to=  list + breakdown
 //   POST  /api/admin/payments                              record manual (cash/EFT) payment
 import { getSupabase } from '../../lib/supabase.js';
-import { allowMethods, readJsonBody, ok, badRequest, serverError } from '../../lib/http.js';
+import { allowMethods, readJsonBody, ok, badRequest, serverError, failed } from '../../lib/http.js';
 import { requireRole } from '../../lib/auth.js';
 import { recordAudit } from '../../lib/audit.js';
 import { activateForPayment } from '../../lib/activation.js';
@@ -33,7 +33,7 @@ export default async function handler(req, res) {
         })
         .select('id, member_id, membership_id, amount, description')
         .single();
-      if (error) return serverError(res, error.message);
+      if (error) return failed(res, error);
 
       // Recording a payment is what activates the member (spec: members pay the
       // gym directly; capture is the activation event).
@@ -68,7 +68,7 @@ export default async function handler(req, res) {
     if (to) q = q.lte('created_at', to);
 
     const { data, error } = await q;
-    if (error) return serverError(res, error.message);
+    if (error) return failed(res, error);
 
     // Revenue breakdown by category (received only).
     const breakdown = {};

@@ -11,7 +11,7 @@
 // haircut, a beard, makeup), the probe is learned as an extra template so the
 // member does not slowly drift out of their own gallery.
 import { getSupabase } from '../../lib/supabase.js';
-import { allowMethods, readJsonBody, ok, badRequest, unauthorized, serverError } from '../../lib/http.js';
+import { allowMethods, readJsonBody, ok, badRequest, unauthorized, serverError, failed } from '../../lib/http.js';
 import { signMemberToken } from '../../lib/memberauth.js';
 import { rateLimit } from '../../lib/ratelimit.js';
 import { faceServiceConfigured, embedFace } from '../../lib/faceservice.js';
@@ -74,7 +74,7 @@ export default async function handler(req, res) {
       legacyColumns: `${BASE}, ${legacyColumn}`,
       apply: (q) => q.not(legacyColumn, 'is', null),
     });
-    if (error) return serverError(res, error.message);
+    if (error) return failed(res, error);
 
     const people = (rows || []).map((row) => ({
       row,

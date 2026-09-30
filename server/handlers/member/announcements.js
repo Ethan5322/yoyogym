@@ -1,6 +1,6 @@
 // GET /api/member/announcements -> published gym announcements (news feed).
 import { getSupabase } from '../../lib/supabase.js';
-import { allowMethods, ok, serverError } from '../../lib/http.js';
+import { allowMethods, ok, serverError, failed } from '../../lib/http.js';
 import { authenticateMember } from '../../lib/memberauth.js';
 
 export default async function handler(req, res) {
@@ -16,7 +16,7 @@ export default async function handler(req, res) {
       .eq('is_published', true)
       .order('created_at', { ascending: false })
       .limit(20);
-    if (error) return serverError(res, error.message);
+    if (error) return failed(res, error);
     return ok(res, { announcements: data || [] });
   } catch (err) {
     console.error('member announcements error:', err.message);

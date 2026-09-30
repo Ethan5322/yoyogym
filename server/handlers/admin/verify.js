@@ -2,7 +2,7 @@
 // `code` may be a verification code OR a membership number. On a valid active
 // member it logs a check-in automatically. Owner/Manager/Reception.
 import { getSupabase } from '../../lib/supabase.js';
-import { allowMethods, readJsonBody, ok, badRequest, serverError } from '../../lib/http.js';
+import { allowMethods, readJsonBody, ok, badRequest, serverError, failed, codeText } from '../../lib/http.js';
 import { requireRole } from '../../lib/auth.js';
 
 export default async function handler(req, res) {
@@ -13,7 +13,9 @@ export default async function handler(req, res) {
   try {
     const { code } = await readJsonBody(req);
     if (!code) return badRequest(res, 'A verification code or membership number is required.');
-    const value = code.trim().toUpperCase();
+    // Letters, digits and dashes only: it goes inside a filter string (CLAUDE.md §46).
+    const value = codeText(code);
+    if (!value) return badRequest(res, 'Enter a membership number or verification code.');
 
     const supabase = getSupabase();
     const { data: member, error } = await supabase
@@ -21,7 +23,7 @@ export default async function handler(req, res) {
       .select('id, full_name, membership_number, status, parq_flag, photo_url')
       .or(`verification_code.eq.${value},membership_number.eq.${value}`)
       .maybeSingle();
-    if (error) return serverError(res, error.message);
+    if (error) return failed(res, error);
 
     // Not found / blocked: show minimal info (no sensitive details).
     if (!member) return ok(res, { granted: false, reason: 'not_found' });

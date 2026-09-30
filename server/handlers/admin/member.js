@@ -2,7 +2,7 @@
 // PATCH /api/admin/member?id=...   -> update status / staff notes (quick actions)
 // Owner/Manager.
 import { getSupabase } from '../../lib/supabase.js';
-import { allowMethods, readJsonBody, ok, badRequest, serverError } from '../../lib/http.js';
+import { allowMethods, readJsonBody, ok, badRequest, serverError, failed } from '../../lib/http.js';
 import { requireRole } from '../../lib/auth.js';
 import { loadCompliance, expectedVisits, adherence } from '../../lib/compliance.js';
 import { recordAudit } from '../../lib/audit.js';
@@ -34,7 +34,7 @@ export default async function handler(req, res) {
 
       // POPIA erasure: cascading FKs remove memberships, parq, checkins, etc.
       const { error } = await supabase.from('members').delete().eq('id', id);
-      if (error) return serverError(res, error.message);
+      if (error) return failed(res, error);
 
       // ...and the copy OUTSIDE this gym's schema. The platform's "which gym
       // did I join?" index kept a pointer to the person after their data was
@@ -68,7 +68,7 @@ export default async function handler(req, res) {
       if (body.status) patch.status = body.status;
       if (typeof body.staff_notes === 'string') patch.staff_notes = body.staff_notes;
       const { error } = await supabase.from('members').update(patch).eq('id', id);
-      if (error) return serverError(res, error.message);
+      if (error) return failed(res, error);
       if (body.status) {
         await recordAudit(supabase, admin, { action: 'member.status', entity: 'member', entity_id: id, detail: `status → ${body.status}` });
       }
@@ -76,7 +76,7 @@ export default async function handler(req, res) {
     }
 
     const { data: member, error } = await supabase.from('members').select('*').eq('id', id).maybeSingle();
-    if (error) return serverError(res, error.message);
+    if (error) return failed(res, error);
     if (!member) return badRequest(res, 'Member not found.');
 
     const since30 = new Date(Date.now() - 30 * 86400000);

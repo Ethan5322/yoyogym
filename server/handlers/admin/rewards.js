@@ -4,7 +4,7 @@
 //   PATCH { id, name?, description?, points?, is_enabled? }       — owner, manager
 //   POST  { action: 'claim', id, status: 'given' | 'cancelled' } — staff at the desk
 import { getSupabase } from '../../lib/supabase.js';
-import { allowMethods, readJsonBody, ok, badRequest, serverError } from '../../lib/http.js';
+import { allowMethods, readJsonBody, ok, badRequest, serverError, failed } from '../../lib/http.js';
 import { requireRole } from '../../lib/auth.js';
 import { recordAudit } from '../../lib/audit.js';
 import { REWARD_RULES_KEY, cleanRewardRules } from '../../lib/loyalty.js';
@@ -32,7 +32,7 @@ export default async function handler(req, res) {
           .limit(100),
         supabase.from('settings').select('value').eq('key', REWARD_RULES_KEY).maybeSingle(),
       ]);
-      if (error) return serverError(res, error.message);
+      if (error) return failed(res, error);
       const rows = (claims || []).map(({ members, ...c }) => ({
         ...c,
         member_name: members?.full_name || '',
@@ -54,7 +54,7 @@ export default async function handler(req, res) {
         .eq('status', 'pending')
         .select('id, member_id')
         .maybeSingle();
-      if (error) return serverError(res, error.message);
+      if (error) return failed(res, error);
       if (!data) return badRequest(res, 'That claim has already been dealt with.');
       await recordAudit(supabase, admin, { action: `reward.claim_${body.status}`, entity: 'member', entity_id: data.member_id });
       return ok(res, { saved: true });
@@ -72,7 +72,7 @@ export default async function handler(req, res) {
         .insert({ name, description: text(body.description, 300) || null, points })
         .select('id')
         .single();
-      if (error) return serverError(res, error.message);
+      if (error) return failed(res, error);
       await recordAudit(supabase, admin, { action: 'reward.created', entity: 'reward', entity_id: data.id });
       return ok(res, { id: data.id });
     }
@@ -89,7 +89,7 @@ export default async function handler(req, res) {
     if (body.is_enabled !== undefined) patch.is_enabled = Boolean(body.is_enabled);
     if (patch.name === '') return badRequest(res, 'Give the reward a name.');
     const { error } = await supabase.from('rewards').update(patch).eq('id', body.id);
-    if (error) return serverError(res, error.message);
+    if (error) return failed(res, error);
     await recordAudit(supabase, admin, { action: 'reward.updated', entity: 'reward', entity_id: body.id });
     return ok(res, { saved: true });
   } catch (err) {

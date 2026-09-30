@@ -29,7 +29,7 @@
 // Never an error for "not learned": the check-in has already happened, and a
 // learning step must never be what a receptionist has to deal with.
 import { getSupabase } from '../../lib/supabase.js';
-import { allowMethods, readJsonBody, ok, badRequest, serverError } from '../../lib/http.js';
+import { allowMethods, readJsonBody, ok, badRequest, failed } from '../../lib/http.js';
 import { requireRole } from '../../lib/auth.js';
 import { rateLimit } from '../../lib/ratelimit.js';
 import {
@@ -65,7 +65,7 @@ export default async function handler(req, res) {
       legacyColumns: `${BASE}, ${LEGACY}`,
       apply: (q) => q.not(LEGACY, 'is', null),
     });
-    if (error) return serverError(res, error.message);
+    if (error) return failed(res, error);
     // No gallery column yet (migration not run): nowhere to learn into.
     if (degraded) return ok(res, { learned: false, reason: 'gallery unavailable' });
 

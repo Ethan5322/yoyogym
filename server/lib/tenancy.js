@@ -26,6 +26,7 @@
 //      default schema**. Falling back to `gym` would serve the original gym's
 //      data to whoever asked.
 import { AsyncLocalStorage } from 'node:async_hooks';
+import { timedFetch } from '../../shared/timed-fetch.js';
 
 const store = new AsyncLocalStorage();
 
@@ -124,7 +125,7 @@ export async function resolveGym(slug, deps) {
   }
 
   const client = deps.createClient(url, key, {
-    auth: { persistSession: false, autoRefreshToken: false },
+    auth: { persistSession: false, autoRefreshToken: false }, global: { fetch: timedFetch },
     db: { schema },
   });
 

@@ -1,7 +1,7 @@
 // GET /api/admin/members -> searchable, filterable member list (spec 4.4).
 // Query params: q, status, tier, parq ("1"), page, page_size. Owner/Manager.
 import { getSupabase } from '../../lib/supabase.js';
-import { allowMethods, ok, serverError } from '../../lib/http.js';
+import { allowMethods, ok, serverError, failed, filterText } from '../../lib/http.js';
 import { requireRole } from '../../lib/auth.js';
 
 export default async function handler(req, res) {
@@ -10,7 +10,7 @@ export default async function handler(req, res) {
 
   try {
     const url = new URL(req.url, 'http://localhost');
-    const q = (url.searchParams.get('q') || '').replace(/[%,]/g, '').trim();
+    const q = filterText(url.searchParams.get('q'));
     const status = url.searchParams.get('status');
     const parq = url.searchParams.get('parq');
     const tier = url.searchParams.get('tier');
@@ -35,7 +35,7 @@ export default async function handler(req, res) {
         mq = mq.gte('end_date', today).lte('end_date', until);
       }
       const { data: ms, error: msErr } = await mq;
-      if (msErr) return serverError(res, msErr.message);
+      if (msErr) return failed(res, msErr);
       memberIdFilter = [...new Set((ms || []).map((m) => m.member_id))];
       if (!memberIdFilter.length) {
         return ok(res, { members: [], total: 0, page, page_size: pageSize, pages: 0 });
@@ -60,7 +60,7 @@ export default async function handler(req, res) {
     if (memberIdFilter) query = query.in('id', memberIdFilter);
 
     const { data, count, error } = await query;
-    if (error) return serverError(res, error.message);
+    if (error) return failed(res, error);
 
     return ok(res, {
       members: data || [],

@@ -2026,3 +2026,59 @@ that need the user's keys and decisions are listed in Q2–Q5.
 > suspension causes, data export on exit, intellectual property, confidentiality, service levels and
 > support, liability and indemnity, price changes and taxes, governing law and disputes, notices and
 > general terms. The rewrite waits for the user's decisions (company details first); it stays DRAFT.
+
+---
+
+## 46. Production security, performance and store-readiness audit (user instruction, 2026-09-30)
+
+> The user's words, word for word ("before i test and we build hear what you should do"), followed by
+> the brief they pasted. Clarified one question at a time in §46.1, which wins over the text above it.
+> Findings are checked against the code, never assumed; store rules are checked against the official
+> store documentation, never from memory (§19).
+
+> Act as a Principal Software Engineer and Mobile Security Expert. I am preparing to launch my
+> application to production (targeting iOS App Store and Google Play Store).
+>
+> Please perform a comprehensive security, performance, and app store readiness audit on this entire
+> codebase, and write the necessary fixes and code updates.
+>
+> Focus specifically on these critical areas:
+>
+> 1. SECURITY & ANTI-HIJACKING
+> - Scan for hardcoded secrets, API keys, credentials, or private URLs, and move them to environment
+>   variables (.env). Ensure .env is added to .gitignore.
+> - Review all API endpoints to ensure Parameterized Queries or ORM methods are used exclusively to
+>   prevent SQL Injection (SQLi).
+> - Verify Object-Level Authorization (BOLA/IDOR): ensure every database query checks resource
+>   ownership (e.g., WHERE user_id = authenticated_user.id).
+> - Audit token/session storage: ensure auth tokens (JWTs) are stored in HttpOnly, Secure cookies or
+>   native OS secure storage (Keychain/KeyStore), NEVER in raw localStorage or AsyncStorage.
+> - Audit third-party dependencies for known vulnerabilities or suspicious imports.
+>
+> 2. RATE LIMITING, RESILIENCE & DENIAL-OF-SERVICE (DoS)
+> - Implement or verify global and route-specific API rate limiting (e.g., using Redis or middleware)
+>   to prevent single users or bots from spamming the API.
+> - Ensure database connection pooling and query timeouts are configured.
+> - Enforce strict JSON payload size limits (e.g., max 1MB) on incoming requests.
+>
+> 3. APP STORE COMPLIANCE (iOS & Android)
+> - Audit AI features: ensure AI outputs are disclaimed, sanitized, and that a user mechanism to
+>   report or block inappropriate content exists.
+> - Account Control: verify there is a working in-app path for users to delete their account and
+>   associated data.
+> - Monetization: ensure digital purchases or subscriptions rely on native store payment mechanisms
+>   (Apple IAP / Google Play Billing).
+> - Social Logins: if Google/Facebook login exists, confirm Sign in with Apple is implemented for iOS
+>   compatibility.
+>
+> 4. ERROR HANDLING & TELEMETRY
+> - Ensure sensitive PII, passwords, or raw stack traces are never logged to output or sent to
+>   user-facing error UI.
+> - Implement clean, graceful UI fallbacks for failed network calls or server errors.
+>
+> Please analyze the codebase against these criteria, list any vulnerabilities or missing
+> requirements found, and provide step-by-step code modifications or pull requests to fix them.
+
+### 46.1 Clarifications — answered by the user, one at a time
+
+(Filled in as the audit finds what needs the user's decision.)

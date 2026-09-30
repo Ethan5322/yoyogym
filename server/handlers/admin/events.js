@@ -3,7 +3,7 @@
 //   POST   /api/admin/events           { title, type, event_date, end_date, start_time, description }
 //   DELETE /api/admin/events?id=...
 import { getSupabase } from '../../lib/supabase.js';
-import { allowMethods, readJsonBody, ok, badRequest, serverError } from '../../lib/http.js';
+import { allowMethods, readJsonBody, ok, badRequest, serverError, failed } from '../../lib/http.js';
 import { requireRole } from '../../lib/auth.js';
 
 const FIELDS = ['title', 'type', 'event_date', 'end_date', 'start_time', 'description'];
@@ -25,7 +25,7 @@ export default async function handler(req, res) {
       if (from) q = q.gte('event_date', from);
       if (to) q = q.lte('event_date', to);
       const { data, error } = await q;
-      if (error) return serverError(res, error.message);
+      if (error) return failed(res, error);
       return ok(res, { events: data || [] });
     }
 
@@ -33,7 +33,7 @@ export default async function handler(req, res) {
       const body = pick(await readJsonBody(req));
       if (!body.title || !body.event_date) return badRequest(res, 'title and event_date are required.');
       const { data, error } = await supabase.from('events').insert({ ...body, created_by: admin.sub }).select('id').single();
-      if (error) return serverError(res, error.message);
+      if (error) return failed(res, error);
       return ok(res, { id: data.id });
     }
 
@@ -41,7 +41,7 @@ export default async function handler(req, res) {
       const id = url.searchParams.get('id');
       if (!id) return badRequest(res, 'id is required.');
       const { error } = await supabase.from('events').delete().eq('id', id);
-      if (error) return serverError(res, error.message);
+      if (error) return failed(res, error);
       return ok(res, { deleted: true });
     }
   } catch (err) {

@@ -1,6 +1,7 @@
 // Root API router. Resolves the route from req.url. Logic lives in /server
 // (outside /api), so only the 6 router files count as Serverless Functions.
 import { json } from '../server/lib/http.js';
+import { guardRequest, MAX_PHOTO_BODY_BYTES } from '../server/lib/guard.js';
 import { withGym } from '../server/lib/gymcontext.js';
 import { applyAppCors } from '../shared/cors.js';
 import { captureError } from '../server/lib/observability.js';
@@ -14,6 +15,9 @@ import publicProfile from '../server/handlers/public/public-profile.js';
 
 const routes = { health, catalog, content, register, scan, document, 'public-profile': publicProfile };
 
+// Routes that carry face photos, a logo or a member import (server/lib/guard.js).
+const PHOTO_ROUTES = new Set(['register']);
+
 export default async function handler(req, res) {
   // The Yoyo Gyms app calls these from its own origin (shared/cors.js).
   if (applyAppCors(req, res)) return;
@@ -21,6 +25,8 @@ export default async function handler(req, res) {
   const key = parts.slice(1).join('/'); // drop leading "api"
   const fn = routes[key];
   if (!fn) return json(res, 404, { error: `Not found: /api/${key}` });
+  // Size and rate first, before any work is done (CLAUDE.md §46).
+  if (!guardRequest(req, res, PHOTO_ROUTES.has(key) ? { maxBytes: MAX_PHOTO_BODY_BYTES } : undefined)) return;
   try {
     return await withGym(req, res, () => fn(req, res), json);
   } catch (err) {

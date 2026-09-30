@@ -7,7 +7,7 @@
 // same person to compare against, and adaptive learning at login time keeps it
 // current as the member's appearance drifts.
 import { getSupabase } from '../../lib/supabase.js';
-import { allowMethods, readJsonBody, ok, badRequest, serverError } from '../../lib/http.js';
+import { allowMethods, readJsonBody, ok, badRequest, serverError, failed } from '../../lib/http.js';
 import { authenticateMember } from '../../lib/memberauth.js';
 import { faceServiceConfigured, embedEnrolmentImages } from '../../lib/faceservice.js';
 import { enrolmentGallery } from '../../lib/facematch.js';
@@ -56,7 +56,7 @@ export default async function handler(req, res) {
 
     const supabase = getSupabase();
     const { error, degraded } = await updateFaceRow(supabase, 'members', auth.sub, patch);
-    if (error) return serverError(res, error.message);
+    if (error) return failed(res, error);
 
     // `degraded` means the gallery columns are missing on this tenant, so only
     // the first pose survived the write. Enrolment still "succeeds", which is

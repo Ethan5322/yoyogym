@@ -5,7 +5,7 @@
 //   POST /api/admin/settings?upload=cover|poster  -> a one-time upload link for
 //        the gym's cover picture (§38.1 Q4) or its background poster (§39.1 Q3)
 import { getSupabase } from '../../lib/supabase.js';
-import { allowMethods, readJsonBody, ok, badRequest, serverError } from '../../lib/http.js';
+import { allowMethods, readJsonBody, ok, badRequest, serverError, failed } from '../../lib/http.js';
 import { requireRole } from '../../lib/auth.js';
 import { recordAudit } from '../../lib/audit.js';
 import { currentGym } from '../../lib/tenancy.js';
@@ -111,13 +111,13 @@ export default async function handler(req, res) {
         { onConflict: 'key' }
       );
       if (!error && key === MEMBER_SERVICES_KEY) forgetServicesOff();
-      if (error) return serverError(res, error.message);
+      if (error) return failed(res, error);
       await recordAudit(supabase, admin, { action: 'settings.save', entity: 'settings', entity_id: key });
       return ok(res, { saved: true });
     }
 
     const { data, error } = await supabase.from('settings').select('key, value, category');
-    if (error) return serverError(res, error.message);
+    if (error) return failed(res, error);
     const settings = Object.fromEntries((data || []).map((r) => [r.key, r.value]));
     return ok(res, { settings });
   } catch (err) {

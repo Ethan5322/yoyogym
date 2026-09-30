@@ -4,7 +4,7 @@
 //        op = "cancel"  -> cancel that occurrence's bookings + email members
 //           | "notify"  -> email all booked members a custom message
 import { getSupabase } from '../../lib/supabase.js';
-import { allowMethods, readJsonBody, ok, badRequest, serverError } from '../../lib/http.js';
+import { allowMethods, readJsonBody, ok, badRequest, serverError, failed } from '../../lib/http.js';
 import { requireRole } from '../../lib/auth.js';
 import { sendEmail, emailConfigured } from '../../lib/notify/channels.js';
 
@@ -56,7 +56,7 @@ export default async function handler(req, res) {
         .eq('class_id', class_id)
         .gte('session_date', today)
         .order('session_date', { ascending: true });
-      if (error) return serverError(res, error.message);
+      if (error) return failed(res, error);
       return ok(res, {
         bookings: (data || []).map((b) => ({
           id: b.id,
@@ -75,13 +75,13 @@ export default async function handler(req, res) {
     if (op === 'mark') {
       if (!booking_id || !['attended', 'no_show', 'booked'].includes(status)) return badRequest(res, 'booking_id and a valid status are required.');
       const { error: e } = await supabase.from('class_bookings').update({ status }).eq('id', booking_id);
-      if (e) return serverError(res, e.message);
+      if (e) return failed(res, e);
       return ok(res, { updated: true });
     }
     if (op === 'promote') {
       if (!booking_id) return badRequest(res, 'booking_id is required.');
       const { error: e } = await supabase.from('class_bookings').update({ status: 'booked', waitlist_position: null }).eq('id', booking_id);
-      if (e) return serverError(res, e.message);
+      if (e) return failed(res, e);
       return ok(res, { promoted: true });
     }
 
@@ -96,7 +96,7 @@ export default async function handler(req, res) {
       .eq('class_id', class_id)
       .eq('session_date', session_date)
       .in('status', ['booked', 'waitlisted']);
-    if (error) return serverError(res, error.message);
+    if (error) return failed(res, error);
 
     if (op === 'cancel') {
       await supabase

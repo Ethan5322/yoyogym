@@ -8,7 +8,7 @@
 // frozen face template, and the only symptom is "recognition keeps failing".
 // Surfacing it here turns a silent misconfiguration into a one-line check.
 import { getSupabase } from '../../lib/supabase.js';
-import { allowMethods, ok, serverError } from '../../lib/http.js';
+import { allowMethods, ok, serverError, failed } from '../../lib/http.js';
 
 // column -> the migration that adds it
 const OPTIONAL_COLUMNS = {
@@ -85,6 +85,6 @@ export default async function handler(req, res) {
         : {}),
     });
   } catch (err) {
-    return serverError(res, err.message);
+    return failed(res, err);
   }
 }

@@ -10,7 +10,7 @@
 // status 'new' (awaiting activation). The membership number + verification
 // code are issued now so the success screen + PDF (Phase 4) can use them.
 import { getSupabase } from '../../lib/supabase.js';
-import { allowMethods, readJsonBody, ok, badRequest, serverError, json } from '../../lib/http.js';
+import { allowMethods, readJsonBody, ok, badRequest, serverError, json, failed } from '../../lib/http.js';
 import { generateMembershipNumber, generateVerificationCode } from '../../lib/identifiers.js';
 import { faceServiceConfigured, embedEnrolmentImages } from '../../lib/faceservice.js';
 import { enrolmentGallery } from '../../lib/facematch.js';
@@ -101,7 +101,7 @@ export default async function handler(req, res) {
       .eq('id', a.membership.plan_id)
       .eq('is_enabled', true)
       .maybeSingle();
-    if (planErr) return serverError(res, planErr.message);
+    if (planErr) return failed(res, planErr);
     if (!plan) return badRequest(res, 'Selected plan is no longer available.');
 
     const { data: discSetting } = await supabase
@@ -132,7 +132,7 @@ export default async function handler(req, res) {
         .select('*')
         .in('id', addonIds)
         .eq('is_enabled', true);
-      if (addonErr) return serverError(res, addonErr.message);
+      if (addonErr) return failed(res, addonErr);
       addons = (addonRows || []).map((r) => ({
         id: r.id,
         name: r.name,
@@ -229,7 +229,7 @@ export default async function handler(req, res) {
     }
     // insertFaceRow retries without the gallery columns on an un-migrated tenant.
     const { data: member, error: memberErr } = await insertFaceRow(supabase, 'members', memberRow, 'id');
-    if (memberErr) return serverError(res, memberErr.message);
+    if (memberErr) return failed(res, memberErr);
     createdMemberId = member.id;
 
     // ---- compute membership dates ----

@@ -1,7 +1,7 @@
 // Membership plan management (spec 4.13 — Membership Plans). Owner/Manager.
 //   GET / POST / PATCH?id / DELETE?id
 import { getSupabase } from '../../lib/supabase.js';
-import { allowMethods, readJsonBody, ok, badRequest, serverError } from '../../lib/http.js';
+import { allowMethods, readJsonBody, ok, badRequest, serverError, failed } from '../../lib/http.js';
 import { requireRole } from '../../lib/auth.js';
 import { planPriceMissing } from '../../../shared/pricing.js';
 
@@ -28,7 +28,7 @@ export default async function handler(req, res) {
   try {
     if (req.method === 'GET') {
       const { data, error } = await supabase.from('plans').select('*').order('sort_order');
-      if (error) return serverError(res, error.message);
+      if (error) return failed(res, error);
       return ok(res, { plans: data || [] });
     }
     if (req.method === 'POST') {
@@ -36,7 +36,7 @@ export default async function handler(req, res) {
       if (!body.name) return badRequest(res, 'Plan name is required.');
       if (body.is_enabled !== false && planPriceMissing({ visit_type: 'full', ...body })) return badRequest(res, NO_PRICE);
       const { data, error } = await supabase.from('plans').insert(body).select('id').single();
-      if (error) return serverError(res, error.message);
+      if (error) return failed(res, error);
       return ok(res, { id: data.id });
     }
     if (req.method === 'PATCH') {
@@ -48,13 +48,13 @@ export default async function handler(req, res) {
       if (after.is_enabled && planPriceMissing(after)) return badRequest(res, NO_PRICE);
       body.updated_at = new Date().toISOString();
       const { error } = await supabase.from('plans').update(body).eq('id', id);
-      if (error) return serverError(res, error.message);
+      if (error) return failed(res, error);
       return ok(res, { updated: true });
     }
     if (req.method === 'DELETE') {
       if (!id) return badRequest(res, 'id is required.');
       const { error } = await supabase.from('plans').delete().eq('id', id);
-      if (error) return serverError(res, error.message);
+      if (error) return failed(res, error);
       return ok(res, { deleted: true });
     }
   } catch (err) {
