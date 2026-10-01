@@ -33,7 +33,7 @@ import { fileFacts } from './forensics.js';
 import { gymStats } from './stats.js';
 import { gymOwnerAccount } from './gym-admin.js';
 import { reconcileSchemas } from './reconciliation.js';
-import { GRACE_DAYS } from './billing.js';
+import { GRACE_DAYS, invoiceNumberOf, paidSubscriptionPatch } from './billing.js';
 import { chargeAuthorization, paystackConfigured, initializeSubscriptionPayment, verifyTransaction } from './paystack.js';
 import { makeLimiter } from './ratelimit.js';
 import { platformBaseUrl } from './base-url.js';
@@ -45,7 +45,6 @@ import {
   coordinate, haversineKm, nearestGyms, likeTerm, RESULT_LIMIT, BOX_FETCH,
 } from './gym-search.js';
 import { timedFetch } from '../shared/timed-fetch.js';
-import { monthBought } from '../shared/yoyo-plan.js';
 
 let _db = null;
 
@@ -825,11 +824,7 @@ export function platformOpsDeps(db = platformDb()) {
 
     /** Apply what a verified Paystack webhook means. */
     applyPaystackEvent: async (intent) => {
-      const { data: invoice } = await db
-        .from('platform_invoices')
-        .select('*')
-        .eq('provider_ref', intent.reference)
-        .maybeSingle();
+      const invoice = await invoiceForReference(db, intent.reference);
 
       // An unknown reference is logged, not guessed at. It may be a payment
       // for something else entirely, and marking a random invoice paid is
@@ -846,26 +841,34 @@ export function platformOpsDeps(db = platformDb()) {
       const now = new Date().toISOString();
 
       if (intent.kind === 'payment_succeeded') {
-        // Already paid: this is a duplicate delivery, which Paystack does
-        // routinely. Acknowledged, not applied twice.
-        if (invoice.status === 'paid') return { ok: true, duplicate: true };
+        if (invoice.status === 'paid') {
+          // The same attempt again: a duplicate delivery, which Paystack does
+          // routinely. Acknowledged, not applied twice.
+          if (!invoice.provider_ref || invoice.provider_ref === intent.reference) return { ok: true, duplicate: true };
+          // ANOTHER attempt on a month already paid: the owner paid twice. Not
+          // applied — a second month was never asked for — and a person must
+          // refund it (§49).
+          await audit(db, {
+            action: 'platform.invoice.paid_twice',
+            actor_kind: 'system',
+            entity: 'invoice',
+            entity_id: invoice.id,
+            detail: { gym_id: invoice.gym_id, reference: intent.reference, paid_reference: invoice.provider_ref, amount_cents: intent.amount_cents },
+          });
+          return { ok: true, paidTwice: true };
+        }
 
-        await db.from('platform_invoices').update({ status: 'paid', paid_at: now, updated_at: now }).eq('id', invoice.id);
+        await db
+          .from('platform_invoices')
+          .update({ status: 'paid', paid_at: now, updated_at: now, provider_ref: intent.reference })
+          .eq('id', invoice.id);
         // The month this invoice bought, and the card for the next one — the
-        // same month the browser's return would record, from the same invoice
-        // (CLAUDE.md §48.1 Q3). Before this, a webhook that arrived first
-        // left the period where it was: a trial payment was never renewed.
-        const month = monthBought(invoice.period_end, new Date(now));
+        // same patch the browser's return records, from the same invoice
+        // (CLAUDE.md §48.1 Q3). Before §48, a webhook that arrived first left
+        // the period where it was: a trial payment was never renewed.
         await db
           .from('platform_subscriptions')
-          .update({
-            status: 'active',
-            grace_ends_at: null,
-            current_period_start: month.start,
-            current_period_end: month.end,
-            ...(intent.card || {}),
-            updated_at: now,
-          })
+          .update(paidSubscriptionPatch({ periodEnd: invoice.period_end, card: intent.card, now: new Date(now) }))
           .eq('gym_id', invoice.gym_id);
         // A gym suspended for non-payment comes back the moment it pays.
         await db.from('gyms').update({ status: 'active', suspended_at: null, updated_at: now })
@@ -994,9 +997,15 @@ export function platformOpsDeps(db = platformDb()) {
       return data ?? null;
     },
 
-    findInvoiceByRef: async (reference) => {
-      const { data } = await db.from('platform_invoices').select('*').eq('provider_ref', reference).maybeSingle();
-      return data ?? null;
+    findInvoiceByRef: (reference) => invoiceForReference(db, reference),
+
+    /** A new payment attempt on an open invoice gets its own reference (§49). */
+    setInvoiceReference: async (id, reference) => {
+      const { error } = await db
+        .from('platform_invoices')
+        .update({ provider_ref: reference, updated_at: new Date().toISOString() })
+        .eq('id', id);
+      if (error) throw new Error(`Could not start a new payment attempt: ${error.message}`);
     },
 
     initializePayment: ({ email, amountCents, reference, metadata }) =>
@@ -1011,10 +1020,12 @@ export function platformOpsDeps(db = platformDb()) {
     /** Asked of Paystack directly. The browser's word is not evidence. */
     verifyPayment: (reference) => verifyTransaction(reference),
 
-    markInvoicePaid: async (id, at) => {
+    // Recorded under the reference that PAID, so a payment on any other
+    // attempt is seen for what it is: a second payment (§49).
+    markInvoicePaid: async (id, at, reference = null) => {
       const { error } = await db
         .from('platform_invoices')
-        .update({ status: 'paid', paid_at: at, updated_at: at })
+        .update({ status: 'paid', paid_at: at, updated_at: at, ...(reference ? { provider_ref: reference } : {}) })
         .eq('id', id);
       if (error) throw new Error(`Could not record the payment: ${error.message}`);
     },
@@ -1054,6 +1065,21 @@ export function platformOpsDeps(db = platformDb()) {
         audit: (e) => audit(db, e),
       }),
   };
+}
+
+/**
+ * The invoice a Paystack reference belongs to: the invoice's current attempt,
+ * or — for a payment made on an EARLIER attempt — the invoice whose number the
+ * reference starts with (attemptReference, CLAUDE.md §49).
+ */
+async function invoiceForReference(db, reference) {
+  const { data } = await db.from('platform_invoices').select('*').eq('provider_ref', reference).maybeSingle();
+  if (data) return data;
+  // The FIRST attempt's reference is the invoice number itself.
+  const number = invoiceNumberOf(reference);
+  if (!number) return null;
+  const { data: byNumber } = await db.from('platform_invoices').select('*').eq('number', number).maybeSingle();
+  return byNumber ?? null;
 }
 
 /** Billing's side effects, against the real database and our own Paystack account. */
@@ -1097,7 +1123,7 @@ export function billingDeps(db = platformDb()) {
     findInvoiceForPeriod: async (gymId, periodEnd) => {
       const { data } = await db
         .from('platform_invoices')
-        .select('id, status')
+        .select('*')
         .eq('gym_id', gymId)
         .eq('period_end', periodEnd)
         .maybeSingle();
@@ -1113,6 +1139,9 @@ export function billingDeps(db = platformDb()) {
     updateInvoice: async (id, patch) => {
       await db.from('platform_invoices').update({ ...patch, updated_at: new Date().toISOString() }).eq('id', id);
     },
+
+    /** Was an earlier attempt on this invoice paid after all? Paystack's word (§49). */
+    verifyPayment: (reference) => verifyTransaction(reference),
 
     charge: async ({ email, amountCents, reference, gymId, authorizationCode = null }) => {
       // THE BUG THIS FIXES: this used to pass authorizationCode: null to

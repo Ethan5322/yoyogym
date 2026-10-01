@@ -3441,12 +3441,28 @@ export function setupDonePage({ recoveryCodes = [], invited = false } = {}) {
  * subscription and a single payment, and the owner should not discover it next
  * month when their gym is suspended.
  */
-export function paymentResultPage({ ok = false, reason = '', alreadyPaid = false, recurring = false, gymSlug = '' } = {}) {
+export function paymentResultPage({ ok = false, reason = '', alreadyPaid = false, paidTwice = false, recurring = false, gymSlug = '' } = {}) {
   // Back to where the owner came from: their gym's admin panel (its dashboard
   // has Pay now, §48) or their Yoyo account page.
   const ways = `<p>${
     gymSlug ? `<a class="btn" href="${h(gymAdminPath(gymSlug))}">Open your gym admin panel →</a> ` : ''
   }<a href="/platform/my-gym"${gymSlug ? ' class="btn ghost"' : ''}>${gymSlug ? 'Your Yoyo account' : 'Back to your gym →'}</a></p>`;
+  // The month was already paid by another attempt, and this one went through
+  // too (CLAUDE.md §49). Said plainly; the second payment is for a person at
+  // Yoyo Gyms to return, and the audit log carries it.
+  if (ok && paidTwice) {
+    return layout({
+      title: 'Already paid',
+      body: `<div class="card">
+  <h1>This month was already paid</h1>
+  <p>This payment went through as well, so you have paid this month twice. Nothing extra has been added
+  to your plan. We have recorded the second payment, and Yoyo Gyms will contact you to return it.</p>
+  <p class="muted">Questions? Write to <a href="mailto:hello@mulesoo.com">hello@mulesoo.com</a>.</p>
+  ${ways}
+</div>`,
+    });
+  }
+
   if (!ok) {
     return layout({
       title: 'Payment not completed',

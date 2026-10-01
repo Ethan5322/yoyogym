@@ -88,12 +88,22 @@ test('the invoice is raised BEFORE the payment page', async () => {
 });
 
 test('opening the payment page twice does not raise two invoices', async () => {
-  // An owner who clicks twice owes one month, not two.
-  const d = deps({ findOpenInvoice: async () => INVOICE });
+  // An owner who clicks twice owes one month, not two. The first page was
+  // left unpaid, so the same invoice gets a NEW attempt with its own
+  // reference — Paystack refuses one it has seen before (CLAUDE.md §49).
+  const refs = [];
+  const d = deps({
+    findOpenInvoice: async () => ({ ...INVOICE, number: 'YG-2026-000001', provider_ref: 'YG-2026-000001' }),
+    verifyPayment: async () => ({ status: 'abandoned' }),
+    setInvoiceReference: async (id, ref) => { refs.push(ref); },
+  });
   const result = await startCheckout(d, { gymId: 'g1', now: NOW });
 
   assert.equal(d.calls.invoices.length, 0);
   assert.equal(result.ok, true);
+  assert.equal(refs.length, 1);
+  assert.match(refs[0], /^YG-2026-000001-[0-9A-Z]+$/);
+  assert.equal(d.calls.initialized[0].reference, refs[0]);
 });
 
 // ---------------------------------------------------------------------------

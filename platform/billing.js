@@ -11,6 +11,7 @@
 // suspension window can be tested in milliseconds.
 //
 // The side effects live in platform/billing-runner.js, which decides nothing.
+import { monthBought } from '../shared/yoyo-plan.js';
 
 /** The free trial, in days (D-070). */
 export const TRIAL_DAYS = 30;
@@ -255,7 +256,7 @@ export function eventToIntent(payload) {
 }
 
 /** The saved-card fields a paid charge carries, or null when it carries none. */
-function cardOf(data) {
+export function cardOf(data) {
   const auth = data?.authorization;
   if (!auth || typeof auth.authorization_code !== 'string' || !auth.authorization_code) return null;
   const text = (v) => (typeof v === 'string' && v ? v.slice(0, 64) : null);
@@ -270,4 +271,55 @@ function cardOf(data) {
 /** Human-readable invoice number: YG-2026-000123. */
 export function invoiceNumber(sequence, now = new Date()) {
   return `YG-${new Date(now).getUTCFullYear()}-${String(sequence).padStart(6, '0')}`;
+}
+
+/**
+ * A fresh Paystack reference for ONE payment attempt on an invoice (CLAUDE.md §49).
+ *
+ * Paystack refuses a reference it has seen before ("Transaction references
+ * must be unique for every initialization attempt"), so a second Pay now on
+ * the same invoice — after the owner left the first page — was refused, and
+ * that month could never be paid. Every attempt now has its own reference,
+ * and each starts with the invoice number, so a payment made on ANY attempt
+ * still finds its invoice (invoiceNumberOf).
+ */
+export function attemptReference(invoiceNo, now = new Date()) {
+  return `${invoiceNo}-${now.getTime().toString(36).toUpperCase()}`;
+}
+
+/** "YG-2026-000123-MG7XK2LQ" -> "YG-2026-000123"; the invoice number itself stays as it is. */
+export function invoiceNumberOf(reference) {
+  const parts = String(reference || '').split('-');
+  return parts.length >= 3 && parts[0] ? parts.slice(0, 3).join('-') : null;
+}
+
+/**
+ * The subscription once an invoice is paid: active, the month that invoice
+ * bought (from where the time it was raised against ends, §48.1 Q3), and the
+ * card for the next one. One patch for every path that records a payment —
+ * the owner's return from Paystack, the webhook, and the nightly run.
+ */
+export function paidSubscriptionPatch({ periodEnd = null, card = null, now = new Date() } = {}) {
+  const month = monthBought(periodEnd, now);
+  return {
+    status: 'active',
+    grace_ends_at: null,
+    current_period_start: month.start,
+    current_period_end: month.end,
+    ...(card || {}),
+    updated_at: now.toISOString(),
+  };
+}
+
+/**
+ * An unpaid invoice the nightly run may try again: raised at least this long
+ * ago. A run that fires twice in a day finds its own invoice from hours
+ * earlier and leaves it — its charge may still be on its way — and an owner
+ * who has just opened Pay now is not charged underneath them.
+ */
+export const RETRY_AFTER_HOURS = 12;
+
+export function staleInvoice(invoice, now = new Date()) {
+  const at = invoice?.issued_at ? new Date(invoice.issued_at).getTime() : NaN;
+  return Number.isFinite(at) && now.getTime() - at >= RETRY_AFTER_HOURS * 3_600_000;
 }

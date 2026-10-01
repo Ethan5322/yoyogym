@@ -2256,3 +2256,33 @@ to `/platform/pay/start`. Fixed on the way: the platform router lacked three fun
 (every Pay now would have failed), and the Paystack webhook moved no dates and saved no card. Also: the
 platform reads its Paystack key from `PLATFORM_PAYSTACK_SECRET_KEY` (D-108), but Settings and this file named
 `PAYSTACK_SECRET_KEY` — corrected; a missing key now says "nothing has been charged" instead of failing. No SQL.
+
+---
+
+## 49. A payment page left open, and the Android test app refused (user instruction, 2026-10-01)
+
+> The user's words, word for word, answering "Do you want me to fix it?" about the gap found in §48.
+
+> yes, fix test android app refused to install in android also fix it, make sure it is not refusing or says
+> not installed after try to install,
+
+**Found while fixing** (checked against Paystack's own documentation: *"Transaction references must be unique
+for every initialization attempt"*): pressing Pay now again after leaving a payment page reused the invoice's
+reference, which Paystack refuses — that month could never be paid; and the unpaid invoice made the nightly run
+skip the gym for ever (never charged, never overdue, never suspended).
+
+**Built 2026-10-01** — vault D-174: every payment attempt has its own reference (the invoice number plus a
+suffix), and a payment on ANY attempt finds its invoice; before a new attempt, Paystack is asked whether the
+last one was paid after all (then it is recorded, never charged again); the nightly run tries an unpaid invoice
+again once it is 12 hours old (younger ones are left alone, so a run twice in a day never charges twice) — with
+no saved card the gym becomes overdue with its two days' grace and an email, as any failed payment; a month paid
+on two attempts is recorded once and flagged in the audit log (`platform.invoice.paid_twice`) for a person to
+refund, and the owner is told. No SQL.
+
+**The Android test app:** the APK on the Desktop is valid — installed successfully on an Android 14 emulator;
+signed (v2, this machine's debug key since 31 Aug); minimum Android 8.0; all 16 native libraries stored as
+Android requires; every file's checksum good; aligned for 4 KB and 16 KB page phones; ordinary permissions only.
+So the refusal comes from the phone, and its exact message decides the fix (another app with the same name
+signed differently, Play Protect, "install unknown apps" not allowed for the app that opened the file, Android
+older than 8.0, or a file not fully downloaded). Google's developer verification began on 30 Sep 2026 in
+Indonesia, Singapore, Thailand and Brazil only; elsewhere in 2027.

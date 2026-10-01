@@ -23,8 +23,8 @@
 //    back to us with a reference; anyone can type that URL. What settles it is
 //    asking Paystack directly what happened to that reference, server to
 //    server, which is what completeCheckout does before anything is recorded.
-import { invoiceNumber } from './billing.js';
-import { planStanding, monthBought, planDate } from '../shared/yoyo-plan.js';
+import { invoiceNumber, attemptReference, paidSubscriptionPatch, cardOf } from './billing.js';
+import { planStanding, planDate } from '../shared/yoyo-plan.js';
 
 /**
  * Start a payment.
@@ -35,7 +35,9 @@ import { planStanding, monthBought, planDate } from '../shared/yoyo-plan.js';
  * payment with no invoice is money arriving for no stated reason.
  *
  * @param {object} deps { getSubscription, getPlan, getGym, findOpenInvoice,
- *                        createInvoice, initializePayment, audit }
+ *                        createInvoice, setInvoiceReference, verifyPayment,
+ *                        markInvoicePaid, activateSubscription,
+ *                        initializePayment, audit }
  */
 export async function startCheckout(deps, { gymId, userId = null, source = 'account page', now = new Date() } = {}) {
   const subscription = await deps.getSubscription(gymId);
@@ -74,7 +76,21 @@ export async function startCheckout(deps, { gymId, userId = null, source = 'acco
   // one. An owner who opens the payment page twice owes one month, not two.
   let invoice = await deps.findOpenInvoice(gymId, periodEnd);
 
-  if (!invoice) {
+  if (invoice) {
+    // The last attempt may have been PAID with nothing recorded — the page
+    // closed before it came back, and the webhook lost. Paystack is asked
+    // first; paying again would take the month twice (CLAUDE.md §49).
+    const last = invoice.provider_ref ? await deps.verifyPayment(invoice.provider_ref).catch(() => null) : null;
+    if (last?.status === 'success' && Number(last.amount) === Number(invoice.amount_cents)) {
+      await settleInvoice(deps, invoice, last, invoice.provider_ref, now);
+      return { ok: false, reason: 'This month is already paid — thank you. Nothing more has been charged.' };
+    }
+    // A new attempt, with its own reference: Paystack refuses one it has seen
+    // before, so the owner who left the first page could never pay (§49).
+    const reference = attemptReference(invoice.number, now);
+    await deps.setInvoiceReference(invoice.id, reference);
+    invoice = { ...invoice, provider_ref: reference };
+  } else {
     const reference = invoiceNumber(Date.now() % 1_000_000, now);
     invoice = await deps.createInvoice({
       gym_id: gymId,
@@ -137,6 +153,19 @@ export async function completeCheckout(deps, { reference, now = new Date() } = {
   // Already settled — the webhook usually arrives before the browser does.
   // Acknowledged, not applied twice.
   if (invoice.status === 'paid') {
+    if (!invoice.provider_ref || invoice.provider_ref === reference) return { ok: true, alreadyPaid: true, invoice };
+    // Paid by ANOTHER attempt — was this one paid too? Then the owner paid
+    // the month twice, and a person must refund one (§49).
+    const second = await deps.verifyPayment(reference).catch(() => null);
+    if (second?.status === 'success') {
+      await deps.audit({
+        action: 'platform.invoice.paid_twice',
+        entity: 'invoice',
+        entity_id: invoice.id,
+        detail: { gym_id: invoice.gym_id, reference, paid_reference: invoice.provider_ref, amount_cents: second.amount ?? null },
+      });
+      return { ok: true, alreadyPaid: true, paidTwice: true, invoice };
+    }
     return { ok: true, alreadyPaid: true, invoice };
   }
 
@@ -164,32 +193,28 @@ export async function completeCheckout(deps, { reference, now = new Date() } = {
     return { ok: false, reason: 'That payment did not match the invoice. Please contact us.' };
   }
 
-  await deps.markInvoicePaid(invoice.id, now.toISOString());
+  const recurring = await settleInvoice(deps, invoice, verified, reference, now);
+  return { ok: true, invoice, recurring };
+}
 
-  // THE PART THAT MAKES IT A SUBSCRIPTION RATHER THAN ONE PAYMENT.
-  //
-  // Paystack returns an authorization code after a successful card payment.
-  // Stored, it lets the nightly run charge the same card next month without
-  // asking. Not stored, there is a first payment and then silence — which is
-  // exactly what this system did before today.
-  const auth = verified.authorization || {};
-  // The month this invoice bought starts where the time it was raised against
-  // ends: paid during the free trial, the free days are kept and the trial's
-  // end charges nothing (CLAUDE.md §48.1 Q3). The webhook applies the same
-  // month from the same invoice, so whichever arrives first, they agree.
-  const month = monthBought(invoice.period_end, now);
-  await deps.activateSubscription(invoice.gym_id, {
-    status: 'active',
-    grace_ends_at: null,
-    current_period_start: month.start,
-    current_period_end: month.end,
-    paystack_auth_code: auth.authorization_code ?? null,
-    paystack_customer: verified.customer?.customer_code ?? null,
-    card_brand: auth.brand ?? null,
-    card_last4: auth.last4 ?? null,
-    updated_at: now.toISOString(),
-  });
-
+/**
+ * Record a payment Paystack has CONFIRMED: the invoice paid (under the
+ * reference that paid it), the subscription active for the month the invoice
+ * bought, and the card kept for the next one.
+ *
+ * THE PART THAT MAKES IT A SUBSCRIPTION RATHER THAN ONE PAYMENT: Paystack
+ * returns an authorization code after a card payment; stored, the nightly run
+ * charges the same card next month without asking.
+ *
+ * The month starts where the time the invoice was raised against ends — paid
+ * during the free trial, every free day is kept (CLAUDE.md §48.1 Q3). The
+ * webhook records the same month from the same invoice, so whichever arrives
+ * first, they agree. Returns whether renewals will work.
+ */
+async function settleInvoice(deps, invoice, verified, reference, now) {
+  await deps.markInvoicePaid(invoice.id, now.toISOString(), reference);
+  const card = cardOf(verified);
+  await deps.activateSubscription(invoice.gym_id, paidSubscriptionPatch({ periodEnd: invoice.period_end, card, now }));
   await deps.audit({
     action: 'platform.checkout.paid',
     entity: 'invoice',
@@ -198,9 +223,8 @@ export async function completeCheckout(deps, { reference, now = new Date() } = {
       gym_id: invoice.gym_id,
       amount_cents: invoice.amount_cents,
       // Whether renewals will work, recorded at the moment it is decided.
-      recurring_enabled: Boolean(auth.authorization_code),
+      recurring_enabled: Boolean(card?.paystack_auth_code),
     },
   });
-
-  return { ok: true, invoice, recurring: Boolean(auth.authorization_code) };
+  return Boolean(card?.paystack_auth_code);
 }

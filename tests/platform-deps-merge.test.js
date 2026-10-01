@@ -63,6 +63,8 @@ test('the router gets every dependency its routes call for', () => {
     // Pay now (platform/checkout.js) — these three were missing, so every
     // payment failed before reaching Paystack (CLAUDE.md §48).
     'getPlan', 'getGym', 'createInvoice',
+    // Each Pay now is its own Paystack attempt (CLAUDE.md §49).
+    'setInvoiceReference',
   ]) {
     assert.equal(typeof merged[name], 'function', `missing dependency: ${name}`);
   }

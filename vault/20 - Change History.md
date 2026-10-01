@@ -15,6 +15,19 @@ occurrence is answered from notes rather than rediscovered.
 
 ---
 
+## 2026-10-01 — §49: payment attempts; the Android install refusal
+
+**§49** (D-174). The test written for the new lookup caught a bug in it at once: an invoice's FIRST
+reference is the bare invoice number, and the lookup skipped that case.
+
+**Android "App not installed":** investigated, not guessed. The Desktop APK was inspected (aapt2, apksigner,
+zipalign, a zip checksum pass) and installed with `adb install` on the `telga-test` emulator (Android 14,
+x86_64): **Success**. The emulator's own system then died under load (this machine: 7 GB RAM, 0.4 GB free;
+the emulator at load 26 with 1 core) — not the app. The cause on the user's phone is still unknown; the
+evidence needed is the phone's exact message, its model and Android version, and how the file was opened.
+Emulator boot here takes about 6 minutes; `adb shell service check package` must say *found* before an
+install, or it fails with "Can't find service: package".
+
 ## 2026-09-30 — §48: the monthly fee and Pay now; the Android test build
 
 **Android test APK** built from `stage-8-app`'s www (`npm run mobile:sync`, then Gradle `assembleDebug`,

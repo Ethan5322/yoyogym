@@ -1073,6 +1073,7 @@ async function handleExtraRoutes(req, res, deps, { url, path, method }) {
       ok: result.ok,
       reason: result.reason,
       alreadyPaid: result.alreadyPaid,
+      paidTwice: result.paidTwice,
       recurring: result.recurring,
       gymSlug: gym?.slug || '',
     }));

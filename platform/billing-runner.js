@@ -8,7 +8,10 @@
 //
 // >>> IT IS NOT GIVEN A DELETE FUNCTION, AND MUST NEVER BE. <<<
 // Suspension stops a gym. Removing its data is a human decision (D-071).
-import { reviewSubscription, applyChargeResult, invoiceNumber } from './billing.js';
+import {
+  reviewSubscription, applyChargeResult, invoiceNumber,
+  attemptReference, paidSubscriptionPatch, cardOf, staleInvoice,
+} from './billing.js';
 
 /**
  * Run one billing pass.
@@ -18,7 +21,8 @@ import { reviewSubscription, applyChargeResult, invoiceNumber } from './billing.
  *
  * @param {object} deps  { listActiveSubscriptions, getPlan, getGym,
  *                         findInvoiceForPeriod, createInvoice, updateInvoice,
- *                         charge, updateSubscription, setGymStatus, notify, audit }
+ *                         verifyPayment, charge, updateSubscription,
+ *                         setGymStatus, notify, audit }
  */
 export async function runBilling(deps, { now = new Date(), dryRun = true } = {}) {
   const report = {
@@ -30,6 +34,7 @@ export async function runBilling(deps, { now = new Date(), dryRun = true } = {})
     suspended: 0,
     warned: 0,
     skipped: 0,
+    recovered: 0,
     planned: { charge: 0, suspend: 0, warn: 0 },
     purgeEligible: [],
     errors: [],
@@ -127,39 +132,85 @@ async function handleOne(sub, deps, { now, dryRun, report }) {
 async function charge(sub, plan, review, deps, { now, dryRun, report }) {
   const periodEnd = sub.current_period_end ?? sub.trial_ends_at;
 
-  // THE DOUBLE-CHARGE GUARD. An invoice already raised for this period means
-  // this work was done — by an earlier run, a retry, or somebody pressing the
-  // button. The invoice is the record, so the invoice is the check.
+  // THE DOUBLE-CHARGE GUARD. One invoice per gym per period: the invoice is
+  // the record, so the invoice is the check.
   const existing = await deps.findInvoiceForPeriod(sub.gym_id, periodEnd);
-  if (existing) return;
+
+  // Paid already, but the subscription still says the period is over: the
+  // payment's month was never recorded on it. Recorded now, from the
+  // invoice — never charged again.
+  if (existing?.status === 'paid') {
+    if (dryRun) return;
+    const paidAt = existing.paid_at ? new Date(existing.paid_at) : now;
+    await deps.updateSubscription(sub.id, paidSubscriptionPatch({ periodEnd: existing.period_end ?? periodEnd, now: paidAt }));
+    report.recovered += 1;
+    return;
+  }
+
+  // Raised hours ago — by a run earlier today whose charge may still be on
+  // its way, or by an owner who has Pay now open — and so left alone. Before
+  // CLAUDE.md §49 EVERY unpaid invoice was left alone, for ever: an owner who
+  // opened Pay now and walked away was never charged, never overdue and never
+  // suspended.
+  if (existing && !staleInvoice(existing, now)) return;
 
   report.planned.charge += 1;
   if (dryRun) return;
 
-  const gym = await deps.getGym(sub.gym_id);
-  const reference = invoiceNumber(Date.now() % 1_000_000, now);
+  let invoice;
+  let reference;
 
-  // The invoice is written BEFORE the money is asked for. If the process dies
-  // mid-charge, an unpaid invoice is a question a human can answer; a charge
-  // with no invoice is money taken with no record of why.
-  const invoice = await deps.createInvoice({
-    gym_id: sub.gym_id,
-    subscription_id: sub.id,
-    number: reference,
-    status: 'issued',
-    amount_cents: review.amount_cents,
-    currency: review.currency,
-    issued_at: now.toISOString(),
-    due_at: now.toISOString(),
-    provider: 'paystack',
-    provider_ref: reference,
-    period_end: periodEnd,
-  });
+  if (existing) {
+    // Paid on Paystack with nothing recorded (the page closed, the webhook
+    // lost)? Then record it — a second charge would take the month twice.
+    const earlier = existing.provider_ref ? await deps.verifyPayment?.(existing.provider_ref).catch(() => null) : null;
+    if (earlier?.status === 'success' && Number(earlier.amount) === Number(existing.amount_cents)) {
+      await deps.updateInvoice(existing.id, { status: 'paid', paid_at: now.toISOString() });
+      await deps.updateSubscription(sub.id, paidSubscriptionPatch({ periodEnd: existing.period_end ?? periodEnd, card: cardOf(earlier), now }));
+      await deps.audit?.({
+        action: 'platform.invoice.recovered',
+        actor_kind: 'system',
+        entity: 'invoice',
+        entity_id: existing.id,
+        detail: { gym_id: sub.gym_id, reference: existing.provider_ref },
+      });
+      report.planned.charge -= 1;
+      report.recovered += 1;
+      return;
+    }
+    // Not paid: tried again on this same invoice, under a reference of its
+    // own (Paystack refuses one it has seen before).
+    invoice = existing;
+    reference = attemptReference(existing.number, now);
+    await deps.updateInvoice(existing.id, { provider_ref: reference, status: 'issued' });
+  } else {
+    reference = invoiceNumber(Date.now() % 1_000_000, now);
+    // The invoice is written BEFORE the money is asked for. If the process
+    // dies mid-charge, an unpaid invoice is a question a human can answer; a
+    // charge with no invoice is money taken with no record of why.
+    invoice = await deps.createInvoice({
+      gym_id: sub.gym_id,
+      subscription_id: sub.id,
+      number: reference,
+      status: 'issued',
+      amount_cents: review.amount_cents,
+      currency: review.currency,
+      issued_at: now.toISOString(),
+      due_at: now.toISOString(),
+      provider: 'paystack',
+      provider_ref: reference,
+      period_end: periodEnd,
+    });
+  }
+
+  const gym = await deps.getGym(sub.gym_id);
 
   const result = await deps.charge({
     gymId: sub.gym_id,
     email: gym?.owner_email,
-    amountCents: review.amount_cents,
+    // The invoice's amount when it already existed: the month is charged at
+    // the price it was raised at.
+    amountCents: invoice.amount_cents ?? review.amount_cents,
     reference,
     // The card the owner authorised when they paid on the web. No code, no
     // renewal — and the runner reports that rather than pretending.
