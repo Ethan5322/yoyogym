@@ -2286,3 +2286,29 @@ So the refusal comes from the phone, and its exact message decides the fix (anot
 signed differently, Play Protect, "install unknown apps" not allowed for the app that opened the file, Android
 older than 8.0, or a file not fully downloaded). Google's developer verification began on 30 Sep 2026 in
 Indonesia, Singapore, Thailand and Brazil only; elsewhere in 2027.
+
+---
+
+## 50. The app icon without lettering, and the maker's credit on every page (user instruction, 2026-10-01)
+
+> The user's words, word for word.
+
+> hear issue in android app when its installed its icon looks like unprofetional the app on app icon remove
+> the writen at botton says yoyo gyms, and also remove says lift,train,transform i only need icon with out
+> those leter one more thing in yoyo gyms at bottom there must be credit that says designed and build by
+> MuleSoo Digital services, the credit must be in all chatbot and all admin pannel, it must be write small
+> profetionally in all page but do not overlap on chat or words or button , fix this issue then update
+
+No question needed: the icon is the logo's mark; "in all page" is every page of the website, both admin
+panels, the chatbot and the app. PDFs and the member ID card already carry the MuleSoo credit as artwork
+(`src/lib/mulesooCredit.js`, `idcard.js`), unchanged.
+
+**Built 2026-10-01** — vault D-175: the app icon is the mark alone (the figure and the barbell), cut from
+the user's logo by `scripts/mobile/make-icon-sources.mjs` at the clear gap above the lettering — no "YOYO
+GYMS", no "LIFT • TRAIN • TRANSFORM"; the splash keeps the whole logo; app version 2 (1.0.1). "Designed and
+built by MuleSoo Digital Services" (`CREDIT`, `shared/brand.js`), 11 px in a quiet grey, as the last line of
+every page and screen and in its flow: the gym admin panel (every page), the chatbot (its own last row under
+the answer box), the gym's welcome, member sign-in and portal, staff and owner sign-in, the scanned-card page,
+404 and closed-gym pages; every page of the main admin panel and the owner's pages; every app screen, and in
+the member area between the content and the tab bar. Checked in a browser on 18 pages and screens: nothing
+covers the credit and the credit touches no word, chat or button.

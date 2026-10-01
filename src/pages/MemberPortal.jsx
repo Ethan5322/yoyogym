@@ -10,6 +10,7 @@ import IdCardButton from '../components/IdCardButton.jsx';
 import FaceCapture from '../chatbot/components/FaceCapture.jsx';
 import GymIcon from '../components/GymIcon.jsx';
 import GymBackdrop from '../components/GymBackdrop.jsx';
+import Credit from '../components/Credit.jsx';
 import GymOffer from '../components/GymOffer.jsx';
 import { RewardsTab, PausePanel, FamilyPanel } from '../components/MemberServicesPortal.jsx';
 
@@ -156,6 +157,7 @@ export default function MemberPortal() {
         {tab === 'contact' && <ContactTab />}
         {tab === 'rewards' && <RewardsTab canUse={(f) => serviceOn(features, off, f)} />}
       </main>
+      <Credit />
     </div>
   );
 }
@@ -234,8 +236,9 @@ function MemberLogin({ onLoggedIn }) {
   }
 
   return (
-    <div className="flex min-h-[100dvh] items-center justify-center px-6">
+    <div className="flex min-h-[100dvh] flex-col">
       <GymBackdrop />
+      <div className="flex flex-1 items-center justify-center px-6">
       <div className="w-full max-w-sm animate-fade-up space-y-4">
         <div className="text-center">
           <div className="mb-5 flex justify-center"><GymIcon size={80} /></div>
@@ -288,6 +291,8 @@ function MemberLogin({ onLoggedIn }) {
           ← Back
         </Link>
       </div>
+      </div>
+      <Credit />
     </div>
   );
 }

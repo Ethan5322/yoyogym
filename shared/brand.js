@@ -19,6 +19,13 @@ export const BRAND = Object.freeze({
   purpleOnDark: '#8C65C8', // the logo, on dark backgrounds
 });
 
+/**
+ * The maker's credit, small and quiet at the foot of every page and screen —
+ * the website, both admin panels, the chatbot and the app (CLAUDE.md §50).
+ * PDFs and ID cards carry it as artwork already (src/lib/mulesooCredit.js).
+ */
+export const CREDIT = 'Designed and built by MuleSoo Digital Services';
+
 /** What a gym gets when it has not chosen a colour. */
 export const DEFAULT_ACCENT = BRAND.lime;
 

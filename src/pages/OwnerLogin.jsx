@@ -24,6 +24,7 @@
 import { useEffect, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import BrandLogo from '../components/BrandLogo.jsx';
+import Credit from '../components/Credit.jsx';
 import { PAGE_HEADERS } from '../lib/api.js';
 import { captureInApp, inApp } from '../lib/inApp.js';
 import { BRAND, hexToRgb, deepen } from '../../shared/brand.js';
@@ -182,7 +183,8 @@ export default function OwnerLogin() {
   const link = 'font-semibold text-white underline underline-offset-4';
 
   return (
-    <main className="flex min-h-screen items-center justify-center px-6 py-12 font-body" style={YOYO}>
+    <main className="flex min-h-screen flex-col font-body" style={YOYO}>
+      <div className="flex flex-1 items-center justify-center px-6 py-12">
       <div className="w-full max-w-[392px]">
         {app?.back && (
           <a href={app.back} className="mb-6 inline-block text-[13px] text-white/[0.62] hover:text-white">← Yoyo Gyms app</a>
@@ -254,6 +256,8 @@ export default function OwnerLogin() {
           </p>
         </div>
       </div>
+      </div>
+      <Credit />
     </main>
   );
 }

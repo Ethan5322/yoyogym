@@ -178,6 +178,18 @@
         margin-top: auto; padding-top: 16px; color: var(--y-muted); font-size: 13px;
       }
       .y-foot i { width: 1px; height: 16px; background: var(--y-line); }
+      /* The maker's credit (CLAUDE.md §50): small and quiet, LAST on every
+         screen and in the flow — pushed to the bottom by the free space, so
+         it never sits over a word or a button. */
+      .y-credit {
+        margin: auto 0 0; padding-top: 24px;
+        color: var(--y-muted); font-size: 11px; line-height: 16px; letter-spacing: 0.02em;
+        text-align: center;
+      }
+      .y-foot + .y-credit { margin-top: 8px; padding-top: 0; }
+      /* Where a screen already pushes its buttons to the bottom (the thumb
+         zone), the credit follows them instead of splitting the space. */
+      .y-bottom ~ .y-credit, .g-id ~ .y-credit { margin-top: 0; padding-top: 16px; }
 
       /* A calm entrance: the words and buttons rise in, once. */
       .y-rise { animation: y-rise 0.6s cubic-bezier(0.2, 0.7, 0.2, 1) both; }
@@ -540,7 +552,16 @@
       .m-board { list-style: none; padding: 0; margin: 12px 0 4px; display: grid; gap: 6px; }
       .m-board li { display: flex; justify-content: space-between; }
       .m-board li.is-you { color: var(--m-accent-text); font-weight: 700; }
-      .m-main { flex: 1; padding: 0 24px calc(96px + env(safe-area-inset-bottom)); }
+      .m-main { flex: 1; padding: 0 24px 16px; }
+      /* The maker's credit (§50), between the content and the tab bar: it
+         holds the space the fixed tabs need, so they can never cover it. */
+      .m-credit {
+        margin: 0; padding: 8px 24px calc(96px + env(safe-area-inset-bottom));
+        color: var(--m-muted); font-size: 11px; line-height: 16px; letter-spacing: 0.02em;
+        text-align: center;
+      }
+      /* No tab bar on the sign-in: the credit closes the screen. */
+      .m-credit--end { margin-top: auto; padding: 24px 24px max(16px, env(safe-area-inset-bottom)); }
       .m-hello { margin: 8px 0 24px; }
 
       .m-card {
@@ -731,6 +752,7 @@
           <i aria-hidden="true"></i>
           <button type="button" class="y-link" data-go="help">Help</button>
         </nav>
+        <p class="y-credit">Designed and built by MuleSoo Digital Services</p>
       </div>
     </main>
 
@@ -766,6 +788,7 @@
         <svg class="y-i y-option__chev"><use href="#i-chev"/></svg>
       </button>
       <p class="note" data-note role="status"></p>
+      <p class="y-credit">Designed and built by MuleSoo Digital Services</p>
     </section>
 
     <!-- ============ 3. Find a gym — members, and owners signing in ============ -->
@@ -801,6 +824,7 @@
           <button type="button" class="y-btn y-btn--ghost" data-go="owner-apply" style="margin-top:16px">Apply as a gym owner</button>
         </div>
       </div>
+      <p class="y-credit">Designed and built by MuleSoo Digital Services</p>
     </section>
 
     <!-- ============ 4. Recovery: which gym am I in? ============ -->
@@ -822,6 +846,7 @@
       <button id="find" type="button" class="y-btn y-btn--primary">Find my gym</button>
       <p class="note" id="find-note" data-note role="status"></p>
       <div id="find-results"></div>
+      <p class="y-credit">Designed and built by MuleSoo Digital Services</p>
     </section>
 
     <!-- ============ 5. Welcome to [Gym] — the gym's own look from here ============
@@ -840,6 +865,7 @@
         <button type="button" class="y-btn y-btn--ghost" data-go="signin">Existing member sign-in</button>
       </div>
       <p class="note" data-note role="status"></p>
+      <p class="y-credit">Designed and built by MuleSoo Digital Services</p>
     </section>
 
     <!-- ============ 6. Join [Gym] ============ -->
@@ -858,6 +884,7 @@
         <button type="button" class="y-btn y-btn--ghost" data-go="signin">Sign in instead</button>
       </div>
       <p class="note" data-note role="status"></p>
+      <p class="y-credit">Designed and built by MuleSoo Digital Services</p>
     </section>
 
     <!-- ============ 7. Welcome, Gym Owner ============ -->
@@ -895,6 +922,7 @@
         </button>
       </div>
       <p class="note" data-note role="status"></p>
+      <p class="y-credit">Designed and built by MuleSoo Digital Services</p>
     </section>
 
     <!-- ============ 8. Bring your gym to Yoyo ============ -->
@@ -926,6 +954,7 @@
         <button type="button" class="y-btn y-btn--primary" data-go="owner-register">Apply as a gym owner</button>
       </div>
       <p class="note" data-note role="status"></p>
+      <p class="y-credit">Designed and built by MuleSoo Digital Services</p>
     </section>
 
     <!-- ============ 9. Help (§36.1 Q1, Q7) ============ -->
@@ -985,6 +1014,7 @@
            a website and is never shown inside the app (§36.1 Q2, Q7). -->
       <p class="y-staff" id="staff"></p>
       <p class="note" data-note role="status"></p>
+      <p class="y-credit">Designed and built by MuleSoo Digital Services</p>
     </section>
 
     <!-- ============ 10. The member's own area (member.js) ============ -->

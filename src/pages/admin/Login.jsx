@@ -7,6 +7,7 @@ import FaceCapture from '../../chatbot/components/FaceCapture.jsx';
 import BrandLogo from '../../components/BrandLogo.jsx';
 import { captureInApp, inApp } from '../../lib/inApp.js';
 import GymBackdrop from '../../components/GymBackdrop.jsx';
+import Credit from '../../components/Credit.jsx';
 
 export default function AdminLogin() {
   const { user, login, applySession, homeFor } = useAuth();
@@ -62,9 +63,10 @@ export default function AdminLogin() {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center px-6">
+    <div className="flex min-h-screen flex-col">
       {/* The gym's poster behind its admin sign-in (CLAUDE.md §39.1 Q4). */}
       <GymBackdrop />
+      <div className="flex flex-1 items-center justify-center px-6">
       <div className="w-full max-w-sm animate-fade-up">
         {app?.back && (
           <a href={app.back} className="mb-6 inline-block text-sm text-muted hover:text-body">← Yoyo Gyms app</a>
@@ -117,6 +119,8 @@ export default function AdminLogin() {
           </>
         )}
       </div>
+      </div>
+      <Credit />
     </div>
   );
 }

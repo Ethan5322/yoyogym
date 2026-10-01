@@ -10,11 +10,14 @@
 // about each. A gym that has not paid is not described to its own customers as
 // a gym that has not paid.
 
+import Credit from './Credit.jsx';
+
 export default function GymUnavailable({ gate, onRetry }) {
   if (!gate) return null;
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-bg px-4">
+    <div className="flex min-h-screen flex-col bg-bg">
+      <div className="flex flex-1 items-center justify-center px-4">
       <div className="w-full max-w-sm rounded-2xl bg-card p-8 text-center">
         <h1 className="text-xl font-bold text-body">{gate.title}</h1>
         <p className="mt-3 text-sm text-muted">{gate.detail}</p>
@@ -38,6 +41,8 @@ export default function GymUnavailable({ gate, onRetry }) {
           </a>
         )}
       </div>
+      </div>
+      <Credit />
     </div>
   );
 }

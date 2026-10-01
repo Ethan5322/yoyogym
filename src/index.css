@@ -304,6 +304,20 @@ textarea:focus-visible,
    ===================================================================== */
 .admin { color: #f0ede8; }
 
+/* The maker's credit (CLAUDE.md §50): 11 px, a quiet grey that still reads
+   (6:1 on the dark ground), clear of the phone's home indicator. */
+.site-credit {
+  margin: 0;
+  padding: 16px 16px calc(16px + env(safe-area-inset-bottom));
+  font-size: 11px;
+  line-height: 16px;
+  letter-spacing: 0.02em;
+  text-align: center;
+  color: rgba(240, 237, 232, 0.6);
+}
+/* Inside the chat window: its last row, under the answer box. */
+.chat-shell .site-credit { padding: 4px 16px calc(8px + env(safe-area-inset-bottom)); }
+
 /* Mobile top bar */
 .admin-topbar {
   position: sticky;

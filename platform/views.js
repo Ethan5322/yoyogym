@@ -18,7 +18,7 @@
 import { when, exact, until, money as fmtMoney } from './format.js';
 import { pageLink } from './paging.js';
 import { gymAdminPath, OWNER_USERNAME } from './gym-admin.js';
-import { BRAND, LOGO_ON_DARK } from '../shared/brand.js';
+import { BRAND, LOGO_ON_DARK, CREDIT } from '../shared/brand.js';
 import { REQUIRED_DOCUMENTS, DOCUMENT_LABELS, missingRequiredDocuments, MAX_DOCUMENT_BYTES } from './documents.js';
 import { INVITE_TTL_HOURS } from './team.js';
 import { SERVICE_INFO, SERVICE_GROUPS, ALL_SERVICES, CORE_FEATURES, effectiveFeatures } from '../shared/features.js';
@@ -142,6 +142,10 @@ const STYLE = `
   .fix { background:rgba(245,196,81,.08); border:1px solid rgba(245,196,81,.3); border-radius:12px; padding:14px 16px; margin:14px 0; }
   .fix p { margin:4px 0 0; }
   .row { display:flex; gap:12px; flex-wrap:wrap; align-items:center; }
+  /* The maker's credit (CLAUDE.md §50): small, quiet, the last line of every
+     page and in its flow — never over a word or a button. */
+  .credit { margin:48px 0 0; font-size:11px; line-height:16px; letter-spacing:.02em;
+            text-align:center; color:var(--muted); }
   ul.events { list-style:none; padding:0; margin:12px 0 0; }
   ul.events li { border-left:2px solid var(--line); padding:6px 0 6px 12px; margin-bottom:6px; }
 
@@ -150,6 +154,9 @@ const STYLE = `
   body.auth { --ink:#fff; --muted:rgba(255,255,255,.62); --line:rgba(255,255,255,.12);
               --bg:#070c10; --accent:#bff642; min-height:100vh; display:grid; place-items:center; }
   body.auth main { width:100%; max-width:440px; padding:48px 24px; }
+  /* The maker's credit (CLAUDE.md §50): its own row under the centred card. */
+  body.auth { grid-template-rows:1fr auto; }
+  body.auth > .credit { margin:0; padding:16px 16px calc(16px + env(safe-area-inset-bottom)); }
   body.auth a { color:#fff; }
   .auth-logo { display:block; width:144px; height:auto; margin:0 auto 32px; }
   body.auth form.card { max-width:none; margin:0; padding:32px 24px; gap:16px;
@@ -531,6 +538,9 @@ export function layout({
   // A signup page nobody can find is a signup page nobody uses, so `indexable`
   // is opt-in per page rather than a blanket rule.
   const robots = indexable ? 'index,follow' : 'noindex,nofollow';
+  // On every page of the platform: the panel, the owner's pages, the public
+  // pages and the sign-ins (CLAUDE.md §50).
+  const credit = `<p class="credit">${h(CREDIT)}</p>`;
   const head = `<!doctype html>
 <html lang="en">
 <head>
@@ -548,6 +558,7 @@ export function layout({
 <main id="main" tabindex="-1">
 ${body}
 </main>
+${credit}
 </body>
 </html>`;
   }
@@ -571,6 +582,7 @@ ${staffNav(user, active)}
 </aside>
 <main id="main" tabindex="-1">
 ${body}
+${credit}
 </main>
 <script>${PANEL_SCRIPT}</script>
 </body>
@@ -596,6 +608,7 @@ ${body}
 </header>
 <main id="main" tabindex="-1">
 ${body}
+${credit}
 </main>
 </body>
 </html>`;

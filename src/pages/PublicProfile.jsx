@@ -6,6 +6,7 @@ import { gymHeaders } from '../lib/gym.js';
 import GymIcon from '../components/GymIcon.jsx';
 import { useBranding } from '../lib/branding.js';
 import GymBackdrop from '../components/GymBackdrop.jsx';
+import Credit from '../components/Credit.jsx';
 
 export default function PublicProfile() {
   const { type, key } = useParams(); // type: 'm' | 't' | 's'
@@ -29,8 +30,9 @@ export default function PublicProfile() {
   }, [type, key]);
 
   return (
-    <div className="flex min-h-[100dvh] flex-col items-center justify-center px-6 text-center">
+    <div className="flex min-h-[100dvh] flex-col">
       <GymBackdrop />
+      <div className="flex flex-1 flex-col items-center justify-center px-6 text-center">
       <div className="w-full max-w-sm animate-fade-up">
         <div className="mb-6 flex flex-col items-center gap-3">
           <GymIcon size={64} />
@@ -72,6 +74,8 @@ export default function PublicProfile() {
 
         <p className="mt-6 text-xs text-muted">Scan verified by {gymName}</p>
       </div>
+      </div>
+      <Credit />
     </div>
   );
 }

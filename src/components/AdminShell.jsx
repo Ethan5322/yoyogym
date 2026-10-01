@@ -10,6 +10,7 @@ import { apiFetch } from '../lib/api.js';
 import UpgradeNotice from './UpgradeNotice.jsx';
 import BrandLogo from './BrandLogo.jsx';
 import Icon from './Icon.jsx';
+import Credit from './Credit.jsx';
 
 // Grouped navigation reads as an organised product, not a random row of buttons.
 //
@@ -217,8 +218,11 @@ export default function AdminShell({ children }) {
       </aside>
 
       {/* ===== Main content ===== */}
-      <div className="admin-content">
-        <main className="mx-auto w-full max-w-6xl px-4 py-6 sm:px-6 lg:px-8 lg:py-8">{children}</main>
+      {/* The credit closes every admin page (CLAUDE.md §50); on a computer it
+          sits at the foot of the screen when a page is short. */}
+      <div className="admin-content flex flex-col lg:min-h-screen">
+        <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-6 sm:px-6 lg:px-8 lg:py-8">{children}</main>
+        <Credit />
       </div>
 
       <UpgradeNotice />

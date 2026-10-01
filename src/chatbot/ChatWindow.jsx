@@ -7,6 +7,7 @@ import ProgressBar from './components/ProgressBar.jsx';
 import Controls from './components/Controls.jsx';
 import { formatAnswer } from './format.js';
 import GymIcon from '../components/GymIcon.jsx';
+import Credit from '../components/Credit.jsx';
 
 export default function ChatWindow({ engine, completeView }) {
   const {
@@ -86,6 +87,9 @@ export default function ChatWindow({ engine, completeView }) {
           )}
         </div>
       )}
+
+      {/* Its own last row, under the answer box — never over the chat (CLAUDE.md §50). */}
+      <Credit />
     </div>
   );
 }

@@ -15,6 +15,16 @@ occurrence is answered from notes rather than rediscovered.
 
 ---
 
+## 2026-10-01 — §50: the icon's mark; the maker's credit
+
+The user installed the APK over USB (it worked) and asked for an icon without lettering and a credit on every
+page. **Found on screen:** the first overlap check flagged two pages that were fine — it measured the credit's
+BOX (whose padding deliberately reserves the space under the member area's tab bar) and counted a paragraph
+inside a closed `<details>`. Measuring the text itself (a Range's rect) and skipping closed details gave the
+true answer: 18 of 18 clear. One page also read "no credit" because the Android build was loading the machine
+and the page had not drawn yet; waiting for the element, not a fixed time, settled it. `@capacitor/assets`
+rewrites `AndroidManifest.xml`'s whitespace when it makes icons; the original was restored.
+
 ## 2026-10-01 — §49: payment attempts; the Android install refusal
 
 **§49** (D-174). The test written for the new lookup caught a bug in it at once: an invoice's FIRST

@@ -481,6 +481,9 @@
 
   // "Sign in to [Gym Name]" (CLAUDE.md §36). Joining is one screen back, on
   // "Welcome to [Gym]", so it is not repeated here.
+  // The maker's credit (CLAUDE.md §50), the same words on every screen.
+  var CREDIT = 'Designed and built by MuleSoo Digital Services';
+
   function renderSignIn(notice) {
     root.innerHTML =
       '<div class="m-signin">' +
@@ -507,7 +510,8 @@
       '  <div class="m-join">' +
       '    <button type="button" class="y-link" data-m="help">Need help?</button>' +
       '  </div>' +
-      '</div>';
+      '</div>' +
+      '<p class="m-credit m-credit--end">' + CREDIT + '</p>';
 
     title('Sign in');
     focusHeading();
@@ -599,6 +603,7 @@
       '  <span class="m-gym" data-gym-name>' + esc(state.gymName || 'My gym') + '</span></span>' +
       '</header>' +
       '<main class="m-main" id="m-main" aria-label="' + esc((TABS.filter(function (t) { return t.id === state.tab; })[0] || {}).label || 'Home') + '"></main>' +
+      '<p class="m-credit">' + CREDIT + '</p>' +
       '<nav class="m-tabs" aria-label="Sections">' +
       visibleTabs().map(function (t) {
         return '<button type="button" class="m-tab' + (t.id === state.tab ? ' is-on' : '') + '" data-tab="' + t.id + '"' +

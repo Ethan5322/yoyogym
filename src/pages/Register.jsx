@@ -8,6 +8,7 @@ import SuccessScreen from '../chatbot/components/SuccessScreen.jsx';
 import { apiFetch } from '../lib/api.js';
 import { logQrScan } from '../lib/scan.js';
 import GymBackdrop from '../components/GymBackdrop.jsx';
+import Credit from '../components/Credit.jsx';
 import { useCatalog } from '../lib/useCatalog.js';
 
 export default function Register({ manual = false }) {
@@ -71,7 +72,8 @@ export default function Register({ manual = false }) {
     return (
       <>
         <GymBackdrop />
-        <main className="mx-auto flex min-h-screen max-w-md items-center px-4">
+        <main className="mx-auto flex min-h-screen max-w-md flex-col px-4">
+          <div className="flex flex-1 items-center">
           <div className="card w-full animate-fade-up text-center">
             <h1 className="font-display text-2xl">Not taking sign-ups yet</h1>
             <p className="mt-3 text-body">
@@ -83,6 +85,8 @@ export default function Register({ manual = false }) {
               Go back
             </button>
           </div>
+          </div>
+          <Credit />
         </main>
       </>
     );

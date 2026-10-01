@@ -6,6 +6,7 @@ import { useBranding } from '../lib/branding.js';
 import GymIcon from '../components/GymIcon.jsx';
 import GymBackdrop from '../components/GymBackdrop.jsx';
 import GymOffer from '../components/GymOffer.jsx';
+import Credit from '../components/Credit.jsx';
 
 export default function Splash() {
   const b = useBranding();
@@ -17,9 +18,10 @@ export default function Splash() {
   const tagline = b.tagline || 'Train harder. Live stronger.';
 
   return (
-    <div className="flex min-h-screen flex-col items-center justify-center px-6 text-center">
+    <div className="flex min-h-screen flex-col">
       {/* The gym's poster behind its welcome page (CLAUDE.md §39.1 Q4). */}
       <GymBackdrop />
+      <div className="flex flex-1 flex-col items-center justify-center px-6 text-center">
       <div className="w-full max-w-sm animate-fade-up">
         {/* The gym's own icon: its logo, or its letter in its colour (CLAUDE.md §37.1 Q7). */}
         <div className="mb-8 flex justify-center"><GymIcon size={96} alt={name} /></div>
@@ -51,6 +53,8 @@ export default function Splash() {
       <div className="mx-auto mt-14 w-full max-w-3xl pb-16">
         <GymOffer heading={`What ${name} offers`} />
       </div>
+      </div>
+      <Credit />
     </div>
   );
 }
