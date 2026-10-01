@@ -2312,3 +2312,30 @@ the answer box), the gym's welcome, member sign-in and portal, staff and owner s
 404 and closed-gym pages; every page of the main admin panel and the owner's pages; every app screen, and in
 the member area between the content and the tab bar. Checked in a browser on 18 pages and screens: nothing
 covers the credit and the credit touches no word, chat or button.
+
+---
+
+## 51. "App not installed" on a Galaxy A12 — found, and the way through (user instruction, 2026-10-01)
+
+> The user's words, word for word.
+
+> app is refused to install in my galaxy a12 it says app not installed no reson be sure that fix the real
+> reson , first findout , and fix, it refused first and now again it refused i never installed this app
+> before so fix it make it to get installed any android device after you fix make computer safe to close
+
+**Found, from the phone itself** (SM-A125F, Android 12, arm64; connected by USB debugging, its system log
+recorded, and the screen photographed at each step). Not the app: the APK copied to the phone is byte-for-
+byte the built one, the phone has 5.3 GB free, and installed from the computer it installs (`Success`). The
+refusal is **Google Play Protect**. Google's new developer verification passes (`VERIFICATION_ALLOW`); then
+Play Protect's scan returns verdict 3 and shows: *"Google Play Protect — App blocked to protect your device.
+Play Protect hasn't seen an app from this developer before. It may be unsafe. … Install anyway · [OK]"*.
+**OK** is recorded as `User selected REJECT`, and the installer says only "App not installed". The user's
+other app, Telga, gets the same box (it is not from Google Play either).
+
+**The way through, on any Android phone:** tap the APK → Install → on the Play Protect box tap the small
+**"Install anyway"**, never OK. Yoyo Gyms 1.0.1 was installed on the A12 over USB the same day.
+
+**What ends the box for good** is Google knowing the app: publishing it through Google Play (an internal
+testing track is enough for testers), which needs a Google Play Console account and a release signing key
+— Stage 10 work, the user's decision. No change to the app's code can remove the warning: it is about who
+made the app, not what is in it.

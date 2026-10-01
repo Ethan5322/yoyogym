@@ -15,6 +15,21 @@ occurrence is answered from notes rather than rediscovered.
 
 ---
 
+## 2026-10-01 — §51: "App not installed" was Google Play Protect
+
+**Failure:** the test APK would not install on the user's Galaxy A12 ("App not installed", no reason), twice.
+**Investigated, not guessed** (CLAUDE.md §27.1): USB debugging on; `adb install` of the same file → `Success`;
+the phone's copy (`Music/YoyoGyms-test.apk`) byte-identical (sha256); 5.3 GB free; then the phone's own
+installer replayed with `adb logcat` recording. **Cause:** `Finsky VerifyApps` (Play Protect) — developer
+verification `VERIFICATION_ALLOW`, then `chooseScanResult returning verdict 3`, the box *"App blocked to
+protect your device. Play Protect hasn't seen an app from this developer before"*, and `User selected REJECT`
+when **OK** is pressed. **Resolution:** "Install anyway" on that box; the app installed over USB. Permanent:
+distribute through Google Play (Stage 10).
+
+**Mistake made and caught:** a tap by screen position landed on the user's Telga APK after the list shifted;
+Play Protect blocked it the same way and nothing changed (Telga still 1.1, updated 17 Sep). Find buttons by
+their TEXT (`uiautomator dump`), never by position; and a locked phone cannot be driven — ask first.
+
 ## 2026-10-01 — §50: the icon's mark; the maker's credit
 
 The user installed the APK over USB (it worked) and asked for an icon without lettering and a credit on every
